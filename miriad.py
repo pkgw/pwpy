@@ -4,6 +4,7 @@
 # 'line' parameters.
 
 import sys, os, re, math
+import os.path
 from os.path import join
 from subprocess import *
 
@@ -48,6 +49,39 @@ else:
 
 # The MIRIAD task running framework
 
+class DefaultedTaskType (type):
+    # YES! I get to write a metaclass! This looks at the
+    # _params and _options members and fills in default values
+    # in the class dictionary for any parameters or options
+    # not already specified. So if there is a 'foo' parameter,
+    # it creates an entry in the class dictionary of 'foo = None'.
+    # This allows TaskBase to just getattr() any class parameter,
+    # and makes tab-completing easy.
+    #
+    # We also guess the task name if _name is not set. Cute.
+    
+    def __init__ (cls, name, bases, dict):
+        type.__init__ (cls, name, bases, dict)
+        
+        # TaskBase doesn't get any special treatment
+        if name == 'TaskBase': return 
+        
+        if '_name' not in dict:
+            if name.startswith ('Task'):
+                setattr (cls, '_name', name[4:].lower ())
+            else:
+                raise Exception ('Task class must define a _name member')
+
+        for p in dict.get ('_params') or []:
+            if p in dict: continue
+
+            setattr (cls, p, None)
+
+        for o in dict.get ('_options') or []:
+            if o in dict: continue
+            
+            setattr (cls, o, False)
+
 class TaskBase (object):
     """Generic MIRIAD task launcher class. The parameters to commands
     are taken from fields in the object; those with names contained in
@@ -63,6 +97,8 @@ class TaskBase (object):
     IDEA/FIXME/TODO: if an element in _params begins with *, ensure that
     it is not None before running the task.
     """
+
+    __metaclass__ = DefaultedTaskType
     
     _name = None
     _params = None
@@ -74,7 +110,7 @@ class TaskBase (object):
     def setArgs (self, **kwargs):
         for (key, val) in kwargs.iteritems ():
             setattr (self, key, val)
-            
+
     def launch (self, **kwargs):
         cmd = [join (_bindir, self._name)]
         options = []
@@ -109,10 +145,12 @@ class TaskBase (object):
             val = getattr (self, name)
             if val: cmd.append ("%s=%s" % (key, val))
 
-        # Now go.
+        # Now go. Set stdin to /dev/null so that the program can't
+        # block waiting for user input.
         
         self.cmdline = ' '.join (cmd)
-        self.proc = Popen (cmd, stdout=PIPE, stderr=PIPE, shell=False, **kwargs)
+        self.proc = Popen (cmd, stdin=file (os.devnull, 'r'),
+                           stdout=PIPE, stderr=PIPE, shell=False, **kwargs)
 
     def checkFail (self, stderr=None):
         if not stderr: stderr = self.proc.stderr
@@ -149,156 +187,84 @@ class TaskBase (object):
         for x in self.proc.stderr: print '\t', x.strip ()
 
 class TaskCgDisp (TaskBase):
-    # XXX FIXME: incomplete set of keywords
-    _name = 'cgdisp'
     _params = ['device', 'in_', 'type', 'region', 'xybin', 'chan',
                'slev', 'levs1', 'levs2', 'levs3', 'cols1', 'range',
-               'vecfac', 'boxfac']
+               'vecfac', 'boxfac', 'nxy', 'labtyp', 'beamtyp',
+               '3format', 'lines', 'break', 'csize', 'scale', 'olay']
 
+    _options = ['abut', 'beamAB', 'blacklab', 'conlabel', 'fiddle',
+                'full', 'gaps', 'grid', 'mirror', 'nodistort',
+                'noepoch', 'noerase', 'nofirst', 'corner', 'relax',
+                'rot90', 'signs', 'single', 'solneg1', 'solneg2',
+                'solneg3', 'trlab', 'unequal', 'wedge', '3pixel',
+                '3value']
+    
     device = '/xs'
-    in_ = None
-    type = None
-    region = None
-    xybin = None
-    chan = None
-    slev = None
-    levs1 = None
-    levs2 = None
-    levs3 = None
-    cols1 = None
-    range = None
-    vecfac = None
-    boxfac = None
 
 class TaskUVList (TaskBase):
-    _name = 'uvlist'
     _params = ['vis', 'select', 'line', 'scale', 'recnum', 'log']
     _options = ['brief', 'data', 'average', 'allan', 'history',
                 'flux', 'full', 'list', 'variables', 'stat',
                 'birds', 'spectra']
     
-    vis = None
-    select = None
-    line = None
-    scale = None
     recnum = 1000
-    log = None
-
-    brief = False
-    data = False
-    average = False
-    allan = False
-    history = False
-    flux = False
-    full = False
-    list = False
     variables = True
-    stat = False
-    birds = False
-    spectra = False
 
 class TaskUVPlot (TaskBase):
-    # XXX FIXME: incomplete set of keywords
+    # XXX FIXME: there is a 'log' option, but that would conflict
+    # with the 'log' parameter.
+    
     _name = 'uvplt'
-    _params = ['vis', 'device', 'axis', 'size', 'select']
-
-    vis = None
+    _params = ['vis', 'line', 'device', 'axis', 'size', 'select',
+               'stokes', 'xrange', 'yrange', 'average', 'hann',
+               'inc', 'nxy', 'log', 'comment']
+    _options = ['nocal', 'nopol', 'nopass', 'nofqav', 'nobase',
+                '2pass', 'scalar', 'avall', 'unwrap', 'rms',
+                'mrms', 'noerr', 'all', 'flagged', 'nanosec',
+                'days', 'hours', 'seconds', 'xind', 'yind',
+                'equal', 'zero', 'symbols', 'nocolour', 'dots',
+                'source', 'inter']
+                
     device = '/xs'
     axis = 'uu,vv'
     size = 2
-    select = None
 
 class TaskInvert (TaskBase):
-    # XXX FIXME: incomplete set of keywords
-    _name = 'invert'
     _params = ['vis', 'map', 'beam', 'select', 'stokes',
-               'robust', 'cell', 'fwhm', 'imsize']
+               'robust', 'cell', 'fwhm', 'imsize', 'offset',
+               'sup', 'line', 'ref', 'mode', 'slop']
     _options = ['nocal', 'nopol', 'nopass', 'double', 'systemp',
                 'mfs', 'sdb', 'mosaic', 'imaginary', 'amplitude',
                 'phase']
     
-    vis = None
-    map = None
-    beam = None
-    select = None
     stokes = 'ii'
-    robust = None
-    cell = None
-    fwhm = None
-    imsize = None
 
-    nocal = False
-    nopol = False
-    nopass = False
     double = True
     systemp = True
     mfs = True
-    sdb = False
-    mosaic = False
-    imaginary = False
-    amplitude = False
-    phase = False
 
 class TaskClean (TaskBase):
-    # XXX FIXME: incomplete set of keywords
-    _name = 'clean'
-    _params = ['map', 'beam', 'out', 'niters', 'region']
-
-    map = None
-    beam = None
-    out = None
+    _params = ['map', 'beam', 'out', 'niters', 'region',
+               'gain', 'cutoff', 'phat', 'minpatch',
+               'speed', 'mode', 'clip']
+    _options = ['negstop', 'positive', 'asym', 'pad']
+    
     niters = 100
-    region = None
 
 class TaskRestore (TaskBase):
-    # XXX FIXME: incomplete set of keywords
     _name = 'restor'
-    _params = ['map', 'beam', 'model', 'out']
-
-    map = None
-    beam = None
-    model = None
-    out = None
+    _params = ['map', 'beam', 'model', 'out', 'mode', 'fwhm',
+               'pa']
 
 class TaskImStat (TaskBase):
-    _name = 'imstat'
     _params = ['in_', 'region', 'plot', 'cutoff',
                'beam', 'axes', 'device', 'log']
     _options = ['tb', 'hanning', 'boxcar', 'deriv', 'noheader',
                 'nolist', 'eformat', 'guaranteespaces', 'xmin',
                 'xmax', 'ymin', 'ymax', 'title', 'style']
-               
-    in_ = None
-    beam = None
-    region = None
-    plot = None
-    cutoff = None
-    axes = None
-    device = None
-    log = None
 
-    tb = False
-    hanning = None
-    boxcar = None
-    deriv = None
-    noheader = False
-    nolist = False
-    eformat = False
-    guaranteespaces = False
-    xmin = None
-    xmax = None
-    ymin = None
-    ymax = None
-    title = None
-    style = None
-    
 class TaskImHead (TaskBase):
-    _name = 'imhead'
     _params = ['in_', 'key', 'log']
-
-    in_ = None
-    key = None
-    log = None
 
     def snarfOne (self, key):
         self.key = key
@@ -311,77 +277,25 @@ class TaskImHead (TaskBase):
         return stdout[0].strip ()
 
 class TaskIMom (TaskBase):
-    _name = 'imom'
     _params = ['in_', 'region', 'min', 'max', 'log']
     _options = ['skew', 'clipmean', 'clip1sigma']
     
-    in_ = None
-    options = None
-    region = None
-    min = None
-    max = None
-    log = None
-
-    skew = False
-    clipmean = False
-    clip1sigma = False
-    
 class TaskImFit (TaskBase):
-    _name = 'imfit'
     _params = ['in_', 'region', 'clip', 'object', 'spar',
                'fix', 'out']
     _options = ['residual']
     
-    in_ = None
-    region = None
-    clip = None
-    object = None
-    spar = None
-    fix = None
-    out = None
-    options = None
-
-    residual = False
-    
 class TaskUVAver (TaskBase):
-    _name = 'uvaver'
     _params = ['vis', 'select', 'line', 'ref', 'stokes',
                'interval', 'out']
     _options = ['nocal', 'nopass', 'nopol', 'relax',
                 'vector', 'scalar', 'scavec']
-    
-    vis = None
-    select = None
-    line = None
-    ref = None
-    stokes = None
-    interval = None
-    options = None
-    out = None
-
-    nocal = False
-    nopass = False
-    nopol = False
-    relax = False
-    vector = False
-    scalar = False
-    scavec = False
 
 class TaskGPCopy (TaskBase):
-    _name = 'gpcopy'
     _params = ['vis', 'out', 'mode']
     _options = ['nopol', 'nocal', 'nopass']
 
-    vis = None
-    out = None
-    mode = None
-
-    nopol = False
-    nocal = False
-    nopass = False
-
 class TaskMSelfCal (TaskBase):
-    _name = 'mselfcal'
     _params = ['vis', 'select', 'model', 'clip', 'interval',
                'minants', 'refant', 'flux', 'offset', 'line',
                'out']
@@ -389,31 +303,80 @@ class TaskMSelfCal (TaskBase):
                 'mfs', 'relax', 'apriori', 'noscale', 'mosaic',
                 'verbose']
 
-    vis = None
-    select = None
-    model = None
-    clip = None
-    interval = None
-    minants = None
-    refant = None
-    flux = None
-    offset = None
-    line = None
-    out = None
+class TaskPutHead (TaskBase):
+    _name = 'puthd'
+    _params = ['in_', 'value', 'type']
 
-    amplitude = False
-    phase = False
-    smooth = False
-    polarized = False
-    mfs = False
-    relax = False
-    apriori = False
-    noscale = False
-    mosaic = False
-    verbose = False
+class TaskGPPlot (TaskBase):
+    _name = 'gpplt'
+    _params = ['vis', 'device', 'log', 'yaxis', 'nxy',
+               'select', 'yrange']
+    _options = ['gains', 'xygains', 'xbyygain',
+                'polarization', 'delays', 'speccor',
+                'bandpass', 'dots', 'dtime', 'wrap']
 
-# These functions operate on single images, using several of
-# the tasks defined above.
+    device = '/xs'
+
+class TaskPrintHead (TaskBase):
+    _name = 'prthd'
+    _params = ['in_', 'log']
+    _options = ['brief', 'full']
+
+    full = True
+
+class TaskClosure (TaskBase):
+    _params = ['vis', 'select', 'line', 'stokes', 'device',
+               'nxy', 'yrange', 'interval']
+    _options = ['amplitude', 'quad', 'avall', 'notriple', 'rms',
+                'nocal', 'nopol', 'nopass']
+
+    device = '/xs'
+
+class TaskUVFlag (TaskBase):
+    _params = ['vis', 'select', 'line', 'edge', 'flagval', 'log' ]
+    _options = ['noapply', 'none', 'brief', 'indicative', 'full',
+                'noquery', 'hms', 'decimal']
+
+class TaskUVSpec (TaskBase):
+    _params = ['vis', 'select', 'line', 'stokes', 'interval', 'hann',
+               'offset', 'axis', 'yrange', 'device', 'nxy', 'log']
+    _options = ['nocal', 'nopass', 'nopol', 'ampscalar', 'rms',
+                'nobase', 'avall', 'dots', 'flagged', 'all']
+
+    device= '/xs'
+
+# These functions operate on single images or single visibilities,
+# using several of the tasks defined above.
+
+def getVisRestfreq (vis, **kwargs):
+    """Returns the rest frequency of the specified visibility file
+    in gigahertz. The data is obtained from the output of the miriad
+    prthd task."""
+    
+    # FIXME: probably breaks with multifreq data! No example
+    # files!
+
+    ph = TaskPrintHead (in_=vis, full=True, **kwargs)
+    (stdout, stderr) = ph.snarf ()
+
+    sawHead = False
+    
+    # '  Spectrum  Channels  Freq(chan=1)  Increment  Restfreq     '
+    # '      1          1       5.00020     0.011719   5.00000 GHz '
+    #  012345678901234567890123456789012345678901234567890123456789'
+    #  0         1         2         3         4         5         '
+    #                      ^             ^          ^         ^    '
+
+    for line in stdout:
+        if 'Restfreq' in line:
+            sawHead = True
+        elif sawHead:
+            if line[56:59] != 'GHz':
+                raise Exception ('Restfreq not in GHz???: %s' % line)
+            s = line[45:55].strip ()
+            return float (s)
+
+    raise Exception ('Unexpected output from prthd task: %s' % stdout)
 
 def getImageDimensions (image, **kwargs):
     imh = TaskImHead (in_=image, **kwargs)
@@ -506,6 +469,29 @@ def fitImagePoint (image, **kwargs):
 
     return (max, rms)
 
+def fitImageGaussian (image, **kwargs):
+    imf = TaskImFit (in_=image, **kwargs)
+    imf.object = 'gaussian'
+    
+    (stdout, stderr) = imf.snarf ()
+
+    rms = max = None
+    
+    for line in stdout:
+        if 'RMS residual' in line:
+            a = line.split (' ')
+            rms = float (a[3])
+        elif 'Peak value:' in line:
+            # '  Peak value:                 6.9948E-04 +/-  0.0000'
+            #  012345678901234567890123456789012345678901234567890123456
+            #  0         1         2         3         4         5      
+            max = float (line[30:40])
+
+    if not rms or not max:
+        raise Exception ('Didn\'t get all info from imfit routine!')
+
+    return (max, rms)
+
 # Simple object representing a MIRIAD data set of some kind or another.
 # gb.py has VisData and ImageData subclasses, etc.
 
@@ -543,4 +529,3 @@ class MiriadData (object):
         if not issubclass (kind, MiriadData): raise Exception ('blarg')
 
         return kind (self.base + '.' + name)
-    
