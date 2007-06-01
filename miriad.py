@@ -2,15 +2,20 @@
 #
 # 'mirhelp uvflag' has good help on the 'select' and
 # 'line' parameters.
+#
+# Actually, you can just do 'mirhelp select' or
+# 'mirhelp line'. Not bad.
 
 import sys, os, re, math
 import os.path
 from os.path import join
 from subprocess import *
 
-home = '/linux-apps4/miriad3'
+#home = '/linux-apps4/miriad3'
+home = '/indirect/hp/wright/miriad/mir4'
 hosttype = 'linux'
 _bindir = join (home, 'bin', hosttype)
+_pager = '/usr/bin/less'
 
 # Here is the awesome part where we set up a million environment
 # variables. I have no idea how many of these are actually necessary.
@@ -103,6 +108,23 @@ class TaskBase (object):
     _name = None
     _params = None
     _options = None
+    _cleanups = None
+
+    # These are extra fake parameters that affect how the task is run. I
+    # prefix special interactive-only features, such as these fake parameters,
+    # with an 'x'.
+    #
+    # xint  - Run the task interactively: don't redirect its standard input and
+    #         output.
+    # xabbr - Create a short-named symbolic link to any data inputs (keyword 'in'
+    #         or 'vis'). Many plots include the filename in the plot titles, and
+    #         long filenames make it impossible to read the useful information.
+    # xhelp - Don't actually run the command; show the help for the task to be
+    #         run, and print out the command that would have been run.
+    
+    xint = False
+    xabbr = False
+    xhelp = False
     
     def __init__ (self, **kwargs):
         self.setArgs (**kwargs)
@@ -111,10 +133,15 @@ class TaskBase (object):
         for (key, val) in kwargs.iteritems ():
             setattr (self, key, val)
 
-    def launch (self, **kwargs):
+    def prepCommand (self):
+        # If xabbr is True, create symbolic links to any data
+        # set inputs with short names, thereby making the output
+        # of things like uvplt much cleaner.
+
         cmd = [join (_bindir, self._name)]
         options = []
-
+        dindex = 0
+        
         # Options
         
         for opt in self._options or []:
@@ -143,14 +170,46 @@ class TaskBase (object):
             else: key = name
             
             val = getattr (self, name)
+
+            if self.xabbr and (key == 'in' or key == 'vis'):
+                data = val
+                val = 'd%d' % dindex
+                dindex += 1
+                os.symlink (str (data), val)
+
+                if self._cleanups: self._cleanups.append (val)
+                else: self._cleanups = [val]
+                
             if val: cmd.append ("%s=%s" % (key, val))
 
-        # Now go. Set stdin to /dev/null so that the program can't
-        # block waiting for user input.
-        
         self.cmdline = ' '.join (cmd)
-        self.proc = Popen (cmd, stdin=file (os.devnull, 'r'),
-                           stdout=PIPE, stderr=PIPE, shell=False, **kwargs)
+        return cmd
+
+    def _cleanup (self):
+        # Reset these
+        self.xint = self.xabbr = self.xhelp = False
+        
+        if not self._cleanups: return
+
+        for f in self._cleanups:
+            print 'xabbr cleanup: unlinking %s' % (f, )
+            os.unlink (f)
+
+        self._cleanups = None
+        
+    def launch (self, **kwargs):
+        cmd = self.prepCommand ()
+        self._was_xint = self.xint
+        
+        if self.xint:
+            # Run the program interactively.
+            self.proc = Popen (cmd, shell=False, **kwargs)
+        else:
+            # Set stdin to /dev/null so that the program can't
+            # block waiting for user input, and capture output.
+
+            self.proc = Popen (cmd, stdin=file (os.devnull, 'r'),
+                               stdout=PIPE, stderr=PIPE, shell=False, **kwargs)
 
     def checkFail (self, stderr=None):
         if not stderr: stderr = self.proc.stderr
@@ -159,18 +218,56 @@ class TaskBase (object):
             
         if self.proc.returncode:
             print 'Ran: %s' % self.cmdline
-            print 'Task "%s" failed with exit code %d! It printed:' % (self._name, self.proc.returncode)
-            for x in stderr: print '\t', x.strip ()
+            print 'Task "%s" failed with exit code %d! It printed:' % \
+                  (self._name, self.proc.returncode)
+
+            if self._was_xint:
+                print '\t[Task was run interactively, see output above]'
+            else:
+                for x in stderr: print '\t', x.strip ()
+                
             raise CalledProcessError (self.proc.returncode, self._name)
 
     def run (self, **kwargs):
-        self.launch (**kwargs)
-        self.proc.wait ()
-        self.checkFail ()
+        if self.xhelp:
+            self.xHelp ()
+            print 'Would run: '
+            print '\t', "'" + "' '".join (self.prepCommand ()) + "'"
+            
+            # prepCommand creates the abbr symlinks, and besides
+            # we want to reset xhelp et al.
+            self._cleanup ()
+            
+            return
+
+        ignorefail = False
+        
+        try:
+            self.launch (**kwargs)
+            self.proc.wait ()
+        except KeyboardInterrupt:
+            # If the subprocess is control-C'ed, we'll get this exception.
+            # Wait on the proc again to reap it for real. If we were interactive,
+            # don't throw the exception: the user is dealing with things
+            # manually and knows what just happened. If not interactive, raise
+            # it, because maybe there is "for d in [100 datasets]: longTask(d)",
+            # and we should bail early if that's what's been asked for.
+            
+            self.proc.wait ()
+            ignorefail = self._was_xint
+        finally:
+            self._cleanup ()
+
+        if not ignorefail: self.checkFail ()
 
     def snarf (self, send=None, **kwargs):
+        if self.xint:
+            raise Exception ('Cannot run a program interactively and also ' \
+                             'snarf its output!')
+        
         self.launch (**kwargs)
         (stdout, stderr) = self.proc.communicate (send)
+        self._cleanup ()
         self.checkFail (stderr)
         return (stdout.splitlines (), stderr.splitlines ())
 
@@ -181,11 +278,45 @@ class TaskBase (object):
         
         print 'Ran: %s' % self.cmdline
         print 'Task "%s", return code %d' % (self._name, self.proc.returncode)
-        print 'Standard output:'
-        for x in self.proc.stdout: print '\t', x.strip ()
-        print 'Standard error:'
-        for x in self.proc.stderr: print '\t', x.strip ()
 
+        if self._was_xint:
+            print 'Program was run interactively, so cannot recover its output'
+        else:
+            print 'Standard output:'
+            for x in self.proc.stdout: print '\t', x.strip ()
+            print 'Standard error:'
+            for x in self.proc.stderr: print '\t', x.strip ()
+
+    def cm_xHelp (klass):
+        args = [join (_bindir, 'mir.help'), klass._name]
+        proc = Popen (args, shell=False)
+        proc.wait ()
+
+    xHelp = classmethod (cm_xHelp)
+
+    def xStatus (self):
+        # Parameters
+        
+        for name in self._params or []:
+            if name[-1] == '_': key = name[:-1]
+            else: key = name
+            
+            val = getattr (self, name)
+
+            if val: print "%20s = %s" % (key, val)
+        
+        # Options
+        
+        for opt in self._options or []:
+            val = getattr (self, opt)
+
+            if val is None: continue
+            
+            if isinstance (val, bool):
+                if val: print '%20s = True' % opt
+            else:
+                print '%20s = %s' % (opt, val)
+        
 class TaskCgDisp (TaskBase):
     _params = ['device', 'in_', 'type', 'region', 'xybin', 'chan',
                'slev', 'levs1', 'levs2', 'levs3', 'cols1', 'range',
@@ -344,6 +475,14 @@ class TaskUVSpec (TaskBase):
                 'nobase', 'avall', 'dots', 'flagged', 'all']
 
     device= '/xs'
+
+class TaskUVSort (TaskBase):
+    _params = ['vis', 'select', 'line', 'out']
+
+class TaskMfCal (TaskBase):
+    _params = ['vis', 'line', 'stokes', 'edge', 'select', 'flux',
+               'refant', 'minants', 'interval', 'tol']
+    _options = ['delay', 'nopassol', 'interpolate', 'oldflux']
 
 # These functions operate on single images or single visibilities,
 # using several of the tasks defined above.
@@ -529,3 +668,14 @@ class MiriadData (object):
         if not issubclass (kind, MiriadData): raise Exception ('blarg')
 
         return kind (self.base + '.' + name)
+
+    def xShowHeaders (self, **params):
+        tph = TaskPrintHead (in_=self)
+        tph.setArgs (**params)
+        (stdout, stderr) = tph.snarf ()
+        for x in stdout: print '\t', x.strip ()
+
+    def xShowHistory (self):
+        f = join (self.base, 'history')
+        proc = Popen ([_pager, f], shell=False)
+        proc.wait ()

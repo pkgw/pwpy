@@ -31,4 +31,8 @@ AUpercm = 1. / cmperAU
 spersyr = 31558150. # s / sidereal yr [dimensionless]
 syrpers = 1. / spersyr
 
+# Astro
+mSun = 1.989e33 # g
+rSun = 6.9599e10 # cm
+
 bnu = lambda nu, T: 2 * h * nu**3 * c**-2 / (exp (h * nu / k / T) - 1)
