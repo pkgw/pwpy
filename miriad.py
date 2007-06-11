@@ -54,6 +54,24 @@ else:
 
 # The MIRIAD task running framework
 
+# I find this class useful in interactive environments -- you can
+# set Holder.foo = bar, and tab-complete on the foo later. So, basically
+# a glorified hashtable, but convenient to use from time to time.
+
+class Holder (object): pass
+
+class Options (Holder):
+    def asHash (self):
+        # self.__dict__ has exactly what we want: the extra properties
+        # that have been set on our instance.
+        return self.__dict__
+
+    def initFrom (self, task):
+        for p in task._params or []:
+            setattr (self, p, getattr (task, p))
+        for o in task._options or []:
+            setattr (self, o, getattr (task, o))
+
 class DefaultedTaskType (type):
     # YES! I get to write a metaclass! This looks at the
     # _params and _options members and fills in default values
@@ -121,10 +139,16 @@ class TaskBase (object):
     #         long filenames make it impossible to read the useful information.
     # xhelp - Don't actually run the command; show the help for the task to be
     #         run, and print out the command that would have been run.
+    # xtra  - Either none, or an instance of Options. If it is an instance,
+    #         copy over all the parameters stored in the instance before running.
+    #
+    # All of these fake parameters are cleared after the task has been run once.
+    # Note that the values set by providing xtra will be preserved, however.
     
     xint = False
     xabbr = False
     xhelp = False
+    xtra = None
     
     def __init__ (self, **kwargs):
         self.setArgs (**kwargs)
@@ -141,6 +165,21 @@ class TaskBase (object):
         cmd = [join (_bindir, self._name)]
         options = []
         dindex = 0
+
+        # extra params to set first? 
+
+        if self.xtra is not None:
+            h = self.xtra.asHash ()
+
+            # We disallow this because snarf () and run() do some processing
+            # of these options before prepCommand is called. So if we allowed
+            # them we'd get inconsistent handling of the options depending on
+            # how exactly you invoked the task. That's bad.
+            
+            if 'xint' in h: raise Exception ('Cannot set xint in Options, sorry')
+            if 'xhelp' in h: raise Exception ('Cannot set xhelp in Options, sorry')
+            
+            self.setArgs (**h)
         
         # Options
         
@@ -188,6 +227,7 @@ class TaskBase (object):
     def _cleanup (self):
         # Reset these
         self.xint = self.xabbr = self.xhelp = False
+        self.xtra = None
         
         if not self._cleanups: return
 
@@ -483,6 +523,47 @@ class TaskMfCal (TaskBase):
     _params = ['vis', 'line', 'stokes', 'edge', 'select', 'flux',
                'refant', 'minants', 'interval', 'tol']
     _options = ['delay', 'nopassol', 'interpolate', 'oldflux']
+
+class TaskUVIndex (TaskBase):
+    _params = ['vis', 'interval', 'refant', 'log']
+    _options = ['mosaic']
+
+class TaskUVCat (TaskBase):
+    _params = ['vis', 'select', 'stokes', 'out']
+    _options = ['nocal', 'nopass', 'nopol', 'nowide', 'nochannel',
+                'unflagged']
+
+class SmaUVPlot (TaskBase):
+    # XXX FIXME: there is a 'log' option, but that would conflict
+    # with the 'log' parameter.
+    
+    _name = 'smauvplt'
+    _params = ['vis', 'line', 'device', 'axis', 'size', 'select',
+               'stokes', 'xrange', 'yrange', 'average', 'hann',
+               'inc', 'nxy', 'log', 'comment', 'dotsize', 'filelabel']
+    _options = ['nocal', 'nopol', 'nopass', 'nofqav', 'nobase',
+                '2pass', 'scalar', 'avall', 'unwrap', 'rms',
+                'mrms', 'noerr', 'all', 'flagged', 'nanosec',
+                'days', 'hours', 'seconds', 'xind', 'yind',
+                'equal', 'zero', 'symbols', 'nocolor', 'dots',
+                'source', 'inter', 'notitle']
+                
+    device = '/xs'
+    size = 2
+
+class SmaUVSpec (TaskBase):
+    _name = 'smauvspec'
+    
+    _params = ['vis', 'select', 'line', 'stokes', 'interval', 'hann',
+               'offset', 'catpath', 'vsource', 'veltype', 'veldef',
+               'strngl', 'axis', 'yrange', 'dotsize', 'device',
+               'nxy', 'log']
+    
+    _options = ['nocal', 'nopass', 'nopol', 'ampscalar', 'rms',
+                'nobase', 'avall', 'dots', 'flagged', 'all',
+                'jplcat', 'restfreq']
+
+    device= '/xs'
 
 # These functions operate on single images or single visibilities,
 # using several of the tasks defined above.
