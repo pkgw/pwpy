@@ -50,3 +50,9 @@ def poparray (dims, func, dtype=numpy.double, **kwargs):
             idxs[order] = 0
             order -= 1
 
+def rms (a, axis=None, dtype=None, out=None):
+    """Return the root mean square along the specified axis of an array.
+    If the axis is unspecified, the last one is used.
+    Yields a single number in the case of a one-dimensional array."""
+    
+    return sqrt (numpy.mean (asarray (a)**2, axis=axis, dtype=dtype, out=out))
