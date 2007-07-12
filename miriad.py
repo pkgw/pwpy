@@ -407,20 +407,12 @@ class TaskInvert (TaskBase):
     _options = ['nocal', 'nopol', 'nopass', 'double', 'systemp',
                 'mfs', 'sdb', 'mosaic', 'imaginary', 'amplitude',
                 'phase']
-    
-    stokes = 'ii'
-
-    double = True
-    systemp = True
-    mfs = True
 
 class TaskClean (TaskBase):
     _params = ['map', 'beam', 'out', 'niters', 'region',
                'gain', 'cutoff', 'phat', 'minpatch',
                'speed', 'mode', 'clip']
     _options = ['negstop', 'positive', 'asym', 'pad']
-    
-    niters = 100
 
 class TaskRestore (TaskBase):
     _name = 'restor'
@@ -467,6 +459,14 @@ class TaskGPCopy (TaskBase):
     _options = ['nopol', 'nocal', 'nopass']
 
 class TaskMSelfCal (TaskBase):
+    _params = ['vis', 'select', 'model', 'clip', 'interval',
+               'minants', 'refant', 'flux', 'offset', 'line',
+               'out']
+    _options = ['amplitude', 'phase', 'smooth', 'polarized',
+                'mfs', 'relax', 'apriori', 'noscale', 'mosaic',
+                'verbose']
+
+class TaskSelfCal (TaskBase):
     _params = ['vis', 'select', 'model', 'clip', 'interval',
                'minants', 'refant', 'flux', 'offset', 'line',
                'out']
@@ -564,6 +564,16 @@ class SmaUVSpec (TaskBase):
                 'jplcat', 'restfreq']
 
     device= '/xs'
+
+class TaskUVCal (TaskBase):
+    _params = ['vis', 'select', 'radec', 'badchan', 'endchan', 'nave',
+               'sigma', 'scale', 'offset', 'model', 'polcal', 'polcode',
+               'parot', 'seeing', 'out']
+
+    _options = ['nocal', 'nopass', 'nopol', 'nowide', 'nochannel',
+                'unflagged', 'contsub', 'conjugate', 'fxcal', 'hanning',
+                'linecal', 'parang', 'passband', 'noisecal', 'uvrotate',
+                'avechan', 'slope', 'holo']
 
 # These functions operate on single images or single visibilities,
 # using several of the tasks defined above.
