@@ -1,58 +1,103 @@
 # Wrapper for invoking MIRIAD scripts
-#
-# 'mirhelp uvflag' has good help on the 'select' and
-# 'line' parameters.
-#
-# Actually, you can just do 'mirhelp select' or
-# 'mirhelp line'. Not bad.
 
 import sys, os, re, math
 import os.path
 from os.path import join
 from subprocess import *
 
-#home = '/linux-apps4/miriad3'
-home = '/indirect/hp/wright/miriad/mir4'
-hosttype = 'linux'
-_bindir = join (home, 'bin', hosttype)
-_pager = '/usr/bin/less'
+_pager = 'less'
+_bindir = None
 
-# Here is the awesome part where we set up a million environment
-# variables. I have no idea how many of these are actually necessary.
-# mir.help needs a bunch of them, but it's a script; the actual
-# executables don't seem to need any.
+# If this is set to a function, it will be called with
+# the command-line of every miriad task that's about to
+# be run
 
-childenv = {}
-childenv['MIR'] = home
-childenv['MIRHOST'] = hosttype
-childenv['AIPSTV'] = 'XASIN'
-childenv['MIRBIN'] = _bindir
-childenv['MIRCAT'] = join (home, 'cat')
-childenv['MIRDEF'] = '.'
-childenv['MIRDOC'] = join (home, 'doc')
-childenv['MIRLIB'] = join (home, 'lib', hosttype)
-childenv['MIRNEWS'] = join (home, 'news')
-childenv['MIRPAGER'] = 'doc'
-childenv['MIRSRC'] = join (home, 'src')
-childenv['MIRPROG'] = join (home, 'src', 'prog')
-childenv['MIRSUBS'] = join (home, 'src', 'subs')
-childenv['MIRPDOC'] = join (home, 'doc', 'prog')
-childenv['MIRSDOC'] = join (home, 'doc', 'subs')
-childenv['PGPLOT_DIR'] = childenv['MIRLIB']
+launchTrace = None
 
-for (k, v) in childenv.iteritems ():
-    os.environ[k] = v
+def enableBasicTrace ():
+    global launchTrace
 
-# Need this to find pgxwin_server if using PGPlot.
-os.environ['PATH'] += ':' + childenv['MIRBIN']
+    def t (cmd):
+        print "MIRIAD: '" + "' '".join (cmd) + "'"
+        sys.stdout.flush ()
+    
+    launchTrace = t
 
-ldlp = os.environ.get ('LD_LIBRARY_PATH')
-if ldlp:
-    os.environ['LD_LIBRARY_PATH'] = ldlp + ':' + childenv['MIRLIB']
-else:
-    os.environ['LD_LIBRARY_PATH'] = childenv['MIRLIB']
+# Programmatically setting environment variables to find
+# the Miriad executables and have them run correctly.
 
-# The MIRIAD task running framework
+def setupEnvironmentClassic (home='/indirect/hp/wright/miriad/mir4',
+                             hosttype='linux'):
+    global _bindir
+    
+    #home = '/linux-apps4/miriad3'
+
+    _bindir = join (home, 'bin', hosttype)
+    
+    childenv = {}
+    childenv['MIR'] = home
+    childenv['MIRHOST'] = hosttype
+    childenv['AIPSTV'] = 'XASIN'
+    childenv['MIRBIN'] = _bindir
+    childenv['MIRCAT'] = join (home, 'cat')
+    childenv['MIRDEF'] = '.'
+    childenv['MIRDOC'] = join (home, 'doc')
+    childenv['MIRLIB'] = join (home, 'lib', hosttype)
+    childenv['MIRNEWS'] = join (home, 'news')
+    childenv['MIRPAGER'] = 'doc'
+    childenv['MIRSRC'] = join (home, 'src')
+    childenv['MIRPROG'] = join (home, 'src', 'prog')
+    childenv['MIRSUBS'] = join (home, 'src', 'subs')
+    childenv['MIRPDOC'] = join (home, 'doc', 'prog')
+    childenv['MIRSDOC'] = join (home, 'doc', 'subs')
+    childenv['PGPLOT_DIR'] = childenv['MIRLIB']
+
+    for (k, v) in childenv.iteritems ():
+        os.environ[k] = v
+
+    # Need this to find pgxwin_server if using PGPlot.
+    os.environ['PATH'] += ':' + childenv['MIRBIN']
+
+    ldlp = os.environ.get ('LD_LIBRARY_PATH')
+    if ldlp:
+        os.environ['LD_LIBRARY_PATH'] = ldlp + ':' + childenv['MIRLIB']
+    else:
+        os.environ['LD_LIBRARY_PATH'] = childenv['MIRLIB']
+
+def setupEnvironmentAutotools (home='/l/pkwill/opt/miriad-x86_64-Linux-suse10.1'):
+    global _bindir
+    
+    #home = '/linux-apps4/miriad3'
+    #home = '/indirect/hp/wright/miriad/mir4'
+    #home = '/l/pkwill/opt/miriad-x86_64-Linux-suse10.1'
+
+    # FIXME: we pretty much need the source tree. The autotools setup
+    # needs to be rethought a bit.
+    
+    _bindir = join (home, 'bin')
+    
+    childenv = {}
+    childenv['MIR'] = home
+    childenv['MIRHOST'] = hosttype
+    childenv['AIPSTV'] = 'XASIN'
+    childenv['MIRBIN'] = _bindir
+    childenv['MIRCAT'] = join (home, 'share', 'miriad')
+    childenv['MIRDEF'] = '.'
+    childenv['MIRDOC'] = join (home, 'share', 'miriad', 'doc')
+    childenv['MIRLIB'] = join (home, 'lib')
+    childenv['MIRPAGER'] = 'doc'
+    childenv['PGPLOT_DIR'] = join (home, 'libexec')
+
+    for (k, v) in childenv.iteritems ():
+        os.environ[k] = v
+
+def _mirBinPath (name):
+    if _bindir is None:
+        # this is OK if the python shell was run with the Miriad programs
+        # already living somewhere in $PATH.
+        return name
+    
+    return join (_bindir, name)
 
 # I find this class useful in interactive environments -- you can
 # set Holder.foo = bar, and tab-complete on the foo later. So, basically
@@ -71,6 +116,8 @@ class Options (Holder):
             setattr (self, p, getattr (task, p))
         for o in task._options or []:
             setattr (self, o, getattr (task, o))
+
+# The MIRIAD task running framework
 
 class DefaultedTaskType (type):
     # YES! I get to write a metaclass! This looks at the
@@ -162,7 +209,7 @@ class TaskBase (object):
         # set inputs with short names, thereby making the output
         # of things like uvplt much cleaner.
 
-        cmd = [join (_bindir, self._name)]
+        cmd = [_mirBinPath (self._name)]
         options = []
         dindex = 0
 
@@ -240,6 +287,8 @@ class TaskBase (object):
     def launch (self, **kwargs):
         cmd = self.prepCommand ()
         self._was_xint = self.xint
+
+        if launchTrace is not None: launchTrace (cmd)
         
         if self.xint:
             # Run the program interactively.
@@ -266,7 +315,8 @@ class TaskBase (object):
             else:
                 for x in stderr: print '\t', x.strip ()
                 
-            raise CalledProcessError (self.proc.returncode, self._name)
+            #raise CalledProcessError (self.proc.returncode, self._name)
+            raise OSError ('%d/%s' % (self.proc.returncode, self._name))
 
     def run (self, **kwargs):
         if self.xhelp:
@@ -283,18 +333,19 @@ class TaskBase (object):
         ignorefail = False
         
         try:
-            self.launch (**kwargs)
-            self.proc.wait ()
-        except KeyboardInterrupt:
-            # If the subprocess is control-C'ed, we'll get this exception.
-            # Wait on the proc again to reap it for real. If we were interactive,
-            # don't throw the exception: the user is dealing with things
-            # manually and knows what just happened. If not interactive, raise
-            # it, because maybe there is "for d in [100 datasets]: longTask(d)",
-            # and we should bail early if that's what's been asked for.
+            try:
+                self.launch (**kwargs)
+                self.proc.wait ()
+            except KeyboardInterrupt:
+                # If the subprocess is control-C'ed, we'll get this exception.
+                # Wait on the proc again to reap it for real. If we were interactive,
+                # don't throw the exception: the user is dealing with things
+                # manually and knows what just happened. If not interactive, raise
+                # it, because maybe there is "for d in [100 datasets]: longTask(d)",
+                # and we should bail early if that's what's been asked for.
             
-            self.proc.wait ()
-            ignorefail = self._was_xint
+                self.proc.wait ()
+                ignorefail = self._was_xint
         finally:
             self._cleanup ()
 
@@ -328,7 +379,7 @@ class TaskBase (object):
             for x in self.proc.stderr: print '\t', x.strip ()
 
     def cm_xHelp (klass):
-        args = [join (_bindir, 'mir.help'), klass._name]
+        args = [_mirBinPath ('mir.help'), klass._name]
         proc = Popen (args, shell=False)
         proc.wait ()
 
@@ -458,6 +509,13 @@ class TaskGPCopy (TaskBase):
     _params = ['vis', 'out', 'mode']
     _options = ['nopol', 'nocal', 'nopass']
 
+class TaskSelfCal (TaskBase):
+    _params = ['vis', 'select', 'model', 'clip', 'interval',
+               'minants', 'refant', 'flux', 'offset', 'line',
+               'out']
+    _options = ['amplitude', 'phase', 'smooth', 'polarized',
+                'mfs', 'relax', 'apriori', 'noscale', 'mosaic']
+
 class TaskMSelfCal (TaskBase):
     _params = ['vis', 'select', 'model', 'clip', 'interval',
                'minants', 'refant', 'flux', 'offset', 'line',
@@ -565,6 +623,20 @@ class SmaUVSpec (TaskBase):
 
     device= '/xs'
 
+class TaskUVGen (TaskBase):
+    _params = ['source', 'ant', 'baseunit', 'telescop', 'corr',
+               'spectra', 'time', 'freq', 'radec', 'harange',
+               'ellim', 'stokes', 'polar', 'leakage', 'zeeman',
+               'lat', 'cycle', 'pbfwhm', 'center', 'gnoise',
+               'pnoise', 'systemp', 'tpower', 'jyperk', 'out']
+
+class TaskUVGen2 (TaskBase):
+    _params = ['source', 'ant', 'baseunit', 'telescop', 'corr',
+               'spectra', 'time', 'freq', 'radec', 'harange',
+               'ellim', 'stokes', 'polar', 'leakage', 'zeeman',
+               'lat', 'cycle', 'pbfwhm', 'center', 'gnoise',
+               'pnoise', 'systemp', 'tpower', 'jyperk', 'out']
+    
 class TaskUVCal (TaskBase):
     _params = ['vis', 'select', 'radec', 'badchan', 'endchan', 'nave',
                'sigma', 'scale', 'offset', 'model', 'polcal', 'polcode',
@@ -694,7 +766,7 @@ def fitImagePoint (image, **kwargs):
             #  0         1         2         3         4         5      
             max = float (line[30:40])
 
-    if not rms or not max:
+    if rms is None or max is None:
         raise Exception ('Didn\'t get all info from imfit routine!')
 
     return (max, rms)
@@ -705,7 +777,7 @@ def fitImageGaussian (image, **kwargs):
     
     (stdout, stderr) = imf.snarf ()
 
-    rms = max = None
+    rms = max = maj = min = None
     
     for line in stdout:
         if 'RMS residual' in line:
@@ -716,11 +788,21 @@ def fitImageGaussian (image, **kwargs):
             #  012345678901234567890123456789012345678901234567890123456
             #  0         1         2         3         4         5      
             max = float (line[30:40])
+        elif 'Major axis' in line:
+            # '  Major axis (arcsec):           0.394 +/-  0.009
+            #  012345678901234567890123456789012345678901234567890123456
+            #  0         1         2         3         4         5      
+            maj = float (line[30:38])
+        elif 'Minor axis' in line:
+            # '  Minor axis (arcsec):           0.394 +/-  0.009
+            #  012345678901234567890123456789012345678901234567890123456
+            #  0         1         2         3         4         5      
+            min = float (line[30:38])
 
-    if not rms or not max:
+    if rms is None or max is None or maj is None or min is None:
         raise Exception ('Didn\'t get all info from imfit routine!')
 
-    return (max, rms)
+    return (max, rms, maj, min)
 
 # Simple object representing a MIRIAD data set of some kind or another.
 # gb.py has VisData and ImageData subclasses, etc.
@@ -746,6 +828,12 @@ class MiriadData (object):
         if self.exists: return
 
         raise Exception ('Data set %s does not exist' % self.base)
+
+    def moveTo (self, dest):
+        self.checkExists ()
+
+        os.rename (self.base, dest)
+        self.base = dest
     
     def delete (self):
         # Silently not doing anything seems appropriate here.
