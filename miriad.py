@@ -3,10 +3,14 @@
 import sys, os, re, math
 import os.path
 from os.path import join
-from subprocess import *
+from subprocess import Popen, PIPE, STDOUT
 
 _pager = 'less'
+_defaultDevice = '/xs'
 _bindir = None
+_childenvWhitelist = ['DISPLAY', 'EDITOR', 'HOME', 'LANG', 'LOGNAME',
+                      'PAGER', 'PATH', 'SHELL', 'TERM', 'UID', 'USER',
+                      'VISUAL', 'PGPLOT_XW_WIDTH']
 
 # If this is set to a function, it will be called with
 # the command-line of every miriad task that's about to
@@ -24,48 +28,51 @@ def enableBasicTrace ():
     launchTrace = t
 
 # Programmatically setting environment variables to find
-# the Miriad executables and have them run correctly.
+# the Miriad executables and have them run correctly. We clear
+# most environment variables; Miriad programs are essentially
+# standalone, so we're only going to need a fairly constrained
+# set of variables.
 
-def setupEnvironmentClassic (home='/indirect/hp/wright/miriad/mir4',
-                             hosttype='linux'):
-    global _bindir
+_childenv = {}
+
+for var in _childenvWhitelist:
+    if var in os.environ:
+        _childenv[var] = os.environ[var]
+
+del var
+
+def addEnvironmentClassic (home='/indirect/hp/wright/miriad/mir4',
+                           hosttype='linux'):
+    global _bindir, _childenv
     
     #home = '/linux-apps4/miriad3'
 
     _bindir = join (home, 'bin', hosttype)
     
-    childenv = {}
-    childenv['MIR'] = home
-    childenv['MIRHOST'] = hosttype
-    childenv['AIPSTV'] = 'XASIN'
-    childenv['MIRBIN'] = _bindir
-    childenv['MIRCAT'] = join (home, 'cat')
-    childenv['MIRDEF'] = '.'
-    childenv['MIRDOC'] = join (home, 'doc')
-    childenv['MIRLIB'] = join (home, 'lib', hosttype)
-    childenv['MIRNEWS'] = join (home, 'news')
-    childenv['MIRPAGER'] = 'doc'
-    childenv['MIRSRC'] = join (home, 'src')
-    childenv['MIRPROG'] = join (home, 'src', 'prog')
-    childenv['MIRSUBS'] = join (home, 'src', 'subs')
-    childenv['MIRPDOC'] = join (home, 'doc', 'prog')
-    childenv['MIRSDOC'] = join (home, 'doc', 'subs')
-    childenv['PGPLOT_DIR'] = childenv['MIRLIB']
-
-    for (k, v) in childenv.iteritems ():
-        os.environ[k] = v
+    _childenv['MIR'] = home
+    _childenv['MIRHOST'] = hosttype
+    _childenv['AIPSTV'] = 'XASIN'
+    _childenv['MIRBIN'] = _bindir
+    _childenv['MIRCAT'] = join (home, 'cat')
+    _childenv['MIRDEF'] = '.'
+    _childenv['MIRDOC'] = join (home, 'doc')
+    _childenv['MIRLIB'] = join (home, 'lib', hosttype)
+    _childenv['MIRNEWS'] = join (home, 'news')
+    _childenv['MIRPAGER'] = 'doc'
+    _childenv['MIRSRC'] = join (home, 'src')
+    _childenv['MIRPROG'] = join (home, 'src', 'prog')
+    _childenv['MIRSUBS'] = join (home, 'src', 'subs')
+    _childenv['MIRPDOC'] = join (home, 'doc', 'prog')
+    _childenv['MIRSDOC'] = join (home, 'doc', 'subs')
+    _childenv['PGPLOT_DIR'] = childenv['MIRLIB']
 
     # Need this to find pgxwin_server if using PGPlot.
-    os.environ['PATH'] += ':' + childenv['MIRBIN']
+    _childenv['PATH'] += ':' + childenv['MIRBIN']
 
-    ldlp = os.environ.get ('LD_LIBRARY_PATH')
-    if ldlp:
-        os.environ['LD_LIBRARY_PATH'] = ldlp + ':' + childenv['MIRLIB']
-    else:
-        os.environ['LD_LIBRARY_PATH'] = childenv['MIRLIB']
+    _childenv['LD_LIBRARY_PATH'] = childenv['MIRLIB']
 
-def setupEnvironmentAutotools (home='/l/pkwill/opt/miriad-x86_64-Linux-suse10.1'):
-    global _bindir
+def addEnvironmentAutotools (home='/l/pkwill/opt/miriad-x86_64-Linux-suse10.1'):
+    global _bindir, _childenv
     
     #home = '/linux-apps4/miriad3'
     #home = '/indirect/hp/wright/miriad/mir4'
@@ -76,20 +83,15 @@ def setupEnvironmentAutotools (home='/l/pkwill/opt/miriad-x86_64-Linux-suse10.1'
     
     _bindir = join (home, 'bin')
     
-    childenv = {}
-    childenv['MIR'] = home
-    childenv['MIRHOST'] = hosttype
-    childenv['AIPSTV'] = 'XASIN'
-    childenv['MIRBIN'] = _bindir
-    childenv['MIRCAT'] = join (home, 'share', 'miriad')
-    childenv['MIRDEF'] = '.'
-    childenv['MIRDOC'] = join (home, 'share', 'miriad', 'doc')
-    childenv['MIRLIB'] = join (home, 'lib')
-    childenv['MIRPAGER'] = 'doc'
-    childenv['PGPLOT_DIR'] = join (home, 'libexec')
-
-    for (k, v) in childenv.iteritems ():
-        os.environ[k] = v
+    _childenv['MIR'] = home
+    _childenv['AIPSTV'] = 'XASIN'
+    _childenv['MIRBIN'] = _bindir
+    _childenv['MIRCAT'] = join (home, 'share', 'miriad')
+    _childenv['MIRDEF'] = '.'
+    _childenv['MIRDOC'] = join (home, 'share', 'miriad', 'doc')
+    _childenv['MIRLIB'] = join (home, 'lib')
+    _childenv['MIRPAGER'] = 'doc'
+    _childenv['PGPLOT_DIR'] = join (home, 'libexec')
 
 def _mirBinPath (name):
     if _bindir is None:
@@ -102,8 +104,13 @@ def _mirBinPath (name):
 # I find this class useful in interactive environments -- you can
 # set Holder.foo = bar, and tab-complete on the foo later. So, basically
 # a glorified hashtable, but convenient to use from time to time.
+#
+# We are totally abusing __repr__ here, but in interactive environments,
+# I think this is more convenient.
 
-class Holder (object): pass
+class Holder (object):
+    def __str__ (self): return str (self.__dict__)
+    def __repr__ (self): return str (self)
 
 class Options (Holder):
     def asHash (self):
@@ -292,13 +299,17 @@ class TaskBase (object):
         
         if self.xint:
             # Run the program interactively.
-            self.proc = Popen (cmd, shell=False, **kwargs)
+            self.proc = Popen (cmd,
+                               shell=False, close_fds=True, env=_childenv,
+                               **kwargs)
         else:
             # Set stdin to /dev/null so that the program can't
             # block waiting for user input, and capture output.
 
-            self.proc = Popen (cmd, stdin=file (os.devnull, 'r'),
-                               stdout=PIPE, stderr=PIPE, shell=False, **kwargs)
+            self.proc = Popen (cmd,
+                               stdin=file (os.devnull, 'r'), stdout=PIPE, stderr=PIPE,
+                               shell=False, close_fds=True, env=_childenv,
+                               **kwargs)
 
     def checkFail (self, stderr=None):
         if not stderr: stderr = self.proc.stderr
@@ -316,7 +327,7 @@ class TaskBase (object):
                 for x in stderr: print '\t', x.strip ()
                 
             #raise CalledProcessError (self.proc.returncode, self._name)
-            raise OSError ('%d/%s' % (self.proc.returncode, self._name))
+            raise OSError ('Command %s returned exit code %d' % (self._name, self.proc.returncode))
 
     def run (self, **kwargs):
         if self.xhelp:
@@ -380,7 +391,7 @@ class TaskBase (object):
 
     def cm_xHelp (klass):
         args = [_mirBinPath ('mir.help'), klass._name]
-        proc = Popen (args, shell=False)
+        proc = Popen (args, shell=False, close_fds=True, env=_childenv)
         proc.wait ()
 
     xHelp = classmethod (cm_xHelp)
@@ -421,16 +432,13 @@ class TaskCgDisp (TaskBase):
                 'solneg3', 'trlab', 'unequal', 'wedge', '3pixel',
                 '3value']
     
-    device = '/xs'
+    device = _defaultDevice
 
 class TaskUVList (TaskBase):
     _params = ['vis', 'select', 'line', 'scale', 'recnum', 'log']
     _options = ['brief', 'data', 'average', 'allan', 'history',
                 'flux', 'full', 'list', 'variables', 'stat',
                 'birds', 'spectra']
-    
-    recnum = 1000
-    variables = True
 
 class TaskUVPlot (TaskBase):
     # XXX FIXME: there is a 'log' option, but that would conflict
@@ -447,9 +455,7 @@ class TaskUVPlot (TaskBase):
                 'equal', 'zero', 'symbols', 'nocolour', 'dots',
                 'source', 'inter']
                 
-    device = '/xs'
-    axis = 'uu,vv'
-    size = 2
+    device = _defaultDevice
 
 class TaskInvert (TaskBase):
     _params = ['vis', 'map', 'beam', 'select', 'stokes',
@@ -544,14 +550,12 @@ class TaskGPPlot (TaskBase):
                 'polarization', 'delays', 'speccor',
                 'bandpass', 'dots', 'dtime', 'wrap']
 
-    device = '/xs'
+    device = _defaultDevice
 
 class TaskPrintHead (TaskBase):
     _name = 'prthd'
     _params = ['in_', 'log']
     _options = ['brief', 'full']
-
-    full = True
 
 class TaskClosure (TaskBase):
     _params = ['vis', 'select', 'line', 'stokes', 'device',
@@ -559,7 +563,7 @@ class TaskClosure (TaskBase):
     _options = ['amplitude', 'quad', 'avall', 'notriple', 'rms',
                 'nocal', 'nopol', 'nopass']
 
-    device = '/xs'
+    device = _defaultDevice
 
 class TaskUVFlag (TaskBase):
     _params = ['vis', 'select', 'line', 'edge', 'flagval', 'log' ]
@@ -572,7 +576,7 @@ class TaskUVSpec (TaskBase):
     _options = ['nocal', 'nopass', 'nopol', 'ampscalar', 'rms',
                 'nobase', 'avall', 'dots', 'flagged', 'all']
 
-    device= '/xs'
+    device= _defaultDevice
 
 class TaskUVSort (TaskBase):
     _params = ['vis', 'select', 'line', 'out']
@@ -606,8 +610,7 @@ class SmaUVPlot (TaskBase):
                 'equal', 'zero', 'symbols', 'nocolor', 'dots',
                 'source', 'inter', 'notitle']
                 
-    device = '/xs'
-    size = 2
+    device = _defaultDevice
 
 class SmaUVSpec (TaskBase):
     _name = 'smauvspec'
@@ -621,7 +624,7 @@ class SmaUVSpec (TaskBase):
                 'nobase', 'avall', 'dots', 'flagged', 'all',
                 'jplcat', 'restfreq']
 
-    device= '/xs'
+    device= _defaultDevice
 
 class TaskUVGen (TaskBase):
     _params = ['source', 'ant', 'baseunit', 'telescop', 'corr',
@@ -856,5 +859,5 @@ class MiriadData (object):
 
     def xShowHistory (self):
         f = join (self.base, 'history')
-        proc = Popen ([_pager, f], shell=False)
+        proc = Popen ([_pager, f], shell=False, close_fds=True)
         proc.wait ()
