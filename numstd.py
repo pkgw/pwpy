@@ -9,6 +9,7 @@ from numpy import sum, dot, min, max
 from numpy import sin, cos, tan, sinh, cosh, tanh
 from numpy import arcsin, arccos, arctan, arcsinh, arccosh, arctanh
 from numpy import log, log10, exp, sqrt
+from numpy import fromfile, fromfunction
 
 def poparray (dims, func, dtype=numpy.double, **kwargs):
     """Populate a new array from the results of a function, which

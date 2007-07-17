@@ -8,9 +8,9 @@ from subprocess import Popen, PIPE, STDOUT
 _pager = 'less'
 _defaultDevice = '/xs'
 _bindir = None
-_childenvWhitelist = ['DISPLAY', 'EDITOR', 'HOME', 'LANG', 'LOGNAME',
-                      'PAGER', 'PATH', 'SHELL', 'TERM', 'UID', 'USER',
-                      'VISUAL', 'PGPLOT_XW_WIDTH']
+_childenvCopylist = ['DISPLAY', 'EDITOR', 'HOME', 'LANG', 'LOGNAME',
+                     'PAGER', 'PATH', 'SHELL', 'TERM', 'UID', 'USER',
+                     'VISUAL', 'PGPLOT_XW_WIDTH']
 
 # If this is set to a function, it will be called with
 # the command-line of every miriad task that's about to
@@ -35,9 +35,14 @@ def enableBasicTrace ():
 
 _childenv = {}
 
-for var in _childenvWhitelist:
+for var in _childenvCopylist:
     if var in os.environ:
         _childenv[var] = os.environ[var]
+
+for (key, val) in os.environ.iteritems ():
+    # We might want to copy over other things: LD_*, maybe?
+    if key.startswith ('MIR'):
+        _childenv[key] = val;
 
 del var
 
@@ -650,6 +655,10 @@ class TaskUVCal (TaskBase):
                 'linecal', 'parang', 'passband', 'noisecal', 'uvrotate',
                 'avechan', 'slope', 'holo']
 
+class TaskUVFlux (TaskBase):
+    _params = ['vis', 'select', 'line', 'stokes', 'offset']
+    _options = ['nocal', 'nopol', 'nopass', 'uvpol']
+
 # These functions operate on single images or single visibilities,
 # using several of the tasks defined above.
 
@@ -846,7 +855,8 @@ class MiriadData (object):
             os.remove (join (self.base, e))
         os.rmdir (self.base)
 
-    def makeVariant (self, kind, name):
+    def makeVariant (self, name, kind=None):
+        if kind is None: kind = MiriadData # for some reason kind=MiriadData barfs.
         if not issubclass (kind, MiriadData): raise Exception ('blarg')
 
         return kind (self.base + '.' + name)
