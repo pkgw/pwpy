@@ -855,7 +855,7 @@ class MiriadData (object):
         if not self.exists: return
 
         if launchTrace is not None:
-            launchTrace (['[delete]', 'vis=%s' % self])
+            launchTrace (['[delete]', 'in=%s' % self])
         
         for e in os.listdir (self.base):
             os.remove (join (self.base, e))
