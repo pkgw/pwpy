@@ -10,7 +10,7 @@ _defaultDevice = '/xs'
 _bindir = None
 _childenvCopylist = ['DISPLAY', 'EDITOR', 'HOME', 'LANG', 'LOGNAME',
                      'PAGER', 'PATH', 'SHELL', 'TERM', 'UID', 'USER',
-                     'VISUAL', 'PGPLOT_XW_WIDTH']
+                     'VISUAL']
 
 # If this is set to a function, it will be called with
 # the command-line of every miriad task that's about to
@@ -42,6 +42,8 @@ for var in _childenvCopylist:
 for (key, val) in os.environ.iteritems ():
     # We might want to copy over other things: LD_*, maybe?
     if key.startswith ('MIR'):
+        _childenv[key] = val;
+    if key.startswith ('PGPLOT'):
         _childenv[key] = val;
 
 del var
