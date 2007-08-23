@@ -196,10 +196,18 @@ def magic_lstore (self, param_s=''):
                     sys.exc_info ()[0]
     elif dozap:
         # Kill all vars
+        if len (args) != 0:
+            print 'Error: %lstore -z takes no arguments.'
+            return
+        
         for k in db.keys (dbprefix + '*'):
             del db[k]
     elif dorel:
         # Reload
+        if len (args) != 0:
+            print 'Error: %lstore -r takes no arguments.'
+            return
+        
         reload_local_vars (ip, db, True)
     elif not args:
         # List stored vars
