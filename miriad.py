@@ -786,12 +786,14 @@ def fitImagePoint (image, **kwargs):
     return (max, rms)
 
 def fitImageGaussian (image, **kwargs):
+    """Returns: (max, total, rms, maj, min)"""
+    
     imf = TaskImFit (in_=image, **kwargs)
     imf.object = 'gaussian'
     
     (stdout, stderr) = imf.snarf ()
 
-    rms = max = maj = min = None
+    rms = max = total = maj = min = None
     
     for line in stdout:
         if 'RMS residual' in line:
@@ -802,6 +804,11 @@ def fitImageGaussian (image, **kwargs):
             #  012345678901234567890123456789012345678901234567890123456
             #  0         1         2         3         4         5      
             max = float (line[30:40])
+        elif 'Total integrated' in line:
+            # '  Total integrated flux:       1559.'
+            #  012345678901234567890123456789012345678901234567890123456
+            #  0         1         2         3         4         5      
+            total = float (line[30:40])
         elif 'Major axis' in line:
             # '  Major axis (arcsec):           0.394 +/-  0.009
             #  012345678901234567890123456789012345678901234567890123456
@@ -813,10 +820,11 @@ def fitImageGaussian (image, **kwargs):
             #  0         1         2         3         4         5      
             min = float (line[30:38])
 
-    if rms is None or max is None or maj is None or min is None:
+    if rms is None or max is None or maj is None \
+           or total is None or min is None:
         raise Exception ('Didn\'t get all info from imfit routine!')
 
-    return (max, rms, maj, min)
+    return (max, total, rms, maj, min)
 
 # Simple object representing a MIRIAD data set of some kind or another.
 # gb.py has VisData and ImageData subclasses, etc.
