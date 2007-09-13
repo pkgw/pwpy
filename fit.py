@@ -62,3 +62,53 @@ def linearConstrained (x, y, x0, y0, weights = None):
     # return a float32.
     
     return _numpy.float64 (_numpy.dot (A, B)) / _numpy.dot (A, A)
+
+def guessGaussianParams (x, y):
+    """Guess initial Gaussian parameters using the moments of the
+    given data."""
+
+    from numpy import asarray, abs, sqrt
+    
+    x = asarray (x)
+    y = asarray (y)
+    
+    height = y.max ()
+
+    ytotal = y.sum ()
+    byx = y * x
+    xmid = byx.sum () / ytotal
+
+    # Not at all sure if this is a good algorithm. Seems to
+    # work OK.
+    width = sqrt (abs ((x - xmid)**2 * y).sum () / ytotal)
+
+    return (height, xmid, width)
+    
+def gaussian (x, y, params=None):
+    """Fit a Gaussian to the data in x and y, optionally starting
+    with the parameters given in params. Params is a tuple of
+    (height, xmid, width) ; if unspecified, the initial guess
+    is taken from the moments of the data.
+
+    Returns: a parameter tuple after performing a fit. Has the
+    same form of (height, xmid, width)."""
+
+    from numpy import exp, asarray, ravel
+    from scipy import optimize
+
+    x = asarray (x)
+    y = asarray (y)
+    
+    if params is None: params = guessGaussianParams (x, y)
+
+    def makeGaussian (height, xmid, width):
+        return lambda x: height * exp (-0.5 * ((x - xmid)/width)**2)
+
+    def error (p):
+        return ravel (makeGaussian (*p)(x) - y)
+
+    pfit, success = optimize.leastsq (error, params)
+
+    if success != 1: raise Exception ('Least square fit failed.')
+
+    return pfit
