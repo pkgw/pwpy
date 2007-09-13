@@ -63,6 +63,19 @@ def linearConstrained (x, y, x0, y0, weights = None):
     
     return _numpy.float64 (_numpy.dot (A, B)) / _numpy.dot (A, A)
 
+_exp = _numpy.exp
+
+def makeGaussian (params):
+    """Return a lambda function that evaluates a Gaussian
+    corresponding to the given parameters.
+
+    Parameters: Gaussian fit tuple. Decomposes into (height,
+      xmid, width).
+    """
+
+    height, xmid, width = params
+    return lambda x: height * _exp (-0.5 * ((x - xmid)/width)**2)
+
 def guessGaussianParams (x, y):
     """Guess initial Gaussian parameters using the moments of the
     given data."""
@@ -93,7 +106,7 @@ def gaussian (x, y, params=None):
     Returns: a parameter tuple after performing a fit. Has the
     same form of (height, xmid, width)."""
 
-    from numpy import exp, asarray, ravel
+    from numpy import asarray, ravel
     from scipy import optimize
 
     x = asarray (x)
@@ -101,14 +114,13 @@ def gaussian (x, y, params=None):
     
     if params is None: params = guessGaussianParams (x, y)
 
-    def makeGaussian (height, xmid, width):
-        return lambda x: height * exp (-0.5 * ((x - xmid)/width)**2)
-
     def error (p):
-        return ravel (makeGaussian (*p)(x) - y)
+        return ravel (makeGaussian (p)(x) - y)
 
-    pfit, success = optimize.leastsq (error, params)
+    pfit, xx, xx, msg, success = optimize.leastsq (error, params,
+                                                   full_output=True)
 
-    if success != 1: raise Exception ('Least square fit failed.')
+    if success != 1:
+        raise Exception ('Least square fit failed: ' + msg)
 
     return pfit

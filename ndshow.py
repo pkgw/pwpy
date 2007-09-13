@@ -78,6 +78,10 @@ class ArrayViewerTmp (object):
         cb = xml.get_widget ('cb_scaling')
         cb.set_active (self.scaling)
 
+        # Enlargement setup
+
+        xml.get_widget ('sb_enlargement').set_value (self.enlargement)
+        
         # Statusbar setup
         
         self.statusbar = xml.get_widget ('statusbar')
