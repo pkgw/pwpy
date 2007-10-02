@@ -124,3 +124,34 @@ def gaussian (x, y, params=None):
         raise Exception ('Least square fit failed: ' + msg)
 
     return pfit
+
+def generic (model, x, y, params):
+    """Generic least-squares fitting algorithm. Parameters are:
+
+    model  - A function of N+1 variables: an ndarray of X values,
+             then N tunable parameters.
+    x      - The data X values.
+    y      - The data Y values.
+    params - A tuple of N values that are the initial guesses for
+             the parameters to maker.
+
+    Returns: a tuple of N parameters that minimize the least-squares
+    difference between the model function and the data.
+    """
+
+    from numpy import asarray, ravel
+    from scipy import optimize
+
+    x = asarray (x)
+    y = asarray (y)
+    
+    def error (p):
+        return ravel (model (x, *p) - y)
+
+    pfit, xx, xx, msg, success = optimize.leastsq (error, params,
+                                                   full_output=True)
+
+    if success != 1:
+        raise Exception ('Least square fit failed: ' + msg)
+
+    return pfit
