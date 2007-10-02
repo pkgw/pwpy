@@ -1,11 +1,14 @@
-# physical constants
+""" cgs - Physical constants in CGS.
+
+For reference: the esu has dimensions of m^1/2 cm^3/2 s^-1
+
+E and B field have m^1/2 cm^-1/2 s^-1
+
+esu * field = dyne
+"""
 
 # make e the electron charge
-from numpy import pi, e as euler, exp
-
-# erg = esu**2 / cm -> esu = m^1/2 cm^3/2 s^-1
-# erg / cm^3 = (E|B)^2 -> [field] = m^1/2 cm^-1/2 s^-1
-# esu * field = dyne
+from numpy import pi, e as euler, exp, sqrt
 
 c = 2.99792458e10 # cm / s
 h = 6.6260755e-27 # erg s
@@ -34,5 +37,10 @@ syrpers = 1. / spersyr
 # Astro
 mSun = 1.989e33 # g
 rSun = 6.9599e10 # cm
+lSun = 3.826e33 # erg s^-1
+tSun = 5770 # K
+mEarth = 5.974e27 # g
+rEarth = 6.378e8 # cm
 
 bnu = lambda nu, T: 2 * h * nu**3 * c**-2 / (exp (h * nu / k / T) - 1)
+blambda = lambda lam, T: 2 * h * lam**-5 * c**2 / (exp (h * c / lam / k / T) - 1)
