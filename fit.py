@@ -133,7 +133,7 @@ def generic (model, x, y, params):
     x      - The data X values.
     y      - The data Y values.
     params - A tuple of N values that are the initial guesses for
-             the parameters to maker.
+             the parameters to model().
 
     Returns: a tuple of N parameters that minimize the least-squares
     difference between the model function and the data.
