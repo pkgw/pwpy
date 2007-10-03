@@ -180,12 +180,20 @@ class ArrayViewerTmp (object):
             self.statusbar.remove (self.sbctxt, self.sbmid)
 
         (x, y) = event.get_coords ()
-        #print 'before:', x, y
-        #(x, y) = ebox.translate_coordinates (self.img, x, y)
-        #print 'after:', x, y
 
-        col, row = int (x) // self.enlargement, int (y) // self.enlargement
+        # Map to image coordinates. This feels sketchy.
+        
+        ncol, nrow = self.orig_ncol, self.orig_nrow
+        enl = self.enlargement
+        alloc = self.img.get_allocation ()
+        x -= (alloc.width - ncol * enl) / 2
+        y -= (alloc.height - nrow * enl) / 2
 
+        col, row = int (x) // enl, int (y) // enl
+
+        if col < 0 or row < 0 or col >= ncol or row >= nrow:
+            return
+        
         try:
             val = 'value %g' % self.orig_data[row,col]
         except Exception, e:
