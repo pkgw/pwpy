@@ -241,8 +241,12 @@ class ArrayWindow (object):
         ncol = alloc.width
         nrow = 16
         self._lastColorscaleWidth = ncol
-        
-        scale = N.linspace (0, 2**24 - 1, ncol)
+
+        if self.invertScale:
+            scale = N.linspace (0, 2**24 - 1, ncol)
+        else:
+            scale = N.linspace (2**24 - 1, 0, ncol)
+            
         scale = N.vstack ((scale, scale, scale, scale))
         scale = N.vstack ((scale, scale, scale, scale))
 
@@ -297,6 +301,7 @@ class ArrayWindow (object):
 
     def onInvertToggled (self, toggle):
         self.invertScale = toggle.get_active ()
+        self.updateColorscaleImage ()
         self.update (False, True)
         
     def onColoringChanged (self, combo):
