@@ -31,9 +31,13 @@ class ArrayWindow (object):
     CLAMPING_MYMEDIAN = 0
     CLAMPING_MINMAX = 1
     CLAMPING_NONE = 2
+
+    COLORING_BLACKTOWHITE = 0
+    COLORING_BLUETORED = 1
+    COLORING_GREENTOMAGENTA = 2
     
     def __init__ (self, array, parent=None, title=None,
-                  clamping=None, scaling=None, enlarge=1):
+                  clamping=None, scaling=None, coloring=None, enlarge=1):
         if array.ndim != 2:
             raise Exception ('Can only show 2-dimensional arrays as images.')
 
@@ -46,11 +50,15 @@ class ArrayWindow (object):
         
         if clamping is None: clamping = self.CLAMPING_MYMEDIAN
         if scaling is None: scaling = self.SCALING_LINEAR
+        if coloring is None: coloring = self.COLORING_BLACKTOWHITE
         
         self.scaling = scaling
         self.invertScale = False
         self.clamping = clamping
+        self.coloring = coloring
         self.enlargement = enlarge
+
+        self._initColors ()
         
         # UI.
         
@@ -77,6 +85,11 @@ class ArrayWindow (object):
 
         cb = xml.get_widget ('cb_scaling')
         cb.set_active (self.scaling)
+
+        # Scaling combo setup
+
+        cb = xml.get_widget ('cb_coloring')
+        cb.set_active (self.coloring)
 
         # Enlargement setup
 
@@ -115,11 +128,16 @@ class ArrayWindow (object):
 
         self.clamped = clamped
         self.clamped_max = cmax
-        
-    def doScaling (self):
-        ncol, nrow = self.orig_ncol, self.orig_nrow
-        scaled = N.ndarray ((nrow, ncol), N.uint8)
 
+    def doScaling (self):
+        """Map our clamped data, ranging from 0 to clamped_max, into a 24-bit
+        space of integers, in preparation for colorization into a 24-bit RGB
+        space."""
+        
+        ncol, nrow = self.orig_ncol, self.orig_nrow
+        scaled = N.ndarray ((nrow, ncol), N.uint32)
+        smax = 2**24 - 1 # 8 bits of R,G,B = 24 bit color
+        
         cmax = self.clamped_max
 
         # These are all slicewise assignments to set the array contents,
@@ -129,31 +147,73 @@ class ArrayWindow (object):
         if cmax == 0:
             scaled[:,:] = 0
         elif self.scaling == self.SCALING_LINEAR:
-            scale = 255. / cmax
+            scale = smax / cmax
             scaled[:,:] = self.clamped * scale
         elif self.scaling == self.SCALING_LOG:
-            scale = 255. / N.log (cmax + 1.0)
+            scale = smax / N.log (cmax + 1.0)
             scaled[:,:] = N.log (self.clamped + 1.0) * scale
         elif self.scaling == self.SCALING_SQRT:
-            scale = 255. / N.sqrt (cmax + 1.0)
+            scale = smax / N.sqrt (cmax + 1.0)
             scaled[:,:] = N.sqrt (self.clamped + 1.0) * scale
         else:
             raise Exception ('Unknown image scale %d' % self.scaling)
 
         if self.invertScale:
-            scaled = -scaled + 255
+            scaled = -scaled + smax
         
         self.scaled = scaled
 
+    # See http://geography.uoregon.edu/datagraphics/ for some information
+    # on good color schemes.
+    
+    def _colorMakeGauss (self, peak, ctr, width):
+        # sqrt (2pi) = 2.50662827463
+
+        def f (work, scaled):
+            work[:,:] = N.exp (-(scaled - ctr)**2/(2*width**2)) * \
+                        peak / 2.50662827463
+
+        return f
+    
+    def _colorTruncate (self, work, scaled):
+        work[:,:] = scaled // 2**16
+
+    def _initColors (self):
+        self._colorschemes = cs = {}
+
+        r = g = b = self._colorTruncate
+        cs[self.COLORING_BLACKTOWHITE] = (r, g, b)
+
+        #  These could all use some work.
+        
+        r = self._colorMakeGauss (255., 2**24 * 0.8, 2**24 * 0.333)
+        g = self._colorMakeGauss (255., 2**24 * 0.5, 2**24 * 0.333)
+        b = self._colorMakeGauss (255., 2**24 * 0.2, 2**24 * 0.5)
+        cs[self.COLORING_BLUETORED] = (r, g, b)
+        
+        r = self._colorMakeGauss (255., 2**24 * 0.8, 2**24 * 0.25)
+        g = self._colorMakeGauss (255., 2**24 * 0.4, 2**24 * 0.3)
+        b = self._colorMakeGauss (255., 2**24 * 0.8, 2**24 * 0.25)
+        cs[self.COLORING_GREENTOMAGENTA] = (r, g, b)
+        
     def makePixbuf (self):
         ncol, nrow = self.orig_ncol, self.orig_nrow
         e = self.enlargement
-        
+
         a2 = Numeric.zeros ((nrow, ncol, 3), 'b')
-        
-        a2[:,:,0] = self.scaled
-        a2[:,:,1] = self.scaled
-        a2[:,:,2] = self.scaled
+        work = N.ndarray ((nrow, ncol), N.uint8)
+
+        if not self.coloring in self._colorschemes:
+            raise Exception ('Unknown image colorization %d' % self.coloring)
+            
+        (r, g, b) = self._colorschemes[self.coloring]
+
+        r (work, self.scaled)
+        a2[:,:,0] = work
+        g (work, self.scaled)
+        a2[:,:,1] = work
+        b (work, self.scaled)
+        a2[:,:,2] = work
 
         pb = gdk.pixbuf_new_from_array (a2, gdk.COLORSPACE_RGB, 8)
 
@@ -202,6 +262,10 @@ class ArrayWindow (object):
         txt = 'Row %d, col %d; %s' % (row, col, val)
         self.sbmid = self.statusbar.push (self.sbctxt, txt)
 
+    def onClampingChanged (self, combo):
+        self.clamping = combo.get_active ()
+        self.update (True, True)
+        
     def onScalingChanged (self, combo):
         self.scaling = combo.get_active ()
         self.update (False, True)
@@ -210,9 +274,9 @@ class ArrayWindow (object):
         self.invertScale = toggle.get_active ()
         self.update (False, True)
         
-    def onClampingChanged (self, combo):
-        self.clamping = combo.get_active ()
-        self.update (True, True)
+    def onColoringChanged (self, combo):
+        self.coloring = combo.get_active ()
+        self.update (False, True)
         
     def onEnlargementChanged (self, spinbutton):
         self.enlargement = spinbutton.get_value_as_int ()
