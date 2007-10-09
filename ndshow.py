@@ -23,7 +23,7 @@ def _makeGladeFile ():
 
 _gladefile = _makeGladeFile ()
 
-class ArrayViewerTmp (object):
+class ArrayWindow (object):
     SCALING_LINEAR = 0
     SCALING_LOG = 1
     SCALING_SQRT = 2
@@ -68,7 +68,7 @@ class ArrayViewerTmp (object):
         
         self.img = xml.get_widget ('img')
 
-        # Scaling combo setup
+        # Clamping combo setup
 
         cb = xml.get_widget ('cb_clamping')
         cb.set_active (self.clamping)
@@ -246,24 +246,24 @@ class ArrayViewer (object):
 
         def init ():
             self.lock.acquire ()
-            self.viewer = ArrayViewerTmp (array, parent, **kwargs)
+            self.window = ArrayWindow (array, parent, **kwargs)
             self.lock.release ()
-            self.viewer.win.connect ('destroy', clear)
-            self.viewer.win.show_all ()
+            self.window.win.connect ('destroy', clear)
+            self.window.win.show_all ()
 
         gtkThread.send (init)
 
     def __del__ (self):
-        if self.viewer == None: return
+        if self.window == None: return
         if gtkThread == None: return # this can get GC'd before us!
 
         # See omega/gtkUtil:LiveDisplay.__del__ ()
 
         def doit ():
             self.lock.acquire ()
-            if self.viewer != None:
-                self.viewer.win.destroy ()
-                self.viewer = None
+            if self.window != None:
+                self.window.win.destroy ()
+                self.window = None
             self.lock.release ()
 
         gtkThread.send (doit)
@@ -271,7 +271,7 @@ class ArrayViewer (object):
     lingerInterval = 250
     
     def linger (self):
-        """Block the caller until the ArrayViewer window has been
+        """Block the caller until the ArrayWindow window has been
         closed by the user. Useful for semi-interactive programs to pause
         while the user examines a plot."""
 
@@ -281,7 +281,7 @@ class ArrayViewer (object):
 
         def check_done ():
             self.lock.acquire ()
-            haswin = self.viewer is not None
+            haswin = self.window is not None
             self.lock.release ()
 
             if haswin:
