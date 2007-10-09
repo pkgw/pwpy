@@ -52,9 +52,9 @@ class ArrayWindow (object):
         if scaling is None: scaling = self.SCALING_LINEAR
         if coloring is None: coloring = self.COLORING_BLACKTOWHITE
         
+        self.clamping = clamping
         self.scaling = scaling
         self.invertScale = False
-        self.clamping = clamping
         self.coloring = coloring
         self.enlargement = enlarge
 
@@ -75,6 +75,7 @@ class ArrayWindow (object):
         # their signal callbacks can set the image correctly.
         
         self.img = xml.get_widget ('img')
+        self.colorscale_img = xml.get_widget ('colorscale_img')
 
         # Clamping combo setup
 
@@ -103,6 +104,7 @@ class ArrayWindow (object):
         # All one. Draw the thing. self.clamped and self.scaled will
         # already have been set from the set_actives above.
 
+        self.updateColorscaleImage ()
         self.update (False, False)
 
     def doClamping (self):
@@ -196,9 +198,8 @@ class ArrayWindow (object):
         b = self._colorMakeGauss (255., 2**24 * 0.8, 2**24 * 0.25)
         cs[self.COLORING_GREENTOMAGENTA] = (r, g, b)
         
-    def makePixbuf (self):
-        ncol, nrow = self.orig_ncol, self.orig_nrow
-        e = self.enlargement
+    def makePixbuf (self, scaled, e):
+        nrow, ncol = scaled.shape
 
         a2 = Numeric.zeros ((nrow, ncol, 3), 'b')
         work = N.ndarray ((nrow, ncol), N.uint8)
@@ -208,11 +209,11 @@ class ArrayWindow (object):
             
         (r, g, b) = self._colorschemes[self.coloring]
 
-        r (work, self.scaled)
+        r (work, scaled)
         a2[:,:,0] = work
-        g (work, self.scaled)
+        g (work, scaled)
         a2[:,:,1] = work
-        b (work, self.scaled)
+        b (work, scaled)
         a2[:,:,2] = work
 
         pb = gdk.pixbuf_new_from_array (a2, gdk.COLORSPACE_RGB, 8)
@@ -228,8 +229,32 @@ class ArrayWindow (object):
         if rescale:
             self.doScaling ()
             
-        pb = self.makePixbuf ()
+        pb = self.makePixbuf (self.scaled, self.enlargement)
         self.img.set_from_pixbuf (pb)
+
+    # Colorscale demo image
+
+    _lastColorscaleWidth = -1
+    
+    def updateColorscaleImage (self):
+        alloc = self.colorscale_img.get_allocation ()
+        ncol = alloc.width
+        nrow = 16
+        self._lastColorscaleWidth = ncol
+        
+        scale = N.linspace (0, 2**24 - 1, ncol)
+        scale = N.vstack ((scale, scale, scale, scale))
+        scale = N.vstack ((scale, scale, scale, scale))
+
+        pb = self.makePixbuf (scale, 1)
+        self.colorscale_img.set_from_pixbuf (pb)
+
+    def onColorscaleAllocate (self, image, allocation):
+        if allocation.width == self._lastColorscaleWidth:
+            return
+
+        self.updateColorscaleImage ()
+    
     
     # Event handlers.
 
@@ -276,6 +301,7 @@ class ArrayWindow (object):
         
     def onColoringChanged (self, combo):
         self.coloring = combo.get_active ()
+        self.updateColorscaleImage ()
         self.update (False, True)
         
     def onEnlargementChanged (self, spinbutton):

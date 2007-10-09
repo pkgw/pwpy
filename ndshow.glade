@@ -232,6 +232,22 @@ Green to Magenta</property>
 	      </child>
 
 	      <child>
+		<widget class="GtkImage" id="colorscale_img">
+		  <property name="visible">True</property>
+		  <property name="xalign">0.5</property>
+		  <property name="yalign">0.5</property>
+		  <property name="xpad">0</property>
+		  <property name="ypad">0</property>
+		  <signal name="size_allocate" handler="onColorscaleAllocate" last_modification_time="Tue, 09 Oct 2007 23:30:44 GMT"/>
+		</widget>
+		<packing>
+		  <property name="padding">0</property>
+		  <property name="expand">False</property>
+		  <property name="fill">True</property>
+		</packing>
+	      </child>
+
+	      <child>
 		<widget class="GtkLabel" id="label3">
 		  <property name="visible">True</property>
 		  <property name="label" translatable="yes">&lt;b&gt;Enlargement Factor:&lt;/b&gt;</property>
