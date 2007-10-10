@@ -1,7 +1,7 @@
 """Utility class for rendering 2-D numpy arrays
 graphically as images."""
 
-# TODO: zooming, color, slices, histogram
+# TODO: zooming, slices, histogram
 
 import numpy as N
 import Numeric # ugh.
@@ -122,9 +122,25 @@ class ArrayWindow (object):
             clamped = self.orig_data - omin
             cmax = omax - omin
         elif self.clamping == self.CLAMPING_MYMEDIAN:
-            max = self.orig_med + (self.orig_med - self.orig_min) * 10
-            clamped = N.minimum (self.orig_data, max) - omin
-            cmax = max - omin
+            clamped = self.orig_data * 1.0
+
+            for i in range (0, 5):
+                med = N.median (clamped.ravel ())
+                quasistd = N.sqrt (((clamped - med)**2).mean ())
+                ciel = N.min (med + 5 * quasistd, omax)
+                floor = N.max (med - 5 * quasistd, omin)
+                
+                #nabove = len (N.where (self.orig_data > ciel)[0])
+                #nbelow = len (N.where (self.orig_data < floor)[0])
+                #
+                #print 'med %f, qs %f, ci %f, fl %f, nab %f, nbe %f' \
+                #      % (med, quasistd, ciel, floor, nabove, nbelow)
+
+                clamped = N.minimum (self.orig_data, ciel)
+                clamped = N.maximum (clamped, floor)
+                
+            clamped -= floor
+            cmax = ciel - floor
         else:
             raise Exception ('Unknown clamping mode %d' % self.clamping)
 
