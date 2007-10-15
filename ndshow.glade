@@ -157,7 +157,8 @@ None</property>
 		  <property name="visible">True</property>
 		  <property name="items" translatable="yes">Linear
 Logarithmic
-Square Root</property>
+Square Root
+Histogram Equalization</property>
 		  <property name="add_tearoffs">False</property>
 		  <property name="focus_on_click">True</property>
 		  <signal name="changed" handler="onScalingChanged" last_modification_time="Wed, 05 Sep 2007 00:16:25 GMT"/>

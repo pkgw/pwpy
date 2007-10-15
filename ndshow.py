@@ -24,14 +24,15 @@ def _makeGladeFile ():
 _gladefile = _makeGladeFile ()
 
 class ArrayWindow (object):
-    SCALING_LINEAR = 0
-    SCALING_LOG = 1
-    SCALING_SQRT = 2
-
     CLAMPING_MYMEDIAN = 0
     CLAMPING_MINMAX = 1
     CLAMPING_NONE = 2
 
+    SCALING_LINEAR = 0
+    SCALING_LOG = 1
+    SCALING_SQRT = 2
+    SCALING_HISTEQ = 3
+    
     COLORING_BLACKTOWHITE = 0
     COLORING_BLUETORED = 1
     COLORING_GREENTOMAGENTA = 2
@@ -159,7 +160,7 @@ class ArrayWindow (object):
         cmax = self.clamped_max
 
         # These are all slicewise assignments to set the array contents,
-        # not just the array variable. Otherwise we lose the uint8 datatype,
+        # not just the array variable. Otherwise we lose the uint32 datatype,
         # and the arrayness altogether when cmax = 0.
         
         if cmax == 0:
@@ -173,6 +174,21 @@ class ArrayWindow (object):
         elif self.scaling == self.SCALING_SQRT:
             scale = smax / N.sqrt (cmax + 1.0)
             scaled[:,:] = N.sqrt (self.clamped + 1.0) * scale
+        elif self.scaling == self.SCALING_HISTEQ:
+            # Scale by area under the image histogram -- equivalently, rank
+            # by percentile
+            # FIXME: if dealing with a very large array, should generate a
+            # smaller histogram sorted array if possible. But I think you must
+            # sort to generate a histogram, so might as well do things right ...
+            
+            raveled = self.clamped.ravel ()
+            
+            sorted = raveled * 1.0
+            sorted.sort ()
+
+            indexed = N.digitize (raveled, sorted) - 1
+            v = 1.0 * smax / len (sorted)
+            scaled[:,:] = indexed.reshape (nrow, ncol) * v
         else:
             raise Exception ('Unknown image scale %d' % self.scaling)
 
