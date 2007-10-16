@@ -141,7 +141,9 @@ class ArrayWindow (object):
                 clamped = N.maximum (clamped, floor)
                 
             clamped -= floor
-            cmax = ciel - floor
+            # for some reason this fails for the very highest values
+            #cmax = ciel - floor
+            cmax = clamped.max ()
         else:
             raise Exception ('Unknown clamping mode %d' % self.clamping)
 
