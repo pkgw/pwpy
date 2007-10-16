@@ -177,15 +177,19 @@ class ArrayWindow (object):
         elif self.scaling == self.SCALING_HISTEQ:
             # Scale by area under the image histogram -- equivalently, rank
             # by percentile
-            # FIXME: if dealing with a very large array, should generate a
-            # smaller histogram sorted array if possible. But I think you must
-            # sort to generate a histogram, so might as well do things right ...
+            # FIXME: we lose precision by taking only a subset of the sorted array,
+            # but digitize () gets very slow when its second argument is large.
+            # Even a ~512 element maximum is pushing it.
             
             raveled = self.clamped.ravel ()
             
             sorted = raveled * 1.0
             sorted.sort ()
 
+            if sorted.size > 512:
+                step = sorted.size / 512
+                sorted = sorted[::step]
+            
             indexed = N.digitize (raveled, sorted) - 1
             v = 1.0 * smax / len (sorted)
             scaled[:,:] = indexed.reshape (nrow, ncol) * v
@@ -275,9 +279,9 @@ class ArrayWindow (object):
         self._lastColorscaleWidth = ncol
 
         if self.invertScale:
-            scale = N.linspace (0, 2**24 - 1, ncol)
-        else:
             scale = N.linspace (2**24 - 1, 0, ncol)
+        else:
+            scale = N.linspace (0, 2**24 - 1, ncol)
             
         scale = N.vstack ((scale, scale, scale, scale))
         scale = N.vstack ((scale, scale, scale, scale))
@@ -290,8 +294,7 @@ class ArrayWindow (object):
             return
 
         self.updateColorscaleImage ()
-    
-    
+        
     # Event handlers.
 
     sbmid = None
@@ -339,7 +342,7 @@ class ArrayWindow (object):
     def onColoringChanged (self, combo):
         self.coloring = combo.get_active ()
         self.updateColorscaleImage ()
-        self.update (False, True)
+        self.update (False, False)
         
     def onEnlargementChanged (self, spinbutton):
         self.enlargement = spinbutton.get_value_as_int ()
