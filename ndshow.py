@@ -417,7 +417,7 @@ class ArrayViewer (object):
     the ArrayWindow automatically."""
     
     def __init__ (self, array, parent=None, **kwargs):
-        self.win = None
+        self.window = None
         self.lock = threading.Lock ()
         
         # see omega/gtkUtil:LiveDisplay.__init__ ().
@@ -430,7 +430,7 @@ class ArrayViewer (object):
 
             if instance != None:
                 instance.lock.acquire ()
-                instance.win = None
+                instance.window = None
                 instance.lock.release ()
 
         # End obscurity.
