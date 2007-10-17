@@ -6,24 +6,7 @@ graphically as images."""
 import numpy as N
 import Numeric # ugh.
 
-import gobject, gtk
-gdk = gtk.gdk
-from gtk import glade
-
-import omega.gtkThread as gtkThread
-import threading
-
-# A lot of this is copied from omega/gtkUtil.py as
-# a temp hack. Should be integrated.
-
-def _makeGladeFile ():
-    import os
-    f = os.path.dirname (__file__)
-    return os.path.join (f, 'ndshow.glade')
-
-_gladefile = _makeGladeFile ()
-
-class ArrayWindow (object):
+class ArrayTransformer (object):
     CLAMPING_MYMEDIAN = 0
     CLAMPING_MINMAX = 1
     CLAMPING_NONE = 2
@@ -36,9 +19,11 @@ class ArrayWindow (object):
     COLORING_BLACKTOWHITE = 0
     COLORING_BLUETORED = 1
     COLORING_GREENTOMAGENTA = 2
+
+    clamped = None
+    scaled = None
     
-    def __init__ (self, array, parent=None, title=None,
-                  clamping=None, scaling=None, coloring=None, enlarge=1):
+    def __init__ (self, array, clamping=None, scaling=None, coloring=None):
         if array.ndim != 2:
             raise Exception ('Can only show 2-dimensional arrays as images.')
 
@@ -57,57 +42,67 @@ class ArrayWindow (object):
         self.scaling = scaling
         self.invertScale = False
         self.coloring = coloring
-        self.enlargement = enlarge
 
         self._initColors ()
+
+    def setClamping (self, clamping):
+        if clamping == self.clamping:
+            return
+
+        if self.orig_min < 0. and clamping == self.CLAMPING_NONE:
+            raise Exception ('Must have some sort of clamping when minimum value less than 0')
         
-        # UI.
+        self.clamping = clamping
         
-        self.xml = xml = glade.XML (_gladefile)        
-        xml.signal_autoconnect (self)
+        self.clamped = None
+        self.scaled = None
 
-        # Window setup
+    def setScaling (self, scaling):
+        if scaling == self.scaling:
+            return
+
+        self.scaling = scaling
         
-        self.win = win = xml.get_widget ('window')
-        if title is not None: win.set_title (str (title))
-        if parent is not None: win.set_transient_for (parent)
+        self.scaled = None
 
-        # Image setup - do this before UI controls so that
-        # their signal callbacks can set the image correctly.
+    def setInvertScale (self, invertScale):
+        if invertScale == self.invertScale:
+            return
+
+        self.invertScale = invertScale
+
+        self.scaled = None
         
-        self.img = xml.get_widget ('img')
-        self.colorscale_img = xml.get_widget ('colorscale_img')
+    def setColoring (self, coloring):
+        if coloring == self.coloring:
+            return
 
-        # Clamping combo setup
+        self.coloring = coloring
 
-        cb = xml.get_widget ('cb_clamping')
-        cb.set_active (self.clamping)
+    def getClamped (self):
+        if self.clamped is None:
+            self.doClamping ()
 
-        # Scaling combo setup
+        return self.clamped
 
-        cb = xml.get_widget ('cb_scaling')
-        cb.set_active (self.scaling)
+    def getScaled (self):
+        if self.clamped is None:
+            self.doClamping ()
+        if self.scaled is None:
+            self.doScaling ()
 
-        # Scaling combo setup
+        return self.scaled
 
-        cb = xml.get_widget ('cb_coloring')
-        cb.set_active (self.coloring)
+    def getPixbufArray (self, enlargement):
+        if self.clamped is None:
+            self.doClamping ()
+        if self.scaled is None:
+            self.doScaling ()
 
-        # Enlargement setup
+        return self.makePixbufArray (self.scaled, enlargement)
 
-        xml.get_widget ('sb_enlargement').set_value (self.enlargement)
+    # Implementations.
         
-        # Statusbar setup
-        
-        self.statusbar = xml.get_widget ('statusbar')
-        self.sbctxt = self.statusbar.get_context_id ('Position')
-
-        # All one. Draw the thing. self.clamped and self.scaled will
-        # already have been set from the set_actives above.
-
-        self.updateColorscaleImage ()
-        self.update (False, False)
-
     def doClamping (self):
         omin, omax = self.orig_min, self.orig_max
         
@@ -116,9 +111,7 @@ class ArrayWindow (object):
             cmax = omax
 
             if omin < 0:
-                print 'Data minimum less than 0, must have some clamping'
-                cb = self.xml.get_widget ('cb_clamping')
-                cb.set_active (self.CLAMPING_MINMAX)
+                raise Exception ('Data minimum less than 0, must have some clamping')
         elif self.clamping == self.CLAMPING_MINMAX:
             clamped = self.orig_data - omin
             cmax = omax - omin
@@ -236,7 +229,7 @@ class ArrayWindow (object):
         b = self._colorMakeGauss (255., 2**24 * 0.8, 2**24 * 0.25)
         cs[self.COLORING_GREENTOMAGENTA] = (r, g, b)
         
-    def makePixbuf (self, scaled, e):
+    def makePixbufArray (self, scaled, e):
         nrow, ncol = scaled.shape
 
         a2 = Numeric.zeros ((nrow, ncol, 3), 'b')
@@ -254,20 +247,82 @@ class ArrayWindow (object):
         b (work, scaled)
         a2[:,:,2] = work
 
-        pb = gdk.pixbuf_new_from_array (a2, gdk.COLORSPACE_RGB, 8)
+        return a2
+
+# Viewer GUI
+
+import gobject, gtk
+gdk = gtk.gdk
+from gtk import glade
+
+import omega.gtkThread as gtkThread
+import threading
+
+# A lot of this is copied from omega/gtkUtil.py as
+# a temp hack. Should be integrated.
+
+def _makeGladeFile ():
+    import os
+    f = os.path.dirname (__file__)
+    return os.path.join (f, 'ndshow.glade')
+
+_gladefile = _makeGladeFile ()
+
+class ArrayWindow (object):
+    def __init__ (self, array, parent=None, title=None, enlarge=1, **kwargs):
+        self.xform = ArrayTransformer (array, **kwargs)
+
+        self.enlargement = enlarge
+        self.xml = xml = glade.XML (_gladefile)        
+        xml.signal_autoconnect (self)
+
+        # Window setup
+        
+        self.win = win = xml.get_widget ('window')
+        if title is not None: win.set_title (str (title))
+        if parent is not None: win.set_transient_for (parent)
+
+        # Image setup - do this before UI controls so that
+        # their signal callbacks can set the image correctly.
+        
+        self.img = xml.get_widget ('img')
+        self.colorscale_img = xml.get_widget ('colorscale_img')
+
+        # Sync UI to our input settings
+
+        cb = xml.get_widget ('cb_clamping')
+        cb.set_active (self.xform.clamping)
+
+        cb = xml.get_widget ('cb_scaling')
+        cb.set_active (self.xform.scaling)
+
+        cb = xml.get_widget ('cb_coloring')
+        cb.set_active (self.xform.coloring)
+
+        xml.get_widget ('sb_enlargement').set_value (self.enlargement)
+        
+        # Statusbar setup
+        
+        self.statusbar = xml.get_widget ('statusbar')
+        self.sbctxt = self.statusbar.get_context_id ('Position')
+
+        # All done. Draw the thing.
+
+        self.updateColorscaleImage ()
+        self.update ()
+
+    def makePixbuf (self, scaled, e):
+        nrow, ncol = scaled.shape
+        arr = self.xform.makePixbufArray (scaled, e)
+        pb = gdk.pixbuf_new_from_array (arr, gdk.COLORSPACE_RGB, 8)
 
         if e != 1:
             pb = pb.scale_simple (ncol * e, nrow * e, gdk.INTERP_NEAREST)
 
         return pb
 
-    def update (self, reclamp, rescale):
-        if reclamp:
-            self.doClamping ()
-        if rescale:
-            self.doScaling ()
-            
-        pb = self.makePixbuf (self.scaled, self.enlargement)
+    def update (self):
+        pb = self.makePixbuf (self.xform.getScaled (), self.enlargement)
         self.img.set_from_pixbuf (pb)
 
     # Colorscale demo image
@@ -280,7 +335,7 @@ class ArrayWindow (object):
         nrow = 16
         self._lastColorscaleWidth = ncol
 
-        if self.invertScale:
+        if self.xform.invertScale:
             scale = N.linspace (2**24 - 1, 0, ncol)
         else:
             scale = N.linspace (0, 2**24 - 1, ncol)
@@ -309,7 +364,7 @@ class ArrayWindow (object):
 
         # Map to image coordinates. This feels sketchy.
         
-        ncol, nrow = self.orig_ncol, self.orig_nrow
+        ncol, nrow = self.xform.orig_ncol, self.xform.orig_nrow
         enl = self.enlargement
         alloc = self.img.get_allocation ()
         x -= (alloc.width - ncol * enl) / 2
@@ -321,7 +376,7 @@ class ArrayWindow (object):
             return
         
         try:
-            val = 'value %g' % self.orig_data[row,col]
+            val = 'value %g' % self.xform.orig_data[row,col]
         except Exception, e:
             val = 'error getting value: %s' % e
             
@@ -329,26 +384,30 @@ class ArrayWindow (object):
         self.sbmid = self.statusbar.push (self.sbctxt, txt)
 
     def onClampingChanged (self, combo):
-        self.clamping = combo.get_active ()
-        self.update (True, True)
+        try:
+            self.xform.setClamping (combo.get_active ())
+        except:
+            combo.set_active (ArrayTransformer.CLAMPING_MINMAX)
+        
+        self.update ()
         
     def onScalingChanged (self, combo):
-        self.scaling = combo.get_active ()
-        self.update (False, True)
+        self.xform.setScaling (combo.get_active ())
+        self.update ()
 
     def onInvertToggled (self, toggle):
-        self.invertScale = toggle.get_active ()
+        self.xform.setInvertScale (toggle.get_active ())
         self.updateColorscaleImage ()
-        self.update (False, True)
+        self.update ()
         
     def onColoringChanged (self, combo):
-        self.coloring = combo.get_active ()
+        self.xform.setColoring (combo.get_active ())
         self.updateColorscaleImage ()
-        self.update (False, False)
+        self.update ()
         
     def onEnlargementChanged (self, spinbutton):
         self.enlargement = spinbutton.get_value_as_int ()
-        self.update (False, False)
+        self.update ()
 
 class ArrayViewer (object):
     """Instantiating this viewer creates an ArrayWindow object that is
