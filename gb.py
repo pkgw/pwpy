@@ -193,7 +193,8 @@ class ImageData (miriad.MiriadData):
 
     def xBasicShow (self, **params):
         self.checkExists ()
-        cgd = miriad.TaskCgDisp (in_=self.base, **params)
+        cgd = miriad.TaskCgDisp (in_=self.base, labtyp='hms', beamtyp='b,l',
+                                 **params)
         cgd.run ()
 
     def getStats (self, kind, **params):
@@ -273,9 +274,9 @@ class ImageData (miriad.MiriadData):
         cgd.run ()
         resid.delete ()
     
-    def xStats (self, kind='r'):
+    def xStats (self, kind='r', **kwargs):
         from math import pi
-        max, rms = self.getStats (kind)
+        max, rms = self.getStats (kind, **kwargs)
         bmaj, bmin = miriad.getImageBeamSize (self)
 
         bmaj *= 3600 * 180 / pi
@@ -402,3 +403,66 @@ def zapNext ():
 def zapReset ():
     global _zapIter
     _zapIter = None
+
+# Recreatable flagging
+
+class Flagger (object):
+    def __init__ (self, src, destvar='af'):
+        self.src = src
+        self.dest = src.makeVariant (destvar, VisData)
+        self.histname = str (src) + '.flaghist'
+        self.ops = []
+
+        if self.hasHistory ():
+            self.loadfile (self.histname)
+
+    def hasHistory (self):
+        return os.path.exists (self.histname)
+    
+    def loadfile (self, fname):
+        for l in file (fname, 'r'):
+            l = l.strip ()
+            if len (l) == 0: continue
+            
+            sel, line, flag, comment = l.split ('###')
+            self.ops.append ((sel, line, bool (flag), comment))
+
+    def apply (self):
+        # Write out history file
+        
+        f = file (self.histname, 'w')
+
+        for tup in self.ops:
+            print >>f, '###'.join ([str (x) for x in tup])
+
+        f.close ()
+
+        # Actually regenerate dest.
+        
+        self.dest.delete ()
+
+        miriad.TaskUVCat (vis=self.src, out=self.dest, nocal=True,
+                          nopass=True, nopol=True).run ()
+        
+        for sel, line, flag, comment in self.ops:
+            if flag: flagval = 'f'
+            else: flagval = 'u'
+
+            if sel == '': sel = None
+            if line == '': line = None
+            
+            miriad.TaskUVFlag (vis=self.dest, select=sel,
+                               line=line, flagval=flagval, brief=True).run ()
+
+    def flag (self, select, comment, flag=True):
+        self.ops.append ((select, '', flag, comment))
+
+    def flagChans (self, select, chstart, chlen, comment, flag=True):
+        """Flag the only certain channels in the given selection:
+        flagChans (select, chstart, chlen, comment)."""
+
+        line = 'chan,%d,%d' % (chlen, chstart)
+        self.ops.append ((select, line, flag, comment))
+
+    def smallUV (self):
+        self.flag ('uvrange(0,0.1)', 'Flag UV distances less than 0.1 klambda.')
