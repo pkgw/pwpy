@@ -1,3 +1,5 @@
+#! /usr/bin/env python
+
 models = {}
 
 def CasA (freq, year):
@@ -101,3 +103,62 @@ def addFromVLA (src, Lband, Cband):
 
     if src in models: raise Exception ('Already have a model for ' + src)
     models[src] = funcFromVLA (Lband, Cband)
+
+# If we're executed as a program, print out a flux given a source
+# name
+
+def _usage ():
+    from sys import stderr, argv, exit
+    
+    print >>stderr, """Usage: %s <source> <freq> [year]
+
+Where:
+  <source> is the source name (e.g., 3c348)
+  <freq> is the observing frequency in MHz (e.g., 1420)
+  [year] is the decimal year of the observation (e.g., 2007.8).
+     Only needed if <source> is CasA.
+
+Prints the flux in Jy of the specified calibrator at the
+specified frequency.""" % argv[0]
+    exit (0)
+    
+def _interactive ():
+    from sys import argv, exit, stderr
+
+    if len (argv) < 2: _usage ()
+
+    source = argv[1]
+
+    if source == 'CasA':
+        if len (argv) != 4: _usage ()
+
+        try:
+            year = float (argv[3])
+            initCasA (year)
+        except Exception, e:
+            print >>stderr, 'Unable to parse year \"%s\":' % argv[3], e
+            exit (1)
+    elif len (argv) != 3: _usage ()
+
+    try:
+        freq = float (argv[2])
+    except Exception, e:
+        print >>stderr, 'Unable to parse frequency \"%s\":' % argv[2], e
+        exit (1)
+        
+    if source not in models:
+        print >>stderr, 'Unknown source \"%s\". Known sources are:' % source
+        print >>stderr, '   ', ', '.join (sorted (models.keys ()))
+        exit (1)
+
+    try:
+        flux = models[source](freq)
+        print '%lg' % (flux, )
+        exit (0)
+    except Exception, e:
+        # Catch, e.g, going beyond frequency limits.
+        print >>stderr, 'Error finding flux of %s at %f MHz:' % (source, freq), e
+        exit (1)
+
+if __name__ == '__main__':
+    _interactive ()
