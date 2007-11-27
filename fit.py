@@ -155,3 +155,15 @@ def generic (model, x, y, params):
         raise Exception ('Least square fit failed: ' + msg)
 
     return pfit
+
+def _gausslinModel (x, y0, m, height, xmid, width):
+    return (y0 + x * m) + height * _exp (-0.5 * ((x - xmid)/width)**2)
+
+def gausslin (x, y, params=None):
+    """Least-squares fit of a Gaussian plus a linear offset. The parameter
+    tuple is of the form (y0, m, height, xmid, width)."""
+    
+    if params is None:
+        params = (0, 0) + guessGaussianParams (x, y)
+
+    return generic (_gausslinModel, x, y, params)
