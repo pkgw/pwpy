@@ -280,7 +280,7 @@ class TaskBase (object):
                 if self._cleanups: self._cleanups.append (val)
                 else: self._cleanups = [val]
                 
-            if val: cmd.append ("%s=%s" % (key, val))
+            if val is not None: cmd.append ("%s=%s" % (key, val))
 
         self.cmdline = ' '.join (cmd)
         return cmd
@@ -661,6 +661,11 @@ class TaskUVFlux (TaskBase):
     _params = ['vis', 'select', 'line', 'stokes', 'offset']
     _options = ['nocal', 'nopol', 'nopass', 'uvpol']
 
+class TaskUVFit (TaskBase):
+    _params = ['vis', 'stokes', 'line', 'select', 'object',
+               'spar', 'fix', 'out']
+    _options = ['residual']
+
 # These functions operate on single images or single visibilities,
 # using several of the tasks defined above.
 
@@ -768,7 +773,7 @@ def fitImagePoint (image, **kwargs):
     
     (stdout, stderr) = imf.snarf ()
 
-    rms = max = None
+    rms = max = dx = None
     
     for line in stdout:
         if 'RMS residual' in line:
@@ -776,14 +781,22 @@ def fitImagePoint (image, **kwargs):
             rms = float (a[3])
         elif 'Peak value:' in line:
             # '  Peak value:                 6.9948E-04 +/-  0.0000'
-            #  012345678901234567890123456789012345678901234567890123456
+            # '  Peak value:                  19.07     +/-  8.9466E-02
+            #  01234567890123456789123456789012345678901234567890123456
             #  0         1         2         3         4         5      
             max = float (line[30:40])
-
-    if rms is None or max is None:
+            err = float (line[45:56])
+        elif 'Offset Position' in line:
+            # '  Offset Position (arcsec):      -0.186   -37.349
+            #  012345678901234567890123456789012345678901234567890123456
+            #  0         1         2         3         4         5      
+            dx = float (line[30:40])
+            dy = float (line[40:50])
+            
+    if rms is None or max is None or dx is None:
         raise Exception ('Didn\'t get all info from imfit routine!')
 
-    return (max, rms)
+    return (max, err, rms, dx, dy)
 
 def fitImageGaussian (image, **kwargs):
     """Returns: (max, total, rms, maj, min)"""
@@ -825,6 +838,35 @@ def fitImageGaussian (image, **kwargs):
         raise Exception ('Didn\'t get all info from imfit routine!')
 
     return (max, total, rms, maj, min)
+
+def fitUVPoint (vis, **kwargs):
+    uvf = TaskUVFit (vis=vis, **kwargs)
+    uvf.object = 'point'
+    
+    (stdout, stderr) = uvf.snarf ()
+
+    rms = max = dx = None
+    
+    for line in stdout:
+        if 'RMS residual' in line:
+            rms = float (line.split (' ')[3])
+        elif 'Flux:' in line:
+            # '  Flux:                          3.792     +/- 8.62E-02'
+            #  01234567890123456789123456789012345678901234567890123456
+            #  0         1         2         3         4         5      
+            max = float (line[32:42])
+            err = float (line[47:58])
+        elif 'Offset Position' in line:
+            # '  Offset Position (arcsec):      -4.48    -1.33'
+            #  012345678901234567890123456789012345678901234567890123456
+            #  0         1         2         3         4         5      
+            dx = float (line[30:40])
+            dy = float (line[40:50])
+            
+    if rms is None or max is None or dx is None:
+        raise Exception ('Didn\'t get all info from imfit routine!')
+
+    return (max, err, rms, dx, dy)
 
 # Simple object representing a MIRIAD data set of some kind or another.
 # gb.py has VisData and ImageData subclasses, etc.

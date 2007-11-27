@@ -497,6 +497,6 @@ def showBlocking (array, parent=None, **kwargs):
                          'loop is running in another thread. Sorry.')
     
     w = ArrayWindow (array, parent, **kwargs)
-    w.connect ('destroy', gtk.main_quit)
-    w.show_all ()
+    w.win.connect ('destroy', gtk.main_quit)
+    w.win.show_all ()
     gtk.main ()

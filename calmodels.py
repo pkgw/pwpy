@@ -33,10 +33,10 @@ def initCasA (year):
 # Other models from Baars et al. 1977
 
 def _makeGenericBaars (a, b, c, fmin, fmax):
-    from numpy import log10
+    from numpy import log10, any
 
     def f (freq):
-        if freq < fmin or freq > fmax:
+        if any (freq < fmin) or any (freq > fmax):
             raise Exception ('Going beyond frequency limits of model!')
         
         lf = log10 (freq)

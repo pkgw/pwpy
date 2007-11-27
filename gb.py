@@ -70,6 +70,12 @@ class VisData (miriad.MiriadData):
     def apply (self, task):
         task.vis = self
         task.run ()
+
+    def fit (self, kind, **kwargs):
+        if kind == 'p':
+            return miriad.fitUVPoint (self, **kwargs)
+        else:
+            raise Exception ('unexpected fit kind ' + kind)
     
     def xShow (self, source=None, **params):
         self.checkExists ()
@@ -201,7 +207,7 @@ class ImageData (miriad.MiriadData):
         if kind == 'r': # raw
             (tmp, tmp, rms, max, tmp, tmp) = miriad.getImageStats (self, **params)
         elif kind == 'p': # point
-            (max, rms) = miriad.fitImagePoint (self, **params)
+            (max, xx, rms, xx, xx) = miriad.fitImagePoint (self, **params)
         elif kind == 'g': # gaussian
             (max, xx, rms, xx, xx) = miriad.fitImageGaussian (self, **params)
         elif kind == 't': # gaussian total
