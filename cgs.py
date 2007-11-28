@@ -42,5 +42,8 @@ tSun = 5770 # K
 mEarth = 5.974e27 # g
 rEarth = 6.378e8 # cm
 
+jypercgs = 1e23 # jy per (erg s^-1 cm^-2 Hz^-1) [dimensionless]
+cgsperjy = 1e-23
+
 bnu = lambda nu, T: 2 * h * nu**3 * c**-2 / (exp (h * nu / k / T) - 1)
 blambda = lambda lam, T: 2 * h * lam**-5 * c**2 / (exp (h * c / lam / k / T) - 1)
