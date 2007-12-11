@@ -6,6 +6,7 @@ magics:
 %slurp
 %reload
 %lstore
+%redo
 
 """
 
@@ -259,3 +260,28 @@ def magic_lstore (self, param_s=''):
             print 'Stored in "%s":' % pwd, ', '.join (descs)
 
 init_ip.expose_magic ('lstore', magic_lstore)
+
+# %redo
+
+def magic_redo (shell, argstr):
+    """Re-execute the specified commands.
+
+    %redo ranges... - Re-executes the input lines specified
+                      in 'ranges'. These ranges have the same
+                      format as the arguments to the %macro 
+                      magic.
+
+    Example:
+
+      %redo 1-4 12 
+
+    Rexecutes lines 1 through 4 (inclusive) and 12.
+    """
+
+    ip = shell.getapi ()
+    ranges = argstr.split ()
+    lines = shell.extract_input_slices (ranges, False)
+    shell.runlines ('\n'.join (lines))
+
+init_ip.expose_magic ('redo', magic_redo)
+
