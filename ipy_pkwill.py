@@ -124,6 +124,8 @@ def get_local_key ():
     return pwd, dbprefix
     
 def reload_local_vars (ip, db, verbose=False):
+    import sys
+
     pwd, dbprefix = get_local_key ()
     skeys = []
         
@@ -167,6 +169,8 @@ def magic_lstore (self, param_s=''):
     Upon initialization, locally stored variables will be recovered,
     and their names will be printed.
     """
+
+    import sys
 
     opts, args = self.parse_options (param_s, 'drz', mode='list')
     ip = self.getapi ()
