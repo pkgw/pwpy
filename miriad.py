@@ -895,12 +895,27 @@ class MiriadData (object):
 
     def moveTo (self, dest):
         self.checkExists ()
-
+        dest = str (dest)
+        
         if launchTrace is not None:
             launchTrace (['[rename]', 'from=%s' % self, 'to=%s' % dest])
         
         os.rename (self.base, dest)
         self.base = dest
+
+    def copyTo (self, dest):
+        self.checkExists ()
+        dest = str (dest)
+
+        if launchTrace is not None:
+            launchTrace (['[copy]', 'from=%s' % self, 'to=%s' % dest])
+
+        from shutil import copy
+
+        os.mkdir (dest)
+
+        for f in os.listdir (self.base):
+            copy (os.path.join (self.base, f), os.path.join (dest, f))
     
     def delete (self):
         # Silently not doing anything seems appropriate here.

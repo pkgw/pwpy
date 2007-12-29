@@ -104,6 +104,9 @@ def addFromVLA (src, Lband, Cband):
     if src in models: raise Exception ('Already have a model for ' + src)
     models[src] = funcFromVLA (Lband, Cband)
 
+addFromVLA ('3c84', 23.9, 23.3)
+addFromVLA ('3c138', 8.47, 3.78)
+
 # If we're executed as a program, print out a flux given a source
 # name
 
