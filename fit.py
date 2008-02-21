@@ -179,7 +179,7 @@ def makeGauss2dFunc (A, xmid, ymid, xwidth, ywidth):
 def guessGauss2dParams (data):
     from numpy import indices, sqrt, abs, arange, int
 
-    totel = data.sum ()
+    total = data.sum ()
     X, Y = indices (data.shape)
     x = (X * data).sum () / total
     y = (Y * data).sum () / total
