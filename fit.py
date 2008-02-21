@@ -194,7 +194,7 @@ def guessGauss2dParams (data):
 
     return A, x, y, xwidth, ywidth
 
-def gauss2d (data, guess=None, **kwargs):
+def gauss2d (data, guess=None, getResid=False, **kwargs):
     """guess and return value take the form: (height, xctr, yctr, xwidth, ywidth)."""
     
     from scipy import optimize
@@ -211,4 +211,8 @@ def gauss2d (data, guess=None, **kwargs):
     if success < 1 or success > 4:
         raise Exception ('Least square fit failed: ' + msg)
 
-    return pfit
+    if not getResid: return pfit
+
+    model = makeGauss2dFunc (*pfit)(*_numpy.indices (data.shape))
+    return pfit, data - model
+
