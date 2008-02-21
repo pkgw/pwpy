@@ -125,15 +125,17 @@ def gaussian (x, y, params=None):
 
     return pfit
 
-def generic (model, x, y, params):
+def generic (model, x, y, params, **kwargs):
     """Generic least-squares fitting algorithm. Parameters are:
 
-    model  - A function of N+1 variables: an ndarray of X values,
-             then N tunable parameters.
-    x      - The data X values.
-    y      - The data Y values.
-    params - A tuple of N values that are the initial guesses for
-             the parameters to model().
+    model    - A function of N+1 variables: an ndarray of X values,
+               then N tunable parameters.
+    x        - The data X values.
+    y        - The data Y values.
+    params   - A tuple of N values that are the initial guesses for
+               the parameters to model().
+    **kwargs - Optional extra parameters to pass to the fitting
+               function, scipy.optimize.leastsq().
 
     Returns: a tuple of N parameters that minimize the least-squares
     difference between the model function and the data.
@@ -149,9 +151,9 @@ def generic (model, x, y, params):
         return ravel (model (x, *p) - y)
 
     pfit, xx, xx, msg, success = optimize.leastsq (error, params,
-                                                   full_output=True)
+                                                   full_output=True, **kwargs)
 
-    if success != 1:
+    if success < 1 or success > 4:
         raise Exception ('Least square fit failed: ' + msg)
 
     return pfit
@@ -167,3 +169,46 @@ def gausslin (x, y, params=None):
         params = (0, 0) + guessGaussianParams (x, y)
 
     return generic (_gausslinModel, x, y, params)
+
+# This is all copied from the Scipy Cookbook page on "Fitting Data"
+
+def makeGauss2dFunc (A, xmid, ymid, xwidth, ywidth):
+    return lambda x, y: A * _exp (-0.5 * (((xmid - x) / xwidth)**2 + \
+                                          ((ymid - y) / ywidth)**2))
+
+def guessGauss2dParams (data):
+    from numpy import indices, sqrt, abs, arange, int
+
+    totel = data.sum ()
+    X, Y = indices (data.shape)
+    x = (X * data).sum () / total
+    y = (Y * data).sum () / total
+
+    col = data[:, int (y)]
+    row = data[int (x), :]
+
+    xwidth = sqrt (abs ((arange (col.size) - y)**2 * col).sum () / col.sum ())
+    ywidth = sqrt (abs ((arange (row.size) - x)**2 * row).sum () / row.sum ())
+
+    A = data.max ()
+
+    return A, x, y, xwidth, ywidth
+
+def gauss2d (data, guess=None, **kwargs):
+    """guess and return value take the form: (height, xctr, yctr, xwidth, ywidth)."""
+    
+    from scipy import optimize
+
+    if guess is None: guess = guessGauss2dParams (data)
+
+    def err (params):
+        model = makeGauss2dFunc (*params)(*_numpy.indices (data.shape))
+        return _numpy.ravel (model - data)
+
+    pfit, xx, xx, msg, success = optimize.leastsq (err, guess,
+                                                   full_output=True, **kwargs)
+
+    if success < 1 or success > 4:
+        raise Exception ('Least square fit failed: ' + msg)
+
+    return pfit
