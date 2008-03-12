@@ -216,3 +216,26 @@ def gauss2d (data, guess=None, getResid=False, **kwargs):
     model = makeGauss2dFunc (*pfit)(*_numpy.indices (data.shape))
     return pfit, data - model
 
+def power (x, y, params=None, **kwargs):
+    """Least-squares fit of a power law: y = q * x**alpha.
+
+    Returns: q, alpha.
+    """
+    
+    l = _numpy.log
+    
+    def model (x, q, alpha):
+        return q * x **alpha
+
+    if params is None:
+        dlogx = l (x.max ()) - l (x.min ())
+        dlogy = l (y.max ()) - l (y.min ())
+        alpha = dlogy / dlogx
+
+        mlogx = l (x).mean ()
+        mlogy = l (y).mean ()
+        q = _numpy.exp (- mlogy / alpha / mlogx)
+
+        params = (q, alpha)
+
+    return generic (model, x, y, params, **kwargs)

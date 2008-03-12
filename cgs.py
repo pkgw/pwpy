@@ -1,8 +1,8 @@
 """ cgs - Physical constants in CGS.
 
-For reference: the esu has dimensions of m^1/2 cm^3/2 s^-1
+For reference: the esu has dimensions of g^1/2 cm^3/2 s^-1
 
-E and B field have m^1/2 cm^-1/2 s^-1
+E and B field have g^1/2 cm^-1/2 s^-1
 
 esu * field = dyne
 """
