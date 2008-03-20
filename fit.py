@@ -252,6 +252,48 @@ def power (x, y, params=None, weights=None, **kwargs):
 import numpy as _N
 
 class FitBase (object):
+    """A object holding information in a generic fitting operation.
+    Fields are:
+
+            x     - The data abscissa values.
+            y     - The data ordinate values.
+       sigmas     - The uncertainties in the ordinate values.
+       params (*) - The best-fit parameters of the model describing the data.
+      uncerts (*) - The uncertainties in those parameters.
+        mfunc (*) - A function evaluating the best-fit model at arbitrary X values.
+        mdata (*) - The best-fit model function evaluated at the given data X values.
+       resids (*) - The residual values, mdata - y.
+       rchisq (*) - The reduced chi squared of the fit.
+
+    (An asterisk denotes values that are only available after fit() has been run.)
+    
+    Methods are:
+
+             setData      - Set the X, Y, and (optionally) sigma input data.
+           makeModel      - Create a function evaluating the model given a choice of
+                            parameters.
+      fakeDataSigmas      - Generate artificial data based on sample model parameters
+                            and given uncertainties in measurements.
+        fakeDataFrac      - Generate artificial data based on sample model parameters
+                            and a given fractional error value.
+          fakeSigmas (*)  - Set the sigma values to some fixed number.
+               guess (*)  - Guess a set of initial parameters based on the data.
+                 fit (*)  - Find the model parameters that best approximate the data.
+         printParams (**) - Print out the model parameters and their uncertainties.
+                plot (**) - Plot the data, the best-fit model, and the residuals.
+
+    (One asterisk denotes that the function requires setData() to have been called,
+    and two asterisks denote that the function requires fit () to have been called.)
+    
+    Subclassers must implement:
+
+      _paramNames - A list of textual names corresponding to the model parameters.
+            guess - The function to guess initial parameters, given the data.
+        makeModel - The function to return a model evaluator function.
+         _fitImpl - The function to actually perform the fit.
+    
+    """
+    
     _paramNames = None
 
     def __init__ (self):
@@ -273,7 +315,27 @@ class FitBase (object):
     def fakeSigmas (self, val):
         self.sigmas = _N.zeros_like (self.x) + val
         return self
-    
+
+    def fakeDataSigmas (self, x, sigmas, *params):
+        self.x = _N.asarray (x)
+        self.sigmas = _N.asarray (sigmas)
+        
+        mfunc = self.makeModel (*params)
+        self.y = mfunc (self.x) + _N.random.standard_normal (self.x.shape) * self.sigmas
+
+        return self
+        
+    def fakeDataFrac (self, x, frac, *params):
+        self.x = _N.asarray (x)
+        
+        mfunc = self.makeModel (*params)
+
+        y = mfunc (self.x)
+        self.sigmas = y * frac
+        self.y = y + _N.random.standard_normal (self.x.shape) * self.sigmas
+
+        return self
+        
     def guess (self):
         """Return a tuple of parameter guesses based on the X and Y data."""
         raise NotImplementedError ()
@@ -315,11 +377,9 @@ class FitBase (object):
         self.rchisq = None
 
         if self.sigmas is None:
-            sig = _N.ones_like (self.x)
-        else:
-            sig = self.sigmas
+            raise ValueError ('Must assess uncertainties; try fakeSigmas')
 
-        self._fitImpl (self.x, self.y, sig, guess)
+        self._fitImpl (self.x, self.y, self.sigmas, guess)
 
         if self.params is None:
             raise RuntimeError ('Failed to find best-fit parameters')
@@ -344,7 +404,8 @@ class FitBase (object):
             self.resids = self.y - self.mdata
 
         if self.rchisq is None:
-            self.rchisq = (self.resids**2).sum () / (self.x.size - len (self.params))
+            self.rchisq = ((self.resids / self.sigmas)**2).sum () / \
+                          (self.x.size - len (self.params))
 
         return self
 
@@ -418,13 +479,27 @@ class LinearFit (FitBase):
         self.b = (t * y * sm1).sum () / Stt
         self.a = (Sy - Sx * self.b) / S
         
-        self.sigma_a = (1 + Sx**2 / S / Stt) / S
-        self.sigma_b = Stt ** -1
+        self.sigma_a = _N.sqrt ((1 + Sx**2 / S / Stt) / S)
+        self.sigma_b = _N.sqrt (Stt ** -1)
 
         self.params = _N.asarray ((self.a, self.b))
         self.uncerts = _N.asarray ((self.sigma_a, self.sigma_b))
 
 class LeastSquaresFit (FitBase):
+    """A Fit object that implements its fit via a generic least-squares
+    minimization algorithm. Extra fields are:
+
+      cov (*) - The covariance matrix of the fitted parameters.
+
+    Subclassers must implement:
+
+      _paramNames - A list of textual names corresponding to the model parameters.
+            guess - The function to guess initial parameters, given the data.
+        makeModel - The function to return a model evaluator function.
+       _fitExport - (Optional.) Set individual fields equivalent to the best-fit
+                    parameters for ease of use.
+    """
+    
     _fitExport = None
     
     def _fitImpl (self, x, y, sig, guess, **kwargs):
@@ -450,7 +525,7 @@ class LeastSquaresFit (FitBase):
             raise Exception ('Least square fit failed: ' + msg)
 
         self.params = pfit
-        self.uncerts = cov.diagonal ()
+        self.uncerts = _N.sqrt (cov.diagonal ())
 
         self.cov = cov
 
@@ -493,3 +568,52 @@ class DemoLinearFit (LeastSquaresFit):
     def _fitExport (self):
         self.a, self.b = self.params
         self.sigma_a, self.sigma_b = self.uncerts
+
+class PowerLawFit (LeastSquaresFit):
+    _paramNames = ['q', 'alpha']
+    
+    def guess (self):
+        l = _N.log
+        
+        dlx = l (self.x.max ()) - l (self.x.min ())
+        dly = l (self.y.max ()) - l (self.y.min ())
+        alpha = dly / dlx
+
+        mlx = l (self.x).mean ()
+        mly = l (self.y).mean ()
+        q = _N.exp (- mly / alpha / mlx)
+
+        return (q, alpha)
+
+    def makeModel (self, q, alpha):
+        return lambda x: q * x ** alpha
+
+    def _fitExport (self):
+        self.q, self.alpha = self.params
+        self.sigma_q, self.sigma_a = self.uncerts
+
+class BiPowerLawFit (LeastSquaresFit):
+    _paramNames = ['xbr', 'ybr', 'alpha1', 'alpha2']
+    
+    def guess (self):
+        l = _N.log
+        
+        dlx = l (self.x.max ()) - l (self.x.min ())
+        dly = l (self.y.max ()) - l (self.y.min ())
+        alpha = dly / dlx
+
+        mx = self.x.mean ()
+        my = self.y.mean ()
+        
+        return (mx, my, alpha, alpha)
+
+    def makeModel (self, xbr, ybr, alpha1, alpha2):
+        def f (x):
+            a = (alpha2 - alpha1) * (x > xbr) + alpha1
+            return ybr * (x / xbr) ** a
+
+        return f
+
+    def _fitExport (self):
+        self.xbr, self.ybr, self.alpha1, self.alpha2 = self.params
+        self.sigma_xbr, self.sigma_ybr, self.sigma_a1, self.sigma_a2 = self.uncerts
