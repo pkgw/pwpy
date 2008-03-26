@@ -433,14 +433,14 @@ class FitBase (object):
         
         vb = omega.layout.VBox (2)
         
-        vb[0] = omega.quickXY (self.x, self.y, 'Data', lines=dlines)
+        vb[0] = vb.pData = omega.quickXY (self.x, self.y, 'Data', lines=dlines)
         vb[0].addXY (modx, mody, 'Model')
         vb[0].setYLabel ('Y')
         vb[0].nudgeBounds (False, True)
         
-        vb[1] = omega.RectPlot ()
+        vb[1] = vb.pResid = omega.RectPlot ()
         vb[1].defaultField.xaxis = vb[1].defaultField.xaxis
-        vb[1].addXY (self.x, self.resids, 'O - C', lines=False)
+        vb[1].addXY (self.x, self.resids, 'Resid.', lines=False)
         vb[1].setLabels ('X', 'Residuals')
         vb[1].nudgeBounds (False, True)
         
