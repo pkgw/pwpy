@@ -524,7 +524,12 @@ class LeastSquaresFit (FitBase):
         if success < 1 or success > 4:
             raise Exception ('Least square fit failed: ' + msg)
 
-        self.params = pfit
+        if len (guess) == 1:
+            # Coerce into arrayness.
+            self.params = N.asarray ((pfit, ))
+        else:
+            self.params = pfit
+            
         self.uncerts = _N.sqrt (cov.diagonal ())
 
         self.cov = cov
