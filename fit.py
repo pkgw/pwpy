@@ -526,7 +526,7 @@ class LeastSquaresFit (FitBase):
 
         if len (guess) == 1:
             # Coerce into arrayness.
-            self.params = N.asarray ((pfit, ))
+            self.params = _N.asarray ((pfit, ))
         else:
             self.params = pfit
             
