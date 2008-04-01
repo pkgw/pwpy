@@ -522,13 +522,6 @@ class TaskGPCopy (TaskBase):
     _params = ['vis', 'out', 'mode']
     _options = ['nopol', 'nocal', 'nopass']
 
-class TaskSelfCal (TaskBase):
-    _params = ['vis', 'select', 'model', 'clip', 'interval',
-               'minants', 'refant', 'flux', 'offset', 'line',
-               'out']
-    _options = ['amplitude', 'phase', 'smooth', 'polarized',
-                'mfs', 'relax', 'apriori', 'noscale', 'mosaic']
-
 class TaskMSelfCal (TaskBase):
     _params = ['vis', 'select', 'model', 'clip', 'interval',
                'minants', 'refant', 'flux', 'offset', 'line',
@@ -666,6 +659,13 @@ class TaskUVFit (TaskBase):
                'spar', 'fix', 'out']
     _options = ['residual']
 
+class SmaMfCal (TaskBase):
+    _name = 'smamfcal'
+    _params = ['vis', 'line', 'edge', 'flux', 'refant', 'minants',
+               'interval', 'weight', 'smooth', 'polyfit', 'tol']
+    _options = ['delay', 'nopassol', 'interpolate', 'oldflux',
+                'msmooth', 'opolyfit', 'wrap', 'averrll']
+    
 # These functions operate on single images or single visibilities,
 # using several of the tasks defined above.
 
