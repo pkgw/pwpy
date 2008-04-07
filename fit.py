@@ -312,6 +312,23 @@ class FitBase (object):
 
         return self
 
+    _lowerEdges = None
+    
+    def setDataDistrib (self, a, bins=10, range=None):
+        counts, lowerEdges = _N.histogram (a, bins, range)
+
+        upperEdges = lowerEdges.copy ()
+        upperEdges[:-1] = lowerEdges[1:]
+        upperEdges[-1] = 2 * lowerEdges[-1] - lowerEdges[-2]
+
+        self._lowerEdges = lowerEdges
+        self.x = (upperEdges + lowerEdges) / 2
+        self.y = counts
+        self.sigmas = _N.sqrt (counts)
+        self.sigmas[_N.where (self.sigmas == 0.)] = 1. # better choice?
+        
+        return self
+    
     def fakeSigmas (self, val):
         self.sigmas = _N.zeros_like (self.x) + val
         return self
@@ -430,6 +447,10 @@ class FitBase (object):
         else:
             modx = _N.linspace (self.x.min (), self.x.max (), 400)
             mody = self.mfunc (modx)
+
+        if self._lowerEdges is not None:
+            # Plot data as histogram
+            pass
         
         vb = omega.layout.VBox (2)
         
@@ -524,6 +545,13 @@ class LeastSquaresFit (FitBase):
         if success < 1 or success > 4:
             raise Exception ('Least square fit failed: ' + msg)
 
+        if cov is None:
+            print 'No covariance matrix!'
+            print 'Fit params:', pfit
+            print 'Message:', msg
+            print 'Success code:', success
+            raise Exception ('No covariance matrix!')
+        
         if len (guess) == 1:
             # Coerce into arrayness.
             self.params = _N.asarray ((pfit, ))
