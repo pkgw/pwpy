@@ -94,5 +94,3 @@ class DemoTweaky (TweakyPlot):
         self.dp.setFloats (self.x, y)
         
         self.p.rebound ()
-        self.p.nudgeBounds ()
-    
