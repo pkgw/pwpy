@@ -650,3 +650,24 @@ class BiPowerLawFit (LeastSquaresFit):
     def _fitExport (self):
         self.xbr, self.ybr, self.alpha1, self.alpha2 = self.params
         self.sigma_xbr, self.sigma_ybr, self.sigma_a1, self.sigma_a2 = self.uncerts
+
+class LameQuadraticFit (LeastSquaresFit):
+    """This is lame because it uses a least-squares fit when the
+    problem can be solved analytically."""
+    
+    _paramNames = ['a', 'b', 'c']
+
+    def guess (self):
+        a = self.x.mean ()
+        b = (self.y.max () - self.y.min ()) / (self.x.max () - self.x.min ())
+        c = (self.y**2 - self.x * b - a).mean ()
+
+        return (a, b, c)
+
+    def makeModel (self, a, b, c):
+        return _numpy.poly1d ([c, b, a])
+
+    def _fitExport (self):
+        self.a, self.b, self.c = self.params
+        self.sigma_a, self.sigma_b, self.sigma_c = self.uncerts
+        self.xExtremum = -self.b / 2 / self.c
