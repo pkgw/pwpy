@@ -25,7 +25,7 @@ class TweakyPlot (omega.ToplevelPaintParent):
         self.oa.connect ('expose_event', self.onExpose)
         vbox.pack_start (self.oa, True, True, 4)
             
-        for (name, pmin, pmax) in params:
+        for (name, pmin, pmax, digits) in params:
             hb = gtk.HBox (2)
             hb.set_homogeneous (False)
 
@@ -37,6 +37,7 @@ class TweakyPlot (omega.ToplevelPaintParent):
             s = gtk.HScale ()
             s.set_value_pos (gtk.POS_RIGHT)
             s.set_update_policy (gtk.UPDATE_CONTINUOUS)
+            s.set_digits (digits)
             s.connect ('value-changed', self.onChanged)
             
             self._adjs[name] = s.get_adjustment ()
@@ -56,7 +57,7 @@ class TweakyPlot (omega.ToplevelPaintParent):
     def onExpose (self, widget, event):
         # Export params
         
-        for (name, pmin, pmax) in self.params:
+        for (name, pmin, pmax, digits) in self.params:
             setattr (self, name, self._adjs[name].value)
 
         # Update data
@@ -76,9 +77,9 @@ class TweakyPlot (omega.ToplevelPaintParent):
 
 class DemoTweaky (TweakyPlot):
     def __init__ (self):
-        TweakyPlot.__init__ (self, [('xmid', -5., 5),
-                                    ('ht', 0., 10.),
-                                    ('w', 0., 5.)])
+        TweakyPlot.__init__ (self, [('xmid', -5., 5, 1),
+                                    ('ht', 0., 10., 1),
+                                    ('w', 0., 5., 1)])
 
     def _setup (self):
         self.dp = omega.rect.XYDataPainter ()
