@@ -330,6 +330,7 @@ class FitBase (object):
         return self
     
     def fakeSigmas (self, val):
+        """Set the uncertainty of every data point to a fixed value."""
         self.sigmas = _N.zeros_like (self.x) + val
         return self
 
