@@ -2,21 +2,24 @@
 
 models = {}
 
-def CasA (freq, year):
+def CasA (freqInMHz, year):
     """Return the flux of Cas A given a frequency and the year of
     observation. Based on the formula given in Baars et al., 1977.
     
     Parameters:
 
-    freq - Observation frequency in GHz.
+    freq - Observation frequency in MHz.
     year - Year of observation. May be floating-point.
 
     Returns: s, flux in Jy.
     """
     from math import log10
+
+    # The snu rule is right out of Baars et al. The dnu is corrected
+    # for the frequency being measured in MHz, not GHz.
     
-    snu = 10. ** (5.745 - 0.770 * log10 (freq * 1000.)) # Jy
-    dnu = 0.01 * (0.97 - 0.30 * log10 (freq)) # percent per yr.
+    snu = 10. ** (5.745 - 0.770 * log10 (freqInMHz)) # Jy
+    dnu = 0.01 * (0.07 - 0.30 * log10 (freqInMHz)) # percent per yr.
     loss = (1 - dnu) ** (year - 1980.)
 
     return snu * loss
@@ -35,11 +38,11 @@ def initCasA (year):
 def _makeGenericBaars (a, b, c, fmin, fmax):
     from numpy import log10, any
 
-    def f (freq):
-        if any (freq < fmin) or any (freq > fmax):
+    def f (freqInMHz):
+        if any (freqInMHz < fmin) or any (freqInMHz > fmax):
             raise Exception ('Going beyond frequency limits of model!')
         
-        lf = log10 (freq)
+        lf = log10 (freqInMHz)
         return 10.**(a + b * lf + c * lf**2)
 
     return f
@@ -92,8 +95,8 @@ def funcFromVLA (Lband, Cband):
     A, B = modelFromVLA (Lband, Cband)
     from numpy import log10
     
-    def f (freq):
-        return 10.**(A * log10 (freq) + B)
+    def f (freqInMHz):
+        return 10.**(A * log10 (freqInMHz) + B)
 
     return f
 
