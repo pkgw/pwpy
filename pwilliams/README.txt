@@ -1,15 +1,16 @@
-This directory contains various of Peter Williams' reduction
+This directory contains various of my (Peter Williams) reduction
 scripts. I'll try my best to make it obvious what they do, but no
 promises.
 
 The scripts contained in this directory (mmm/pwilliams) should only
 require a standard MIRIAD install to operate.
 
-The scripts contained in the "fancy" subdirectory rely on my stack
-of Python bindings to MIRIAD. There's a fairly complicated set of
-software that needs to be set up for these to work. See 
+The scripts contained in the "fancy" subdirectory
+(mmm/pwilliams/fancy) rely on my stack of Python bindings to
+MIRIAD. There's a fairly complicated set of software that needs to be
+set up for these to work. See
 
-   XXX write a logbook page
+   http://log.hcro.org/node/782
 
 for information on how to get access to an environment that lets you
 give those scripts a spin.
