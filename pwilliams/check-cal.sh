@@ -1,4 +1,12 @@
 #! /bin/bash
+#
+# Check the calibration applied to a dataset, by plotting
+# amplitude and phase versus UV distance to see if they look
+# nice and flat.
+#
+# Usage: check-cal.sh [visname] [pol]
+#
+# where we select only the specified polarization.
 
 if [ "$2" != xx -a "$2" != yy ] ; then
     echo "Usage: $0 vis polname" 1>&2

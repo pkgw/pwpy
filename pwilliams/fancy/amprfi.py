@@ -1,5 +1,14 @@
 #! /usr/bin/env python
 
+"""amprfi - Interactive tool for finding RFI by summing spectra
+
+We find RFI by summing spectra and searching for amplitude spikes.
+
+This documentation is wildly insufficient.
+
+Note that this is not a standalone script, but a module that should
+be imported into IPython and used interactively."""
+
 from bbs import *
 import omega
 from mirexec import TaskUVCal

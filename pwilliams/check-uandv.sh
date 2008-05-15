@@ -1,4 +1,11 @@
 #! /bin/bash
+#
+# Plot amplitude as a function of U and V, to check how
+# big a deal time-smearing is on the given dataset.
+#
+# Usage: check-uandv.sh [vis] [pol]
+#
+# where we select only the specified polarization.
 
 v="$1"
 shift

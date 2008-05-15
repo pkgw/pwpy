@@ -1,6 +1,10 @@
 #! /usr/bin/env python
 
-"""Varcat -- print values of UV variables."""
+"""Varcat -- print values of UV variables.
+
+It looks like the UVIO task basically does the same thing
+as this. But my formatting is prettier.
+"""
 
 import sys
 import mirtask
@@ -8,12 +12,11 @@ from mirtask import uvdat, keys
 
 #print 'varcat'
 
-keys.init ()
 keys.keyword ('vars', 'a', None, 64)
 keys.keyword ('context', 'a', None, 64)
 keys.keyword ('format', 'a', None, 64)
 keys.keyword ('cformat', 'a', None, 64)
-uvdat.init ('dslcef3')
+keys.doUvdat ('dsl3', True)
 opts = keys.process ()
 
 if len (opts.vars) == 0:

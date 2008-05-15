@@ -1,5 +1,12 @@
 #! /usr/bin/env python
 
+"""mfapply - Apply a "multiflag" file to a UV dataset.
+
+My flagging scripts generate .flags files in a special format.
+This script applies them to a UV dataset by invoking UVFLAG.
+Note that all the heavy lifting is done in the miriad-python
+wrapper."""
+
 import sys, miriad
 
 if len (sys.argv) < 6:

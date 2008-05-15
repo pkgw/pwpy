@@ -1,4 +1,18 @@
 #! /bin/bash
+#
+# Multi-file Invert, Clean, Restore.
+#
+# Generate an image from several vis files. Unlike icr.sh,
+# no polarization filtering is performed.
+#
+# Usage: micr.sh [vis1] [vis2] [vis3] ....
+#
+# Output files are
+#
+# [vis1].mp - Raw map
+# [vis1].bm - Beam
+# [vis1].cl - Cleaned map
+# [vis1].rm - Restored map
 
 vis="$1"
 mp="$1".mp

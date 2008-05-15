@@ -1,5 +1,15 @@
 #! /usr/bin/env python
 
+"""blflag - Baseline-based bad data flagger.
+
+Presents a graphical interface for identifying and flagging bad baselines
+in a dataset.
+
+This documentation is wildly insufficient.
+
+This can be used as a standalone script, or interactively as a module
+via IPython."""
+
 from bbs import *
 import omega, pickle
 from os import listdir, mkdir

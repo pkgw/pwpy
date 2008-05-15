@@ -1,4 +1,13 @@
 #! /bin/bash
+#
+# "Check SelfCal'ed U and V". Make a temporary copy of the data
+# set, selfcal it, and plot amplitude versus U and V. A quick
+# way to see how bad the time-smearing is affecting a given 
+# dataset.
+#
+# Usage: check-scuv.sh [vis] [pol]
+#
+# where we select only the specified polarization.
 
 if [ "$2" != xx -a "$2" != yy ] ; then
     echo "Usage: $0 vis polname" 1>&2

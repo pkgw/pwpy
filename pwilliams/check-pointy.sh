@@ -1,4 +1,13 @@
 #! /bin/bash
+#
+# Check how much uncalibrated data looks like a point source.
+# We make a temporary copy of the dataset, selfcal it to 
+# a point source with flux=1, and then plot amplitudes and
+# phases as a function of uvdistance.
+#
+# Usage: check-pointy.sh [vis] [pol]
+#
+# where we select only the specified polarization.
 
 if [ "$2" != xx -a "$2" != yy ] ; then
     echo "Usage: $0 vis polname" 1>&2

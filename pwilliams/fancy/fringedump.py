@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
-"""Fringe Fix -- scale vis amplitudes by a correction factor
-to compensate for our lack of fringe rotation."""
+"""FringeDump - Dump out some information related to correcting for
+time smearing. Not of general interest."""
 
 import sys
 import miriad, mirtask

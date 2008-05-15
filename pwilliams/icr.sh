@@ -1,4 +1,16 @@
 #! /bin/bash
+#
+# Invert, Clean, Restore. Generate an image from a single vis
+# file.
+#
+# Usage: icr.sh [vis] [pol]
+#
+# where we select only the specified polarization. Output files are
+#
+# [vis].mp - Raw map
+# [vis].bm - Beam
+# [vis].cl - Cleaned map
+# [vis].rm - Restored map
 
 if [ x"$2" != xxx -a x"$2" != xyy ] ; then
     echo "Usage: %0 vis pol" 1>&2

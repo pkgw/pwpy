@@ -1,3 +1,10 @@
+"""ata2mir -- Tables mapping ATA antenna names to MIRIAD antenna numbers.
+
+In theory, we should load this information per-dataset from the beginning
+of the history item, but it'd be real pain in the butt to do that. The
+antenna mapping has been constant (as far as I know...) so just hardcode it
+for now."""
+
 ata2mir0 = {
     '1a':  0, '1b':  1, '1c':  2, '1d':  3, '1e':  4,
     '1f':  5, '1g':  6, '1h':  7, '1j':  8, '1k':  9,
