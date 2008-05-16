@@ -13,12 +13,12 @@ from cgs import c
 omega_e = 2. * N.pi / 86400 # Earth rot rate in rads per sec
 deg2rad = N.pi / 180.
 
-ll.output ('fringe-fix.py')
+banner = 'FRINGEFIX: Correct for fringe rate amplitude loss'
+print banner
 
-keys.init ()
 keys.keyword ('out', 'f', ' ')
 keys.keyword ('maxscale', 'd', 7.)
-uvdat.init ('dslcef3')
+keys.doUvdat ('dsl3', True)
 opts = keys.process ()
 
 if opts.out == ' ':
@@ -180,8 +180,8 @@ print 'Suppressed %d records (%.2g%%) requiring scale factor > %g' % (nSupp, 100
 # All done. Write history entry and quit.
 
 dOut.openHistory ()
-dOut.writeHistory ('fringefix')
-dOut.logInvocation ('fringefix')
+dOut.writeHistory (banner)
+dOut.logInvocation ('FRINGEFIX')
 dOut.closeHistory ()
 dOut.close ()
 

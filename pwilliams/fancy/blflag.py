@@ -643,3 +643,4 @@ if __name__ == '__main__':
     
     blw = BLWindow (wf)
     blw.run ()
+    blw.workflow.work.delete ()
