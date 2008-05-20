@@ -4,6 +4,11 @@ import gtk
 import omega, omega.gtkUtil
 import numpy as N
 
+class MyArea (omega.gtkUtil.OmegaArea):
+    def _expose (self, widget, event):
+        self.owner._update ()
+        omega.gtkUtil.OmegaArea._expose (self, widget, event)
+            
 class TweakyPlot (omega.ToplevelPaintParent):
     def __init__ (self, params):
         self.params = params
@@ -21,8 +26,11 @@ class TweakyPlot (omega.ToplevelPaintParent):
         vbox.set_homogeneous (False)
         self.win.add (vbox)
 
-        self.oa = omega.gtkUtil.OmegaArea (self.p, omega.styles.WhiteOnBlackBitmap (), False)
-        self.oa.connect ('expose_event', self.onExpose)
+        self.oa = MyArea (self.p, omega.styles.WhiteOnBlackBitmap (), False)
+        self.oa.owner = self
+        # Wanted to do this, but this function is called after the
+        # widget actually repaints, which is no good.
+        #self.oa.connect ('expose_event', self.onExpose)
         vbox.pack_start (self.oa, True, True, 4)
             
         for (name, pmin, pmax, digits) in params:
@@ -52,9 +60,9 @@ class TweakyPlot (omega.ToplevelPaintParent):
 
         # Load in first batch of data
         
-        self.onExpose (None, None)
+        self._update ()
 
-    def onExpose (self, widget, event):
+    def _update (self):
         # Export params
         
         for (name, pmin, pmax, digits) in self.params:
