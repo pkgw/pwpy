@@ -3,6 +3,31 @@
 """Fringe Fix -- scale vis amplitudes by a correction factor
 to compensate for our lack of fringe rotation."""
 
+# I should write real documentation, but in the meantime ...
+#
+# This script scales the amplitude of each vis by
+#
+# 1 / sinc (-omega_e * u * cos (decl) * inttime)
+#
+# which, ideally, corrects for the loss in amplitude caused
+# by the fact that we don't compensate for fringe rotation.
+#
+# You run this like a normal MIRIAD task:
+#
+# fringefix.py vis=input out=output maxscale=3 options=nocal,nopass,nopol
+#
+# "vis" and "out" should be self-explanatory.
+#
+# "maxscale" sets the maximum scale factor that we are allowed to
+# apply: if data in a given vis would have its amplitude scaled by
+# more than this number, the vis is flagged instead. (Presumably,
+# a vis with a really low amplitude will have a correspondingly low
+# SNR, and we don't want them to mess up our results.) The default
+# is 7, which is probably too high.
+#
+# The nocal, nopass, and nopol options are the usual
+# calibration-related ones.
+
 import sys
 import miriad, mirtask
 import mirtask.lowlevel as ll
