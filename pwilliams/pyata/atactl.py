@@ -467,7 +467,9 @@ def launchFX64 (src, freq, radec, duration, outbase):
     log ('  Embedding coords: ' + radec)
     log ('          Duration: %f (%d dumps)' % (duration, ndumps))
 
-    args = ['/bin/sh', '/home/pkwill/obs/fx64.sh', src, str(freq), radec,
+    mydir = os.path.dirname (__file__)
+    script = os.path.join (mydir, 'fx64.sh')
+    args = ['/bin/sh', script, src, str(freq), radec,
             str(ndumps), outbase]
     
     if noopMode:
