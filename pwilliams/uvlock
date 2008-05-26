@@ -1,0 +1,47 @@
+#! /bin/bash
+# -*- shell-script -*-
+#
+# "Lock" a UV dataset, backing up its original contents.
+# Intended for when data at HCRO is going to be analyzed but
+# we want to be sure that the original correlator output is
+# recoverable if necessary.
+#
+# The small data items (everything except the visdata file)
+# are backed up in .orig files with their write bits removed.
+# The visdata itself just has its write bits removed, since
+# no normal operation will modify that file once the dataset
+# is written.
+#
+# So a dataset can be restored to its original state by:
+#
+# for f in $uv/*.orig ; do cp $f `echo $f |sed -e s/\.orig//` ; done
+#
+# (Well, this will not restore the permission bits, but you get
+# the idea.)
+#
+# Usage example: uvlock fx64a-*
+#
+
+while [ $# -gt 0 ] ; do
+    uv="$1"
+    shift
+
+    if [ ! -d "$uv" ] ; then
+	echo "$uv is not a directory"
+	exit 1
+    fi
+
+    echo "$uv"
+    
+    for f in "$uv"/* ; do
+	if [ "$f" = "$uv/visdata" ] ; then
+	    chmod 444 "$f"
+	else 
+	    cp "$f" "$f".orig
+	    chmod 444 "$f".orig
+	fi
+    done
+done
+
+exit 0
+
