@@ -5,6 +5,12 @@ promises.
 The scripts contained in this directory (mmm/pwilliams) should only
 require a standard MIRIAD install to operate.
 
+The scripts contained in the "BBS" subdirectory are my scripts for
+my broadband spectra observing campaign.
+
+The files in the "pyata" subdirectory are for HCRO computers, 
+allowing you to run various useful ata* commands in Python.
+
 The scripts contained in the "fancy" subdirectory
 (mmm/pwilliams/fancy) rely on my stack of Python bindings to
 MIRIAD. There's a fairly complicated set of software that needs to be
