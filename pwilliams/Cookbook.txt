@@ -1,0 +1,186 @@
+An ATA-42 Flagging and Calibration Cookbook
+Peter Williams <pwilliams@astro.berkeley.edu>
+============================================================
+
+
+
+Here's a quick cookbook that gives my standard ATA data flagging and
+calibration procedures. I'm not an experienced radio astronomer, and
+no one is truly experienced at working with ATA data, so all of these
+instructions should be regarded as provisional. I'll happily accept
+suggestions and corrections.
+
+The master copy of this document is stored in the "mmm" Subversion
+repository on svn.hcro.org. I've put it here since, at the moment,
+writing this document as simple text file is the most appealing
+thing. Perhaps this should be exported to log.hcro.org eventually.
+
+
+
+
+TERMINOLOGY
+============================================================
+
+Right now, observations with the ATA generate data in the form of
+Miriad datasets named
+
+       fx64a-SRC-FREQ_HALF
+
+Where SRC is the name of the target you're observing (as recognized by
+the ATA catalog system), FREQ is your observing frequency in MHz, and
+HALF is (what I call) the "correlator half" of the spectrum you're
+observing. The correlator outputs 1024 channels; the first 512 are in
+half 1, and the other 512 are in half 2.
+
+An indented line starting with "$" indicates a command that could be
+run in a shell. Command arguments enclosed in square brackets ("[]")
+are optional. Lines starting with "<" indicate sample output of the
+preceding command.
+
+An "antpol" is a particular antenna-polarization pair. The two
+polarization signals from a single antenna are treated separately for
+pretty much the entire signal path of the ATA. The terminology
+emphasizes that a problem with a particular input to the correlator is
+often not associated with one antenna, but with one particular
+polarization of one particular antenna.
+
+When processing a dataset in some way that generates a new Miriad
+dataset, my convention is to name the new dataset as the old one,
+followed by a period (".") and a few letters indicating what kind of
+processing happened. For instance, if FX-calibrating a dataset, I
+usually name the new dataset with a ".fxx" or ".fxy" at the end, the
+final letter indicating which polarization was used. (The FX
+calibration done by UVCAL can't handle more than on parallel-hand
+polarization at once.) E.g.,
+
+  $ uvcal options=fxcal select='pol(xx)' vis=fx64a-SRC-FREQ_HALF \
+    out=fx64a-SRC-FREQ_HALF.fxx
+  $ uvaver interval=10 vis=fx64a-SRC-FREQ_HALF out=fx64a-SRC-FREQ_HALF.av
+
+
+
+
+FLAGGING RECIPE
+============================================================
+
+One of the earliest steps of working with ATA data will almost always
+be flagging. This is done 99% of the time with the UVFLAG Miriad
+task. PKGW's steps for flagging observations are:
+
+* The DC channel of the correlator is always bad. This is the very
+  first channel of half-2 datasets:
+
+  $ uvflag flagval=f line=chan,1,1 vis=fx64a-SRC-FREQ_2
+
+  for all SRC and FREQ.
+
+* The edges of the ATA bandpass are always very low-amplitude and are
+  likely to suffer from quantization errors. The usual practice is to
+  flag the 100 channels on each edge of the bandpass; I sometimes use
+  128 if I'm feeling more power-of-two-y.
+
+  $ uvflag flagval=f line=chan,100,1 vis=fx64a-SRC-FREQ_1
+  $ uvflag flagval=f line=chan,100,413 vis=fx64a-SRC-FREQ_2
+
+  Note that each correlator half has 512 channels, numbered starting
+  at 1, so the last channel number in each half is #513 and the last
+  100 channels are 413 - 513.
+
+* Experience shows that there is a fair level of crosstalk between
+  antpols that are on the same ADC card that also have the same Walsh
+  function applied to them. The data from baselines corresponding to these
+  antpols have unusable data.
+
+  David MacMahon has a quick shell script that looks at the "history"
+  item of an ATA dataset and reports what baselines are have the same
+  Walsh function and are digitized on the same ADC card. These
+  baselines should be flagged. The script is available on the HCRO
+  computers and is called walsh_adc_conflict.sh:
+
+  $ walsh_adc_conflict.sh fx64a-SRC-FREQ_HALF
+  <   fx64a   54   i14.fxa in2   4jyb   35Y   Walsh 0  
+  <   fx64a   55   i14.fxa in3   5cyb   39Y   Walsh 0  
+  <
+  <   fx64a   18   i05.fxa in2   1kyb   10Y   Walsh 2  
+  <   fx64a   19   i05.fxa in3   2hyb   18Y   Walsh 2  
+  < 
+  <   fx64a   56   i15.fxa in0   1byb    2X   Walsh 2  
+  <   fx64a   57   i15.fxa in1   4kyb   36X   Walsh 2 
+  $ uvflag flagval=f select='ant(ANT1)(ANT2),pol(POL)' vis=fx64a-SRC-FREQ_HALF
+  $ uvflag ...
+
+  With ANT1, ANT2, and POL corresponding to the pairs listed in the 
+  output of walsh_adc_conflict.sh. In the sample output above, you'd
+  flag 
+
+  ant(35)(39),pol(yy)
+  ant(10)(18),pol(yy)
+  ant(2)(23),pol(xx)
+
+  The bad baselines identified by walsh_adc_conflict.sh are a function
+  of the physical configuration of the correlator, and so will not
+  vary across a single observing run. So you can run
+  walsh_adc_conflict.sh on one dataset from your observation, figure
+  out the appropriate UVFLAG commands, and then apply them to all of
+  your datasets.
+  
+* If your data were taken during the daytime, you may have to flag out
+  baselines showing solar interference. I do not know of a good easy
+  way to identify these baselines. Baselines with short UV distances
+  are likely candidates, since the solar radiation will be more
+  correlated on small distances. Baselines with solar interference
+  tend to have amplitudes that oscillate across the band. You can look
+  for these manually by looking at spectra:
+
+  $ smauvspec device=1/xs axis=ch,bo select='pol(xx),-auto' nxy=NX,NY \
+    vis=fx64a-SRC-FREQ_HALF [interval=MINUTES]
+
+  The dataset used can probably be arbitrary. PKGW assumes that
+  baselines that show interference in one dataset will show
+  interference in all datasets. This assumption may not be
+  correct. 
+
+  Set NX and NY to something that will keep spectra small but legible
+  in your PGPLOT window. Adding an "interval" keyword to time-average
+  your data may wash out the amplitude oscillations. Presumably, solar
+  interference that shows up in the XX pol should also show up in YY,
+  but this presumption hasn't been examined.
+
+* With the egregiously bad baselines flagged out, some attempts at
+  automated RFI flagging can be made. Several people have written
+  scripts that attempt to do this; one of Garrett's is described at
+
+  http://log.hcro.org/node/571
+
+  PKGW's favored technique is to sum together *all* of the spectra in an
+  observation, regardless of baseline, that are made at the same frequency.
+  This is implemented with his semi-interactive Python module
+  amprfi.py, in the pwilliams/fancy directory of the MMM Subversion
+  repository. FIXME: this tool should be documented, but it has an
+  enormous learning curve.
+
+  FIXME: fill this in.
+
+* Now that RFI is flagged out, the passband-averaged visibility
+  amplitudes and phases should be somewhat believable.  This means
+  that closure-based flagging is possible.
+
+  If you have observations of a point-source-like calibrator, closure
+  phases can be examined to identify bad antennas and
+  baselines. Unfortunately, with 42 antennas, there are *very* many
+  closure triples to examine. PKGW has a program to look at closure
+  triples and attempt to figure out if there are any "culprit"
+  baselines consistently associated with the bad triples, but this is
+  not the place to document it. Contact him if this program would be
+  of interest to you.
+
+* FIXME: Phase stddev-based flagging
+
+* FIXME: paying attention to what ataalarms -l has complained about.
+
+
+
+CALIBATION RECIPE
+============================================================
+
+FIXME: this.
