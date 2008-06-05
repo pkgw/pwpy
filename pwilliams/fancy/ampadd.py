@@ -82,9 +82,9 @@ class AmpFlagsAccum (object):
                     self.sdf = tup[0].getVarFirstDouble ('sdf', -1)
                 else:
                     if self.freq != freq or self.sfreq != sfreq:
-                        print >>sys.stderr, 'ERROR: Previous datasets have freq = %g and sfreq = %g' \
+                        print >>sys.stderr, 'Error: Previous datasets have freq = %g and sfreq = %g' \
                               % (self.freq, self.sfreq)
-                        print >>sys.stderr, 'ERROR: This one (%s) has freq = %g and sfreq = %g' \
+                        print >>sys.stderr, 'Error: This one (%s) has freq = %g and sfreq = %g' \
                               % (tup[0].name, freq, sfreq)
                         sys.exit (1)
 
@@ -111,11 +111,11 @@ afa = AmpFlagsAccum ()
 args = keys.process ()
 
 if len (args.vis) < 1:
-    print >>sys.stderr, 'No input datasets specified!'
+    print >>sys.stderr, 'Error: No input datasets specified!'
     sys.exit (1)
 
 if args.log == ' ':
-    print >>sys.stderr, 'No output logfile specified!'
+    print >>sys.stderr, 'Error: No output logfile specified!'
     sys.exit (1)
 
 print 'Reading data ...'
@@ -124,7 +124,7 @@ for v in args.vis:
     v = VisData (v)
     
     if not v.exists:
-        print >>sys.stderr, 'No such dataset', v
+        print >>sys.stderr, 'Error: No such dataset', v
         sys.exit (1)
         
     print '    ', v
