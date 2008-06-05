@@ -1,10 +1,12 @@
 #! /usr/bin/env python
 
-"""ampadd - Average UV amplitudes over time and baseline but not frequency.
+"""ampadd - Average UV amplitudes over everything but frequency.
 
 This task is intended to aid in the detection of high-duty-cycle RFI.
-By averaging amplitudes over baseline and time, those channels that frequently
-have above-average amplitudes stand out.
+By averaging amplitudes over everything but frequency, those channels
+that frequently have above-average amplitudes stand out. Thus, this
+approach is most sensitive to signals that are omnipresent: detectible
+at all times, in all polarizations, on all baselines, etc.
 
 Keyword: vis
         The input visibility files(s). The more files are input, the more
@@ -30,7 +32,7 @@ from mirtask import util, keys
 import numpy as N
 import sys
 
-banner = 'AMPADD (Python): average UV amplitudes over time and baseline but not frequency'
+banner = 'AMPADD (Python): average UV amplitudes over everything but frequency'
 print banner
 
 keys.keyword ('log', 'f', ' ')
@@ -134,7 +136,7 @@ fout = file (args.log, 'w')
 print 'Writing', args.log, '...'
 
 for i in xrange (0, afa.ch.size):
-    ch = afa.ch[i]
+    ch = afa.ch[i] + 1
     y = afa.y[i]
     freq = afa.sfreq + i * afa.sdf
 
