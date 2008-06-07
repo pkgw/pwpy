@@ -10,7 +10,6 @@ This documentation is wildly insufficient.
 This can be used as a standalone script, or interactively as a module
 via IPython."""
 
-from bbs import *
 import omega, pickle
 from os import listdir, mkdir
 from os.path import basename, join, isdir, exists, dirname
@@ -575,49 +574,6 @@ class IterFlagWorkFlow (object):
 
         f.close ()
 
-class WorkingWorkFlow (FlagWork,IterFlagWorkFlow):
-    def __init__ (self):
-        FlagWork.__init__ (self)
-        
-        self.makeFxs (True, False)
-        self.pruneDone ()
-    
-    def pruneDone (self):
-        todel = []
-
-        for fx in self.fxs:
-            rname = basename (fx.pred.base)
-            f = '%s/%s/blflag-%s.flags' % (self.fdata, rname, fx.pol)
-
-            if exists (f) or not fx.exists:
-                todel.append (fx)
-
-        print 'Pruning:'
-        
-        for fx in todel:
-            print '  ', fx
-            self.fxs.remove (fx)
-
-    def next (self):
-        if len (self.fxs) == 0: return False
-
-        fx = self.fxs[0]
-        del self.fxs[0]
-
-        pname = basename (fx.pred.base)
-        flagfile = '%s/%s/blflag-%s.flags' % (self.fdata, pname, fx.pol)
-        
-        self.startFile (fx, fx.pol, flagfile)
-        return True
-
-    def write (self):
-        try: mkdir (self.fdata)
-        except OSError: pass
-
-        try: mkdir (dirname (self.flagfile))
-        except OSError: pass
-
-        IterFlagWorkFlow.write (self)
 
 class SingleWorkFlow (IterFlagWorkFlow):
     def __init__ (self, vis, pol, flagfile):
@@ -633,12 +589,10 @@ class SingleWorkFlow (IterFlagWorkFlow):
         return True
 
 if __name__ == '__main__':
-    if len (sys.argv) == 1:
-        wf = WorkingWorkFlow ()
-    elif len (sys.argv) == 4:
+    if len (sys.argv) == 4:
         wf = SingleWorkFlow (VisData (sys.argv[1]), sys.argv[2], sys.argv[3])
     else:
-        print 'Usage: %s [vis pol flagfile]' % sys.argv[0]
+        print 'Usage: %s vis pol flagfile' % sys.argv[0]
         sys.exit (1)
     
     blw = BLWindow (wf)
