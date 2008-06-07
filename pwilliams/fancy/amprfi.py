@@ -224,12 +224,15 @@ class AmpRfi (object):
         print 'Writing %s ...' % self.fname
 
         print >>f, '# amprfi %d %d %d' % (self.mfactor, self.boxcar, self.pad)
-        print >>f, '!%04d---%d---' % (self.freq, self.half)
-        
-        for bound in self.toFlag:
-            start = bound[0] + 1 # convert to 1-based
-            num = bound[1] - bound[0]
-            print >>f, '---chan,%d,%d---f' % (num, start)
+
+        def makeChans ():
+            for bound in self.toFlag:
+                start = bound[0] + 1 # convert to 1-based
+                num = bound[1] - bound[0]
+                yield '%d,%d' % (num, start)
+            
+        print >>f, 'freq=%04d atahalf=%d chan=%s' \
+              % (self.freq, self.half, ';'.join (makeChans ()))
 
         f.close ()
 
