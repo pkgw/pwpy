@@ -167,7 +167,12 @@ PKGW's steps for flagging observations are:
   out the average spectrum to a logfile that can then be plotted. One
   can then pick out the RFI-afflicted channels by eye. This script
   lives in the pwilliams/fancy directory of the MMM Subversion repository.
+  To run it, you need to configure your environment by running
 
+  $ source /cosmic1/pkwill/usemir.sh
+
+  Once that's been done:
+  
   $ ampadd.py vis='fx64a-*-FREQ_HALF' log=rfi-FREQ-HALF.txt
 
   One way to visualize the results is with Gnuplot:
@@ -196,6 +201,8 @@ PKGW's steps for flagging observations are:
   that computes closure triples and lists the triples, baselines, and
   antennas that have the worst closure properties. The program lives
   in the pwilliams/fancy directory of the MMM Subversion repository.
+  (To run it you will need to have run the 'source' command given in
+  the previous section, but you only need to run it once.)
 
   $ closanal.py vis='fx64a-CAL-FREQ_HALF' interval=10
 
