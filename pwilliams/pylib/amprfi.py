@@ -9,8 +9,8 @@ This documentation is wildly insufficient.
 Note that this is not a standalone script, but a module that should
 be imported into IPython and used interactively."""
 
-from bbs import *
-import omega
+import omega, numpy as N
+import miriad
 from mirexec import TaskUVCal
 import os.path
 
@@ -236,70 +236,9 @@ class AmpRfi (object):
 
         f.close ()
 
-class WorkRfi (AmpRfi,FlagWork):
-    def __init__ (self):
-        FlagWork.__init__ (self)
-        
-        try: os.mkdir (self.fdata)
-        except OSError: pass
+def vglob (match):
+    from glob import glob
+    for p in glob (match):
+        yield miriad.VisData (p)
 
-        self.fh = None
-        self.byfh = byfh = {}
-
-        for pol in 'xx', 'yy':
-            for vis in self.raws:
-                fh = (vis.freq, vis.half)
-
-                if fh in byfh: byfh[fh].append (vis.fxcal (pol, False))
-                else: byfh[fh] = [vis.fxcal (pol, False)]
-        
-        print 'Run runFxcals () to create the fxcaled bypol datasets'
-        print 'Or doNext () to get going.'
-        print 'Or pruneDone () to skip redoing FHs that have already been flagged.'
-
-    def runFxcals (self):
-        self.makeFxs (True, True)
-    
-    def pruneDone (self):
-        toprune = []
-
-        for fh in self.byfh.iterkeys ():
-            f = '%s/amprfi-%04d-%d.flags' % ((self.fdata, ) + fh)
-
-            if os.path.exists (f): toprune.append (fh)
-
-            any = False
-            for vis in self.byfh[fh]:
-                any = any or vis.exists
-
-            if not any: toprune.append (fh)
-
-        if len (toprune) == 0: return
-
-        print 'Already done:'
-        
-        for fh in toprune:
-            print '   %04d %d' % fh
-            del self.byfh[fh]
-
-    def doNext (self, fh=None):
-        if self.fh is not None: self.write ()
-        self.skipNext (fh)
-        
-    def skipNext (self, fh=None):
-        if len (self.byfh) == 0:
-            print 'No more to do'
-            return
-
-        if fh is None:
-            fh = self.byfh.keys ()[0]
-
-        self.fh = fh
-        vises = self.byfh[fh]
-        del self.byfh[fh]
-
-        fname = '%s/amprfi-%04d-%d.flags' % ((self.fdata, ) + fh)
-
-        self.setupNext (vises, fname, fh[0], fh[1])
-
-__all__ = ['AmpRfi', 'WorkRfi']
+__all__ = ['AmpRfi', 'vglob']

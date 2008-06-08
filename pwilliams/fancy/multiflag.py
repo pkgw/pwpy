@@ -15,6 +15,8 @@ from mirtask import uvdat, keys, util
 import numpy as N
 
 class Condition (object):
+    __slots__ = ['isSubRecord']
+
     def __init__ (self, isSubRecord):
         self.isSubRecord = isSubRecord
 
@@ -28,8 +30,14 @@ class Condition (object):
         # to 1 for all X that you do NOT match.
         raise NotImplementedError ()
 
+    def formatParams (self):
+        # Return a string-formatted version of your parameters
+        # or None
+        raise NotImplementedError ()
+        
+
 class CAnt (Condition):
-    __slots__ = ['isSubRecord', 'ants']
+    __slots__ = ['ants']
     
     def __init__ (self, paramstr):
         Condition.__init__ (self, False)
@@ -38,8 +46,11 @@ class CAnt (Condition):
     def matchRecord (self, inp, uvw, time, bl):
         return bl[0] in self.ants or bl[1] in self.ants
 
+    def formatParams (self):
+        return ','.join (str (x) for x in self.ants)
+    
 class CBaseline (Condition):
-    __slots__ = ['isSubRecord', 'bls']
+    __slots__ = ['bls']
     
     def __init__ (self, paramstr):
         Condition.__init__ (self, False)
@@ -55,19 +66,25 @@ class CBaseline (Condition):
     def matchRecord (self, inp, uvw, time, bl):
         return bl in self.bls
 
+    def formatParams (self):
+        return ','.join ('%d-%d' % x for x in self.bls)
+
 class CPol (Condition):
-    __slots__ = ['isSubRecord', 'pols']
+    __slots__ = ['pols']
     
     def __init__ (self, paramstr):
         Condition.__init__ (self, False)
 
-        self.pols = set (mirtask.util.polarizationNumber (s) for s in paramstr.split (','))
+        self.pols = set (util.polarizationNumber (s) for s in paramstr.split (','))
 
     def matchRecord (self, inp, uvw, time, bl):
         return uvdat.getPol () in self.pols
 
+    def formatParams (self):
+        return ','.join (util.polarizationName (p) for p in self.pols)
+
 class CAuto (Condition):
-    __slots__ = ['isSubRecord']
+    __slots__ = []
 
     def __init__ (self, paramstr):
         Condition.__init__ (self, False)
@@ -75,9 +92,11 @@ class CAuto (Condition):
 
     def matchRecord (self, inp, uvw, time, bl):
         return bl[0] == bl[1]
-    
+
+    def formatParams (self): return None
+
 class CCross (Condition):
-    __slots__ = ['isSubRecord']
+    __slots__ = []
 
     def __init__ (self, paramstr):
         Condition.__init__ (self, False)
@@ -86,6 +105,27 @@ class CCross (Condition):
     def matchRecord (self, inp, uvw, time, bl):
         return bl[0] != bl[1]
 
+    def formatParams (self): return None
+
+class CFreq (Condition):
+    __slots__ = ['freqs']
+
+    def __init__ (self, paramstr):
+        Condition.__init__ (self, False)
+        self.freqs = [float (x) for x in paramstr.split (',')]
+
+    def matchRecord (self, inp, uvw, time, bl):
+        freq = inp.getVarDouble ('freq') * 1000 # convert to MHz
+
+        for f in self.freqs:
+            if abs (freq - f) / f < 0.005:
+                return True
+
+        return False
+
+    def formatParams (self):
+        return ','.join (str (x) for x in self.freqs)
+    
 def mergeChannels (chanlist):
     # Assume channel numbers here are all 0-indexed
     merged = []
@@ -111,7 +151,7 @@ def mergeChannels (chanlist):
     return merged
     
 class CChannel (Condition):
-    __slots__ = ['isSubRecord', 'intervals']
+    __slots__ = ['intervals']
 
     def __init__ (self, paramstr):
         Condition.__init__ (self, True)
@@ -140,8 +180,21 @@ class CChannel (Condition):
             if end == -1: flags[start:] = 1
             else: flags[start:end] = 1
 
+    def formatParams (self):
+        def getChans ():
+            lastEnd = None
+
+            for start, end in self.intervals:
+                if lastEnd is not None:
+                    s = lastEnd + 1
+                    n = start - lastEnd
+                    yield n, s
+                lastEnd = end
+
+        return ';'.join ('%d,%d' % x for x in getChans ())
+
 class CATAHalf (Condition):
-    __slots__ = ['isSubRecord', 'half']
+    __slots__ = ['half']
 
     def __init__ (self, paramstr):
         Condition.__init__ (self, False)
@@ -157,19 +210,27 @@ class CATAHalf (Condition):
         else: assert (False), 'ATA corr half unknown!'
 
         return half == self.half
-    
+
+    def formatParams (self): return str (self.half)
+
 conditions = {
     'ant': CAnt, 'bl': CBaseline, 'pol': CPol,
     'auto': CAuto, 'cross': CCross, 'chan': CChannel,
-    'atahalf': CATAHalf
+    'atahalf': CATAHalf, 'freq': CFreq
     }
 
+names = {}
+
+for name, cls in conditions.iteritems (): names[cls] = name
+
 class Line (object):
-    __slots__ = ['rconds', 'srconds']
+    __slots__ = ['rconds', 'srconds', 'matches', '_formatted']
     
     def __init__ (self):
         self.rconds = []
         self.srconds = []
+        self.matches = 0
+        self._formatted = None
 
     def add (self, cond):
         if cond.isSubRecord:
@@ -177,6 +238,25 @@ class Line (object):
         else:
             self.rconds.append (cond)
 
+    def clearStats (self): self.matches = 0
+
+    def format (self):
+        if self._formatted is not None: return self._formatted
+
+        def cformat (cond):
+            name = names[cond.__class__]
+            params = cond.formatParams ()
+
+            if params is None: return name
+            return name + '=' + params
+            
+        def conds ():
+            for c in self.rconds: yield cformat (c)
+            for c in self.srconds: yield cformat (c)
+
+        self._formatted = ' '.join (conds ())
+        return self._formatted
+    
     def anySubRecord (self):
         return len (self.srconds) > 0
     
@@ -184,6 +264,7 @@ class Line (object):
         for c in self.rconds:
             if not c.matchRecord (inp, uvw, time, bl):
                 return False
+        self.matches += 1
         return True
 
     def matchSubRecord (self, inp, uvw, time, bl, data, flags):
@@ -194,11 +275,12 @@ class Line (object):
         #print 'srb', matched[0:10]
         for c in self.srconds:
             c.matchSubRecord (inp, uvw, time, bl, data, flags)
+        self.matches += 1 # the best we can reasonable do...
         #print 'sra', matched[0:10]
 
 # OK, done with preliminaries.
 
-banner = 'MULTIFLAG: UV data multiflagger'
+banner = 'MULTIFLAG: UV data multiflagger $Version$'
 print banner
 
 keys.keyword ('spec', 'f', ' ', 128)
@@ -259,12 +341,34 @@ print 'Parsed %d condition lines from %d file(s).' % (len (rLines) + len (srLine
 curInp = None
 lineFlags = None
 
+def doneFile (inp, nR, nSR, nSeen):
+    print '   %d of %d (%.1f%%) are now completely flagged' % (nR, nSeen,
+                                                               100. * nR / nSeen)
+    print '   %d of %d (%.1f%%) are now partially flagged' % (nSR, nSeen,
+                                                              100. * nSR / nSeen)
+
+    inp.openHistory ()
+    inp.writeHistory ('MULTIFLAG: %d of %d (%.1f%%) are now completely flagged' \
+                      % (nR, nSeen, 100. * nR / nSeen))
+    inp.writeHistory ('MULTIFLAG: %d of %d (%.1f%%) are now partially flagged' \
+                      % (nSR, nSeen, 100. * nSR / nSeen))
+    inp.writeHistory ('MULTIFLAG: Hit stats of normalized conditions:')
+
+    for line in rLines:
+        inp.writeHistory ('MULTIFLAG:   %s : %d' % (line.format (), line.matches))
+    for line in srLines:
+        inp.writeHistory ('MULTIFLAG:   %s : %d' % (line.format (), line.matches))
+
+    inp.closeHistory ()
+
+    for line in rLines: line.clearStats ()
+    for line in srLines: line.clearStats ()
+
 for inp, preamble, data, flags, nread in uvdat.readAll ():
     if inp is not curInp:
         if curInp is not None:
-            print '   %d of %d (%.1f%%) are now completely flagged' % (nR, nSeen, 100. * nR / nSeen)
-            print '   %d of %d (%.1f%%) are now partially flagged' % (nSR, nSeen, 100. * nSR / nSeen)
-            
+            doneFile (curInp, nR, nSR, nSeen)
+
         curInp = inp
         inp.openHistory ()
         inp.writeHistory (banner)
@@ -301,8 +405,6 @@ for inp, preamble, data, flags, nread in uvdat.readAll ():
             line.matchSubRecord (inp, uvw, time, bl, data, lineFlags)
             flags &= lineFlags
             
-        if nSeen % 4000 == 0: print 'fmf', flags[0:10]
-
         nUnflagged = flags.sum ()
 
         if nUnflagged == 0:
@@ -312,8 +414,11 @@ for inp, preamble, data, flags, nread in uvdat.readAll ():
         
     inp.rewriteFlags (flags)
 
-print '   %d of %d (%.1f%%) are now completely flagged' % (nR, nSeen, 100. * nR / nSeen)
-print '   %d of %d (%.1f%%) are now partially flagged' % (nSR, nSeen, 100. * nSR / nSeen)
+# Need to reopen the dataset to be able to get back to the history.
+# Not too elegant, but life goes on.
+curInp = curInp.refobj.open ('r')
+doneFile (curInp, nR, nSR, nSeen)
+curInp.close ()
 
 # All done. Boogie.
 
