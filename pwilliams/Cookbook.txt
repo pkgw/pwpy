@@ -171,11 +171,16 @@ PKGW's steps for flagging observations are:
   out the average spectrum to a logfile that can then be plotted. One
   can then pick out the RFI-afflicted channels by eye. This script
   lives in the pwilliams/fancy directory of the MMM Subversion repository.
-  To run it, you need to configure your environment by running
+  To run it, you need to configure your environment by running a script. 
+  If you use a Bourne shell (sh, bash), run
 
   $ source /cosmic1/pkwill/usemir.sh
 
-  Once that's been done:
+  If you use a C shell (csh, tcsh), run
+
+  $ source /cosmic1/pkwill/usemir.csh
+
+  (Note the different extension.) Once that's been done:
   
   $ ampadd.py vis='fx64a-*-FREQ_HALF' log=rfi-FREQ-HALF.txt
 
