@@ -213,10 +213,71 @@ class CATAHalf (Condition):
 
     def formatParams (self): return str (self.half)
 
+class CTime (Condition):
+    __slots__ = ['tStart', 'tEnd']
+
+    def __init__ (self, paramstr):
+        Condition.__init__ (self, False)
+
+        # We attempt to match the semantics of the time(a,b)
+        # select command here. Except time(fulldate) matches
+        # anything between fulldate and fulldate+24hours,
+        # whereas we match anything after fulldate. I have
+        # never used time(fulldate).
+        
+        st, end = paramstr.split (',')
+
+        if st == '': self.tStart = None
+        else: self.tStart = util.dateOrTimeToJD (st)
+
+        if end == '': self.tEnd = None
+        else: self.tEnd = util.dateOrTimeToJD (end)
+
+        if self.tStart is not None and self.tEnd is not None:
+            if max (self.tStart, self.tEnd) > 1 and \
+               min (self.tStart, self.tEnd) < 1:
+                assert (False), 'Cannot mix full and offset time specifications!'
+
+    def matchRecord (self, inp, uvw, time, bl):
+        ts, te = self.tStart, self.tEnd
+        
+        ofs = time - int (time - 1) - 0.5
+        
+        if ts is not None:
+            if ts < 1:
+                if ofs < ts: return False
+            elif time < ts: return False
+
+        if te is not None:
+            if te < 1:
+                if ofs > te: return False
+            elif time > te: return False
+
+        return True
+
+    def formatParams (self):
+        def tostr (jd):
+            if jd is None: return ''
+            elif jd > 1: return util.jdToFull (jd)
+
+            from math import floor
+            jd *= 24
+            hours = floor (jd)
+            jd = 60 * (jd - hours)
+            mins = floor (jd)
+            secs = (jd - mins) * 60
+
+            if secs >= 0.05:
+                return '%02d:%02d:%3.1f' % (hours, mins, secs)
+
+            return '%02d:%02d' % (hours, mins)
+            
+        return '%s,%s' % (tostr (self.tStart), tostr (self.tEnd))
+
 conditions = {
     'ant': CAnt, 'bl': CBaseline, 'pol': CPol,
     'auto': CAuto, 'cross': CCross, 'chan': CChannel,
-    'atahalf': CATAHalf, 'freq': CFreq
+    'atahalf': CATAHalf, 'freq': CFreq, 'time': CTime
     }
 
 names = {}
