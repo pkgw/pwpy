@@ -8,8 +8,6 @@
 #  blah blah.
 #-
 
-print 'This script is UNFINISHED and EXPERIMENTAL!!!!'
-
 import sys
 from mirtask import uvdat, keys, util
 import numpy as N
@@ -339,148 +337,167 @@ class Line (object):
         self.matches += 1 # the best we can reasonable do...
         #print 'sra', matched[0:10]
 
-# OK, done with preliminaries.
+# The actual multiflag implementation ...
 
-banner = 'MULTIFLAG: UV data multiflagger $Version$'
-print banner
+class MultiFlag (object):
+    def __init__ (self):
+        self.rLines = []
+        self.srLines = []
+        self.nR = self.nSR = self.nSeen = 0
+        self.lineFlags = None
+        
+    # Read in the conditions
+    #
+    # The basic format is line-oriented
+    # If an entry matches a line, it is flagged.
+    # An entry matches a line if it matches *all* of the conditions in the line
+    # A condition in a line just looks like "attr=match"
+    # Conditions are separated by spaces
+    # If there are multiple match values, a condition is matched if *any* of those
+    # values are matched
+    # So the overall logical flow is
+    #  flag if [match any line]
+    #  match line if [match every condition]
+    #  match condition if [match any value]
+    #
+    # E.g. ...
+    #
+    # ant=24 pol=xx
+    # bl=1-4 cross
+    # pol=xx chan=128,1
 
-keys.keyword ('spec', 'f', ' ', 128)
-keys.doUvdat ('3', False)
-opts = keys.process ()
+    def loadSpec (self, fname):
+        for l in file (fname, 'r'):
+            bits = l.strip ().split ()
 
-if len (opts.spec) < 1:
-    print >>sys.stderr, 'Error: must give at least one "spec" filename'
-    sys.exit (1)
+            if len (bits) < 1: continue
+            if bits[0][0] == '#': continue
 
-# Read in the conditions
-#
-# The basic format is line-oriented
-# If an entry matches a line, it is flagged.
-# An entry matches a line if it matches *all* of the conditions in the line
-# A condition in a line just looks like "attr=match"
-# Conditions are separated by spaces
-# If there are multiple match values, a condition is matched if *any* of those
-# values are matched
-# So the overall logical flow is
-#  flag if [match any line]
-#  match line if [match every condition]
-#  match condition if [match any value]
-#
-# E.g. ...
-#
-# ant=24 pol=xx
-# bl=1-4 cross
-# pol=xx chan=128,1
+            thisLine = Line ()
 
-rLines = []
-srLines = []
+            for b in bits:
+                split = b.split ('=', 2)
+                if len (split) == 1: cond, arg = split[0], None
+                else: cond, arg = split
 
-for fname in opts.spec:
-    for l in file (fname, 'r'):
-        bits = l.strip ().split ()
+                thisLine.add (conditions[cond] (arg))
 
-        if len (bits) < 1: continue
-        if bits[0][0] == '#': continue
+            if thisLine.anySubRecord (): self.srLines.append (thisLine)
+            else: self.rLines.append (thisLine)
 
-        thisLine = Line ()
+    def numLines (self): return len (self.rLines) + len (self.srLines)
 
-        for b in bits:
-            split = b.split ('=', 2)
-            if len (split) == 1: cond, arg = split[0], None
-            else: cond, arg = split
+    def applyVis (self, inp, preamble, data, flags, nread):
+        self.nSeen += 1
+        lineFlags = self.lineFlags
+        data = data[0:nread]
+        flags = flags[0:nread]
 
-            thisLine.add (conditions[cond] (arg))
+        uvw = preamble[0:3]
+        time = preamble[3]
+        bl = util.decodeBaseline (preamble[4])
 
-        if thisLine.anySubRecord (): srLines.append (thisLine)
-        else: rLines.append (thisLine)
+        hit = False
+        for line in self.rLines:
+            if line.matchRecord (inp, uvw, time, bl):
+                hit = True
+                break
 
-print 'Parsed %d condition lines from %d file(s).' % (len (rLines) + len (srLines),
-                                                      len (opts.spec))
+        if hit:
+            self.nR += 1
+            flags.fill (0)
+        elif len (self.srLines) > 0:
+            if lineFlags is None or lineFlags.shape != flags.shape:
+                self.lineFlags = lineFlags = flags.copy ()
 
-# Flag the input file
+            for line in self.srLines:
+                lineFlags.fill (0)
+                line.matchSubRecord (inp, uvw, time, bl, data, lineFlags)
+                flags &= lineFlags
+            
+            nUnflagged = flags.sum ()
 
-curInp = None
-lineFlags = None
+            if nUnflagged == 0:
+                self.nR += 1
+            elif nUnflagged < flags.size:
+                self.nSR += 1
+        
+        inp.rewriteFlags (flags)
 
-def doneFile (inp, nR, nSR, nSeen):
-    print '   %d of %d (%.1f%%) are now completely flagged' % (nR, nSeen,
-                                                               100. * nR / nSeen)
-    print '   %d of %d (%.1f%%) are now partially flagged' % (nSR, nSeen,
-                                                              100. * nSR / nSeen)
+    def doneFile (self, inp):
+        nR, nSR, nSeen = self.nR, self.nSR, self.nSeen
+        
+        print '   %d of %d (%.1f%%) are now completely flagged' % (nR, nSeen,
+                                                                   100. * nR / nSeen)
+        print '   %d of %d (%.1f%%) are now partially flagged' % (nSR, nSeen,
+                                                                  100. * nSR / nSeen)
 
-    inp.openHistory ()
-    inp.writeHistory ('MULTIFLAG: %d of %d (%.1f%%) are now completely flagged' \
-                      % (nR, nSeen, 100. * nR / nSeen))
-    inp.writeHistory ('MULTIFLAG: %d of %d (%.1f%%) are now partially flagged' \
-                      % (nSR, nSeen, 100. * nSR / nSeen))
-    inp.writeHistory ('MULTIFLAG: Hit stats of normalized conditions:')
-
-    for line in rLines:
-        inp.writeHistory ('MULTIFLAG:   %s : %d' % (line.format (), line.matches))
-    for line in srLines:
-        inp.writeHistory ('MULTIFLAG:   %s : %d' % (line.format (), line.matches))
-
-    inp.closeHistory ()
-
-    for line in rLines: line.clearStats ()
-    for line in srLines: line.clearStats ()
-
-for inp, preamble, data, flags, nread in uvdat.readAll ():
-    if inp is not curInp:
-        if curInp is not None:
-            doneFile (curInp, nR, nSR, nSeen)
-
-        curInp = inp
         inp.openHistory ()
-        inp.writeHistory (banner)
-        inp.logInvocation ('MULTIFLAG')
+        inp.writeHistory ('MULTIFLAG: %d of %d (%.1f%%) are now completely flagged' \
+                          % (nR, nSeen, 100. * nR / nSeen))
+        inp.writeHistory ('MULTIFLAG: %d of %d (%.1f%%) are now partially flagged' \
+                          % (nSR, nSeen, 100. * nSR / nSeen))
+        inp.writeHistory ('MULTIFLAG: Hit stats of normalized conditions:')
+
+        for line in self.rLines:
+            inp.writeHistory ('MULTIFLAG:   %s : %d' % (line.format (), line.matches))
+        for line in self.srLines:
+            inp.writeHistory ('MULTIFLAG:   %s : %d' % (line.format (), line.matches))
+
         inp.closeHistory ()
 
-        nR = nSR = nSeen = 0
+        for line in rLines: line.clearStats ()
+        for line in srLines: line.clearStats ()
+    
+    def applyUvdat (self):
+        curInp = None
 
-        print inp.name, '...'
+        for inp, preamble, data, flags, nread in uvdat.readAll ():
+            if inp is not curInp:
+                if curInp is not None:
+                    self.doneFile (curInp)
+
+                curInp = inp
+                inp.openHistory ()
+                inp.writeHistory (banner)
+                inp.logInvocation ('MULTIFLAG')
+                inp.closeHistory ()
+
+                nR = nSR = nSeen = 0
+
+                print inp.name, '...'
+
+            self.applyVis (inp, preamble, data, flags, nread)
         
-    nSeen += 1
-    data = data[0:nread]
-    flags = flags[0:nread]
+        # Need to reopen the dataset to be able to get back to the history.
+        # Not too elegant, but life goes on.
+        curInp = curInp.refobj.open ('r')
+        self.doneFile (curInp)
+        curInp.close ()
 
-    uvw = preamble[0:3]
-    time = preamble[3]
-    bl = util.decodeBaseline (preamble[4])
+def task ():
+    print 'This script is UNFINISHED and EXPERIMENTAL!!!!'
 
-    hit = False
-    for line in rLines:
-        if line.matchRecord (inp, uvw, time, bl):
-            hit = True
-            break
+    banner = 'MULTIFLAG: UV data multiflagger $Version$'
+    print banner
 
-    if hit:
-        nR += 1
-        flags.fill (0)
-    elif len (srLines) > 0:
-        if lineFlags is None or lineFlags.shape != flags.shape:
-            lineFlags = flags.copy ()
+    keys.keyword ('spec', 'f', ' ', 128)
+    keys.doUvdat ('3', False)
+    opts = keys.process ()
 
-        for line in srLines:
-            lineFlags.fill (0)
-            line.matchSubRecord (inp, uvw, time, bl, data, lineFlags)
-            flags &= lineFlags
-            
-        nUnflagged = flags.sum ()
+    if len (opts.spec) < 1:
+        print >>sys.stderr, 'Error: must give at least one "spec" filename'
+        sys.exit (1)
 
-        if nUnflagged == 0:
-            nR += 1
-        elif nUnflagged < flags.size:
-            nSR += 1
-        
-    inp.rewriteFlags (flags)
+    mf = MultiFlag ()
+    
+    for fname in opts.spec: mf.loadSpec (fname)
 
-# Need to reopen the dataset to be able to get back to the history.
-# Not too elegant, but life goes on.
-curInp = curInp.refobj.open ('r')
-doneFile (curInp, nR, nSR, nSeen)
-curInp.close ()
+    print 'Parsed %d condition lines from %d file(s).' % (mf.numLines (),
+                                                          len (opts.spec))
 
-# All done. Boogie.
+    mf.applyUvdat ()
 
-sys.exit (0)
+if __name__ == '__main__':
+    task ()
+    sys.exit (0)
