@@ -29,17 +29,17 @@ Miriad datasets named
 Where SRC is the name of the target you're observing (as recognized by
 the ATA catalog system), FREQ is your observing frequency in MHz, and
 HALF is (what I call) the "correlator half" of the spectrum you're
-observing. The correlator outputs 1024 channels; the first 512 are in
-half 1, and the other 512 are in half 2.
-
-An indented line starting with "$" indicates a command that could be
-run in a shell. Command arguments enclosed in square brackets ("[]")
-are optional. Lines starting with "<" indicate sample output of the
-preceding command.
+observing. The correlator outputs 1024 channels; in my nomenclature,
+the first 512 are in "half 1", and the other 512 are in "half 2".
 
 An "antpol" is a particular antenna-polarization combination. The FX64
 correlator has 64 antpol inputs. When all 42 ATA antennas are fully
 functional, there are 84 antpols being fed into the processing room.
+
+In this document, an indented line starting with "$" indicates a
+command that could be run in a shell. Command arguments enclosed in
+square brackets ("[]") are optional. Lines starting with "<" indicate
+sample output of the preceding command.
 
 When processing a dataset in some way that generates a new Miriad
 dataset, my convention is to name the new dataset as the old one,
@@ -52,6 +52,9 @@ polarization at once.) E.g.,
 
   $ uvcal options=fxcal select='pol(xx)' vis=fx64a-SRC-FREQ_HALF \
     out=fx64a-SRC-FREQ_HALF.fxx
+
+or
+
   $ uvaver interval=10 vis=fx64a-SRC-FREQ_HALF out=fx64a-SRC-FREQ_HALF.av
 
 
@@ -77,8 +80,8 @@ PKGW's steps for flagging observations are:
   $ uvflag flagval=f line=chan,100,413 vis=fx64a-SRC-FREQ_2
 
   Note that each correlator half has 512 channels, numbered starting
-  at 1, so the last channel number in each half is #512 and the last
-  100 channels are 413 - 512.
+  at 1, so the last channel number in each half is number 512 and the
+  last 100 channels are 413 - 512.
 
 * Experience shows that there is a fair level of crosstalk between
   antpols that are on the same ADC card that also have the same Walsh
@@ -156,8 +159,9 @@ PKGW's steps for flagging observations are:
   interference that shows up in the XX pol should also show up in YY,
   but this presumption hasn't been examined.
 
-* With the egregiously bad baselines flagged out, some attempts at
-  automated RFI flagging can be made. 
+* At this point in the recipe, the egregiously bad baselines should
+  have been flagged out. Now, some attempts at automated RFI flagging
+  can be made.
 
   One way to do this is to average together *all* visibilities over
   everything but frequency, so that those channels with consistently
@@ -215,7 +219,126 @@ PKGW's steps for flagging observations are:
 
 
 
+
 CALIBRATION RECIPE
 ============================================================
 
-FIXME: this.
+PKGW's generic steps for calibrating observations are:
+
+* On all datasets (both calibrator and target) run an FX calibration
+  to smooth out the bandpass somewhat:
+
+  $ uvcal options=fxcal,unflagged select='pol(xx)' vis=VIS out=VIS.fxx
+  $ uvcal options=fxcal,unflagged select='pol(yy)' vis=VIS out=VIS.fxy
+
+  The way the FX cal program works, different polarizations need to
+  be processed separately. This is helpful down the road as SELFCAL
+  has the same limitation.
+
+  If you're doing spectral line work and a line of interest shows up
+  in the autocorrelations, the above command will cause problems. PKGW
+  does not know what to do about this, but it wouldn't be the worst
+  thing to just skip this step and hope SMAMFCAL (below) comes up with
+  good bandpass solutions.
+
+  The "unflagged" option makes UVCAL not write out visibilities that
+  have been completely flagged, making your output files somewhat
+  smaller.
+
+* On all datasets, attempt to correct for amplitude loss due to the
+  relatively long FX64 integration time.
+
+  $ fringefix.py maxscale=3 vis=VIS.fxx out=VIS.fxx.ff
+  $ fringefix.py maxscale=3 vis=VIS.fxy out=VIS.fxy.ff
+  
+  Unfortunately, the amplitude loss seen in ATA-43/FX64 data does not
+  quite match theoretical explanations, so the corrections applied by
+  this script introduce infidelities of their own. But hopefully,
+  those infidelities are less severe than those in the uncorrected
+  data.
+
+* Run a bandpass and amplitude calibration on your calibrator
+  datasets:
+
+  $ smamfcal options=interp,opolyfit select=-auto polyfit=7 \
+    refant=REFANT vis=CAL.fxx.ff
+  $ smamfcal options=interp,opolyfit select=-auto polyfit=7 \
+    refant=REFANT vis=CAL.fxy.ff
+
+  If you're doing spectral line work, you will want to temporarily
+  flag out the line so that SMAMFCAL doesn't calibrate it away. PGKW
+  has no experience doing this, though.
+
+  The invocation above will interpolate bandpass solutions into
+  flagged regions of the spectrum and also smooth out the fit bandpass
+  points, both of which should be helpful. The derived bandpass
+  solutions can be seen with
+
+  $ gpplt device=1/xs options=bandpass vas=CAL.fxPOL.ff
+
+* If Miriad isn't familiar with your source, SMAMFCAL won't set the
+  antenna amplitudes to anything useful. (If it does know your source,
+  you will see a message such as "Using known frequency variation of
+  3c286.") If your calibrator is a nice bright point source, remedy
+  this with a SELFCAL:
+
+  $ selfcal select=-auto options=amp,noscale flux=FLUX vis=CAL.fxx.ff
+  $ selfcal select=-auto options=amp,noscale flux=FLUX vis=CAL.fxy.ff
+
+  (Assuming an unpolarized source and so on.) The "select=-auto" line
+  is essential; otherwise SELFCAL will produce bogus results. It is
+  also essential to have only one polarization present in the UV
+  dataset being self-cal'ed.
+
+  FIXME: more advanced usage with a self-cal model and such.
+
+* Miriad stores a header in its dataset indicating how far in time the
+  calibration routines will be willing to extrapolate antenna
+  gains. The default used by SMAMFCAL is half a day, whereas the
+  default that SELFCAL may overwrite is 5 minutes. The first number is
+  too large but probably not a problem in practice; the second number
+  is often too small, and can result in data in your target dataset
+  being discarded when applying gain solutions from the
+  calibrator. You can tweak the setting with:
+
+  $ puthd type=double value=INTERVALDAYS in=CAL.fxPOL.ff/interval
+
+  where INTERVAL days is the extrapolation interval in days. I suggest
+  0.02, about half an hour, as a reasonable value.
+
+* Now copy antenna gains from the calibration datasets to the target
+  datasets:
+
+  $ gpcopy vis=CAL-FREQ-HALF.fxPOL.ff out=TARG-FREQ-HALF.fxPOL.ff
+
+  for all FREQ, HALF, and POL.
+
+  Now all of your datasets should have reasonable antenna and bandpass
+  calibrations applied. Hooray!
+
+* WARNING: Are the steps described below actually a good idea? I am
+  not sure.
+
+  Extra credit: If you're imaging your target and want to try to clean
+  things up, it may help to phase self-calibrate your target
+  datasets. To do this, you need a model of your target image, most
+  likely created by the CLEAN task. Call this dataset "TARG.cl". So,
+  the first step is to image the target without any further processing
+  and create that dataset.
+
+  Even though we only want to self-calibrate in phase, doing so
+  overwrites antenna amplitude solutions, so the previous calibrated
+  dataset needs to be UVCAT'ed to rewrite the data with the amplitude
+  solutions applied:
+
+  $ uvcat vis=TARG.fxPOL.ff out=TARG.fxPOL.ff.phsc
+
+  Then, a phase-only selfcal can be reapplied:
+
+  $ selfcal options=ph,mfs model=TARG.cl vis=TARG.fxPOL.ff.phsc
+
+  Hopefully, an image generated after running this step will be
+  cleaner than the previous one. Iterate until happy.
+
+* FIXME: polarization calibration. No one has dared to do this yet, as
+  far as I know.
