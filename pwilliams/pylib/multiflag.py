@@ -446,10 +446,10 @@ class MultiFlag (object):
 
         inp.closeHistory ()
 
-        for line in rLines: line.clearStats ()
-        for line in srLines: line.clearStats ()
+        for line in self.rLines: line.clearStats ()
+        for line in self.srLines: line.clearStats ()
     
-    def applyUvdat (self):
+    def applyUvdat (self, banner):
         curInp = None
 
         for inp, preamble, data, flags, nread in uvdat.readAll ():
@@ -496,7 +496,7 @@ def task ():
     print 'Parsed %d condition lines from %d file(s).' % (mf.numLines (),
                                                           len (opts.spec))
 
-    mf.applyUvdat ()
+    mf.applyUvdat (banner)
 
 if __name__ == '__main__':
     task ()
