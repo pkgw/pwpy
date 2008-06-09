@@ -478,7 +478,7 @@ class MultiFlag (object):
 def task ():
     print 'This script is UNFINISHED and EXPERIMENTAL!!!!'
 
-    banner = 'MULTIFLAG: UV data multiflagger $Version$'
+    banner = 'MULTIFLAG (Python): UV data multiflagger $Id: $'
     print banner
 
     keys.keyword ('spec', 'f', ' ', 128)
