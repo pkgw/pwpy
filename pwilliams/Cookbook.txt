@@ -236,10 +236,10 @@ PKGW's generic steps for calibrating observations are:
   has the same limitation.
 
   If you're doing spectral line work and a line of interest shows up
-  in the autocorrelations, the above command will cause problems. PKGW
-  does not know what to do about this, but it wouldn't be the worst
-  thing to just skip this step and hope SMAMFCAL (below) comes up with
-  good bandpass solutions.
+  in the autocorrelations, the above command will mess up your line
+  data. PKGW does not know what to do about this, but it wouldn't be
+  the worst thing to just skip this step and hope SMAMFCAL (below)
+  comes up with good bandpass solutions.
 
   The "unflagged" option makes UVCAL not write out visibilities that
   have been completely flagged, making your output files somewhat
@@ -303,7 +303,7 @@ PKGW's generic steps for calibrating observations are:
 
   $ puthd type=double value=INTERVALDAYS in=CAL.fxPOL.ff/interval
 
-  where INTERVAL days is the extrapolation interval in days. I suggest
+  where INTERVALDAYS is the extrapolation interval in days. I suggest
   0.02, about half an hour, as a reasonable value.
 
 * Now copy antenna gains from the calibration datasets to the target
@@ -322,9 +322,9 @@ PKGW's generic steps for calibrating observations are:
   Extra credit: If you're imaging your target and want to try to clean
   things up, it may help to phase self-calibrate your target
   datasets. To do this, you need a model of your target image, most
-  likely created by the CLEAN task. Call this dataset "TARG.cl". So,
-  the first step is to image the target without any further processing
-  and create that dataset.
+  likely created by the CLEAN task. We'll assume this dataset is
+  called "TARG.cl". So, the first step is to image the target without
+  any further processing and create that dataset.
 
   Even though we only want to self-calibrate in phase, doing so
   overwrites antenna amplitude solutions, so the previous calibrated
