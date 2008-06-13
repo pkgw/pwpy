@@ -122,7 +122,7 @@ PKGW's steps for flagging observations are:
   your datasets.
 
 * Observations made before May 1, 2008 will contain some data that
-  went through a bad ADC card. The effect of the bad card was to ruin
+  went through a bad C board. The effect of the bad card was to ruin
   a quarter of the band for some antpols in half-2 data. The easiest
   way to determine the affected antpols is to plot the data and find
   them visually.
@@ -231,7 +231,8 @@ CALIBRATION RECIPE
 PKGW's generic steps for calibrating observations are:
 
 * On all datasets (both calibrator and target) run an FX calibration
-  to smooth out the bandpass somewhat:
+  (that is, divide cross-correlations by auto-correlations) to smooth
+  out the bandpass somewhat:
 
   $ uvcal options=fxcal,unflagged select='pol(xx)' vis=VIS out=VIS.fxx
   $ uvcal options=fxcal,unflagged select='pol(yy)' vis=VIS out=VIS.fxy
