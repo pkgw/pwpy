@@ -35,12 +35,11 @@ for l in hist:
                 pol = p1 + p2
                 a1, a2 = int (a1), int (a2)
 
-                if pol not in bypol: bypol[pol] = []
+                if pol not in bypol: bypol[pol] = set ()
 
-                bypol[pol].append ((a1, a2))
+                bypol[pol].add ((a1, a2))
 
     prevIbob, prevWalsh, prevAdc, prevAnt, prevPol = ibob, walsh, adc, ant, pol
 
 for pol, bls in bypol.iteritems ():
     print 'pol=%s bl=%s' % (pol, ','.join ('%d-%d' % x for x in bls))
-
