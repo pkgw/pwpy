@@ -328,14 +328,14 @@ class Line (object):
 
     def matchSubRecord (self, inp, uvw, time, bl, data, flags):
         if not self.matchRecord (inp, uvw, time, bl):
-            flags[:] = 1
-            return
+            return False
 
         #print 'srb', matched[0:10]
         for c in self.srconds:
             c.matchSubRecord (inp, uvw, time, bl, data, flags)
-        self.matches += 1 # the best we can reasonable do...
+        self.matches += 1 # the best we can reasonably do...
         #print 'sra', matched[0:10]
+        return True
 
 # The actual multiflag implementation ...
 
@@ -412,8 +412,10 @@ class MultiFlag (object):
 
             for line in self.srLines:
                 lineFlags.fill (0)
-                line.matchSubRecord (inp, uvw, time, bl, data, lineFlags)
-                flags &= lineFlags
+                if line.matchSubRecord (inp, uvw, time, bl, data, lineFlags):
+                    # Only do the op if this line matched some parts (ie,
+                    # marked some channels for flagging)
+                    flags &= lineFlags
             
             nUnflagged = flags.sum ()
 
@@ -474,6 +476,27 @@ class MultiFlag (object):
         curInp = curInp.refobj.open ('r')
         self.doneFile (curInp)
         curInp.close ()
+
+    def applyDataSet (self, dset, banner):
+        first = True
+        
+        for inp, preamble, data, flags, nread in dset.readLowlevel (False):
+            if first:
+                inp.openHistory ()
+                inp.writeHistory (banner)
+                inp.logInvocation ('MULTIFLAG')
+                inp.closeHistory ()
+
+                nR = nSR = nSeen = 0
+                first = False
+
+            self.applyVis (inp, preamble, data, flags, nread)
+        
+        # Need to reopen the dataset to be able to get back to the history.
+        # Not too elegant, but life goes on.
+        inp = dset.open ('r')
+        self.doneFile (inp)
+        inp.close ()
 
 def task ():
     print 'This script is UNFINISHED and EXPERIMENTAL!!!!'
