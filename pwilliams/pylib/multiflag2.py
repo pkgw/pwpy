@@ -57,7 +57,6 @@ class MultiFlag2 (object):
                 elif cond == 'ant': shared.append ('ant(%s)' % arg)
                 elif cond == 'bl':
                     assert multi is None
-                    print arg.split (',')
                     multi = [('ant(%s)(%s)' % tuple (x.split ('-'))) for x in arg.split (',')]
                 elif cond == 'pol': shared.append ('pol(%s)' % arg)
                 elif cond == 'chan':
