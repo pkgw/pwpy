@@ -32,20 +32,55 @@ class Condition (object):
         # Return a string-formatted version of your parameters
         # or None
         raise NotImplementedError ()
+
+    def __hash__ (self): raise NotImplementedError ()
+
+    def __eq__ (self, other): raise NotImplementedError ()
         
+class VarCondition (Condition):
+    """A condition whose result is solely dependent upon the value of
+    a UV variable."""
+
+    __slots__ = ['varname', 'vartype', 'ctxt']
+
+    V_STRING = 0
+    V_INT = 1
+    V_FLOAT = 2
+    V_DOUBLE = 3
+    V_COMPLEX = 4
+    
+    def __init__ (self, varname, vartype):
+        Condition.__init__ (self, False)
+        self.varname = varname
+        self.vartype = vartype
+
+    def register (self, ctxt):
+        ctxt.addVar (self.varname, self.vartype)
+        self.ctxt = ctxt
+        
+    def matchRecord (self, inp, uvw, time, bl):
+        return self.matchVar (self.ctxt.getVar (self.varname))
+    
+    def matchVar (self, var):
+        raise NotImplementedError ()
 
 class CAnt (Condition):
     __slots__ = ['ants']
     
     def __init__ (self, paramstr):
         Condition.__init__ (self, False)
-        self.ants = set (int (x) for x in paramstr.split (','))
+        self.ants = frozenset (int (x) for x in paramstr.split (','))
 
     def matchRecord (self, inp, uvw, time, bl):
         return bl[0] in self.ants or bl[1] in self.ants
 
     def formatParams (self):
         return ','.join (str (x) for x in self.ants)
+
+    def __hash__ (self): return hash (self.ants)
+
+    def __eq__ (self, other):
+        return isinstance (other, CAnt) and self.ants == other.ants
     
 class CBaseline (Condition):
     __slots__ = ['bls']
@@ -59,7 +94,7 @@ class CBaseline (Condition):
             if a1 > a2: return (a2, a1)
             return (a1, a2)
         
-        self.bls = set (blParse (s) for s in paramstr.split (','))
+        self.bls = frozenset (blParse (s) for s in paramstr.split (','))
 
     def matchRecord (self, inp, uvw, time, bl):
         return bl in self.bls
@@ -67,19 +102,29 @@ class CBaseline (Condition):
     def formatParams (self):
         return ','.join ('%d-%d' % x for x in self.bls)
 
-class CPol (Condition):
+    def __hash__ (self): return hash (self.bls)
+
+    def __eq__ (self, other):
+        return isinstance (other, CBaseline) and self.bls == other.bls
+
+class CPol (VarCondition):
     __slots__ = ['pols']
     
     def __init__ (self, paramstr):
-        Condition.__init__ (self, False)
+        VarCondition.__init__ (self, 'pol', VarCondition.V_INT)
 
-        self.pols = set (util.polarizationNumber (s) for s in paramstr.split (','))
+        self.pols = frozenset (util.polarizationNumber (s) for s in paramstr.split (','))
 
-    def matchRecord (self, inp, uvw, time, bl):
-        return uvdat.getPol () in self.pols
+    def matchVar (self, value):
+        return value in self.pols
 
     def formatParams (self):
         return ','.join (util.polarizationName (p) for p in self.pols)
+
+    def __hash__ (self): return hash (self.pols)
+
+    def __eq__ (self, other):
+        return isinstance (other, CPol) and self.pols == other.pols
 
 class CAuto (Condition):
     __slots__ = []
@@ -93,6 +138,11 @@ class CAuto (Condition):
 
     def formatParams (self): return None
 
+    def __hash__ (self): return 0
+
+    def __eq__ (self, other):
+        return isinstance (other, CAuto)
+
 class CCross (Condition):
     __slots__ = []
 
@@ -105,15 +155,20 @@ class CCross (Condition):
 
     def formatParams (self): return None
 
-class CFreq (Condition):
+    def __hash__ (self): return 0
+
+    def __eq__ (self, other):
+        return isinstance (other, CCross)
+
+class CFreq (VarCondition):
     __slots__ = ['freqs']
 
     def __init__ (self, paramstr):
-        Condition.__init__ (self, False)
-        self.freqs = [float (x) for x in paramstr.split (',')]
+        VarCondition.__init__ (self, 'freq', VarCondition.V_DOUBLE)
+        self.freqs = frozenset (float (x) for x in paramstr.split (','))
 
-    def matchRecord (self, inp, uvw, time, bl):
-        freq = inp.getVarDouble ('freq') * 1000 # convert to MHz
+    def matchVar (self, val):
+        freq = val * 1000 # convert to MHz
 
         for f in self.freqs:
             if abs (freq - f) / f < 0.005:
@@ -123,6 +178,11 @@ class CFreq (Condition):
 
     def formatParams (self):
         return ','.join (str (x) for x in self.freqs)
+
+    def __hash__ (self): return hash (self.freqs)
+
+    def __eq__ (self, other):
+        return isinstance (other, CFreq) and self.freqs == other.freqs
     
 def mergeChannels (chanlist):
     # Assume channel numbers here are all 0-indexed
@@ -191,6 +251,21 @@ class CChannel (Condition):
 
         return ';'.join ('%d,%d' % x for x in getChans ())
 
+    def __hash__ (self):
+        h = 0
+        for p in self.intervals: h ^= hash (p)
+        return h
+
+    def __eq__ (self, other):
+        if not isinstance (other, CChannel): return False
+
+        if len (self.intervals) != len (other.intervals): return False
+
+        for p1, p2 in zip (self.intervals, other.intervals):
+            if p1 != p2: return False
+
+        return True
+
 class CATAHalf (Condition):
     __slots__ = ['half']
 
@@ -210,6 +285,11 @@ class CATAHalf (Condition):
         return half == self.half
 
     def formatParams (self): return str (self.half)
+
+    def __hash__ (self): return hash (self.half)
+
+    def __eq__ (self, other):
+        return isinstance (other, CATAHalf) and self.half == other.half
 
 class CTime (Condition):
     __slots__ = ['tStart', 'tEnd']
@@ -272,6 +352,12 @@ class CTime (Condition):
             
         return '%s,%s' % (tostr (self.tStart), tostr (self.tEnd))
 
+    def __hash__ (self): return hash (self.tStart) ^ hash (self.tEnd)
+
+    def __eq__ (self, other):
+        return isinstance (other, CTime) and self.tStart == other.tStart \
+               and self.tEnd == other.tEnd
+
 conditions = {
     'ant': CAnt, 'bl': CBaseline, 'pol': CPol,
     'auto': CAuto, 'cross': CCross, 'chan': CChannel,
@@ -283,19 +369,23 @@ names = {}
 for name, cls in conditions.iteritems (): names[cls] = name
 
 class Line (object):
-    __slots__ = ['rconds', 'srconds', 'matches', '_formatted']
+    __slots__ = ['rconds', 'srconds', 'rfuncs', 'srfuncs', 'matches', '_formatted']
     
     def __init__ (self):
         self.rconds = []
         self.srconds = []
+        self.rfuncs = []
+        self.srfuncs = []
         self.matches = 0
         self._formatted = None
 
     def add (self, cond):
         if cond.isSubRecord:
             self.srconds.append (cond)
+            self.srfuncs.append (cond.matchSubRecord)
         else:
             self.rconds.append (cond)
+            self.rfuncs.append (cond.matchRecord)
 
     def clearStats (self): self.matches = 0
 
@@ -318,29 +408,50 @@ class Line (object):
     
     def anySubRecord (self):
         return len (self.srconds) > 0
-    
-    def matchRecord (self, inp, uvw, time, bl):
+
+    def registerVars (self, ctxt):
         for c in self.rconds:
-            if not c.matchRecord (inp, uvw, time, bl):
-                return False
+            if isinstance (c, VarCondition):
+                c.register (ctxt)
+        for c in self.srconds:
+            if isinstance (c, VarCondition):
+                c.register (ctxt)
+                
+    def matchRecord (self, cache, inp, uvw, time, bl):
+        for f in self.rfuncs:
+            res = cache.get (f)
+
+            if res is None:
+                res = f (inp, uvw, time, bl)
+                cache[f] = res
+
+            if not res: return False
         self.matches += 1
         return True
 
-    def matchSubRecord (self, inp, uvw, time, bl, data, flags):
-        if not self.matchRecord (inp, uvw, time, bl):
-            return False
+    def matchSubRecord (self, cache, inp, uvw, time, bl, data, flags):
+        # Save a function call here by not relying on self.matchRecord
+        # -- this function is called millions of times so this makes
+        # a difference.
+        for f in self.rfuncs:
+            res = cache.get (f)
 
-        #print 'srb', matched[0:10]
-        for c in self.srconds:
-            c.matchSubRecord (inp, uvw, time, bl, data, flags)
+            if res is None:
+                res = f (inp, uvw, time, bl)
+                cache[f] = res
+
+            if not res: return False
+        
+        for f in self.srfuncs:
+            f (inp, uvw, time, bl, data, flags)
         self.matches += 1 # the best we can reasonably do...
-        #print 'sra', matched[0:10]
         return True
 
 # The actual multiflag implementation ...
 
 class MultiFlag (object):
     def __init__ (self):
+        self.conditions = {}
         self.rLines = []
         self.srLines = []
         self.nR = self.nSR = self.nSeen = 0
@@ -380,15 +491,35 @@ class MultiFlag (object):
                 if len (split) == 1: cond, arg = split[0], None
                 else: cond, arg = split
 
-                thisLine.add (conditions[cond] (arg))
+                try:
+                    condobj = conditions[cond] (arg)
+                except Exception, e:
+                    print 'Error parsing file \"%s\", line:' % fname, l
+                    raise e
+                
+                # Share instances of identical conditions so that
+                # we can cache their results effectively.
+                
+                if condobj in self.conditions:
+                    condobj = self.conditions[condobj]
+                else:
+                    self.conditions[condobj] = condobj
+                    
+                thisLine.add (condobj)
 
             if thisLine.anySubRecord (): self.srLines.append (thisLine)
             else: self.rLines.append (thisLine)
 
     def numLines (self): return len (self.rLines) + len (self.srLines)
 
+    def FAKEapplyVis (self, inp, preamble, data, flags, nread):
+        self.nSeen += 1
+        inp.rewriteFlags (flags[0:nread])
+
     def applyVis (self, inp, preamble, data, flags, nread):
         self.nSeen += 1
+        ns = self.nSeen
+        cache = {}
         lineFlags = self.lineFlags
         data = data[0:nread]
         flags = flags[0:nread]
@@ -399,23 +530,28 @@ class MultiFlag (object):
 
         hit = False
         for line in self.rLines:
-            if line.matchRecord (inp, uvw, time, bl):
+            if line.matchRecord (cache, inp, uvw, time, bl):
                 hit = True
                 break
 
         if hit:
             self.nR += 1
             flags.fill (0)
-        elif len (self.srLines) > 0:
+        elif self.anySR:
             if lineFlags is None or lineFlags.shape != flags.shape:
                 self.lineFlags = lineFlags = flags.copy ()
 
+            lineFlags.fill (0)
+
             for line in self.srLines:
-                lineFlags.fill (0)
-                if line.matchSubRecord (inp, uvw, time, bl, data, lineFlags):
+                if line.matchSubRecord (cache, inp, uvw, time, bl, data, lineFlags):
                     # Only do the op if this line matched some parts (ie,
-                    # marked some channels for flagging)
-                    flags &= lineFlags
+                    # marked some channels for flagging). If no channels were marked for
+                    # flagging, lineFlags will not have been altered and we need not
+                    # re-zero it. The logical_and invocation below modifies 'flags'
+                    # in-place, saving an expensive allocation.
+                    N.logical_and (flags, lineFlags, flags)
+                    lineFlags.fill (0)
             
             nUnflagged = flags.sum ()
 
@@ -426,7 +562,58 @@ class MultiFlag (object):
         
         inp.rewriteFlags (flags)
 
+    def setupFile (self, inp, banner):
+        #print self.conditions.keys ()
+        
+        self.vartypes = {}
+        self.varvals = {}
+        self.vartrackers = {}
+        self.curInp = inp
+        
+        for l in self.rLines: l.registerVars (self)
+        for l in self.srLines: l.registerVars (self)
+
+        for vname in self.vartypes.iterkeys ():
+            self.vartrackers[vname] = vt = inp.makeVarTracker ()
+            vt.track (vname)
+            
+        inp.openHistory ()
+        inp.writeHistory (banner)
+        inp.logInvocation ('MULTIFLAG')
+        inp.closeHistory ()
+
+        self.nR = self.nSR = self.nSeen = 0
+        self.anySR = len (self.srLines) > 0
+
+    def addVar (self, varname, vartype):
+        self.vartypes[varname] = vartype
+
+    def getVar (self, varname):
+        vt = self.vartrackers[varname]
+
+        if varname in self.varvals and not vt.updated ():
+            return self.varvals[varname]
+
+        vtype = self.vartypes[varname]
+
+        if vtype == VarCondition.V_DOUBLE:
+            val = self.curInp.getVarDouble (varname)
+        elif vtype == VarCondition.V_INT:
+            val = self.curInp.getVarInt (varname)
+        elif vtype == VarCondition.V_FLOAT:
+            val = self.curInp.getVarFloat (varname)
+        elif vtype == VarCondition.V_COMPLEX:
+            val = self.curInp.getVarComplex (varname)
+        elif vtype == VarCondition.V_STRING:
+            val = self.curInp.getVarString (varname)
+
+        self.varvals[varname] = val
+        return val
+    
     def doneFile (self, inp):
+        self.vartrackers = self.varvals = self.vartypes = None
+        self.curInp = None
+        
         nR, nSR, nSeen = self.nR, self.nSR, self.nSeen
         
         print '   %d of %d (%.1f%%) are now completely flagged' % (nR, nSeen,
@@ -450,7 +637,7 @@ class MultiFlag (object):
 
         for line in self.rLines: line.clearStats ()
         for line in self.srLines: line.clearStats ()
-    
+
     def applyUvdat (self, banner):
         curInp = None
 
@@ -460,13 +647,7 @@ class MultiFlag (object):
                     self.doneFile (curInp)
 
                 curInp = inp
-                inp.openHistory ()
-                inp.writeHistory (banner)
-                inp.logInvocation ('MULTIFLAG')
-                inp.closeHistory ()
-
-                nR = nSR = nSeen = 0
-
+                self.setupFile (inp, banner)
                 print inp.name, '...'
 
             self.applyVis (inp, preamble, data, flags, nread)
@@ -482,12 +663,7 @@ class MultiFlag (object):
         
         for inp, preamble, data, flags, nread in dset.readLowlevel (False):
             if first:
-                inp.openHistory ()
-                inp.writeHistory (banner)
-                inp.logInvocation ('MULTIFLAG')
-                inp.closeHistory ()
-
-                nR = nSR = nSeen = 0
+                self.setupFile (inp, banner)
                 first = False
 
             self.applyVis (inp, preamble, data, flags, nread)
