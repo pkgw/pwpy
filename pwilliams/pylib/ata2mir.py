@@ -35,3 +35,17 @@ def _map ():
         mir02ata[num] = name
 
 _map ()
+
+def _run ():
+    import sys
+
+    for n in sys.argv[1:]:
+        if len (n) > 1 and n[1] in 'abcdefghijklmn':
+            mir = ata2mir[n]
+            print n, '->', mir
+        else:
+            num = int (n)
+            ata = mir2ata[num]
+            print num, '->', ata
+
+if __name__ == '__main__': _run ()
