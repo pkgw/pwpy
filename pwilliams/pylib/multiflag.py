@@ -644,7 +644,10 @@ class MultiFlag (object):
         for inp, preamble, data, flags, nread in uvdat.readAll ():
             if inp is not curInp:
                 if curInp is not None:
+                    # See comment below.
+                    curInp = curInp.refobj.open ('r')
                     self.doneFile (curInp)
+                    curInp.close ()
 
                 curInp = inp
                 self.setupFile (inp, banner)
