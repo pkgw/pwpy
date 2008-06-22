@@ -15,6 +15,7 @@ from mirexec import TaskUVCal
 import os.path
 
 widthLimit = 30
+numChans = 512
 
 class AmpFlagsAccum (object):
     def __init__ (self):
@@ -41,7 +42,7 @@ class AmpFlagsAccum (object):
             self.data += data
             self.times += times
             
-    def process (self, dset):
+    def process (self, dset, **kwargs):
         from mirtask.util import decodeBaseline
         #from mirtask.uvdat import getPol
         #thepol = None
@@ -67,7 +68,7 @@ class AmpFlagsAccum (object):
         self.y = self.data[w] / self.times[w]
 
 class AmpRfi (object):
-    def setupNext (self, vises, fname, freq, half):
+    def setupNext (self, vises, fname, freq, half, **kwargs):
         self.vises = vises
         self.fname = fname
         self.freq = freq
@@ -82,7 +83,7 @@ class AmpRfi (object):
             if not v.exists: continue
             print 'Reading %s ...' % v
             any = True
-            afa.process (v)
+            afa.process (v, **kwargs)
 
         if not any:
             print 'No actual data for this!'
@@ -218,7 +219,10 @@ class AmpRfi (object):
 
     def show (self):
         self.p = self.plot ().show ('amprfi')
-        
+
+    def ybounds (self, ymin, ymax):
+        self.p.setBounds (ymin=ymin, ymax=ymax)
+    
     def write (self):
         f = file (self.fname, 'w')
         print 'Writing %s ...' % self.fname
