@@ -1,2 +1,2 @@
 #! /bin/sh
-exec python -m `basename $0` "$@"
+exec python -m blflag "$@"
