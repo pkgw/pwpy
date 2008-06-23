@@ -10,9 +10,10 @@ from mirexec import TaskUVFlag
 # ant bl pol auto cross chan atahalf freq time
 
 class MultiFlag2 (object):
-    def __init__ (self, freq, half):
+    def __init__ (self, freq, half, pol):
         self.freq = freq
         self.half = half
+        self.pol = pol
         self.lines = []
         
     # Read in the conditions
@@ -58,7 +59,10 @@ class MultiFlag2 (object):
                 elif cond == 'bl':
                     assert multi is None
                     multi = [('ant(%s)(%s)' % tuple (x.split ('-'))) for x in arg.split (',')]
-                elif cond == 'pol': shared.append ('pol(%s)' % arg)
+                elif cond == 'pol':
+                    if self.pol is None: shared.append ('pol(%s)' % arg)
+                    else:
+                        ignore = ignore or self.pol not in arg.split (',')
                 elif cond == 'chan':
                     assert lmulti is None
                     lmulti = ['chan,%s' % x for x in arg.split (';')]

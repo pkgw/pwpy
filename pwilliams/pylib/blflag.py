@@ -16,7 +16,7 @@ from os.path import basename, join, isdir, exists, dirname
 from mirexec import TaskSelfCal, TaskUVPlot, TaskUVFlag
 from mirtask.util import decodeBaseline
 from numutils import *
-import cairo, gtk, gobject
+import cairo, gtk, gobject, numpy as N
 
 def _makeGladeFile ():
     import os
@@ -561,17 +561,18 @@ class IterFlagWorkFlow (object):
         print 'Flagged baselines:', ' '.join ('%d-%d' % x for x in self.bls)
     
     def save (self):
+        if len (self.ants) == 0 and len (self.bls) == 0:
+            print 'Nothing to write, not saving.'
+            return
+        
         f = file (self.flagfile, 'w')
         print 'Writing %s ...' % self.flagfile
 
-        print >>f, '# blflag manual'
-        print >>f, '!------%s' % self.pol
-
         if len (self.ants) > 0:
-            print >>f, 'ant(%s)------f' % ','.join(str (a) for a in sorted (self.ants))
-        
-        for bl in self.bls: print >>f, 'ant(%d)(%d)------f' % bl
+            print >>f, 'pol=%s ant=%s' % (self.pol, ','.join(str (a) for a in sorted (self.ants)))
 
+        if len (self.bls) > 0:
+            print >>f, 'pol=%s bl=%s' % (self.pol, ','.join ('%d-%d' % t for t in self.bls))
         f.close ()
 
 
