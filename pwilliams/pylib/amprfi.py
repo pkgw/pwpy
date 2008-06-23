@@ -81,7 +81,10 @@ class AmpRfi (object):
         
         for v in self.vises:
             if not v.exists: continue
-            print 'Reading %s ...' % v
+            if len (kwargs) ==  0: print 'Reading %s ...' % v
+            else:
+                kws = ' '.join ('%s=%s' % x for x in kwargs.iteritems ())
+                print 'Reading %s with %s...' % (v, kws)
             any = True
             afa.process (v, **kwargs)
 
@@ -223,19 +226,26 @@ class AmpRfi (object):
     def ybounds (self, ymin, ymax):
         self.p.setBounds (ymin=ymin, ymax=ymax)
     
-    def write (self):
+    def write (self, extraCond=None):
+        if len (self.toFlag) == 0:
+            print 'Nothing to write, skipping'
+            return
+        
         f = file (self.fname, 'w')
         print 'Writing %s ...' % self.fname
 
         print >>f, '# amprfi %d %d %d' % (self.mfactor, self.boxcar, self.pad)
 
+        if extraCond is None: cstr = ''
+        else: cstr = str (extraCond) + ' '
+        
         def makeChans ():
             for bound in self.toFlag:
                 start = bound[0] + 1 # convert to 1-based
                 num = bound[1] - bound[0]
                 yield '%d,%d' % (num, start)
             
-        print >>f, 'freq=%04d atahalf=%d chan=%s' \
+        print >>f, cstr + 'freq=%04d atahalf=%d chan=%s' \
               % (self.freq, self.half, ';'.join (makeChans ()))
 
         f.close ()
