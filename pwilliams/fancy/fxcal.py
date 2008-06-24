@@ -17,7 +17,7 @@ import miriad
 from mirtask import uvdat, keys, util
 import numpy as N
 
-banner = 'FXCAL: reimplementation of uvcal options=fxcal'
+banner = 'FXCAL (Python): reimplementation of uvcal options=fxcal'
 print banner
 
 keys.keyword ('out', 'f', ' ')
@@ -213,4 +213,3 @@ dOut.closeHistory ()
 dOut.close ()
 
 sys.exit (0)
-
