@@ -62,7 +62,8 @@ class MultiFlag2 (object):
                 elif cond == 'pol':
                     if self.pol is None: shared.append ('pol(%s)' % arg)
                     else:
-                        ignore = ignore or self.pol not in arg.split (',')
+                        ignore = ignore or self.pol.lower () not in \
+                                 (x.lower () for x in arg.split (','))
                 elif cond == 'chan':
                     assert lmulti is None
                     lmulti = ['chan,%s' % x for x in arg.split (';')]
