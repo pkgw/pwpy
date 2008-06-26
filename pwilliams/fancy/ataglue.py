@@ -107,10 +107,11 @@ def aligned (first, t1, t2):
             sys.exit (1)
 
         # Preambles agree?
-        if pream1[1] != pream2[1] or pream1[3] != pream2[3] or pream1[4] != pream2[4]:
+        if pream1[3] != pream2[3] or pream1[4] != pream2[4]:
             print >>sys.stderr, 'Error: preamble disagreement! (1)'
             print >>sys.stderr, pream1
             print >>sys.stderr, pream2
+            print >>sys.stderr, pream1[3] - pream2[3], pream1[4] - pream2[4]
             sys.exit (1)
 
         writes[1] += 1
