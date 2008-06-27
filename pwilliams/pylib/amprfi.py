@@ -15,7 +15,6 @@ from mirexec import TaskUVCal
 import os.path
 
 widthLimit = 30
-numChans = 512
 
 class AmpFlagsAccum (object):
     def __init__ (self):
@@ -68,6 +67,9 @@ class AmpFlagsAccum (object):
         self.y = self.data[w] / self.times[w]
 
 class AmpRfi (object):
+    def __init__ (self, numChans):
+        self.numChans = numChans
+        
     def setupNext (self, vises, fname, freq, half, **kwargs):
         self.vises = vises
         self.fname = fname
@@ -167,8 +169,8 @@ class AmpRfi (object):
             deltas = N.convolve (deltas, N.ones (boxcar) / boxcar, 'same')
         my = self.mfactor * N.median (N.abs (deltas))
         p = omega.quickXY (self.ch[0:-1], deltas, 'Deltas')
-        p.addXY ((0, 512), (my, my), '+MFactor')
-        p.addXY ((0, 512), (-my, -my), '-MFactor')
+        p.addXY ((0, self.numChans), (my, my), '+MFactor')
+        p.addXY ((0, self.numChans), (-my, -my), '-MFactor')
 
         if ylim is not None:
             p.setBounds (None, None, -ylim, ylim)
@@ -181,7 +183,7 @@ class AmpRfi (object):
 
         for bound in flaglist:
             bmin = max (0, bound[0] - pad)
-            bmax = min (numChans - 1, bound[1] + pad)
+            bmax = min (self.numChans - 1, bound[1] + pad)
 
             for i in xrange (0, len (merged)):
                 mmin, mmax = merged[i]
