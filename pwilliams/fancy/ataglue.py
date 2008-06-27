@@ -22,8 +22,9 @@ from mirtask import keys, util
 
 specVars = ['ischan', 'nschan', 'nspect', 'restfreq',
             'sdf', 'sfreq']
-
+TOL = 1e-9
 AF_NEITHER, AF_LEFT, AF_RIGHT, AF_BOTH = range (0, 4)
+badCAnts = set ((1, 16, 19, 23, 37))
 
 # Keyword handling
 
@@ -32,6 +33,7 @@ print banner
 
 keys.keyword ('out', 'f', ' ')
 keys.keyword ('vis', 'f', None, 2)
+keys.option ('badc1', 'flagdc')
 opts = keys.process ()
 
 if opts.out == ' ':
@@ -41,6 +43,12 @@ if opts.out == ' ':
 if len (opts.vis) != 2:
     print >>sys.stderr, 'Error: must give exactly two input datasets'
     sys.exit (1)
+
+if opts.badc1:
+    print '**** MASKING BAD-C DATA! KNOW WHAT THIS DOES! AIE! ****'
+
+if opts.flagdc:
+    print 'Automatically flagging and zeroing DC channel.'
 
 # Setup.
 
@@ -85,7 +93,8 @@ def getConfig (src):
 
 def write (src, pream):
     src.copyLineVars (dOut)
-    dOut.writeVarInt ('pol', src.getVarInt ('pol'))
+    pol = src.getVarInt ('pol')
+    dOut.writeVarInt ('pol', pol)
     dOut.writeVarInt ('npol', src.getVarInt ('npol'))
     dOut.writeVarInt ('nspect', 1)
     dOut.writeVarInt ('nschan', 1024)        
@@ -93,10 +102,21 @@ def write (src, pream):
     dOut.writeVarDouble ('sfreq', sfreq)
     dOut.writeVarDouble ('sdf', sdf)
     dOut.writeVarDouble ('restfreq', restfreq)
+
+    if opts.flagdc:
+        mFlags[512] = 0
+        mData[512] = 0.0
+
+    if opts.badc1 and pol == util.POL_XX:
+        bl = util.decodeBaseline (pream[4])
+        if bl[0] in badCAnts or bl[1] in badCAnts:
+            mFlags[512:768] = 0
+            mData[512:768] = 0
+    
     dOut.write (pream, mData, mFlags, 1024)
 
 def aligned (first, t1, t2):
-    while t1 == t2:
+    while abs (t1 - t2) < TOL:
         # No important variables changed?
         if not first and sanity1.updated () and getConfig (in1) != config1:
             print >>sys.stderr, 'Error: correlator configuration changed in input 1!'
@@ -107,7 +127,7 @@ def aligned (first, t1, t2):
             sys.exit (1)
 
         # Preambles agree?
-        if pream1[3] != pream2[3] or pream1[4] != pream2[4]:
+        if abs (pream1[3] - pream2[3]) > TOL or pream1[4] != pream2[4]:
             print >>sys.stderr, 'Error: preamble disagreement! (1)'
             print >>sys.stderr, pream1
             print >>sys.stderr, pream2
@@ -164,7 +184,7 @@ def catchup (leftIsAhead, expectFinish, first, t1, t2):
     t = ta
     #print 'Catchup starting with', util.jdToFull (t)
     
-    while t == ta:
+    while abs (t - ta) < TOL:
         # No important variables changed?
         if not first and sanitya.updated () and getConfig (ahead) != configa:
             print >>sys.stderr, 'Error: correlator configuration changed in ahead input!'
@@ -173,7 +193,7 @@ def catchup (leftIsAhead, expectFinish, first, t1, t2):
         if leftIsAhead: mFlags[512:].fill (0)
         else: mFlags[:512].fill (0)
 
-        #print 'Writing half-record'
+        #if expectFinish: print 'Writing half-record'
         writes[akey] += 1
         write (ahead, preama)
 
@@ -182,11 +202,11 @@ def catchup (leftIsAhead, expectFinish, first, t1, t2):
         else:
             na = ahead.lowlevelRead (preama, mData[512:], mFlags[512:], 512)
 
-        #print 'Read half-record, got', na
+        #if expectFinish: print 'Read half-record, got', na
         
         if na == 0:
             if expectFinish:
-                #print 'Expected to finish and did'
+                print 'Expected to finish and did'
                 return True
             print >>sys.stderr, 'Error: Unexpected EOF in ahead dataset'
             sys.exit (1)
@@ -197,8 +217,12 @@ def catchup (leftIsAhead, expectFinish, first, t1, t2):
             reads[akey] += 1
 
         t = preama[3]
-        #print 'New time', util.jdToFull (t)
+        #if expectFinish: print 'New time', util.jdToFull (t), '; reference', util.jdToFull (ta)
 
+    if expectFinish:
+        print >>sys.stderr, 'Error: should have finished but time changed instead!'
+        sys.exit (1)
+    
     #print 'Exited because got to new timestamp'
     return False
 
@@ -229,7 +253,7 @@ while True:
     t2 = pream2[3]
     print '%s %s: ' % (util.jdToFull (t1), util.jdToFull (t2)),
     
-    if t1 == t2:
+    if abs (t1 - t2) < TOL:
         #if prevState == PS_1AHEAD:
         # The two sets are aligned for this chunk. Nice!
         print 'aligned'
@@ -242,20 +266,20 @@ while True:
             # Will exit if the right dataset doesn't finish
             nRight += 1
             print 'Left finished, catching up right'
-            catchup (False, True, first, 0, t2)
+            catchup (False, True, first, 0, pream2[3])
             break
         elif finishState == AF_LEFT:
             # Will exit if the left dataset doesn't finish
             nLeft += 1
             print 'Right finished, catching up left'
-            catchup (True, True, first, t1, 0)
+            catchup (True, True, first, pream1[3], 0)
             break
     elif t1 < t2:
-        print 'need to catch up left'
+        print 'need to catch up left: %f %f %f' % (t1, t2, t2 - t1)
         nLeft += 1
         catchup (True, False, first, t1, t2)
     else:
-        print 'need to catch up right'
+        print 'need to catch up right: %f %f %f' % (t1, t2, t1 - t2)
         nRight += 1
         catchup (False, False, first, t1, t2)
     
