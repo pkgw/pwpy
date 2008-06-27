@@ -268,7 +268,7 @@ while True:
             print 'Left finished, catching up right'
             catchup (False, True, first, 0, pream2[3])
             break
-        elif finishState == AF_LEFT:
+        elif finishState == AF_RIGHT:
             # Will exit if the left dataset doesn't finish
             nLeft += 1
             print 'Right finished, catching up left'
