@@ -8,11 +8,23 @@
 #
 # where we select only the specified polarization.
 
-if [ "$2" != xx -a "$2" != yy ] ; then
-    echo "Usage: $0 vis polname" 1>&2
-    exit 1
+vis="$1"
+shift
+
+if echo $vis |egrep '(xx|yy)' >/dev/null ; then
+    autosel="-auto"
+else
+    pol="$1"
+    shift
+
+    if [ "$pol" != xx -a "$pol" != yy ] ; then
+	echo "Usage: $0 vis polname" 1>&2
+	exit 1
+    fi
+
+    autosel="-auto,pol($pol)"
 fi
 
-uvplt select="-auto,pol($2)" device=1/xs axis=uvdist,am options=nobase vis="$1"
-uvplt select="-auto,pol($2)" device=2/xs axis=uvdist,ph options=nobase vis="$1"
+uvplt select="$autosel" device=1/xs axis=uvdist,am options=nobase vis="$vis" "$@"
+uvplt select="$autosel" device=2/xs axis=uvdist,ph options=nobase vis="$vis" "$@"
 
