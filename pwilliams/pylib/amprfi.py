@@ -220,6 +220,7 @@ class AmpRfi (object):
             r = omega.rect.XBand (*bound)
             p.add (r)
 
+        p.setBounds (0, self.numChans)
         return p
 
     def show (self):
