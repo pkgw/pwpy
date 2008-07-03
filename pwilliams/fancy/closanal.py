@@ -14,8 +14,8 @@ keys.keyword ('interval', 'd', 0.01)
 keys.keyword ('ntrip', 'i', 10)
 keys.keyword ('nbl', 'i', 10)
 keys.keyword ('nant', 'i', 10)
-keys.option ('rmshist', 'best')
-keys.doUvdat ('dsl3x', True)
+keys.option ('rmshist', 'best', 'uvdplot')
+keys.doUvdat ('dsl3xw', True)
 
 integData = {}
 accData = {}
@@ -114,6 +114,9 @@ args = keys.process ()
 interval = args.interval / 60. / 24.
 print 'Averaging interval: %g minutes' % (args.interval)
 
+if args.uvdplot:
+    uvdists = AccDict (StatsAccumulator, lambda sa, v: sa.add (v))
+
 # Let's go.
 
 first = True
@@ -159,6 +162,9 @@ for (inp, preamble, data, flags, nread) in uvdat.readAll ():
     tmin = min (tmin, t)
     tmax = max (tmax, t)
     integData[(bl, pol)] = (data, flags, var)
+
+    if args.uvdplot:
+        uvdists.accum ((pol, bl[0], bl[1]), N.sqrt ((preamble[0:3]**2).sum ()))
 
 flushInteg (t)
 flushAcc ()
@@ -233,5 +239,22 @@ if args.rmshist:
     allrms.doneAdding ()
     n = int (N.sqrt (len (allrms)))
     omega.quickHist (allrms.col (0), n).showBlocking ()
+
+if args.uvdplot:
+    print
+    print 'Showing baseline closure errors as function of UV distance ...'
+    import omega
+    n = len (uvdists)
+    uvds = N.ndarray (n)
+    rmss = N.ndarray (n)
+
+    i = 0
+    for key, uvdsa in uvdists.iteritems ():
+        uvds[i] = uvdsa.mean ()
+        rmss[i] = blStats[key].mean ()
+        i += 1
+
+    uvds *= 0.001 # express in kilolambda.
+    omega.quickXY (uvds, rmss, lines=False).showBlocking ()
 
 sys.exit (0)
