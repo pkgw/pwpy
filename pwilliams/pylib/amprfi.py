@@ -103,6 +103,11 @@ class AmpRfi (object):
         
         self.ch, self.y = afa.ch, afa.y
         self.manualFlag = []
+
+        if self.y.size == 0:
+            print 'All data flagged for this!'
+            return
+        
         self.suggFlag ()
 
     def plotRaw (self):
