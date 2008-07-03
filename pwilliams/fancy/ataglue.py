@@ -275,11 +275,11 @@ while True:
             catchup (True, True, first, pream1[3], 0)
             break
     elif t1 < t2:
-        print 'need to catch up left: %f %f %f' % (t1, t2, t2 - t1)
+        print 'need to catch up left: %f %f %g' % (t1, t2, t2 - t1)
         nLeft += 1
         catchup (True, False, first, t1, t2)
     else:
-        print 'need to catch up right: %f %f %f' % (t1, t2, t1 - t2)
+        print 'need to catch up right: %f %f %g' % (t1, t2, t1 - t2)
         nRight += 1
         catchup (False, False, first, t1, t2)
     
