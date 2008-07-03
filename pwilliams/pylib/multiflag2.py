@@ -73,7 +73,9 @@ class MultiFlag2 (object):
                     ignore = ignore or self.freq != int (arg)
                 elif cond == 'time':
                     shared.append ('time(%s)' % arg)
-                else: assert False, 'Unbknown condition'
+                elif cond == 'uvrange':
+                    shared.append ('uvrange(%s)' % arg)
+                else: assert False, 'Unknown condition'
 
             if ignore: continue
 
