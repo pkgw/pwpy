@@ -411,7 +411,8 @@ class BLWindow (object):
         self.drawer.queue_draw ()
 
     def onShowUVds (self, button):
-        self.workflow.uvdExport (self.data)
+        #self.workflow.uvdExport (self.data)
+        self.workflow.maxExport (self.data)
         self.drawer.queue_draw ()
 
     def onSaveNext (self, button):
@@ -439,7 +440,7 @@ class IterFlagWorkFlow (object):
     vis = None
     work = None
     
-    def startFile (self, vis, pol, flagfile):
+    def startFile (self, vis, pol, flagfile, nchan):
         if self.work is not None: self.work.delete ()
 
         print
@@ -454,6 +455,7 @@ class IterFlagWorkFlow (object):
         self.vis = vis
         self.pol = pol
         self.flagfile = flagfile
+        self.nchan = nchan
         
         self.work = vis.vvis ('blflag')
         self.bls = set ()
@@ -495,10 +497,11 @@ class IterFlagWorkFlow (object):
         self.astats = AccDict (StatsAccumulator, lambda a, v: a.add (v))
         self.uvstats = AccDict (StatsAccumulator, lambda a, v: a.add (v))
         self.phstats = AccDict (StatsAccumulator, lambda a, v: a.add (v))
+        self.maxstats = RedDict (0, lambda a, b: max (a, b))
         
         print 'Reading', self.work, '...'
         ngot = 0
-        iter = self.work.readLowlevel (False, line='chan,1,1,512')
+        iter = self.work.readLowlevel (False, line='chan,1,1,%d' % self.nchan)
         
         for inp, preamble, data, flags, nread in iter:
             assert (nread == 1)
@@ -509,6 +512,7 @@ class IterFlagWorkFlow (object):
             self.astats.accum (bl, abs (data[0]))
             self.phstats.accum (bl, N.arctan2 (data[0].imag, data[0].real))
             self.uvstats.accum (bl, uvd)
+            self.maxstats.reduce (bl, abs (data[0]))
 
         if ngot == 0: print 'Read no data??!'
         else: print 'Read %d points' % ngot
@@ -542,6 +546,12 @@ class IterFlagWorkFlow (object):
         
         for bl, acc in self.uvstats.iteritems ():
             data.add (bl, acc.mean ())
+
+    def maxExport (self, data):
+        data.clear ()
+        
+        for bl, val in self.maxstats.iteritems ():
+            data.add (bl, val)
 
     def applySels (self, selected):
         for a1, a2 in selected:
@@ -578,23 +588,24 @@ class IterFlagWorkFlow (object):
 
 
 class SingleWorkFlow (IterFlagWorkFlow):
-    def __init__ (self, vis, pol, flagfile):
+    def __init__ (self, vis, pol, flagfile, nchan):
         self.thevis = vis
         self.thepol = pol
         self.theflag = flagfile
+        self.nchan = nchan
     
     def next (self):
         if self.thevis is None: return False
 
-        self.startFile (self.thevis, self.thepol, self.theflag)
+        self.startFile (self.thevis, self.thepol, self.theflag, self.nchan)
         self.thevis = None
         return True
 
 if __name__ == '__main__':
-    if len (sys.argv) == 4:
-        wf = SingleWorkFlow (VisData (sys.argv[1]), sys.argv[2], sys.argv[3])
+    if len (sys.argv) == 5:
+        wf = SingleWorkFlow (VisData (sys.argv[1]), sys.argv[2], sys.argv[3], int (sys.argv[4]))
     else:
-        print 'Usage: %s vis pol flagfile' % sys.argv[0]
+        print 'Usage: %s vis pol flagfile nchan' % sys.argv[0]
         sys.exit (1)
     
     blw = BLWindow (wf)
