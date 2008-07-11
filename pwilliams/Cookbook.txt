@@ -171,6 +171,11 @@ essentially automatable.
   have been completely flagged, making your output files somewhat
   smaller.
 
+You should now have a bunch of prepped datasets called SRC-FREQ-POL,
+where POL is one of "xx" or "yy". You may want to back these data up
+if you want to revert some of your flagging and calibration
+operations.
+
 
 
 
@@ -346,7 +351,7 @@ averaged data.]]
 
 * FIXME: paying attention to what ataalarms -l has complained about.
 
-
+* FIXME: iterative flagging based on self-cal results.
 
 
 CALIBRATION RECIPE
