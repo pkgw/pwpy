@@ -12,17 +12,10 @@ The files in the "pyata" subdirectory are for HCRO computers,
 allowing you to run various useful ata* commands in Python.
 
 The scripts contained in the "fancy" subdirectory
-(mmm/pwilliams/fancy) rely on my stack of Python bindings to
-MIRIAD. There's a fairly complicated set of software that needs to be
-set up for these to work. See
+(mmm/pwilliams/fancy) rely on my bridge between Python and Miriad. See
 
-   http://log.hcro.org/node/782
+http://badgrads.berkeley.edu/doku.php?id=miriad_in_python
 
-for information on how to get access to an environment that lets you
-give those scripts a spin.
+for information on how to give those scripts a spin.
 
-I actually keep the scripts in a Git repository in my home directory;
-if you know what that means, I can set up direct access for you. If
-you don't know what that means, don't worry about it.
-
- -- Peter Williams <pwilliams@astro.berkeley.edu>
+  -- Peter Williams <pwilliams@astro.berkeley.edu>
