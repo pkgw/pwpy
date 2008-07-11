@@ -252,9 +252,13 @@ class AmpRfi (object):
                 start = bound[0] + 1 # convert to 1-based
                 num = bound[1] - bound[0]
                 yield '%d,%d' % (num, start)
-            
-        print >>f, cstr + 'freq=%04d atahalf=%d chan=%s' \
-              % (self.freq, self.half, ';'.join (makeChans ()))
+
+        if self.half == 0:
+            print >>f, cstr + 'freq=%04d chan=%s' \
+                  % (self.freq, ';'.join (makeChans ()))
+        else:
+            print >>f, cstr + 'freq=%04d atahalf=%d chan=%s' \
+                  % (self.freq, self.half, ';'.join (makeChans ()))
 
         f.close ()
 
@@ -264,3 +268,25 @@ def vglob (match):
         yield miriad.VisData (p)
 
 __all__ = ['AmpRfi', 'vglob']
+
+if __name__ == '__main__':
+    import sys, IPython
+    
+    if len (sys.argv) < 6:
+        print 'Usage: %s numchans flagfile freq half vis1 ...' % sys.argv[0]
+        sys.exit (0)
+
+    nchan, flags, freq, half = int (sys.argv[1]), sys.argv[2], int (sys.argv[3]), int (sys.argv[4])
+    vises = [miriad.VisData (x) for x in sys.argv[5:]]
+    
+    a = AmpRfi (nchan)
+    a.setupNext (vises, flags, freq, half)
+    
+    ns = {'a': a, 'vises': vises, 'freq': freq, 'half': half, 'fname': flags}
+    sys.argv = sys.argv[0:1]
+    sh = IPython.Shell.start (ns)
+    print 'AmpRfi instance is in variable "a". Exit to write'
+    sh.mainloop ('')
+    print 'Writing to', flags, '...'
+    a.write ()
+    sys.exit (0)
