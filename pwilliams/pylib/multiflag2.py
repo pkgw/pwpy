@@ -103,3 +103,42 @@ class MultiFlag2 (object):
             t.select = select
             t.line = line
             t.run ()
+
+def task ():
+    from mirtask import keys
+    from miriad import VisData, basicTrace
+
+    basicTrace ()
+    
+    banner = 'MULTIFLAG2 (Python): Apply groups of flags by calling UVFLAG'
+    print banner
+
+    keys.keyword ('spec', 'f', None, 128)
+    keys.keyword ('vis', 'f', None, 128)
+    keys.keyword ('freq', 'd', -1)
+    keys.keyword ('half', 'i', 0)
+    keys.keyword ('pol', 'a', ' ')
+    opts = keys.process ()
+
+    if opts.pol == ' ': opts.pol = None
+    
+    if len (opts.spec) < 1:
+        print >>sys.stderr, 'Error: must give at least one "spec" filename'
+        sys.exit (1)
+
+    if opts.freq < 0:
+        print >>sys.stderr, 'Error: must specify "freq" keyword.'
+        sys.exit (1)
+    
+    mf = MultiFlag2 (opts.freq, opts.half, opts.pol)
+    
+    for fname in opts.spec: mf.loadSpec (fname)
+
+    print 'Parsed conditions from %d file(s).' % (len (opts.spec))
+
+    for vf in opts.vis:
+        mf.applyDataSet (VisData (vf), 'unused')
+
+if __name__ == '__main__':
+    task ()
+    sys.exit (0)
