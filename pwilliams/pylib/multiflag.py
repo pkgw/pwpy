@@ -679,7 +679,8 @@ class MultiFlag (object):
 
 def task ():
     print 'This script is UNFINISHED and EXPERIMENTAL!!!!'
-
+    print 'Use multiflag2 instead!!!!'
+    
     banner = 'MULTIFLAG (Python): UV data multiflagger $Id$'
     print banner
 
