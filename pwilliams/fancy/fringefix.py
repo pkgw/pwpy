@@ -33,7 +33,6 @@ import miriad, mirtask
 import mirtask.lowlevel as ll
 from mirtask import uvdat, keys
 import numpy as N
-from cgs import c
 
 omega_e = 2. * N.pi / 86400 # Earth rot rate in rads per sec
 deg2rad = N.pi / 180.
