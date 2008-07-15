@@ -10,6 +10,12 @@ no one is truly experienced at doing science with ATA data, so all of
 these instructions should be regarded as provisional. I'll happily
 accept suggestions and corrections.
 
+One implication of this document being a "cookbook" is that I've
+skipped some justifications and explanations in favor of concision. If
+the effect of a step is unclear, you should probably read the
+documentation for its associated task; if its rationale is unclear,
+you should probably ask Peter.
+
 The master copy of this document is stored in the "mmm" Subversion
 repository on svn.hcro.org. I've put it here since, at the moment,
 writing this document as simple text file is the most appealing
@@ -26,11 +32,20 @@ Miriad datasets named
 
        fx64a-SRC-FREQ_HALF
 
-Where SRC is the name of the target you're observing (as recognized by
+Where SRC is the name of the source you're observing (as recognized by
 the ATA catalog system), FREQ is your observing frequency in MHz, and
 HALF is (what I call) the "correlator half" of the spectrum you're
-observing. The correlator outputs 1024 channels; in my nomenclature,
-the first 512 are in "half 1", and the other 512 are in "half 2".
+observing and is either "1" or "2". The correlator outputs 1024
+channels: the first 512 are in "half 1" and the other 512 are in 
+"half 2".
+
+This cookbook is written as if your observations have one calibrator
+and one science target taken at one frequency. Extrapolation to more
+complicated observations is your job. In the example commands, the
+observed source is referred to either as CAL, or TARG, or SRC. If CAL
+is used, the command is run on a calibrator dataset; if TARG is used,
+it's run on a science target dataset; and if SRC is used, it's run on
+both kinds of dataset.
 
 An "antpol" is a particular antenna-polarization combination. The FX64
 correlator has 64 antpol inputs. When all 42 ATA antennas are fully
@@ -126,7 +141,7 @@ essentially automatable.
   gluing together two spectra, these data can cause the rest of their
   spectra to be badly damaged by quantization in the Miriad data
   format. This can be prevented by giving ATAGLUE.PY the argument
-  "options=badc1", which flags channels 512 - 768 of antennas 1X, 16X,
+  "options=badc1", which flags channels 512 - 768 of antpols 1X, 16X,
   19X, 23X, and 37X. Due to rewirings of the correlator, these may not
   be the right antpols to flag. You should look at your data to check
   where the bad C data are before using this option. (If your bad C
@@ -138,10 +153,16 @@ essentially automatable.
     vis=fx64a-SRC-FREQ_2
 
 * On all datasets, attempt to correct for amplitude loss due to the
-  relatively long FX64 integration time.
+  relatively long FX64 integration time and the fact that we do not
+  currently have fringe rotation in our correlator.
 
-  $ fringefix.py maxscale=2 vis=VIS out=VIS.ff
+  $ fringefix.py maxscale=2 vis=fx64a-SRC-FREQ out=fx64a-SRC-FREQ.ff
   
+  PKGW is a little uncertain of the correctness of this step and
+  of whether it should be applied to both cal and target
+  datasets. Hopefully we will soon get fringe rotation and it won't
+  matter anymore.
+
   Unfortunately, the amplitude loss seen in ATA-43/FX64 data does not
   quite match theoretical explanations, so the corrections applied by
   this script introduce infidelities of their own. But hopefully,
@@ -149,17 +170,18 @@ essentially automatable.
   data.
 
 * On all datasets, run an FX calibration (that is, divide
-  cross-correlations by auto-correlations) to smooth out the bandpass
-  somewhat:
+  cross-correlations by auto-correlations). We hope that this smoothes
+  out the bandpass somewhat, and it also makes quantification of
+  the antenna gains easier.
 
   $ uvcal options=fxcal,unflagged select='pol(xx)' \
     vis=fx64a-SRC-FREQ.ff out=SRC-FREQ-xx
   $ uvcal options=fxcal,unflagged select='pol(yy)' \
     vis=fx64a-SRC-FREQ.ff out=SRC-FREQ-yy
 
-  The way the FX cal program works, different polarizations need to
-  be processed separately. This is helpful down the road as SELFCAL
-  has the same limitation.
+  Different polarizations need to be processed separately due to the
+  way the FX cal procedure is implemented. Splitting the data here is
+  somewhat helpful down the road as SELFCAL has the same limitation.
 
   If you're doing spectral line work and a line of interest shows up
   in the autocorrelations, the above command will mess up your line
@@ -205,9 +227,10 @@ steps is:
 
 If the file containing that line was called generic.mf, you'd run
 
-  $ multiflag2 spec=generic.mf vis=VIS1,VIS2,VIS3,...
+  $ multiflag2 spec=generic.mf freq=FREQ vis=VIS1,VIS2,VIS3,...
 
-]]
+where FREQ is the observation frequency in MHz of the specified UV
+datasets.]]
 
 * Experience shows that there is a fair level of crosstalk between
   antpols that are on the same ADC card that also have the same Walsh
@@ -217,7 +240,7 @@ If the file containing that line was called generic.mf, you'd run
 [[Python note: A script called walsh-flags.py will generate
 appropriate multiflag commands based on the conflicts. Run it as
 
-  $ walsh-flags SRC-FREQ-POL >walsh.mf
+  $ walsh-flags.py SRC-FREQ-POL >walsh.mf
 
 where SRC-FREQ-POL is an arbitrary dataset. The flagging commands can
 then be applied with multiflag2.]]
@@ -302,7 +325,7 @@ then be applied with multiflag2.]]
   everything but channel, so that those channels with consistently
   high amplitudes (due to high-duty-cycle RFI) can be identified.
 
-[[Python note: PGKW's interactive implementation of this algorithm
+[[Python note: PGKW's interactive implementation of this approach
 lives in a module called amprfi.py and can be started on the
 command-line with "amprfi". There is not currently any documentation
 of this tool. The script below is much lower-level and performs only
@@ -345,7 +368,9 @@ averaged data.]]
   $ closanal.py vis=CAL-FREQ-POL interval=10
 
   You should time-average over at least a few minutes to damp out the
-  effects of noise.
+  effects of noise. You can get CLOSANAL.PY to print out the *best*
+  triples, baselines, and antennas by giving it the keyword
+  "options=best".
 
 * FIXME: Phase stddev-based flagging
 
@@ -376,7 +401,7 @@ PKGW's generic steps for calibrating observations are:
   points, both of which should be helpful. The derived bandpass
   solutions can be seen with
 
-  $ gpplt device=1/xs options=bandpass vis=CAL-POL
+  $ gpplt device=1/xs options=bandpass vis=CAL-FREQ-POL
 
   The "line" keyword in the above SMAMFCAL commands may be needed
   because, in at least some cases, SMAMFCAL crashes if it tries to
@@ -392,7 +417,7 @@ PKGW's generic steps for calibrating observations are:
   3c286.") If your calibrator is a nice bright point source, remedy
   this with a SELFCAL:
 
-  $ selfcal select=-auto options=amp,noscale flux=FLUX vis=CAL-POL
+  $ selfcal select=-auto options=amp,noscale flux=FLUX vis=CAL-FREQ-POL
 
   for both POL. (Assuming an unpolarized source and so on.) The
   "select=-auto" line is essential; otherwise SELFCAL will produce
@@ -410,7 +435,7 @@ PKGW's generic steps for calibrating observations are:
   being discarded when applying gain solutions from the
   calibrator. You can tweak the setting with:
 
-  $ puthd type=double value=INTERVALDAYS in=CAL-POL/interval
+  $ puthd type=double value=INTERVALDAYS in=CAL-FREQ-POL/interval
 
   for both POL, where INTERVALDAYS is the extrapolation interval in
   days. I suggest 0.02, about half an hour, as a reasonable value.
@@ -432,19 +457,19 @@ PKGW's generic steps for calibrating observations are:
   things up, it may help to phase self-calibrate your target
   datasets. To do this, you need a model of your target image, most
   likely created by the CLEAN task. We'll assume this dataset is
-  called "TARG.cl". So, the first step is to image the target without
-  any further processing and create that dataset.
+  called "TARG-FREQ.cl". So, the first step is to image the target
+  without any further processing and create that dataset.
 
   Even though we only want to self-calibrate in phase, doing so
   overwrites antenna amplitude solutions, so the previous calibrated
   dataset needs to be UVCAT'ed to rewrite the data with the amplitude
   solutions applied:
 
-  $ uvcat vis=TARG-POL out=TARG-POL.phsc
+  $ uvcat vis=TARG-FREQ-POL out=TARG-FREQ-POL.phsc
 
   for both POL. Then, a phase-only selfcal can be reapplied:
 
-  $ selfcal options=ph,mfs model=TARG.cl vis=TARG-POL.phsc
+  $ selfcal options=ph,mfs model=TARG-FREQ.cl vis=TARG-FREQ-POL.phsc
 
   Hopefully, an image generated after running this step will be
   cleaner than the previous one. Iterate until happy.
