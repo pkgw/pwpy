@@ -75,6 +75,8 @@ class MultiFlag2 (object):
                     shared.append ('time(%s)' % arg)
                 elif cond == 'uvrange':
                     shared.append ('uvrange(%s)' % arg)
+                elif cond == 'shadow':
+                    shared.append ('shadow(%s)' % arg)
                 else: assert False, 'Unknown condition'
 
             if ignore: continue
