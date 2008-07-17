@@ -1,16 +1,48 @@
 #! /usr/bin/env python
 
-"""A reimplentation of UVCAL with the FXCAL option. FXCAL
-suffers from two failings:
+"""= fxcal.py - A reimplentation of UVCAL with the FXCAL option
+& pkgw
+: uv Analysis
++
+ FXCAL.PY "FX calibrates" datasets, dividing cross-correlation spectra
+ by the geometric mean of the two contributing autocorrelation
+ spectra. This is the same functionality as UVCAL with
+ "options=fxcal", but with fewer bugs.
+ 
+ The UVCAL implementation suffers from three failings:
 
-* It is sensitive to the order of the data within a file:
-if the (p, q) baseline appears before (p, p) or (q, q), the
-data will be lost, even if the data is present with the
-correct timestamp.
+ * It is sensitive to the order of the data within a file:
+   if the (p, q) baseline appears before (p, p) or (q, q), the
+   data will be lost, even if the data is present with the
+   correct timestamp.
 
-* It writes zeros instead of flagging invalid data.
+ * It writes zeros instead of flagging invalid data.
 
-This version avoids those issues."""
+ * It does not pay attention to polarizations, generating junk results
+   if it's given data for more than one polarization.
+
+ This implementation does not have these issues. Because it is written
+ in Python, however, it is slower, and cannot simultaneously apply the
+ other processing steps supported by UVCAL.
+
+ An important caveat is that this implementation is aware of
+ polarizations, but can't deal with cross-hand
+ polarizations. Parallel-hand polarizations are processed correctly,
+ but cross-hand pols are not written to the output dataset.
+
+< vis
+ Multiple input files are supported by FXCAL.PY.
+
+@ out
+ The name of the output dataset. The FX-calibrated data will be
+ written to this file.
+
+< select
+
+< stokes
+
+--
+"""
 
 import sys
 import miriad
