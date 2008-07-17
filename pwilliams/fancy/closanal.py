@@ -8,13 +8,12 @@
  are bad in a given dataset. It computes phase triple closures from
  the data and computes RMS values for each baseline and
  antenna from the closures for each triple that they contribute
- to. The worse triple, baseline, and antenna closure values are then
+ to. The worst triple, baseline, and antenna closure values are then
  printed.
 
  Besides the RMS phase closure value for baselines and antennas, the
  standard deviation of those values ("StdDev") and the number of
- triples contribution used in the computation ("nTrip") is also
- printed.
+ triples used in the computation ("nTrip") are also printed.
  
 < vis
 
@@ -46,7 +45,8 @@
            'omega'
 
  'nocal'   Do not apply antenna gain corrections. This task should
-           yield identical results with this enabled or disabled.
+           yield identical results with this enabled or disabled --
+           that's the whole point of looking at closures!
 
  'nopol'   Do not apply polarization leakage corrections.
 
@@ -58,6 +58,7 @@
 
 < stokes
 
+--
 """
 
 import numpy as N
