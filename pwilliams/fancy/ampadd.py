@@ -6,10 +6,11 @@
 +
 
  This task is intended to aid in the detection of high-duty-cycle RFI.
- By averaging amplitudes over everything but frequency, those channels
- that frequently have above-average amplitudes stand out. Thus, this
- approach is most sensitive to signals that are omnipresent: detectible
- at all times, in all polarizations, on all baselines, etc.
+ By averaging amplitudes over everything but channel number, those
+ channels that frequently have above-average amplitudes stand
+ out. Thus, this approach is most sensitive to signals that are
+ omnipresent: detectible at all times, in all polarizations, on all
+ baselines, etc.
 
 < vis
  The more files are input, the more data will be averaged and the more

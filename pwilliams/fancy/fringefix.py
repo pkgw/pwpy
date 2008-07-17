@@ -1,32 +1,70 @@
 #! /usr/bin/env python
 
-"""Fringe Fix -- scale vis amplitudes by a correction factor
-to compensate for our lack of fringe rotation."""
+"""= fringefix.py - Scale visibility amplitudes to account for fringe rotation
+& pkgw
+: Calibration
++
+ This task applies a fringe-rotation correction to UV data, writing
+ the corrected data to a new dataset.
 
-# I should write real documentation, but in the meantime ...
-#
-# This script scales the amplitude of each vis by
-#
-# 1 / sinc (-omega_e * u * cos (decl) * inttime)
-#
-# which, ideally, corrects for the loss in amplitude caused
-# by the fact that we don't compensate for fringe rotation.
-#
-# You run this like a normal MIRIAD task:
-#
-# fringefix.py vis=input out=output maxscale=3 options=nocal,nopass,nopol
-#
-# "vis" and "out" should be self-explanatory.
-#
-# "maxscale" sets the maximum scale factor that we are allowed to
-# apply: if data in a given vis would have its amplitude scaled by
-# more than this number, the vis is flagged instead. (Presumably,
-# a vis with a really low amplitude will have a correspondingly low
-# SNR, and we don't want them to mess up our results.) The default
-# is 7, which is probably too high.
-#
-# The nocal, nopass, and nopol options are the usual
-# calibration-related ones.
+ The correction applied is intended to fix up data taken with an
+ interferometer that has a long integration time and does not track
+ fringe rotation. Over the course of an integration, the (ideal)
+ visibility vector being observed will rotate around the complex plane
+ at the fringe rate, reducing the observed amplitude from what it
+ should be. The fringe rate is
+
+  -omega_e * u * cos (decl)   [Thompson, Moran, & Swenson, sec 4.4]
+
+ where omega_e is the rotation rate of the Earth in radians per
+ second. Computation of the amount of decorrelation indicates that the
+ observed amplitude decreases as a sinc (x), where x is the angle (in
+ radians) traversed over the integration. Hence, this task multiplies
+ the amplitude of each visibility record by
+
+  1 / sinc (-omega_e * u * cos (decl) * inttime)
+
+ Note that this task works on whole records, and not individual
+ channels. A more sophisticated approach would be to compute the UVW
+ coordinates of each channel and apply the correction on a
+ channel-by-channel basis.
+
+ This task should be used with care. It seems to overcorrect ATA-42
+ FX64 data. The author believes that it is correct to use this task
+ with observations of bright sources at phase center, but is unsure if
+ it should also be used for crowded fields or other kinds of data.
+
+< vis
+ Multiple input files are supported in FRINGEFIX.PY.
+
+@ out
+ The name of the output dataset to create. The corrected data are
+ written to this file.
+
+@ maxscale
+ A number specifying the maximum allowed correction factor. If the
+ correction factor (the 1/sinc (x) quantity given above) is greater
+ than maxscale, the record will be elided from the output
+ dataset. Default value is 3.
+
+< select
+
+< line
+
+< stokes
+
+@ options
+ Multiple options can be specified, separated by commas, and
+ minimum-match is used.
+
+ 'nocal'   Do not apply antenna gain corrections.
+
+ 'nopol'   Do not apply polarization leakage corrections.
+
+ 'nopass'  Do not apply bandpass shape corrections.
+
+--
+"""
 
 import sys
 import miriad, mirtask
@@ -41,7 +79,7 @@ banner = 'FRINGEFIX: Correct for fringe rate amplitude loss'
 print banner
 
 keys.keyword ('out', 'f', ' ')
-keys.keyword ('maxscale', 'd', 7.)
+keys.keyword ('maxscale', 'd', 3.)
 keys.doUvdat ('dsl3', True)
 opts = keys.process ()
 
