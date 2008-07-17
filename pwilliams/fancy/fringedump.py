@@ -1,7 +1,13 @@
 #! /usr/bin/env python
 
-"""FringeDump - Dump out some information related to correcting for
-time smearing. Not of general interest."""
+"""= fringedump.py - Not of general interest.
+& pkgw
+: Other
++
+ This task logs some data related to fringe rate corrections.
+ You don't need it.
+--
+"""
 
 import sys
 import miriad, mirtask
