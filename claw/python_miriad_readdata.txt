@@ -6,8 +6,9 @@
 
 lupus>ipython
 
-In [1]:import miriad
 ## Most standard functions and classes are in the 'miriad' python library.
+
+In [1]:import miriad
 
 In [2]:dir (miriad)
 Out[2]:
@@ -40,8 +41,9 @@ Out[2]:
  'sys',
  'trace']
 
-In [4]:q = miriad.VisData ('/k/claw/big_scr2/ata080403/3c286-1430-xx')
 ## This object 'q' does not hold data, but contains lots of info that you might get from the file system (size, etc.)
+
+In [4]:q = miriad.VisData ('/k/claw/big_scr2/ata080403/3c286-1430-xx')
 
 In [5]:q.exists
 Out[5]:True
@@ -60,6 +62,9 @@ q.__module__        q._mutations        q.checkExists       q.getMutations      
 In [6]:q.mtime
 Out[6]:1216172967
 
+## Most standard reading of data will be done with the "readLowlevel" method.
+## Data is read using the 'yield' function of python, which basically steps through the data for each integration.
+
 In [7]:q.readLowlevel ?
 Type:			instancemethod
 Base Class:		<type 'instancemethod'>
@@ -69,7 +74,6 @@ File:				/cosmic1/pkwill/miriad-x86_64-Linux-suse10.2/lib64/python2.5/site-packa
 Definition:			q.readLowlevel(self, saveFlags, **kwargs)
 Docstring:
     <no docstring>
-## 
 
 In [8]:def f ():
    ...:    yield 1
@@ -81,16 +85,26 @@ In [9]:for x in f(): print x
 1
 2
 
+## This 'gen' object allows one to step throug the data.
+
 In [10]:gen = q.readLowlevel (False)
+
+## The first step of reading is accessing low level Miriad libraries that automatically print out the corrections that are being applied to the data.  This cannot be controlled from here.
 
 In [11]:data = gen.next ()
 Applying bandpass corrections to /k/claw/big_scr2/ata080403/3c286-1430-xx
 Applying gain corrections to /k/claw/big_scr2/ata080403/3c286-1430-xx
 
+## The data object that is returned by 'gen' has by default five parts.
+
 In [12]:inp, preamble, data, flags, nread = data
+
+## The size of the data indicates the number of channels for that integration.  It is larger than the number of channels with data, since in principal the size of the data can change.
 
 In [13]:data.size
 Out[13]:4096
+
+## 'nread' is a standard measure of the number of channels with data.  One can then use this to reduce the data and flag arrays as appropriate.
 
 In [14]:nread
 Out[14]:1024
@@ -99,21 +113,28 @@ In [15]:data = data[0:nread]
 
 In [16]:flags = flags[0:nread]
 
+## It looks like this particular integration is completely flagged...
+
 In [17]:flags.any ()
 Out[17]:False
 
-In [18]:flags[0:10]
-Out[18]:array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0], dtype=int32)
+## The 'preamble' object has details about the integration.  The first three are (u,v,w) coordinates, next one is MDJ (?) in seconds, finally is a code for the antennas in the baseline.
 
 In [19]:preamble
 Out[19]:
 array([  0.00000000e+00,   0.00000000e+00,   0.00000000e+00,
          2.45455976e+06,   1.54200000e+03])
 
+## Some translation tools are in 'mirtask.util'.
+
 In [20]:import mirtask.util
+
+## This one takes the baseline code in the preamble and gives antenna numbers.
 
 In [21]:print mirtask.util.decodeBaseline (preamble[4])
 (6, 6)
+
+## The 'inp' object has more details about the integration.  In particular, things Miraid calls 'variables' are here.
 
 In [22]:inp.__class__
 Out[22]:<class 'mirtask.uvdat.UVDatDataSet'>
@@ -127,11 +148,17 @@ inp.__del__             inp.__weakref__         inp.getHeaderDouble     inp.getV
 inp.__delattr__         inp._close              inp.getHeaderFloat      inp.getVarInt           inp.refobj              inp.writeHistory
 inp.__dict__            inp._histOpen           inp.getHeaderInfo       inp.getVarSt
 
+## You can get the number for variables if you know its name.  In this case, you need to do this to get the polarization code for the integration.
+
 In [23]:inp.getVarInt ('pol')
 Out[23]:-5
 
+## This integration has a code of -5, which is the same as that of the XX polarization.
+
 In [24]:mirtask.util.POL_XX
 Out[24]:-5
+
+## You can also translate this with 'mirtask.util'
 
 In [25]:mirtask.util.
 mirtask.util.POL_I                    mirtask.util.POL_XY                   mirtask.util.__name__                 mirtask.util.encodedBaselineIndexMap
@@ -153,14 +180,15 @@ Out[25]:'XX'
 In [26]:mirtask.util.jdToFull (preamble[3])
 Out[26]:'08APR03:06:08:11.3'
 
+## More variables...  These are listed in a Miriad manual, I think.
+
 In [28]:inp.getVarInt ('nspect')
 Out[28]:1
 
 In [29]:inp.getVarInt ('nschan')
 Out[29]:1024
 
-In [30]:abs (data[100])
-Out[30]:1756075.25
+## The 'readLowlevel' routine is a wrapper around 'mirtask.uvdat'.  The uvdat function has more control and is better if you are trying to actually write Miriad-like tools.
 
 In [36]:mirtask.uvdat.init ?
 
