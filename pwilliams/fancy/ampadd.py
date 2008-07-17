@@ -1,26 +1,30 @@
 #! /usr/bin/env python
 
-"""ampadd - Average UV amplitudes over everything but frequency.
+"""=ampadd.py - Average UV amplitudes over everything but frequency.
+& pkgw
+: uv Analysis
++
 
-This task is intended to aid in the detection of high-duty-cycle RFI.
-By averaging amplitudes over everything but frequency, those channels
-that frequently have above-average amplitudes stand out. Thus, this
-approach is most sensitive to signals that are omnipresent: detectible
-at all times, in all polarizations, on all baselines, etc.
+ This task is intended to aid in the detection of high-duty-cycle RFI.
+ By averaging amplitudes over everything but frequency, those channels
+ that frequently have above-average amplitudes stand out. Thus, this
+ approach is most sensitive to signals that are omnipresent: detectible
+ at all times, in all polarizations, on all baselines, etc.
 
-Keyword: vis
-        The input visibility files(s). The more files are input, the more
-        data will be averaged and the more prominent RFI should be. All input
-        files must have the same correlator configuration.
+< vis
+ The more files are input, the more data will be averaged and the more
+ prominent RFI should be. All input files must have the same
+ correlator configuration.
 
-Keyword: log
-        The name of an output log file. The logfile contains three columns
-        of numbers. The first column is channel number, the second column is
-        channel frequency, and the third column is averaged amplitude. Not
-        all channels will be present if the channel was flagged in all input
-        visibilities. The contents of the logfile are intended to be plotted
-        in whatever means are convenient to the user.
-        
+@ log
+ The name of an output log file. The logfile contains three columns of
+ numbers. The first column is channel number, the second column is
+ chqannel frequency, and the third column is averaged amplitude. Not
+ all channels will be present if the channel was flagged in all input
+ visibilities. The contents of the logfile are intended to be plotted
+ in whatever means are convenient to the user.
+
+--
 """
 
 # TODO: maybe use uvdat to read the data? No real reason not to I think

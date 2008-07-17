@@ -101,6 +101,15 @@ built for your particular OS and CPU, the setup script will let you
 know about this fact and exit; in that case, you will unfortunately
 not be able to run the Python scripts.
 
+Documentation for the scripts should be available by running
+
+  $ mirhelp scriptname.py
+
+in the usual manner. If this results in a list of no files 
+"matching 'scriptname.py'", try running
+
+  $ mirpyhelp.py scriptname.py
+
 Some of the Python scripts require only the Miriad-Python bridge and
 do not overlap in functionality with existing Miriad tasks; others are
 more sophisticated and fit in more tightly with PKGW's particular
