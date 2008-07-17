@@ -1,8 +1,31 @@
-#!/usr/bin/python
-#
-# Print out gains information from a vis file. Based on gplist,
-# but not constrained to CARMA, and doesn't support rewriting gains
-# tables.
+#! /usr/bin/env python
+
+"""= gpcat2.py - Print out antenna gain information
+& pkgw
+: calibration
++
+ This task prints out the antenna gain amplitude information stored in
+ a UV dataset. The task GPLIST performs a similar function, but
+ crashes for data not from CARMA.
+
+ The antenna gains are printed in a table format. The first column is
+ the full date and time associated with the entry in the gain table,
+ and the subsequent columns given the amplitudes of the antenna gains
+ in that entry. Antennas with zero amplitudes in the first record are
+ skipped in that record and all subsequent ones.
+
+ With many antennas (e.g., ATA data), the individual lines can get
+ very long.
+
+ The gains-table reading code does not handle all possible
+ configurations (e.g., ntau != 1) but should exit with an error if it
+ encounters a table it cannot handle.
+
+< vis
+ Only a single input UV dataset is supported by GPCAT2.PY.
+
+--
+"""
 
 import sys, os
 import miriad
