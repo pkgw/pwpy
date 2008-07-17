@@ -1,9 +1,86 @@
 #! /usr/bin/env python
 
-"""Varcat -- print values of UV variables.
+"""= varcat.py -- Print values of UV variables.
+& pkgw
+: Tools
++
+ This task scans through UV data and prints out the values of
+ user-specified UV variables as they change. Use it to investigate the
+ low-level properties of your UV data.
 
-It looks like the UVIO task basically does the same thing
-as this. But my formatting is prettier.
+ There two groups of variables: the variables of interest, and
+ "context" variables. A line is printed only when one of the
+ variables of interest changes. When a line is printed, both
+ the context variables and the variables of interest are shown. The
+ variable values are shown in a column format.
+
+ A variable of interest is said to have "changed" when a new entry for
+ the variable appears in the UV data stream (according to the routine
+ UVVARUPD). The new entry for the variable may have the same value as
+ the previous entry, however.
+ 
+ Array-valued variables are not well-handled at the moment.
+ 
+< vis
+ Multiple input datasets are supported by VARCAT.PY.
+
+@ vars
+ A comma-separated list of variable names. A line containing the values
+ of these variables is printed every time one of the variables
+ changes. No default, and must be specified. 
+
+@ context
+ A comma-separated list of variable names. Whenever a line is printed,
+ the values of these variables are printed as well. However, changes
+ in the values of these variables do not trigger the printing of a
+ line. Defaults to "time".
+
+@ format
+ A comma-separated list of formatting styles for the variables of
+ interest. Each formatting style is associated with the corresponding
+ variable named in the "vars" keyword. The formatting styles are:
+
+ 'default'    Python's string representation of the variable's
+              value is used.
+ 'time'       The variable is treated as Julian date and
+              formatted as a date and time.
+ 'baseline'   The variable is treated as a baseline number and
+              is formatted as ANT1-ANT2.
+ 'pol'        The variable is treated as a FITS-encoded polarization
+              number and is formatted as the string representation of
+              that polarization: XX, RL, etc.
+ '' (blank)   The most appropriate formatting style for the variable is
+              used. For the UV variable "time", this is "time"; for
+              "baseline", it is "baseline"; for "pol", it is "pol";
+              for all others, it is "default".
+
+ If there are fewer formats specified than variables, the extra
+ variables use the "most-appropriate" style. It is an error to
+ specify more formats than variables. Defaults to an empty list, i.e.,
+ all variables use the most-appropriate style.
+
+@ cformat
+ Analogous to "format", but applied to the context variables. Defaults
+ to an empty list, i.e. all context variables use the most-appropriate
+ style.
+
+< select
+
+< stokes
+
+< line
+
+@ options
+ Multiple options can be specified, separated by commas, and
+ minimum-match is used.
+
+ 'nocal'   Do not apply antenna gain corrections.
+
+ 'nopol'   Do not apply polarization leakage corrections.
+
+ 'nopass'  Do not apply bandpass shape corrections.
+
+--
 """
 
 import sys
