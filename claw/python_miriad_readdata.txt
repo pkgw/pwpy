@@ -1,0 +1,317 @@
+# This is a commented log of an introduction by Peter to the Python bindings to Miriad.
+# A focus of this was developing simple scripts to read in UV data for customized plotting.
+# Written up by Casey, 17Jul2008
+# Comments prepended with '##'
+
+
+lupus>ipython
+
+In [1]:import miriad
+## Most standard functions and classes are in the 'miriad' python library.
+
+In [2]:dir (miriad)
+Out[2]:
+['Data',
+ 'ImData',
+ 'ST_MTIME',
+ 'VisData',
+ '__all__',
+ '__builtins__',
+ '__doc__',
+ '__file__',
+ '__name__',
+ '_averOperation',
+ '_catOperation',
+ '_flagOperation',
+ '_multiFlagOperation',
+ '_selfcalOperation',
+ '_smamfcalOperation',
+ 'basicTrace',
+ 'branchOps',
+ 'join',
+ 'launchTrace',
+ 'mutFile',
+ 'mutOps',
+ 'os',
+ 'paramConvert',
+ 'paramRecover',
+ 'predFile',
+ 'sep',
+ 'sys',
+ 'trace']
+
+In [4]:q = miriad.VisData ('/k/claw/big_scr2/ata080403/3c286-1430-xx')
+## This object 'q' does not hold data, but contains lots of info that you might get from the file system (size, etc.)
+
+In [5]:q.exists
+Out[5]:True
+
+In [6]:q.
+q.__class__         q.__new__           q._openImpl         q.copyTo            q.getPredInfo       q.reconstruct       q.xApply
+q.__delattr__       q.__reduce__        q._openObj          q.delete            q.getPredecessor    q.recordMutation    q.xPlot
+q.__dict__          q.__reduce_ex__     q._writeMutations   q.exists            q.hasPredecessor    q.selfCal           q.xQuickImage
+q.__doc__           q.__repr__          q.apply             q.fAnt              q.makeVariant       q.setPredecessor    q.xSpec
+q.__eq__            q.__setattr__       q.averTo            q.fBL               q.moveTo            q.smaMfCal          
+q.__getattribute__  q.__str__           q.base              q.fChans            q.mtime             q.stack             
+q.__hash__          q.__weakref__       q.branch            q.fGeneric          q.open              q.umtime            
+q.__init__          q._loadMutations    q.catTo             q.fMulti            q.readLowlevel      q.vim               
+q.__module__        q._mutations        q.checkExists       q.getMutations      q.realPath          q.vvis              
+
+In [6]:q.mtime
+Out[6]:1216172967
+
+In [7]:q.readLowlevel ?
+Type:			instancemethod
+Base Class:		<type 'instancemethod'>
+String Form:		<bound method VisData.readLowlevel of <MIRIAD data, base "/k/claw/big_scr2/ata080403/3c286-1430-xx">>
+Namespace:		Interactive
+File:				/cosmic1/pkwill/miriad-x86_64-Linux-suse10.2/lib64/python2.5/site-packages/miriad.py
+Definition:			q.readLowlevel(self, saveFlags, **kwargs)
+Docstring:
+    <no docstring>
+## 
+
+In [8]:def f ():
+   ...:    yield 1
+   ...:    yield 2
+   ...:
+
+In [9]:for x in f(): print x
+   ...:
+1
+2
+
+In [10]:gen = q.readLowlevel (False)
+
+In [11]:data = gen.next ()
+Applying bandpass corrections to /k/claw/big_scr2/ata080403/3c286-1430-xx
+Applying gain corrections to /k/claw/big_scr2/ata080403/3c286-1430-xx
+
+In [12]:inp, preamble, data, flags, nread = data
+
+In [13]:data.size
+Out[13]:4096
+
+In [14]:nread
+Out[14]:1024
+
+In [15]:data = data[0:nread]
+
+In [16]:flags = flags[0:nread]
+
+In [17]:flags.any ()
+Out[17]:False
+
+In [18]:flags[0:10]
+Out[18]:array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0], dtype=int32)
+
+In [19]:preamble
+Out[19]:
+array([  0.00000000e+00,   0.00000000e+00,   0.00000000e+00,
+         2.45455976e+06,   1.54200000e+03])
+
+In [20]:import mirtask.util
+
+In [21]:print mirtask.util.decodeBaseline (preamble[4])
+(6, 6)
+
+In [22]:inp.__class__
+Out[22]:<class 'mirtask.uvdat.UVDatDataSet'>
+
+In [23]:inp.
+inp.MODE_RD             inp.__reduce_ex__       inp.deleteItem          inp.getVarFirstDouble   inp.makeVarTracker      inp.setWavelengthMode
+inp.MODE_RDWR           inp.__repr__            inp.flush               inp.getVarFirstFloat    inp.name                inp.tno
+inp.MODE_UNKNOWN        inp.__setattr__         inp.getHeaderBool       inp.getVarFirstInt      inp.next                inp.trackVar
+inp.__class__           inp.__str__             inp.getHeaderComplex    inp.getVarFirstString   inp.openHistory         inp.updated
+inp.__del__             inp.__weakref__         inp.getHeaderDouble     inp.getVarFloat         inp.probeVar            inp.write
+inp.__delattr__         inp._close              inp.getHeaderFloat      inp.getVarInt           inp.refobj              inp.writeHistory
+inp.__dict__            inp._histOpen           inp.getHeaderInfo       inp.getVarSt
+
+In [23]:inp.getVarInt ('pol')
+Out[23]:-5
+
+In [24]:mirtask.util.POL_XX
+Out[24]:-5
+
+In [25]:mirtask.util.
+mirtask.util.POL_I                    mirtask.util.POL_XY                   mirtask.util.__name__                 mirtask.util.encodedBaselineIndexMap
+mirtask.util.POL_II                   mirtask.util.POL_YX                   mirtask.util.__new__                  mirtask.util.genBaselineIndexMapping
+mirtask.util.POL_LL                   mirtask.util.POL_YY                   mirtask.util.__reduce__               mirtask.util.indexBaselineMap
+mirtask.util.POL_LR                   mirtask.util.__builtins__             mirtask.util.__reduce_ex__            mirtask.util.indexEncodedBaselineMap
+mirtask.util.POL_Q                    mirtask.util.__class__                mirtask.util.__repr__                 mirtask.util.jdToFull
+mirtask.util.POL_QQ                   mirtask.util.__delattr__              mirtask.util.__setattr__              mirtask.util.jdToPartial
+mirtask.util.POL_RL                   mirtask.util.__dict__                 mirtask.util.__str__                  mirtask.util.ll
+mirtask.util.POL_RR                   mirtask.util.__doc__                  mirtask.util._polNames                mirtask.util.polarizationIsInten
+mirtask.util.POL_U                    mirtask.util.__file__                 mirtask.util.baselineIndexMap         mirtask.util.polarizationName
+mirtask.util.POL_UU                   mirtask.util.__getattribute__         mirtask.util.dateOrTimeToJD           mirtask.util.polarizationNumber
+mirtask.util.POL_V                    mirtask.util.__hash__                 mirtask.util.decodeBaseline           
+mirtask.util.POL_XX                   mirtask.util.__init__                 mirtask.util.encodeBaseline           
+
+In [25]:mirtask.util.polarizationName (-5)
+Out[25]:'XX'
+
+In [26]:mirtask.util.jdToFull (preamble[3])
+Out[26]:'08APR03:06:08:11.3'
+
+In [28]:inp.getVarInt ('nspect')
+Out[28]:1
+
+In [29]:inp.getVarInt ('nschan')
+Out[29]:1024
+
+In [30]:abs (data[100])
+Out[30]:1756075.25
+
+In [36]:mirtask.uvdat.init ?
+
+Type:		function
+Base Class:	<type 'function'>
+String Form:	<function init at 0xcfd8c0>
+Namespace:	Interactive
+File:			/cosmic1/pkwill/miriad-x86_64-Linux-suse10.2/lib64/python2.5/site-packages/mirtask/uvdat.py
+Definition:		mirtask.uvdat.init(flags, keyword='vis')
+Docstring:
+    Initialize standard UV data reading subsystem. If you are
+    writing a standalone task, you should use keys.doUvdat() rather
+    than this function to give the use control over whether calibration
+    corrections are applied or not.
+    
+    Parameters:
+    
+    flags - A sequence of characters giving options to the UV reading
+    subsystem. Possible contents are:
+    
+      r - Get a reference linetype specification via the 'ref' keyword
+      s - Get Stokes parameters / polarizations via the 'stokes' keyword
+      d - Perform input selection via the 'select' keyword
+      l - Get a data linetype specification via the 'line' keyword
+      p - Apply planet rotation and scaling
+      w - Return U and V values in wavelengths
+      1 - Default number of channels is 1
+      x - Data must be cross-correlation data
+      a - Data must be auto-correlation data
+      b - Input must be a single file
+      c - Apply gain/phase and delay corrections
+      e - Apply polarization leakage corrections
+      f - Apply bandpass corrections
+      3 - Always return a 5-element 'preamble' with UVW coordinates
+    
+    keyword - The keyword from which to get one or more UV dataset names.
+    Defaults to 'vis', the usual value.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Type:			function
+Base Class:		<type 'function'>
+String Form:		<function hstack at 0xc64398>
+Namespace:		Interactive
+File:				/usr/local/lib/python2.5/site-packages/numpy/lib/shape_base.py
+Definition:			N.hstack(tup)
+Docstring:
+    Stack arrays in sequence horizontally (column wise)
+    
+    Description:
+        Take a sequence of arrays and stack them horizontally
+        to make a single array.  All arrays in the sequence
+        must have the same shape along all but the second axis.
+        hstack will rebuild arrays divided by hsplit.
+    Arguments:
+        tup -- sequence of arrays.  All arrays must have the same
+               shape.
+    Examples:
+        >>> import numpy
+        >>> a = array((1,2,3))
+        >>> b = array((2,3,4))
+        >>> numpy.hstack((a,b))
+        array([1, 2, 3, 2, 3, 4])
+        >>> a = array([[1],[2],[3]])
+        >>> b = array([[2],[3],[4]])
+        >>> numpy.hstack((a,b))
+        array([[1, 2],
+               [2, 3],
+               [3, 4]])
+
+
+In [34]:N.concatenate ?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Type:			builtin_function_or_method
+Base Class:		<type 'builtin_function_or_method'>
+String Form:		<built-in function concatenate>
+Namespace:		Interactive
+Docstring:
+    concatenate((a1, a2, ...), axis=0)
+    
+    Join arrays together.
+    
+    The tuple of sequences (a1, a2, ...) are joined along the given axis
+    (default is the first one) into a single numpy array.
+    
+    Example:
+    
+    >>> concatenate( ([0,1,2], [5,6,7]) )
+    array([0, 1, 2, 5, 6, 7])
