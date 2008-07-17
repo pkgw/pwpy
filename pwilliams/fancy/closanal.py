@@ -1,5 +1,65 @@
 #! /usr/bin/env python
 
+"""= closanal.py - Attempt to diagnose bad baselines based on phase triple closures
+& pkgw
+: uv Analysis
++
+ CLOSANAL is a utility for diagnosing which antennas and/or baselines
+ are bad in a given dataset. It computes phase triple closures from
+ the data and computes RMS values for each baseline and
+ antenna from the closures for each triple that they contribute
+ to. The worse triple, baseline, and antenna closure values are then
+ printed.
+
+ Besides the RMS phase closure value for baselines and antennas, the
+ standard deviation of those values ("StdDev") and the number of
+ triples contribution used in the computation ("nTrip") is also
+ printed.
+ 
+< vis
+
+@ interval
+ UV data time-averaging interval in minutes. It's recommended that
+ this be set to a few minutes to damp out noise. Default is 0.01,
+ i.e., no averaging.
+
+@ ntrip
+ The number of triple closure values to print. Default is 10.
+
+@ nbl
+ The number of RMS baseline closure values to print. Default is 10.
+
+@ nant
+ The number of antenna closure values to print. Default is 10.
+
+@ options
+ Multiple options can be specified, separated by commas, and
+ minimum-match is used.
+
+ 'best'    Print out the best closure values rather than the worst
+
+ 'rmshist' Plot a histogram of the computed closure values. Requires
+           the Python module 'omega'.
+
+ 'uvdplot' Plot a scatter diagram of RMS baseline phase closure versus
+           average baseline UV distance. Requires the Python module
+           'omega'
+
+ 'nocal'   Do not apply antenna gain corrections. This task should
+           yield identical results with this enabled or disabled.
+
+ 'nopol'   Do not apply polarization leakage corrections.
+
+ 'nopass'  Do not apply bandpass shape corrections.
+
+< select
+
+< line
+
+< stokes
+
+"""
+
 import numpy as N
 from mirtask import keys, util, uvdat
 from numutils import *
