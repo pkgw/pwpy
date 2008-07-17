@@ -1,18 +1,74 @@
 #! /usr/bin/env python
-"""ataglue - Merge together two ATA half-datasets, accounting for single-item errors."""
-# Blah de blah
-#
-# UVW coordinate handling : the left and right halves have slightly-different UVW
-# coordinates. From this I infer that the UVW coordinate refers to the first channel
-# in a multichannel dataset, since if referred to the nominal observing
-# frequency, it would be the same in both datasets. Hence we should write the
-# coordinates from the half-1 preamble as that will still have the first channel
-# in the merged dataset. I hope.
-#
-# UPDATE: I am told that the UVW coordinates should be relative to the sky frequency.
-# Need to check on equality etc in datasets
-#
-# 3c48 2880 is a nice dataset with one epoch where the two halves are aligned.
+"""= ataglue.py - Merge together two ATA half-datasets, accounting for single-item errors.
+& pkgw
+: Tools
++
+
+ The ATAGLUE task merges together two 512-channel ATA FX64
+ half-datasets, writing a single 1024-channel output dataset
+ containing the combined data.
+
+ This task performs a similar function to the task UVGLUE, but that
+ task fails with ATA data since sometimes the two half-datasets start
+ at different clock ticks due to the way in which the ATA FX64
+ correlator is currently run. One can get records in which the
+ timestamps look like this:
+
+   H1 H2
+   -----
+   T0 T1
+   T1 T2
+   T2 T3
+   T3 T4
+
+ In this case, ATAGLUE will write out records that look like:
+
+   T0   Last 512 channels flagged
+   T1
+   T2
+   T3
+   T4   First 512 channels flagged
+
+ ATAGLUE will print information about the out-of-sync records that
+ it encounters.
+
+ ATAGLUE is fairly strict about its inputs and tries to ensure that
+ it will never create bad datasets. Running ATAGLUE on raw ATA data
+ should always work if it is valid to do so; running it on somewhat-
+ processed data is not advised.
+
+ FIXME: The left and right halves of glued ATA datasets have
+ slightly-different UVW coordinates. These coordinates should be
+ relative to the sky frequency and hence should agree between the two
+ datasets. This may indicate a bug in the current datacatcher. The
+ coordinates from the half-1 dataset are used in the merged dataset.
+ 
+@ vis
+ Should specify exactly two input sets, with the first being the
+ lower-frequency set (fx64a-SRC-FREQ_1) and the second being the
+ higher-frequency one (fx64a-SRC-FREQ_2).
+
+@ out
+ The name of the glued dataset to create.
+     
+@ options
+
+ Task enrichment options. Minimum match of names is used.
+ 
+ 'flagdc'  Flag the DC channel in all output records.
+ 
+ 'badc1'   Flag channels 513 - 769 of antpols 1X, 16X, 19X, 23X,
+           and 37X. In some array hookups, these were the antpols
+           and channels that were affected by bad C board hardware.
+           If these corrupted channels are not flagged, their very
+           high amplitudes can corrupt the rest of the (good) data in
+           their associated records due to quantization in the Miriad
+           data format. You should check that the above-named records
+           are in fact affected by bad-C-board data before using this
+           flag. (The C board was fixed on May 1, 2008.)
+
+--
+"""
 
 import sys, numpy as N
 from miriad import *
@@ -45,7 +101,7 @@ if len (opts.vis) != 2:
     sys.exit (1)
 
 if opts.badc1:
-    print '**** MASKING BAD-C DATA! KNOW WHAT THIS DOES! AIE! ****'
+    print '**** MASKING BAD-C DATA! Read the documentation before using this option! ****'
 
 if opts.flagdc:
     print 'Automatically flagging and zeroing DC channel.'
