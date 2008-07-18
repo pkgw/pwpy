@@ -1,12 +1,11 @@
 #! /usr/bin/env python
-"""A flagging script"""
-#* multiflag - Apply complex flagging operations to UV data in one pass.
-#& pkgw
-#: calibration, uv analysis
-#+
-#  MULTIFLAG changes the flags embedded in visibility data. Unlike UVFLAG,
-#  blah blah.
-#-
+"""= multiflag - Apply many kinds of flags to UV data.
+& pkgw
+: calibration
++
+ This task is a work in progress. Use MULTIFLAG2 instead.
+--
+"""
 
 import sys
 from mirtask import uvdat, keys, util
