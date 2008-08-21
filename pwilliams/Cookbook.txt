@@ -364,8 +364,17 @@ averaged data.]]
   http://log.hcro.org/node/571
 
 * Now that RFI is flagged out, the passband-averaged visibility
-  amplitudes and phases should be somewhat believable.  This means
-  that closure-based flagging is possible.
+  amplitudes and phases should be somewhat believable.
+
+  One useful technique is to plot baseline phase as a function of time
+  at this point:
+
+  $ uvplt device=/xs select=-auto axis=ti,ph vis=CAL-FREQ-POL
+
+  Bad baselines or antennas will have phases that vary essentially
+  randomly, while good ones will be more consistent.
+
+* Closure-based flagging is also possible after RFI flagging.
 
   If you have observations of a point-source-like calibrator, closure
   phases can be examined to identify bad antennas and
@@ -398,17 +407,15 @@ PKGW's generic steps for calibrating observations are:
 * Run a bandpass and amplitude calibration on your calibrator
   datasets:
 
-  $ smamfcal options=interp,opolyfit select=-auto polyfit=7 \
+  $ smamfcal options=opolyfit select=-auto polyfit=7 \
     refant=REFANT line=chan,824,101 vis=CAL-FREQ-POL
 
   for both POL. If you're doing spectral line work, you will want to
   temporarily flag out the line so that SMAMFCAL doesn't calibrate it
   away. PGKW has no experience doing this, though.
 
-  The invocation above will interpolate bandpass solutions into
-  flagged regions of the spectrum and also smooth out the fit bandpass
-  points, both of which should be helpful. The derived bandpass
-  solutions can be seen with
+  The invocation above will smooth out the fit bandpass points, which
+  should be helpful. The derived bandpass solutions can be seen with
 
   $ gpplt device=1/xs options=bandpass vis=CAL-FREQ-POL
 
@@ -416,9 +423,9 @@ PKGW's generic steps for calibrating observations are:
   because, in at least some cases, SMAMFCAL crashes if it tries to
   process all 1024 channels. Whether this is a problem for you will
   probably depend on the particular build of Miriad that you're
-  using. The crash isn't a major issue because 200 edge channels are
-  all flagged anyway, and SMAMFCAL can successfully process the
-  unflagged 824 center channels.
+  using. (It may affect at least 64-bit Linux builds.) The crash isn't
+  a major issue because 200 edge channels are all flagged anyway, and
+  SMAMFCAL can successfully process the unflagged 824 center channels.
 
 * If Miriad isn't familiar with your source, SMAMFCAL won't set the
   antenna amplitudes to anything useful. (If it does know your source,
@@ -447,7 +454,9 @@ PKGW's generic steps for calibrating observations are:
   $ puthd type=double value=INTERVALDAYS in=CAL-FREQ-POL/interval
 
   for both POL, where INTERVALDAYS is the extrapolation interval in
-  days. I suggest 0.02, about half an hour, as a reasonable value.
+  days. I suggest 0.02, about half an hour, as a reasonable value. (In
+  the above command, the final "/interval" should be included as shown
+  -- this tells PUTHD which keyword to set.)
 
 * Now copy antenna gains from the calibration datasets to the target
   datasets:
