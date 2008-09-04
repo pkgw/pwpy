@@ -676,13 +676,14 @@ class MultiFlag (object):
         self.doneFile (inp)
         inp.close ()
 
+_SVNID = '$Id$'
+
 def task ():
     print 'This script is UNFINISHED and EXPERIMENTAL!!!!'
     print 'Use multiflag2 instead!!!!'
     
-    banner = 'MULTIFLAG (Python): UV data multiflagger $Id$'
-    print banner
-
+    banner = util.printBannerSvn ('multiflag', 'UV data multiflagger', _SVNID)
+    
     keys.keyword ('spec', 'f', ' ', 128)
     keys.doUvdat ('3', False)
     opts = keys.process ()

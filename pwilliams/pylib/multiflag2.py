@@ -250,14 +250,15 @@ class MultiFlag2 (object):
             t.line = line
             t.run ()
 
+_SVNID = '$Id$'
+
 def task ():
     from mirtask import keys
     from miriad import VisData, basicTrace
 
     basicTrace ()
     
-    banner = 'MULTIFLAG2 (Python): Apply groups of flags by calling UVFLAG'
-    print banner
+    banner = util.printBannerSvn ('multiflag2', 'apply groups of flags by calling UVFLAG', _SVNID)
 
     keys.keyword ('spec', 'f', None, 128)
     keys.keyword ('vis', 'f', None, 128)
