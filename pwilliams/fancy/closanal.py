@@ -66,8 +66,9 @@ from mirtask import keys, util, uvdat
 from numutils import *
 import sys
 
-banner = 'CLOSANAL (Python): attempt to diagnose bad baselines based on phase triple closures.'
-print banner
+SVNID = '$Id$'
+banner = util.printBannerSvn ('closanal', 'attempt to diagnose bad baselines based on ' +
+                              'phase triple closures', SVNID)
 
 SECOND = 1.0 / 3600. / 24.
 

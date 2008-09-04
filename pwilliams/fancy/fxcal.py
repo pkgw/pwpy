@@ -49,8 +49,8 @@ import miriad
 from mirtask import uvdat, keys, util
 import numpy as N
 
-banner = 'FXCAL (Python): reimplementation of uvcal options=fxcal'
-print banner
+SVNID = '$Id$'
+banner = util.printBannerSvn ('fxcal', 'reimplementation of uvcal options=fxcal', SVNID)
 
 keys.keyword ('out', 'f', ' ')
 keys.doUvdat ('ds3', False)

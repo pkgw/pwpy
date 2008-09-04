@@ -30,11 +30,11 @@
 import sys, os
 import miriad
 from mirtask import keys, readgains
-from mirtask.util import jdToFull
+from mirtask.util import jdToFull, printBannerSvn
 import numpy as N
 
-banner = 'GPCAT2: Python take on gpcat that doesn\'t crash'
-print banner
+SVNID = '$Id'
+banner = printBannerSvn ('gpcat2', 'print antenna gains tables', SVNID)
 
 keys.keyword ('vis', 'f', ' ')
 opts = keys.process ()

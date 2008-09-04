@@ -69,14 +69,14 @@
 import sys
 import miriad, mirtask
 import mirtask.lowlevel as ll
-from mirtask import uvdat, keys
+from mirtask import uvdat, keys, util
 import numpy as N
 
 omega_e = 2. * N.pi / 86400 # Earth rot rate in rads per sec
 deg2rad = N.pi / 180.
 
-banner = 'FRINGEFIX: Correct for fringe rate amplitude loss'
-print banner
+SVNID = '$Id$'
+banner = util.printBannerSvn ('fringefix', 'correct for fringe rate amplitude loss', SVNID)
 
 keys.keyword ('out', 'f', ' ')
 keys.keyword ('maxscale', 'd', 3.)

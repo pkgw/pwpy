@@ -110,8 +110,7 @@ SVNID = '$Id$'
 
 # Keyword handling
 
-banner = 'ATAGLUE (Python): Glue together two 512-channel ATA datasets'
-print banner
+banner = util.printBannerSvn ('ataglue', 'glue together two 512-channel ATA datasets', SVNID)
 
 keys.keyword ('out', 'f', ' ')
 keys.keyword ('vis', 'f', None, 2)

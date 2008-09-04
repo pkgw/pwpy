@@ -37,8 +37,8 @@ from mirtask import util, keys
 import numpy as N
 import sys
 
-banner = 'AMPADD (Python): average UV amplitudes over everything but frequency'
-print banner
+SVNID = '$Id$'
+banner = util.printBannerSvn ('ampadd', 'average UV amplitudes over everything but frequency', SVNID)
 
 keys.keyword ('log', 'f', ' ')
 keys.keyword ('vis', 'f', None, 64)
