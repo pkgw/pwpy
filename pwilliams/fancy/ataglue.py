@@ -32,6 +32,25 @@
  ATAGLUE will print information about the out-of-sync records that
  it encounters.
 
+ The timestamps on the two datasets are derived from the system clocks
+ of the two X hosts that the data catcher software runs on. These clocks
+ are normally synchronized to the HCRO NTP server and should agree to
+ within a few milliseconds. However, the clocks can occasionally get
+ out of sync -- typically this happens after a power incident. In that
+ case, timestamps on the two datasets that should agree (T1 on H1 and T1
+ on H2, e.g.) will differ nontrivially. The TOL keyword lets you specify
+ the timestamp disagreement tolerance: timestamps differing by less than
+ TOL are considered identical. The default value is about 86 ms. (See
+ the documentation for the keyword below.) You can increase this value
+ if ATAGLUE fails to process your datasets. When ATAGLUE performs a
+ "catchup", it prints two lines of information; the last number printed
+ is the disagreement between the two timestamps in days. If this number
+ is bigger than 1e-9 but smaller than about 1e-5, you probably need to
+ increase TOL. Note, however, that the integration windows of the two
+ halves are out of phase in this situation. It is up to you to decide
+ whether it is appropriate to glue together your datasets with a large
+ value of TOL.
+ 
  ATAGLUE is fairly strict about its inputs and tries to ensure that
  it will never create bad datasets. Running ATAGLUE on raw ATA data
  should always work if it is valid to do so; running it on somewhat-
@@ -50,7 +69,14 @@
 
 @ out
  The name of the glued dataset to create.
-     
+
+@ tol
+ A floating-point number, giving the tolerance to which two timestamps
+ must agree to be considered identical, as measured in days. Defaults
+ to 1e-9, or about 86 microseconds. You may wish to set this to a higher
+ value if the system clocks on the two X hosts were not sufficiently
+ synchronized. See the discussion above.
+ 
 @ options
 
  Task enrichment options. Minimum match of names is used.
@@ -78,7 +104,6 @@ from mirtask import keys, util
 
 specVars = ['ischan', 'nschan', 'nspect', 'restfreq',
             'sdf', 'sfreq']
-TOL = 1e-9
 AF_NEITHER, AF_LEFT, AF_RIGHT, AF_BOTH = range (0, 4)
 badCAnts = set ((1, 16, 19, 23, 37))
 
@@ -89,6 +114,7 @@ print banner
 
 keys.keyword ('out', 'f', ' ')
 keys.keyword ('vis', 'f', None, 2)
+keys.keyword ('tol', 'd', 1e-9)
 keys.option ('badc1', 'flagdc')
 opts = keys.process ()
 
@@ -105,6 +131,9 @@ if opts.badc1:
 
 if opts.flagdc:
     print 'Automatically flagging and zeroing DC channel.'
+
+TOL = opts.tol
+print 'Timestamp tolerance: %g s' % (TOL * 86400)
 
 # Setup.
 
