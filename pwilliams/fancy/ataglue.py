@@ -40,7 +40,7 @@
  case, timestamps on the two datasets that should agree (T1 on H1 and T1
  on H2, e.g.) will differ nontrivially. The "tol" keyword lets you specify
  the timestamp disagreement tolerance: timestamps differing by less than
- TOL are considered identical. The default value is about 86 ms. (See
+ TOL are considered identical. The default value is 0.1 ms. (See
  the documentation for the keyword below.) You can increase this value
  if ATAGLUE fails to process your datasets. When ATAGLUE performs a
  "catchup", it prints the difference between the two timestamps. If
@@ -71,8 +71,8 @@
 
 @ tol
  A floating-point number, giving the tolerance to which two timestamps
- must agree to be considered identical, as measured in days. Defaults
- to 1e-9, or about 86 microseconds. You may wish to set this to a higher
+ must agree to be considered identical, as measured in
+ seconds. Defaults to 0.1 ms. You may wish to set this to a higher
  value if the system clocks on the two X hosts were not sufficiently
  synchronized. See the discussion above.
  
@@ -114,7 +114,7 @@ banner = util.printBannerSvn ('ataglue', 'glue together two 512-channel ATA data
 
 keys.keyword ('out', 'f', ' ')
 keys.keyword ('vis', 'f', None, 2)
-keys.keyword ('tol', 'd', 1e-9)
+keys.keyword ('tol', 'd', 1e-4)
 keys.option ('badc1', 'flagdc')
 opts = keys.process ()
 
@@ -132,8 +132,8 @@ if opts.badc1:
 if opts.flagdc:
     print 'Automatically flagging and zeroing DC channel.'
 
-TOL = opts.tol
-print 'Timestamp tolerance: %g s' % (TOL * 86400)
+TOL = opts.tol / 86400.
+print 'Timestamp tolerance: %g s' % opts.tol
 
 # Setup.
 
