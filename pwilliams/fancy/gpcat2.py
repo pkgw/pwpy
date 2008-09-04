@@ -33,7 +33,7 @@ from mirtask import keys, readgains
 from mirtask.util import jdToFull, printBannerSvn
 import numpy as N
 
-SVNID = '$Id'
+SVNID = '$Id$'
 banner = printBannerSvn ('gpcat2', 'print antenna gains tables', SVNID)
 
 keys.keyword ('vis', 'f', ' ')
