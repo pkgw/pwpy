@@ -44,7 +44,7 @@
  the documentation for the keyword below.) You can increase this value
  if ATAGLUE fails to process your datasets. When ATAGLUE performs a
  "catchup", it prints the difference between the two timestamps. If
- this number is any smaller than your integration time (typicall 7.5
+ this number is any smaller than your integration time (typically 7.5
  s), you probably need to increase "tol". Note, however, that the
  integration windows of the two halves are out of phase in this
  situation. It is up to you to decide whether it is appropriate to
