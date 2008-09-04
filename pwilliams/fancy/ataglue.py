@@ -38,18 +38,17 @@
  within a few milliseconds. However, the clocks can occasionally get
  out of sync -- typically this happens after a power incident. In that
  case, timestamps on the two datasets that should agree (T1 on H1 and T1
- on H2, e.g.) will differ nontrivially. The TOL keyword lets you specify
+ on H2, e.g.) will differ nontrivially. The "tol" keyword lets you specify
  the timestamp disagreement tolerance: timestamps differing by less than
  TOL are considered identical. The default value is about 86 ms. (See
  the documentation for the keyword below.) You can increase this value
  if ATAGLUE fails to process your datasets. When ATAGLUE performs a
- "catchup", it prints two lines of information; the last number printed
- is the disagreement between the two timestamps in days. If this number
- is bigger than 1e-9 but smaller than about 1e-5, you probably need to
- increase TOL. Note, however, that the integration windows of the two
- halves are out of phase in this situation. It is up to you to decide
- whether it is appropriate to glue together your datasets with a large
- value of TOL.
+ "catchup", it prints the difference between the two timestamps. If
+ this number is any smaller than your integration time (typicall 7.5
+ s), you probably need to increase "tol". Note, however, that the
+ integration windows of the two halves are out of phase in this
+ situation. It is up to you to decide whether it is appropriate to
+ glue together your datasets with a large value of "tol".
  
  ATAGLUE is fairly strict about its inputs and tries to ensure that
  it will never create bad datasets. Running ATAGLUE on raw ATA data
@@ -336,7 +335,7 @@ while True:
 
     t1 = pream1[3]
     t2 = pream2[3]
-    print '%s %s: ' % (util.jdToFull (t1), util.jdToFull (t2)),
+    print '%s %s:' % (util.jdToFull (t1), util.jdToFull (t2)),
     
     if abs (t1 - t2) < TOL:
         #if prevState == PS_1AHEAD:
@@ -360,11 +359,13 @@ while True:
             catchup (True, True, first, pream1[3], 0)
             break
     elif t1 < t2:
-        print 'need to catch up left: %f %f %g' % (t1, t2, t2 - t1)
+        print 'need to catch up left: T1 %f, T2 %f' % (t1, t2)
+        print 'Timestamps differ by %g seconds' % ((t2 - t1) * 86400)
         nLeft += 1
         catchup (True, False, first, t1, t2)
     else:
-        print 'need to catch up right: %f %f %g' % (t1, t2, t1 - t2)
+        print 'need to catch up right: T1 %f, T2 %f' % (t1, t2)
+        print 'Timestamps differ by %g seconds' % ((t1 - t2) * 86400)
         nRight += 1
         catchup (False, False, first, t1, t2)
     
