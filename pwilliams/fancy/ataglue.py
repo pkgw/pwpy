@@ -106,6 +106,8 @@ specVars = ['ischan', 'nschan', 'nspect', 'restfreq',
 AF_NEITHER, AF_LEFT, AF_RIGHT, AF_BOTH = range (0, 4)
 badCAnts = set ((1, 16, 19, 23, 37))
 
+SVNID = '$Id$'
+
 # Keyword handling
 
 banner = 'ATAGLUE (Python): Glue together two 512-channel ATA datasets'
