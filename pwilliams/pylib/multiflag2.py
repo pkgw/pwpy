@@ -253,7 +253,7 @@ class MultiFlag2 (object):
 _SVNID = '$Id$'
 
 def task ():
-    from mirtask import keys
+    from mirtask import keys, util
     from miriad import VisData, basicTrace
 
     basicTrace ()
