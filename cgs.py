@@ -20,6 +20,7 @@ k = 1.3806505e-16 # erg / K
 hbar = h / 2 / pi
 alpha = e**2  / hbar / c # dimensionless
 sigma = pi**2 * k ** 4 * hbar**-3 * c**-2 / 60 # g s^-3 K^-4
+aRad = 4 * sigma / c # radiation constant, erg cm^-3 K^-4
 a0 = hbar**2 / (me * e**2) # cm
 re = e**2 / (me * c**2) # cm
 Ryd1 = e**2 / (2 * a0) # erg
