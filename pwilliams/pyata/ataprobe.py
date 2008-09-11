@@ -118,7 +118,12 @@ def getFocusSettings (ants):
     res = {}
 
     for l in lines:
-        a = lines.split ()
+        a = l.split ()
+
+        if a[0][-1] == ':':
+            # Error-message ant. Have seen: uncalibrated; no rim box
+            continue
+        
         assert len (a) == 2
         freq = float (a[1])
         ant = a[0]
@@ -126,7 +131,7 @@ def getFocusSettings (ants):
         if ant in ants:
             res[ant] = freq
         elif ant[3:] in ants:
-            res[ants[3:]] = freq
+            res[ant[3:]] = freq
         else:
             raise Exception ('Unexpected antname in atagetfocus output: ' + ant)
 
