@@ -3,8 +3,9 @@
 # Broadband spectra observing script, going by frequency
 # From bbs.py
 
+import atactl
 from atactl import *
-import os, time, sys, socket
+import os, time, sys
 
 # Some parameters that are unlikely to be tweaked.
 
@@ -99,6 +100,16 @@ S = BBSState ()
 initAntennas (allAnts)
 setIntegTime ()
 fringeKill ()
+
+def roundFocus (s):
+    return s - (s % 1000)
+
+atactl.roundFocusSetting = roundFocus
+
+def attenKey (src, freq):
+    return freq - (freq % 1000)
+
+atactl.attenKey = attenKey
 
 # Stuff
 

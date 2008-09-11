@@ -40,7 +40,7 @@ try:
     h = ataprobe.Hookup (instr)
     setIntegTime ()
     lockServer ('lo' + h.lo)
-    observe (me, h, 'scan', source, freq, durMins * 60, True)
+    observe (me, h, 'scan', source, freq, durMins * 60)
     showAccounting ()
     retcode = 0
 except Exception, e:
