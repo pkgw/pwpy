@@ -2,6 +2,8 @@
 in Jython to use the native Java APIs, but Jython is broken right now.
 """
 
+SVNID = '$Id$'
+
 runLogger = None
 
 def _slurp (cmd, checkCode=True):

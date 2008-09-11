@@ -15,6 +15,8 @@ should be looked into.
 
 import subprocess, sys, os, time, atexit
 
+SVNID = '$Id$'
+
 noopMode = True
 logFile = None
 _bindir = '/opt/atasys/ata/run/'
@@ -24,7 +26,8 @@ _startTime = None
 
 def initScript (doAnything, logname):
     global logFile, noopMode, _startTime
-
+    import ataprobe
+    
     noopMode = not doAnything
 
     if doAnything:
@@ -43,7 +46,9 @@ def initScript (doAnything, logname):
     else: mode = 'debug'
     
     log ('Initialized script in %s mode' % mode)
-
+    log ('ataprobe Version: ' + ataprobe.SVNID)
+    log ('atactl Version: ' + SVNID)
+    
 def log (text):
     utc = time.gmtime ()
     stamp = time.strftime ('%Y-%m-%dT%H:%M:%SZ', utc)
