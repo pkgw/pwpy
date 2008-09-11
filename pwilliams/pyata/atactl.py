@@ -55,6 +55,15 @@ def logAbort (exc):
     log ('Error: ' + str (exc))
     log ('Aborting after %f hours elapsed' % ((time.time () - _startTime) / 3600.0))
 
+import ataprobe
+
+def _logProbeCommand (cmd):
+    log ('running (probe): ' + cmd)
+    
+ataprobe.runLogger = _logProbeCommand
+
+# Time accounting.
+
 _accountInfo = {}
 
 def account (desc, duration):
@@ -489,3 +498,113 @@ def launchFX64 (src, freq, radec, duration, outbase):
             raise Exception ('FX64 invocation failed.')
     
     account ('integrating for %d seconds' % duration, time.time () - tStart)
+
+# Focus control
+
+def _setFocus (ants, settingInMHz, calMode):
+    antstr = ','.join (sorted (ants))
+    log ('Setting focus of %f for antennas: %s' % (settingInMHz, antstr))
+
+    args = ['/bin/sh', _bindir + 'atasetfocus', antstr, str (settingInMHz)]
+    if calMode: args.append ('--cal')
+    runCommand (*args)
+
+_curFocus = None
+
+def roundFocusSetting (settingInMHz):
+    return settingInMHz
+
+_focusWaitInterval = 15
+_focusWaitTimeout = 90.
+_numFocusReissues = 2
+
+def _waitForFocus (ants):
+    from ataprobe import getFocusSettings
+    allThere = False
+    tThis = tStart = time.time ()
+    log ('Waiting for antennas to reach focus %f' % _curFocus)
+
+    tol = 0.005 * _curFocus
+
+    for reissue in xrange (0, _numFocusReissues):
+        while time.time () - tThis < _focusWaitTimeout:
+            notThere = set ()
+            unknown = set ()
+            settings = getFocusSettings (ants)
+            log (str (settings))
+            
+            for ant in ants:
+                if ant not in settings:
+                    ant = 'ant' + ant
+                    if ant not in settings:
+                        unknown.add (ant)
+                        continue
+
+                val = settings[ant]
+
+                if abs (val - _curFocus) > tol:
+                    notThere.add (ant)
+
+            if len (notThere) + len (unknown) == 0:
+                return
+
+            time.sleep (_focusWaitInterval)
+
+        # Reissues the setfocus commands
+
+        if len (unknown) > 0:
+            _setFocus (unknown, _curFocus, True)
+
+        # FIXME, maybe: reissue setFocus for notThere ants
+        # with cal=False?
+        
+        ants = unknown.union (notThere)        
+        tThis = time.time ()
+
+    log ('!!!! Unable to focus all antennas!!!!')
+    
+def setFocus (ants, settingInMHz, wait=True):
+    """Set the focus setting of the specified antennas to the
+    specified value. If already at the given value, do
+    nothing. Calibrates focus settings upon first invocation and if
+    moving from higher frequency to lower frequency (!!! -- apparently
+    the focus gets wacky if one moves back and forth. Recommended to
+    focus in one direction only). Calls roundFocusSetting() to tweak
+    the given focus setting; this can be used to make the focus not be
+    adjusted very often."""
+    
+    # FIXME: assumes that we're always setting the focus of the same suite
+    # of antennas ...
+    global _curFocus
+
+    tStart = time.time ()
+    log ('Setting input focus %f for: %s' % (settingInMHz,
+                                             ','.join (sorted (ants))))
+    
+    s = roundFocusSetting (settingInMHz)
+
+    if s < 1000:
+        log ('Clamping focus value from %f to %f', s, 1000)
+        s = 1000
+    if s > 9000:
+        log ('Clamping focus value from %f to %f', s, 9000)
+        s = 9000
+        
+    log ('Focus value %f mapped to %f' % (settingInMHz, s))
+    
+    if _curFocus is None or _curFocus > s:
+        _setFocus (ants, s, True)
+        _curFocus = s
+        if wait:
+            log ('Pausing 60s for focus cal to proceed.')
+            time.sleep (60)
+    elif _curFocus != s:
+        _setFocus (ants, s, False)
+        _curFocus = s
+    else:
+        # already at desired focus setting
+        wait = False
+
+    if wait: _waitForFocus (ants)
+    
+    account ('focusing antennas', time.time () - tStart)

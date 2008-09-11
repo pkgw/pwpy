@@ -2,6 +2,8 @@
 in Jython to use the native Java APIs, but Jython is broken right now.
 """
 
+runLogger = None
+
 def _slurp (cmd, checkCode=True):
     """Return the output of a cmd, which is executed in a shell.
 
@@ -15,8 +17,13 @@ def _slurp (cmd, checkCode=True):
     
     import subprocess, os
 
-    proc = subprocess.Popen (str (cmd), shell=True,
-                             stdin=file (os.devnull, 'r'), stdout=subprocess.PIPE,
+    cmd = str (cmd)
+    
+    if runLogger is not None:
+        runLogger (cmd)
+    
+    proc = subprocess.Popen (cmd, shell=True, stdin=file (os.devnull, 'r'),
+                             stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE, close_fds=True)
     (stdout, stderr) = proc.communicate (None)
 
@@ -122,6 +129,9 @@ def getFocusSettings (ants):
 
         if a[0][-1] == ':':
             # Error-message ant. Have seen: uncalibrated; no rim box
+            # "focus not calibrated" can indicate that we're in the
+            # middle of focusing the antenna after a 'atasetfocus
+            # ANT VAL --cal'.
             continue
         
         assert len (a) == 2
@@ -137,3 +147,8 @@ def getFocusSettings (ants):
 
     return res
 
+def logFocusSettings (ants, destname):
+    from subprocess import call
+    
+    call ('atagetfocus %s >%s 2>&1' % (','.join (sorted (ants)), destname),
+          shell=True)
