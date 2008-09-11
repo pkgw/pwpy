@@ -20,7 +20,8 @@ def read (log):
             desired = float (a[10])
             flag = 'ok'
 
-        res[(ibob, inp)] = (setting, rms, desired, flag)
+        name = '%s %s' % (ibob, inp)
+        res[name] = (setting, rms, desired, flag)
 
     return res
 
@@ -33,13 +34,15 @@ all = set ()
 for tab in tabs.itervalues ():
     all = all.union (tab.iterkeys ())
 
+sall = sorted (all)
 sfiles = sorted (sys.argv[1:])
 
-for key in all:
-    print '%s %s:' % key
+for name in sall:
+    print '%s:' % name
+    
     for fn in sfiles:
         tab = tabs[fn]
-        if key not in tab: continue
+        if name not in tab: continue
 
-        setting, rms, desired, flag = tab[key]
+        setting, rms, desired, flag = tab[name]
         print '   %20s: %6.1f %6.1f %6.1f %s' % (fn, setting, rms, desired, flag)
