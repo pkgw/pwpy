@@ -232,7 +232,7 @@ def isSourceUp (source, integTime, padTime=300):
 
 def initAntennas (ants):
     antlist = ','.join (ants)
-    log ('Initializing hardware for antennas: %s' % ', '.join (ants))
+    log ('@@ Initializing PAMs and LNAs for antennas: %s' % ','.join (ants))
     tStart = time.time ()
     runCommand ('/bin/sh', _bindir + 'atasetpams', antlist)
     runCommand ('/bin/sh', _bindir + 'atalnaon', antlist)
@@ -247,13 +247,13 @@ def setAllPAMsToDefaults ():
     account (_acctPAM, time.time () - tStart)
 
 def setPAM (ants, xval, yval):
-    log ('Setting PAMs to [%.1f, %.1f] for antennas: %s' % (xval, yval, ', '.join (ants)))
+    log ('Setting PAMs to [%.1f, %.1f] for antennas: %s' % (xval, yval, ','.join (ants)))
     tStart = time.time ()
     runCommand ('/bin/sh', _bindir + 'atasetpams', ','.join (ants), str (xval), str (yval))
     account (_acctPAM, time.time () - tStart)
     
 def setSkyFreq (lo, freqInMhz):
-    log ('Setting sky frequency to %d MHz' % freqInMhz)
+    log ('@@ Setting sky frequency to %d MHz' % freqInMhz)
     unlockServer ('lo' + lo)
     tStart = time.time ()
     runCommand ('/bin/sh', _bindir + 'atasetskyfreq', str (lo), str (freqInMhz))
@@ -403,8 +403,8 @@ def ensureEphem (src, ebase, obsDurSeconds):
     return radec
 
 def trackEphemWait (ants, ebase):
-    f = ebase + '.nsphem'
-    log ('Tracking antennas: %s' % ', '.join (ants))
+    f = ebase + '.nsephem'
+    log ('@@ Tracking antennas: %s' % ','.join (ants))
     log (' ... to ephemeris in file: %s' % f)
     tStart = time.time ()
     # Sort the list of antennas to put 3f,3g,3h next to each other. This gets them
@@ -437,11 +437,11 @@ def launchCatcher (hookup, src, freq, radec, durationSeconds, outbase, ebase):
     ndumps = int (math.ceil (durationSeconds / _integTime))
     nsephem = ebase + '.nsephem'
     
-    log ('Launching data catcher: %s at %s MHz on %s' % (src, freq, hookup.instr))
-    log ('     atafx output base: %s' % outbase)
-    log ('      Embedding coords: ' + radec)
-    log ('Ephemeris file (in ns): ' + nsephem)
-    log ('              Duration: %f s (%d dumps)' % (durationSeconds, ndumps))
+    log ('@@ Launching data catcher: %s at %s MHz on %s' % (src, freq, hookup.instr))
+    log ('        atafx output base: %s' % outbase)
+    log ('         Embedding coords: ' + radec)
+    log ('   Ephemeris file (in ns): ' + nsephem)
+    log ('                 Duration: %f s (%d dumps)' % (durationSeconds, ndumps))
 
     mydir = os.path.dirname (__file__)
     script = os.path.join (mydir, 'fxlaunch.sh')
@@ -471,7 +471,7 @@ def launchCatcher (hookup, src, freq, radec, durationSeconds, outbase, ebase):
 
 def _setFocus (ants, settingInMHz, calMode):
     antstr = ','.join (sorted (ants))
-    log ('Setting focus of %f for antennas: %s' % (settingInMHz, antstr))
+    log ('@@ Setting focus of %f for antennas: %s' % (settingInMHz, antstr))
 
     args = ['/bin/sh', _bindir + 'atasetfocus', antstr, str (settingInMHz)]
     if calMode: args.append ('--cal')
@@ -590,7 +590,7 @@ def autoAttenAll (hookup, rms=13.0):
     from ataprobe import _slurp
     
     tStart = time.time ()
-    log ('Auto-attening all antpols')
+    log ('@@ Auto-attening all antpols')
     settings = {}
     
     for (antpol, (ibob, inp)) in hookup.apIbobs ():
@@ -617,7 +617,7 @@ def autoAttenAll (hookup, rms=13.0):
 def setAttens (settings):
     tStart = time.time ()
 
-    log ('Restoring saved attemplifier settings')
+    log ('@@ Restoring saved attemplifier settings')
     
     for ((ibob, inp), db) in settings.iteritems ():
         runCommand ('/bin/sh', _rubydir + 'setatten.rb', 'i%02d' %
@@ -666,6 +666,7 @@ atexit.register (fringeKill)
 def fringeStart (hookup, ebase, freq):
     tStart = time.time ()
     msephem = ebase + '.msephem'
+    log ('@@ Starting fringe rotation server')
     runCommand ('/bin/csh', _obsbindir + 'frot.csh', hookup.instr,
                 msephem, str (freq), os.getcwd (), 'start')
     # Pause to not confuse the ibobs by talking to them too much
@@ -675,6 +676,7 @@ def fringeStart (hookup, ebase, freq):
     
 def fringeStop (hookup):
     tStart = time.time ()
+    log ('@@ Stopping fringe rotation')
     runCommand ('/bin/csh', _obsbindir + 'frot.csh', hookup.instr,
                 'ign_eph', 'ign_freq', os.getcwd (), 'stop')
     # Pause to not confuse the ibobs by talking to them too much
@@ -713,7 +715,7 @@ def observe (me, hookup, kind, src, freq, integTimeSeconds):
     setupAttens (src, freq, hookup)
     
     try:
-        log ('Beginning %s observations (%s, %d MHz)' % (kind, src, freq))
+        log ('@@ Beginning %s observations (%s, %d MHz)' % (kind, src, freq))
         outBase = '-'.join ([me, kind, src, '%04d' % freq])
         launchCatcher (hookup, src, freq, radec, integTimeSeconds, outBase, src)
     finally:
