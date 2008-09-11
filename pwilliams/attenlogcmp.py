@@ -7,7 +7,7 @@ CONTACT = 'Peter Williams <pwilliams@astro.berkeley.edu>'
 
 if len (sys.argv) < 2:
     print 'Usage: %s autoatten.log1 [autoatten.log2 ...]' % sys.argv[0]
-    print 'Example: %s autoattenlog.*' % sys.argv[0]
+    print 'Example: %s autoattenlog.1430 autoattenlog.9500' % sys.argv[0]
     print 'SVN Id:', SVNID
     print 'Contact info:', CONTACT
     sys.exit (1)
