@@ -8,6 +8,13 @@ CONTACT = 'Peter Williams <pwilliams@astro.berkeley.edu>'
 if len (sys.argv) < 2:
     print 'Usage: %s autoatten.log1 [autoatten.log2 ...]' % sys.argv[0]
     print 'Example: %s autoattenlog.1430 autoattenlog.9500' % sys.argv[0]
+    print
+    print 'Collates the data contained in several "autoatten logs", where'
+    print 'each log is the saved output of an invocation of autoatten.rb.'
+    print 'The output columns are: '
+    print '  attemplifier setting, RMS obtained, RMS desired, input status'
+    print 'where the status can be "ok", "low", or "high".'
+    print
     print 'SVN Id:', SVNID
     print 'Contact info:', CONTACT
     sys.exit (1)
@@ -27,6 +34,10 @@ def read (fn, log):
                 rms = float (a[13])
                 desired = float (a[16])
                 flag = 'low'
+            elif 'too high' in l:
+                rms = float (a[13])
+                desired = float (a[16])
+                flag = 'high'
             else:
                 rms = float (a[7])
                 desired = float (a[10])
