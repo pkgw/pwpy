@@ -484,52 +484,43 @@ def roundFocusSetting (settingInMHz):
 
 _focusWaitInterval = 15
 _focusWaitTimeout = 90.
-_numFocusReissues = 2
 
 def _waitForFocus (ants):
     from ataprobe import getFocusSettings
     allThere = False
-    tThis = tStart = time.time ()
+    tStart = time.time ()
     log ('Waiting for antennas to reach focus %f' % _curFocus)
 
     tol = 0.005 * _curFocus
 
-    for reissue in xrange (0, _numFocusReissues):
-        while time.time () - tThis < _focusWaitTimeout:
-            notThere = set ()
-            unknown = set ()
-            settings = getFocusSettings (ants)
-            log (str (settings))
+    while time.time () - tStart < _focusWaitTimeout:
+        notThere = set ()
+        unknown = set ()
+        settings = getFocusSettings (ants)
+        log (str (settings))
             
-            for ant in ants:
-                if ant not in settings:
-                    ant = 'ant' + ant
-                    if ant not in settings:
-                        unknown.add (ant)
-                        continue
+        for ant in ants:
+            if not ant.startswith ('ant'): ant = 'ant' + ant
+                
+            if ant not in settings:
+                unknown.add (ant)
+                continue
 
-                val = settings[ant]
+            val = settings[ant]
 
-                if abs (val - _curFocus) > tol:
-                    notThere.add (ant)
+            if abs (val - _curFocus) > tol:
+                notThere.add (ant)
 
-            if len (notThere) + len (unknown) == 0:
-                return
+        if len (notThere) + len (unknown) == 0:
+            return
 
-            time.sleep (_focusWaitInterval)
+        time.sleep (_focusWaitInterval)
+        ants = notThere.union (unknown)
 
-        # Reissues the setfocus commands
-
-        if len (unknown) > 0:
-            _setFocus (unknown, _curFocus, True)
-
-        # FIXME, maybe: reissue setFocus for notThere ants
-        # with cal=False?
-        
-        ants = unknown.union (notThere)        
-        tThis = time.time ()
-
-    log ('!!!! Unable to focus all antennas!!!!')
+    if len (notThere) > 0:
+        log ('!!!! Antennas are slow to focus: ' + ','.join (notThere))
+    if len (unknown) > 0:
+        log ('!!!! Antennas don\'t have focus info: ' + ','.join (unknown))
     
 def setFocus (ants, settingInMHz, wait=True):
     """Set the focus setting of the specified antennas to the
