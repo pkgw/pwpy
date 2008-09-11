@@ -105,3 +105,30 @@ def getPAMDefaults (ants):
         return (float (a[1]), float (a[2]))
 
     return [parse (l) for l in lines]
+
+def getFocusSettings (ants):
+    """Return the current focus settings for the specified antennas.
+
+    Returns a dictionary mapping antenna name (as seen in ants) to
+    estimated focus frequency in MHz. Antennas with uncalibrated
+    focus settings are not present in the dictionary."""
+
+    lines = _slurp ('atagetfocus "%s"' % ','.join (ants))
+
+    res = {}
+
+    for l in lines:
+        a = lines.split ()
+        assert len (a) == 2
+        freq = float (a[1])
+        ant = a[0]
+
+        if ant in ants:
+            res[ant] = freq
+        elif ant[3:] in ants:
+            res[ants[3:]] = freq
+        else:
+            raise Exception ('Unexpected antname in atagetfocus output: ' + ant)
+
+    return res
+
