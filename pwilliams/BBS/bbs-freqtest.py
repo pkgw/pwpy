@@ -9,9 +9,7 @@ import os, time, sys, socket
 # Some parameters that are unlikely to be tweaked.
 
 me = 'bbsft'
-# could munge in username: import pwd; uname = pwd.getpwuid (os.getuid ())[0]
-lockid = '-'.join ([me, socket.gethostname (), 'pid%d' % os.getpid ()])
-integTime = 60 # seconds
+obsDur = 60 # seconds
 calFreq = 1430 # MHz
 calPeriod = 1200 # how many seconds between attempts to cal
 
@@ -37,9 +35,9 @@ if len (obsFreqs) < 1:
     
 # Settings from the commandline
 
-if len (sys.argv) != 4:
-    print >>sys.stderr, 'Usage: %s [debug|real] LO stopHour' % sys.argv[0]
-    print >>sys.stderr, 'E.g.: %s debug b 3.0' % sys.argv[0]
+if len (sys.argv) != 3:
+    print >>sys.stderr, 'Usage: %s [debug|real] stopHour' % sys.argv[0]
+    print >>sys.stderr, 'E.g.: %s debug 3.0' % sys.argv[0]
     sys.exit (1)
 
 if sys.argv[1] == 'real':
@@ -50,8 +48,7 @@ else:
     print >>sys.stderr, 'First argument must be "debug" or "real"; got', sys.argv[1]
     sys.exit (1)
     
-LO = sys.argv[2]
-stopHour = float (sys.argv[3])
+stopHour = float (sys.argv[2])
 
 # Define state structure
 
@@ -97,37 +94,13 @@ initScript (reallyDoIt, me + '.log')
 stopTime, durHours = calcStopTime (stopHour)
 S = BBSState ()
 
-# Copy over control files and set up antenna hardware.
+# Initial setup
 
-#switches, allAnts, usedAnts, corrExact = initControlFiles ()
-switches, allAnts = initControlFiles ()
 initAntennas (allAnts)
+setIntegTime ()
+fringeKill ()
 
 # Stuff
-
-_lastFreq = 0
-_lastSrc = None
-_lastSrcExpire = 0
-
-def observe (kind, src, freq, integTime):
-    global _lastFreq, _lastSrc, _lastSrcExpire
-    
-    if _lastFreq != freq:
-        setSkyFreq (LO, freq)
-        _lastFreq = freq
-
-    f = src + '.ephem'
-    radec = ensureEphem (src, f, integTime)
-    now = time.time ()
-    
-    if _lastSrc != src or now >= _lastSrcExpire:
-        trackEphemWait (allAnts, f)
-        _lastSrc = src
-        _lastSrcExpire = now + 2000 # ensureephem actually gives us 1.1 hours
-
-    log ('Beginning %s observations (%s, %d MHz)' % (kind, src, freq))
-    outBase = '-'.join ([me, kind, src, '%04d' % freq])
-    launchFX64 (src, freq, radec, integTime, outBase)
 
 def mainLoop ():
     while not isTimeUp (stopTime, True):
@@ -137,7 +110,7 @@ def mainLoop ():
             if not isSourceUp (calSources[0]):
                 log ('Would cal on %s, but not up; skipping.' % calSources[0])
             else:
-                observe ('cal', calSources[0], calFreq, integTime)
+                observe ('cal', calSources[0], calFreq, obsDur)
                 S.lastCal = int (time.time ())
 
         if isTimeUp (stopTime, False): break
@@ -147,7 +120,7 @@ def mainLoop ():
         if not isSourceUp (S.src):
             log ('Would observe %s, but not up; skipping' % S.src)
         else:
-            observe ('obs', S.src, S.freq, integTime)
+            observe ('obs', S.src, S.freq, obsDur)
         
         if isTimeUp (stopTime, False): break
         S.next ()
@@ -157,7 +130,6 @@ retcode = 1
 try:
     try:
         log ('Locking server and beginning observing script.')
-        setLockKey (lockid)
         lockServer ('lo' + LO)
         mainLoop ()
         log ('Script ended normally (time up)')

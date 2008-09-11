@@ -113,6 +113,8 @@ def getPAMDefaults (ants):
 
     return [parse (l) for l in lines]
 
+# Focus stuff
+
 def getFocusSettings (ants):
     """Return the current focus settings for the specified antennas.
 
@@ -152,3 +154,64 @@ def logFocusSettings (ants, destname):
     
     call ('atagetfocus %s >%s 2>&1' % (','.join (sorted (ants)), destname),
           shell=True)
+
+# Array hookup data
+
+_defaultInstrument = 'fx64a:fxa'
+
+class Hookup (object):
+    def __init__ (self, instr=None):
+        if instr is None: instr = _defaultInstrument
+
+        self.instr = instr
+        self._read ()
+
+    def _read (self):
+        lines = _slurp ('fxconf.rb hookup_tab "%s"' % self.instr)
+
+        tab = {}
+        ants = set ()
+        los = set ()
+        
+        for l in lines:
+            if len (l) == 0 or l[0] == ':':
+                # "grayed out" and not used
+                continue
+
+            a = l.split ()
+
+            num = int (a[3])
+            conn = a[5]
+            antinfo = a[7]
+            mirinfo = a[9]
+            walsh = int (a[12])
+        
+            ibob = int (conn[1:3])
+            inp = int (conn[-1:])
+            
+            antpol = antinfo[0:3]
+            lo = antinfo[3]
+
+            mirnum = int (mirinfo[:-1])
+        
+            tab[antpol] = (ibob, inp, lo, walsh, num, mirnum)
+            ants.add (antpol[0:2])
+            los.add (lo)
+
+        self.tab = tab
+        self.sants = sorted (ants)
+        assert len (los) == 1
+        self.lo = lo
+
+    def ants (self): return self.sants
+
+    def antpols (self): return sorted (self.tab.iterkeys ())
+
+    def apIbobs (self):
+        l = []
+        
+        for (ap, info) in self.tab.iteritems ():
+            l.append ((ap, (info[0], info[1])))
+
+        l.sort (key = lambda t: t[1][0] * 10 + t[1][1])
+        return l

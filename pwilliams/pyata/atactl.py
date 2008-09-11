@@ -18,6 +18,8 @@ import subprocess, sys, os, time, atexit
 noopMode = True
 logFile = None
 _bindir = '/opt/atasys/ata/run/'
+_rubydir = '/home/obs/ruby/bin/'
+_obsbindir = '/home/obs/bin/'
 _startTime = None
 
 def initScript (doAnything, logname):
@@ -165,19 +167,26 @@ class State (object):
 # Locking servers
 
 _lockInfo = set ()
-_lockKey = None
+
+def _getLockKey ():
+    from socket import gethostname
+    from os import getpid, getuid
+    from os.path import basename
+    from sys import argv
+    from pwd import getpwuid
+
+    script = basename (argv[0])
+    user = getpwuid (os.getuid ())[0]
+    
+    return '-'.join (['%s@%s' % (user, gethostname ()), script, 'pid%d' % getpid ()])
+
+_lockKey = _getLockKey ()
 
 def _releaseLocks ():
     for server in _lockInfo:
         runCommand ('/bin/sh', _bindir + 'ataunlockserver', server, _lockKey)
 
 atexit.register (_releaseLocks)
-
-def setLockKey (key):
-    global _lockKey
-
-    if _lockKey is not None: raise Exception ('Can only set lock key once!')
-    _lockKey = key
 
 _acctLock = 'locking and unlocking servers'
 
@@ -246,76 +255,6 @@ def setSkyFreq (lo, freqInMhz):
     account ('setting the sky frequency', time.time () - tStart)
     lockServer ('lo' + lo)
 
-#_controlFiles = ['hookup8x1.dat', 'genswitch']
-_controlFiles = ['hookup8x1.dat']
-
-def initControlFiles ():
-    homedir = os.environ['HOME']
-    gendir = os.path.join (homedir, 'bin')
-    
-    for f in _controlFiles:
-        if os.path.exists (f): continue
-
-        print 'copy here', f
-        log ('Copying over generic control file %s' % f)
-        generic = os.path.join (gendir, f)
-        runCommand ('cp', generic, f)
-
-    log ('Reading in settings from control files')
-    
-    #f = file ('genswitch', 'r')
-    #switches = f.read ().strip ()
-    #f.close ()
-    switches = 'unused'
-    
-    f = file ('hookup8x1.dat', 'r')
-    corrAnts = {}
-    corrPols = {}
-    corrLOs = {}
-    
-    for l in f:
-        l = l.strip ()
-        if l[0] == '#': continue
-
-        # split on both commas and whitespace.
-        
-        pieces = []
-        spaces = [x for x in l.split () if x != '']
-        
-        for bit in spaces:
-            pieces += [x for x in bit.split (',') if x != '']
-
-        linetype = pieces[8]
-        if linetype[0:3] != 'fx8': raise Exception ('format change?: "%s"' % linetype)
-        corrid = linetype[3]
-
-        if linetype[5:] == 'ant':
-            corrAnts[corrid] = pieces[0:8] 
-        elif linetype[5:] == 'pols':
-            corrPols[corrid] = pieces[0:8] 
-        elif linetype[5:] == 'LO':
-            corrLOs[corrid] = pieces[0:8] 
-
-    usedAnts = {}
-    corrExact = {}
-    allAnts = set ()
-
-    for corr in 'abcdefgh':
-        ants = corrAnts[corr]
-        pols = corrPols[corr]
-        los = corrLOs[corr]
-        
-        s = set (ants)
-        if 'nc' in s: s.remove ('nc')
-        usedAnts[corr] = s
-
-        allAnts = allAnts.union (s)
-
-        ex =','.join (['%s%s%s1' % tup for tup in zip (ants, pols, los)])
-        corrExact[corr] = ex
-
-    return switches, allAnts #, usedAnts, corrExact
-
 def calcStopTime (stopHour):
     """Calculate the Unix time at which we should stop, if we were told
     to stop at the given (potentially fractional) hour of local time.
@@ -357,9 +296,9 @@ def isTimeUp (stopTime, outermost):
 
 # Ephemerides
 
-def makeCatalogEphemOwned (owner, src, duration, outfile):
-    cmd = "atacatalogephem --owner '%s' '%s' now +%fhours >%s" % \
-          (owner, src, duration, outfile)
+def _makeCatalogEphemOwned (owner, src, durHours, start, outfile, args):
+    cmd = "atacatalogephem --owner '%s' '%s' %s +%fhours %s >%s" % \
+          (owner, src, start, durHours, args, outfile)
 
     if noopMode:
         log ('WOULD execute: %s' % cmd)
@@ -367,7 +306,6 @@ def makeCatalogEphemOwned (owner, src, duration, outfile):
         print >>file (outfile, 'w'), 'Fake ephemeris file.'
         return 'ra,dec'
     
-    tStart = time.time ()
     log ('executing: %s' % cmd) 
 
     proc = subprocess.Popen (cmd, shell=True, close_fds=True,
@@ -393,6 +331,17 @@ def makeCatalogEphemOwned (owner, src, duration, outfile):
     # Wrap ephem to avoid hitting limits.
     runCommand ('/bin/sh', _bindir + 'atawrapephem', outfile)
 
+def makeCatalogEphemsOwned (owner, src, durHours, outbase):
+    tStart = time.time ()
+
+    _makeCatalogEphemOwned (owner, src, durHours, 'now', outbase +
+                            '.nsephem', '')
+    t = time.gmtime ()
+    stUTC = time.strftime ('%Y-%m-%dT%H:%M:00.000Z', time.gmtime ())
+    _makeCatalogEphemOwned (owner, src, durHours, stUTC,
+                            outbase + '.msephem',
+                            '--utcms --interval 10')
+    
     # Extract the RA and Dec for passing to the FX64 dumper
     cmd = "atalistcatalog -l --owner '%s' --source '%s'" % (owner, src)
     log ('executing: %s' % cmd) 
@@ -404,10 +353,6 @@ def makeCatalogEphemOwned (owner, src, duration, outfile):
 
     if proc.returncode != 0:
         log ('process returned error code %d!' % proc.returncode)
-        try:
-            os.unlink (outfile)
-        except:
-            pass
         raise Exception ("Command failed")
 
     a = stdout.split ()
@@ -418,19 +363,19 @@ def makeCatalogEphemOwned (owner, src, duration, outfile):
     account ('generating ephemerides', time.time () - tStart)
     return radec
 
-def makeCatalogEphem (src, duration, outfile):
+def makeCatalogEphem (src, durHours, outbase):
     """Create an ephemeris file for the specified source in the ATA catalog.
 
     The source is looked for under the 'bima' and 'pta' owners in the catalog.
-    Duration is measured in hours. The ephemeris is written to the file
-    outfile.
+    Duration is measured in hours. The ephemeris is written to files named
+    outbase.{ns,ms}ephem.
     """
     
     for owner in ['bima', 'pta', 'pkgw']:
         try:
-            radec = makeCatalogEphemOwned (owner, src, duration, outfile)
+            radec = makeCatalogEphemsOwned (owner, src, durHours, outbase)
             log ('Found catalog ephemeris for source "%s" under owner "%s"' % (src, owner))
-            log ('  Saved data for next %f hours into %s' % (duration, outfile))
+            log ('  Saved data for next %f hours into %s.*ephem' % (durHours, outbase))
             return radec
         except:
             pass
@@ -440,46 +385,64 @@ def makeCatalogEphem (src, duration, outfile):
 _ephemTable = {}
 _radecTable = {}
 
-def ensureEphem (src, f, obsDur):
+def ensureEphem (src, ebase, obsDurSeconds):
     now = time.time ()
     expiry = _ephemTable.get (src)
     
-    if expiry is not None and now + obsDur + 180 < expiry:
+    if expiry is not None and now + obsDurSeconds + 180 < expiry:
             return _radecTable[src]
 
-    radec = makeCatalogEphem (src, 1.1, f)
+    radec = makeCatalogEphem (src, 1.1, ebase)
     _ephemTable[src] = now + 3600
     _radecTable[src] = radec
     return radec
 
-def trackEphemWait (ants, file):
+def trackEphemWait (ants, ebase):
+    f = ebase + '.nsphem'
     log ('Tracking antennas: %s' % ', '.join (ants))
-    log (' ... to ephemeris in file: %s' % file)
+    log (' ... to ephemeris in file: %s' % f)
     tStart = time.time ()
     # Sort the list of antennas to put 3f,3g,3h next to each other. This gets them
     # moving at the same time and hopefully reduces the likelihood of the collision
     # server getting angry at us.
-    runCommand ('/bin/sh', _bindir + 'atatrackephem', '-w', ','.join (sorted (ants)), file)
+    runCommand ('/bin/sh', _bindir + 'atatrackephem', '-w',
+                ','.join (sorted (ants)), f)
     account ('tracking to sources', time.time () - tStart)
 
-# Launching the FX64
+# Launching the data catcher
 
-integTime = 7.5
+defaultIntegTime = 10.0 # in s
+_integTime = None
 import math
 
-def launchFX64 (src, freq, radec, duration, outbase):
-    tStart = time.time ()
-    ndumps = int (math.ceil (duration / integTime))
+def setIntegTime (itime=None):
+    global _integTime
     
-    log ('Launching FX64 obs: %s at %s MHz' % (src, freq))
-    log ('      Output files: %s_{1,2}' % outbase)
-    log ('  Embedding coords: ' + radec)
-    log ('          Duration: %f (%d dumps)' % (duration, ndumps))
+    if itime is None: itime = defaultIntegTime
+
+    tStart = time.time ()
+    runCommand ('/bin/csh', _obsbindir + 'setint64.csh', str (itime))
+    _integTime = itime
+    account ('setting integration time', time.time () - tStart)
+
+def launchCatcher (hookup, src, freq, radec, durationSeconds, outbase, ebase):
+    assert _integTime is not None
+    
+    tStart = time.time ()
+    ndumps = int (math.ceil (durationSeconds / _integTime))
+    nsephem = ebase + '.nsephem'
+    
+    log ('Launching data catcher: %s at %s MHz on %s' % (src, freq, hookup.instr))
+    log ('     atafx output base: %s' % outbase)
+    log ('      Embedding coords: ' + radec)
+    log ('Ephemeris file (in ns): ' + nsephem)
+    log ('              Duration: %f s (%d dumps)' % (durationSeconds, ndumps))
 
     mydir = os.path.dirname (__file__)
-    script = os.path.join (mydir, 'fx64.sh')
-    args = ['/bin/sh', script, src, str(freq), radec,
-            str(ndumps), outbase]
+    script = os.path.join (mydir, 'fxlaunch.sh')
+    args = ['/bin/sh', script, src, str(freq), radec, str (ndumps),
+            outbase, ','.join (hookup.antpols ()), hookup.lo, nsephem,
+            str (durationSeconds)]
     
     if noopMode:
         log ('WOULD execute: %s' % (' '.join (args))) 
@@ -491,13 +454,13 @@ def launchFX64 (src, freq, radec, duration, outbase):
                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
         for l in proc.stdout:
-            log ('FX64: ' + l[:-1])
+            log ('Catcher: ' + l[:-1])
 
         if proc.wait ():
-            log ('FX64 returned nonzero! %d' % proc.returncode)
-            raise Exception ('FX64 invocation failed.')
+            log ('Catcher returned nonzero! %d' % proc.returncode)
+            raise Exception ('Catcher invocation failed.')
     
-    account ('integrating for %d seconds' % duration, time.time () - tStart)
+    account ('integrating for %d seconds' % durationSeconds, time.time () - tStart)
 
 # Focus control
 
@@ -577,6 +540,9 @@ def setFocus (ants, settingInMHz, wait=True):
     # of antennas ...
     global _curFocus
 
+    # don't both pausing if simulating.
+    if noopMode: wait = False
+    
     tStart = time.time ()
     log ('Setting input focus %f for: %s' % (settingInMHz,
                                              ','.join (sorted (ants))))
@@ -608,3 +574,83 @@ def setFocus (ants, settingInMHz, wait=True):
     if wait: _waitForFocus (ants)
     
     account ('focusing antennas', time.time () - tStart)
+
+# Attemplifier control
+
+def autoAttenAll (hookup, rms=13.0):
+    tStart = time.time ()
+    log ('Auto-attening all antpols')
+    
+    for (antpol, (ibob, inp)) in hookup.apIbobs ():
+        runCommand ('/bin/sh', _rubydir + 'autoatten.rb', 'i%02d' %
+                    ibob, str (inp), str (rms), '0')
+
+    account ('autoattening ibobs', time.time () - tStart)
+
+# Fringe rotation control
+
+_acctFringe = 'controlling fringe rotation'
+
+def fringeKill ():
+    tStart = time.time ()
+    runCommand ('/bin/csh', _obsbindir + 'frot.csh', 'ign_gr',
+                'ign_eph', 'ign_freq', os.getcwd (), 'kill')
+    account (_acctFringe, time.time () - tStart)
+
+atexit.register (fringeKill)
+
+def fringeStart (hookup, ebase, freq):
+    tStart = time.time ()
+    msephem = ebase + '.msephem'
+    runCommand ('/bin/csh', _obsbindir + 'frot.csh', hookup.instr,
+                msephem, str (freq), os.getcwd (), 'start')
+    # Pause to not confuse the ibobs by talking to them too much
+    # -- copied from mosfx.sh 9/11/2008
+    time.sleep (10)
+    account (_acctFringe, time.time () - tStart)
+    
+def fringeStop (hookup):
+    tStart = time.time ()
+    runCommand ('/bin/csh', _obsbindir + 'frot.csh', hookup.instr,
+                'ign_eph', 'ign_freq', os.getcwd (), 'stop')
+    # Pause to not confuse the ibobs by talking to them too much
+    # -- copied from mosfx.sh 9/11/2008
+    time.sleep (5)
+    account (_acctFringe, time.time () - tStart)
+
+# Generic observing function
+
+_lastFreq = 0
+_lastSrc = None
+_lastSrcExpire = 0
+
+def observe (me, hookup, kind, src, freq, integTimeSeconds, autoAtten):
+    global _lastFreq, _lastSrc, _lastSrcExpire
+
+    assert _integTime is not None # save time in this case
+    
+    if _lastFreq != freq:
+        setSkyFreq (hookup.lo, freq)
+        _lastFreq = freq
+
+    f = src + '.ephem'
+    radec = ensureEphem (src, src, integTimeSeconds)
+    now = time.time ()
+    
+    if _lastSrc != src or now >= _lastSrcExpire:
+        trackEphemWait (hookup.ants (), src)
+        _lastSrc = src
+        _lastSrcExpire = now + 2000 # ensureephem actually gives us 1.1 hours
+
+    fringeStart (hookup, src, freq)
+
+    setFocus (hookup.ants (), freq, True)
+
+    if autoAtten: autoAttenAll (hookup)
+    
+    try:
+        log ('Beginning %s observations (%s, %d MHz)' % (kind, src, freq))
+        outBase = '-'.join ([me, kind, src, '%04d' % freq])
+        launchCatcher (hookup, src, freq, radec, integTimeSeconds, outBase, src)
+    finally:
+        fringeStop (hookup)
