@@ -188,7 +188,7 @@ class Hookup (object):
             mirinfo = a[9]
             walsh = int (a[12])
         
-            ibob = int (conn[1:3])
+            ibob = conn.split (':')[0]
             inp = int (conn[-1:])
             
             antpol = antinfo[0:3]
@@ -215,5 +215,5 @@ class Hookup (object):
         for (ap, info) in self.tab.iteritems ():
             l.append ((ap, (info[0], info[1])))
 
-        l.sort (key = lambda t: t[1][0] * 10 + t[1][1])
+        l.sort (key = lambda t: t[1][0] + str (t[1][1]))
         return l

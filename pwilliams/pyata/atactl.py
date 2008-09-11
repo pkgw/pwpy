@@ -594,7 +594,7 @@ def autoAttenAll (hookup, rms=13.0):
     settings = {}
     
     for (antpol, (ibob, inp)) in hookup.apIbobs ():
-        cmd = 'autoatten.rb i%02d %d %f 0' % (ibob, inp, rms)
+        cmd = 'autoatten.rb %s %d %f 0' % (ibob, inp, rms)
 
         if noopMode:
             log ('WOULD slurp: ' + cmd)
@@ -620,8 +620,8 @@ def setAttens (settings):
     log ('@@ Restoring saved attemplifier settings')
     
     for ((ibob, inp), db) in settings.iteritems ():
-        runCommand ('/bin/sh', _rubydir + 'setatten.rb', 'i%02d' %
-                    ibob, str (inp), str (db), '0')
+        runCommand ('/bin/sh', _rubydir + 'setatten.rb', ibob,
+                    str (inp), str (db), '0')
 
     account (_acctAttemp, time.time () - tStart)
 
