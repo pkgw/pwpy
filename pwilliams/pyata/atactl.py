@@ -582,15 +582,74 @@ def setFocus (ants, settingInMHz, wait=True):
 
 # Attemplifier control
 
+_fakeAtten = \
+'setatten.rb iXX.fxX inX 99.9 0 ;: Got 99.9 RMS, wanted 99.9 +/- 9.9 ;'
+_acctAttemp = 'controlling attemplifiers'
+
 def autoAttenAll (hookup, rms=13.0):
+    from ataprobe import _slurp
+    
     tStart = time.time ()
     log ('Auto-attening all antpols')
+    settings = {}
     
     for (antpol, (ibob, inp)) in hookup.apIbobs ():
-        runCommand ('/bin/sh', _rubydir + 'autoatten.rb', 'i%02d' %
-                    ibob, str (inp), str (rms), '0')
+        cmd = 'autoatten.rb i%02d %d %f 0' % (ibob, inp, rms)
 
-    account ('autoattening ibobs', time.time () - tStart)
+        if noopMode:
+            log ('WOULD slurp: ' + cmd)
+            out = _fakeAtten
+        else:
+            out = _slurp (cmd)
+            assert len (out) == 1
+            out = out[0]
+        
+        if 'too low' in out: flag = 'low'
+        elif 'too high' in out: flag = 'high'
+        else: flag = 'ok'
+        
+        setting = float (out.split ()[3])
+        settings[(ibob, inp)] = setting
+
+    account (_acctAttemp, time.time () - tStart)
+    return settings
+
+def setAttens (settings):
+    tStart = time.time ()
+
+    log ('Restoring saved attemplifier settings')
+    
+    for ((ibob, inp), db) in settings.iteritems ():
+        runCommand ('/bin/sh', _rubydir + 'setatten.rb', 'i%02d' %
+                    ibob, str (inp), str (db), '0')
+
+    account (_acctAttemp, time.time () - tStart)
+
+def makeAttenKey (src, freq): return freq
+
+_attenSettings = {}
+_curAttenKey = None
+
+def setupAttens (src, freq, hookup):
+    global _curAttenKey
+    
+    k = makeAttenKey (src, freq)
+
+    s = _attenSettings.get (k)
+    log ('Retrieving or auto-getting attemplifier ' + \
+         'settings for key ' + str (k))
+
+    if _curAttenKey is not None and _curAttenKey == k:
+        log ('Already at right settings.')
+        return
+    
+    if s is not None:
+        setAttens (s)
+    else:
+        s = autoAttenAll (hookup)
+        _attenSettings[k] = s
+
+    _curAttenKey = k
 
 # Fringe rotation control
 
@@ -629,7 +688,7 @@ _lastFreq = 0
 _lastSrc = None
 _lastSrcExpire = 0
 
-def observe (me, hookup, kind, src, freq, integTimeSeconds, autoAtten):
+def observe (me, hookup, kind, src, freq, integTimeSeconds):
     global _lastFreq, _lastSrc, _lastSrcExpire
 
     assert _integTime is not None # save time in this case
@@ -651,7 +710,7 @@ def observe (me, hookup, kind, src, freq, integTimeSeconds, autoAtten):
 
     setFocus (hookup.ants (), freq, True)
 
-    if autoAtten: autoAttenAll (hookup)
+    setupAttens (src, freq, hookup)
     
     try:
         log ('Beginning %s observations (%s, %d MHz)' % (kind, src, freq))
