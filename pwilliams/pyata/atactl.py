@@ -402,7 +402,7 @@ def ensureEphem (src, ebase, obsDurSeconds):
     _radecTable[src] = radec
     return radec
 
-def trackEphemWait (ants, ebase):
+def trackEphem (ants, ebase, wait):
     f = ebase + '.nsephem'
     log ('@@ Tracking antennas: %s' % ','.join (ants))
     log (' ... to ephemeris in file: %s' % f)
@@ -410,8 +410,10 @@ def trackEphemWait (ants, ebase):
     # Sort the list of antennas to put 3f,3g,3h next to each other. This gets them
     # moving at the same time and hopefully reduces the likelihood of the collision
     # server getting angry at us.
-    runCommand ('/bin/sh', _bindir + 'atatrackephem', '-w',
-                ','.join (sorted (ants)), f)
+    args = ['/bin/sh', _bindir + 'atatrackephem']
+    if wait: args.append ('-w')
+    args += [','.join (sorted (ants)), f]
+    runCommand (*args)
     account ('tracking to sources', time.time () - tStart)
 
 # Launching the data catcher
@@ -571,6 +573,12 @@ def setFocus (ants, settingInMHz, wait=True):
     
     account ('focusing antennas', time.time () - tStart)
 
+def waitForFocus (ants):
+    tStart = time.time ()
+    log ('Waiting for antennas to focus ...')
+    _waitForFocus (ants)
+    account ('focusing antennas', time.time () - tStart)
+
 # Attemplifier control
 
 _fakeAtten = \
@@ -691,27 +699,42 @@ def observe (me, hookup, kind, src, freq, integTimeSeconds):
     global _lastFreq, _lastSrc, _lastSrcExpire
 
     assert _integTime is not None # save time in this case
-    
-    if _lastFreq != freq:
-        setSkyFreq (hookup.lo, freq)
-        _lastFreq = freq
+
+    # Start the ants focusing. Don't wait for them, so that
+    # we can do other stuff while they're moving around.
+    setFocus (hookup.ants (), freq, False)
 
     f = src + '.ephem'
     radec = ensureEphem (src, src, integTimeSeconds)
     now = time.time ()
     
+    # Start tracking. Same rationale as above.
     if _lastSrc != src or now >= _lastSrcExpire:
-        trackEphemWait (hookup.ants (), src)
+        trackEphem (hookup.ants (), src, False)
         _lastSrc = src
         _lastSrcExpire = now + 2000 # ensureephem actually gives us 1.1 hours
+        needTrackWait = True
+    else: needTrackWait = False
 
-    setFocus (hookup.ants (), freq, True)
+    if _lastFreq != freq:
+        setSkyFreq (hookup.lo, freq)
+        _lastFreq = freq
 
     setupAttens (src, freq, hookup)
 
     # Start this last to not tickle the ibobs too much before --
     # auto-attening can fail with this going.
     fringeStart (hookup, src, freq)
+
+    # Wait to finish tracking. This reissues the trackephem command,
+    # but we're already on the way so I don't think it will slow
+    # things down much.
+    if needTrackWait:
+        trackEphem (hookup.ants (), src, True)
+
+    # Wait for the ants to reach their focus if they haven't
+    # already.
+    waitForFocus (hookup.ants ())
 
     try:
         log ('@@ Beginning %s observations (%s, %d MHz)' % (kind, src, freq))
