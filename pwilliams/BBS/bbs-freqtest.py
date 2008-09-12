@@ -113,7 +113,7 @@ atactl.roundFocusSetting = roundFocus
 def attenKey (src, freq):
     return freq - (freq % 1000)
 
-atactl.attenKey = attenKey
+atactl.makeAttenKey = attenKey
 
 # Stuff
 
