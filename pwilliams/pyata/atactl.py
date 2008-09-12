@@ -615,7 +615,7 @@ def setAttens (settings):
         if flag != 'ok':
             log ('!! Warning: flag = %s ; what to do ?' % flag)
         
-        runCommand ('/bin/sh', _rubydir + 'setatten.rb', ibob,
+        runCommand ('/usr/bin/env', 'ruby', _rubydir + 'setatten.rb', ibob,
                     'in%d' % inp, str (db), '0')
 
     account (_acctAttemp, time.time () - tStart)
