@@ -10,14 +10,14 @@ This documentation is wildly insufficient.
 This can be used as a standalone script, or interactively as a module
 via IPython."""
 
-import omega, pickle, sys
+import sys
 from os import listdir, mkdir
 from os.path import basename, join, isdir, exists, dirname
 from miriad import VisData
 from mirexec import TaskSelfCal, TaskUVPlot, TaskUVFlag
 from mirtask.util import decodeBaseline
 from numutils import *
-import cairo, gtk, gobject, numpy as N
+import gtk, gobject, numpy as N
 
 def _makeGladeFile ():
     import os
