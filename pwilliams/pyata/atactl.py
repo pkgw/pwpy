@@ -46,8 +46,8 @@ def initScript (doAnything, logname):
     else: mode = 'debug'
     
     log ('Initialized script in %s mode' % mode)
-    log ('ataprobe Version: ' + ataprobe.SVNID)
-    log ('atactl Version: ' + SVNID)
+    log (ataprobe.SVNID)
+    log (SVNID)
     
 def log (text):
     utc = time.gmtime ()
@@ -585,7 +585,7 @@ def autoAttenAll (hookup, rms=13.0):
     settings = {}
     
     for (antpol, (ibob, inp)) in hookup.apIbobs ():
-        cmd = 'autoatten.rb %s %d %f 0' % (ibob, inp, rms)
+        cmd = 'autoatten.rb %s in%d %f 0' % (ibob, inp, rms)
 
         if noopMode:
             log ('WOULD slurp: ' + cmd)
@@ -612,7 +612,7 @@ def setAttens (settings):
     
     for ((ibob, inp), db) in settings.iteritems ():
         runCommand ('/bin/sh', _rubydir + 'setatten.rb', ibob,
-                    str (inp), str (db), '0')
+                    'in%d' % inp, str (db), '0')
 
     account (_acctAttemp, time.time () - tStart)
 
