@@ -215,5 +215,12 @@ class Hookup (object):
         for (ap, info) in self.tab.iteritems ():
             l.append ((ap, (info[0], info[1])))
 
-        l.sort (key = lambda t: t[1][0] + str (t[1][1]))
+        # This sorts by ADC input first. This is important,
+        # since it makes looping through this list talk to an
+        # four times with long breaks in between, instead of
+        # one long time. The latter mode seems to be too much
+        # for the ibobs, causing them to sometimes fail to
+        # respond to commands.
+        
+        l.sort (key = lambda t: str (t[1][1]) + t[1][0])
         return l

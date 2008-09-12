@@ -38,6 +38,7 @@ initScript (reallyDoIt, me + '.log')
 
 try:
     h = ataprobe.Hookup (instr)
+    initAntennas (h.ants ())
     setIntegTime ()
     lockServer ('lo' + h.lo)
     observe (me, h, 'scan', source, freq, durMins * 60)

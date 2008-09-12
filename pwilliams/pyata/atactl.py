@@ -594,13 +594,14 @@ def autoAttenAll (hookup, rms=13.0):
             out = _slurp (cmd)
             assert len (out) == 1
             out = out[0]
-        
+
+        log (out)
         if 'too low' in out: flag = 'low'
         elif 'too high' in out: flag = 'high'
         else: flag = 'ok'
         
         setting = float (out.split ()[3])
-        settings[(ibob, inp)] = setting
+        settings[(ibob, inp)] = (setting, flag)
 
     account (_acctAttemp, time.time () - tStart)
     return settings
@@ -610,7 +611,10 @@ def setAttens (settings):
 
     log ('@@ Restoring saved attemplifier settings')
     
-    for ((ibob, inp), db) in settings.iteritems ():
+    for ((ibob, inp), (db, flag)) in settings.iteritems ():
+        if flag != 'ok':
+            log ('!! Warning: flag = %s ; what to do ?' % flag)
+        
         runCommand ('/bin/sh', _rubydir + 'setatten.rb', ibob,
                     'in%d' % inp, str (db), '0')
 
@@ -658,7 +662,8 @@ def fringeStart (hookup, ebase, freq):
     tStart = time.time ()
     msephem = ebase + '.msephem'
     log ('@@ Starting fringe rotation server')
-    runCommand ('/bin/csh', _obsbindir + 'frot.csh', hookup.instr,
+    group = hookup.instr.split (':')[1]
+    runCommand ('/bin/csh', _obsbindir + 'frot.csh', group,
                 msephem, str (freq), os.getcwd (), 'start')
     # Pause to not confuse the ibobs by talking to them too much
     # -- copied from mosfx.sh 9/11/2008
@@ -668,7 +673,8 @@ def fringeStart (hookup, ebase, freq):
 def fringeStop (hookup):
     tStart = time.time ()
     log ('@@ Stopping fringe rotation')
-    runCommand ('/bin/csh', _obsbindir + 'frot.csh', hookup.instr,
+    group = hookup.instr.split (':')[1]
+    runCommand ('/bin/csh', _obsbindir + 'frot.csh', group,
                 'ign_eph', 'ign_freq', os.getcwd (), 'stop')
     # Pause to not confuse the ibobs by talking to them too much
     # -- copied from mosfx.sh 9/11/2008
@@ -699,15 +705,17 @@ def observe (me, hookup, kind, src, freq, integTimeSeconds):
         _lastSrc = src
         _lastSrcExpire = now + 2000 # ensureephem actually gives us 1.1 hours
 
-    fringeStart (hookup, src, freq)
-
     setFocus (hookup.ants (), freq, True)
 
     setupAttens (src, freq, hookup)
-    
+
+    # Start this last to not tickle the ibobs too much before --
+    # auto-attening can fail with this going.
+    fringeStart (hookup, src, freq)
+
     try:
         log ('@@ Beginning %s observations (%s, %d MHz)' % (kind, src, freq))
-        outBase = '-'.join ([me, kind, src, '%04d' % freq])
+        outBase = me + '-' + kind
         launchCatcher (hookup, src, freq, radec, integTimeSeconds, outBase, src)
     finally:
         fringeStop (hookup)

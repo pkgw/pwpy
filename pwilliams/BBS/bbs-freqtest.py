@@ -22,11 +22,11 @@ from bbsftcfg import *
 cfgFile = sys.modules['bbsftcfg'].__file__
 del sys.path[0]
 
-if len (calSources) < 2:
+if len (calSources) < 1:
     print >>sys.stderr, '"calSources" not set in config file', cfgFile
     sys.exit (1)
 
-if len (sciSources) < 2:
+if len (sciSources) < 1:
     print >>sys.stderr, '"sciSources" not set in config file', cfgFile
     sys.exit (1)
 
