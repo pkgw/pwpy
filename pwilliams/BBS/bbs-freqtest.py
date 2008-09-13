@@ -11,8 +11,6 @@ import os, time, sys
 
 me = 'bbsft'
 obsDur = 60 # seconds
-calFreq = 1430 # MHz
-calPeriod = 1200 # how many seconds between attempts to cal
 
 # Load config file and check that it sets our
 # vital parameters
@@ -21,10 +19,6 @@ sys.path = ['.'] + sys.path
 from bbsftcfg import *
 cfgFile = sys.modules['bbsftcfg'].__file__
 del sys.path[0]
-
-if len (calSources) < 1:
-    print >>sys.stderr, '"calSources" not set in config file', cfgFile
-    sys.exit (1)
 
 if len (sciSources) < 1:
     print >>sys.stderr, '"sciSources" not set in config file', cfgFile
@@ -57,40 +51,24 @@ stopHour = float (sys.argv[3])
 # Define state structure
 
 class BBSState (State):
-    vars = ['ifreq', 'isci', 'ical', 'lastCal', 'onCal']
+    vars = ['ifreq', 'isci']
 
     def init (self):
-        self.ifreq = self.isci = self.ical = self.lastCal = 0
-        self.onCal = True
+        self.ifreq = self.isci = 0
 
     def map (self):
         self.freq = obsFreqs[self.ifreq]
-
-        if self.onCal:
-            self.src = calSources[self.ical]
-        else:
-            self.src = sciSources[self.isci]
-        
-        self.doCal = (time.time () - self.lastCal) > calPeriod
+        self.src = sciSources[self.isci]
 
     def inc (self):
-        # self.lastCal must be updated in the script loop.
-        
         self.ifreq += 1
 
         if self.ifreq == len (obsFreqs):
             self.ifreq = 0
 
-            if self.onCal:
-                self.ical += 1
-                if self.ical == len (calSources):
-                    self.ical = 0
-            else:
-                self.isci += 1
-                if self.isci == len (sciSources):
-                    self.isci = 0
-                    
-            self.onCal = not self.onCal
+            self.isci += 1
+            if self.isci == len (sciSources):
+                self.isci = 0
         
 # OK, let's go!
 
@@ -119,17 +97,8 @@ atactl.makeAttenKey = attenKey
 
 def mainLoop ():
     while not isTimeUp (stopTime, True):
-        log ('State: %s %d %s %d' % (S.src, S.freq, S.doCal, S.lastCal))
+        log ('State: %s %d' % (S.src, S.freq))
         
-        if S.doCal and S.onCal and S.ical == 0: # cal when we can avoid two consecutive slews
-            if not isSourceUp (calSources[0], obsDur):
-                log ('Would cal on %s, but not up; skipping.' % calSources[0])
-            else:
-                observe (me, h, 'cal', calSources[0], calFreq, obsDur)
-                S.lastCal = int (time.time ())
-
-        if isTimeUp (stopTime, False): break
-
         # Now our main obs
 
         if not isSourceUp (S.src, obsDur):
@@ -153,11 +122,10 @@ try:
     except Exception, e:
         logAbort (e)
 finally:
-    for src in calSources:
-        try: os.unlink (src + '.ephem')
-        except: pass
     for src in sciSources:
-        try: os.unlink (src + '.ephem')
+        try: os.unlink (src + '.nsephem')
+        except: pass
+        try: os.unlink (src + '.msephem')
         except: pass
 
 sys.exit (retcode)
