@@ -515,7 +515,10 @@ def _waitForFocus (ants):
 
         if len (notThere) + len (unknown) == 0:
             return
-
+        elif len (notThere) + len (unknown) < 3:
+            log ('Only a few antennas unfocused, not waiting. Hope for the best!')
+            return
+        
         time.sleep (_focusWaitInterval)
         ants = notThere.union (unknown)
 
