@@ -1,0 +1,30 @@
+#! /bin/sh
+
+echo "WankerScripts v1.0!"
+
+if [ -d $HOME/mmm ] ; then
+    wsdir=$HOME/mmm/pwilliams/ws
+elif [ -d $HOME/cvs/mmm ] ; then
+    wsdir=$HOME/cvs/mmm/pwilliams/ws
+elif [ -d `dirname $0`/ws ] ; then
+    wsdir=`dirname $0`/ws
+else
+    echo "Bummer, can't find the MMM files" 1>&2
+    echo "Running 'sh `which $0`' should fix things." 1>&2
+    exit 1
+fi
+
+for f in $wsdir/*.sh $wsdir/*.py $wsdir/basic.mf ; do
+    b=`basename $f`
+
+    if [ $b = config.sh -a -f config.sh ] ; then
+	echo "   [not overwriting config.sh]"
+    else
+	echo "   $b"
+	cp $f .
+    fi
+done
+
+chmod +x *.sh *.py
+
+exit 0
