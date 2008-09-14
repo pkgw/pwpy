@@ -4,7 +4,7 @@
 
 . common.sh
 
-for v in `cat fx.list` ; do
+for v in `./filter-list.py fx.list "$@"` ; do
     src=`cat $v/ws-src`
     freq=`cat $v/ws-freq`
     pol=`cat $v/ws-pol`

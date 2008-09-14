@@ -4,7 +4,7 @@
 
 . common.sh
 
-freqs=`./index-list.py fx.list freq`
+freqs=`./index-list.py fx.list freq "$@"`
 
 for freq in $freqs ; do
     vises=$(./comma.py $(./filter-list.py fx.list freq=$freq))
