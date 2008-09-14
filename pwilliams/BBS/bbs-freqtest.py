@@ -117,11 +117,12 @@ try:
         lockServer ('lo' + h.lo)
         mainLoop ()
         log ('Script ended normally (time up)')
-        showAccounting ()
         retcode = 0
     except Exception, e:
         logAbort (e)
 finally:
+    try: showAccounting ()
+    except: pass
     for src in sciSources:
         try: os.unlink (src + '.nsephem')
         except: pass
