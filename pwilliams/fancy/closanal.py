@@ -19,8 +19,8 @@
 
 @ interval
  UV data time-averaging interval in minutes. It's recommended that
- this be set to a few minutes to damp out noise. Default is 0.01,
- i.e., no averaging.
+ this be set to a few minutes to damp out noise. Default is 10. An
+ extremely small number such as 0.01 will result in no averaging.
 
 @ ntrip
  The number of triple closure values to print. Default is 10.
@@ -72,7 +72,7 @@ banner = util.printBannerSvn ('closanal', 'attempt to diagnose bad baselines bas
 
 SECOND = 1.0 / 3600. / 24.
 
-keys.keyword ('interval', 'd', 0.01)
+keys.keyword ('interval', 'd', 10.)
 keys.keyword ('ntrip', 'i', 10)
 keys.keyword ('nbl', 'i', 10)
 keys.keyword ('nant', 'i', 10)
