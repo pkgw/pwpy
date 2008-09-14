@@ -5,6 +5,7 @@ scripts. Some of the nice higher-level features that it provides are:
 
  - Comprehensive logging of all actions
  - Accounting of how observing time is spent
+ - Ability to run scripts in simulation mode
  - Saving of script state and resuming in-place if the script
    crashes or is killed.
 
@@ -179,14 +180,13 @@ def runCommand (*args):
 # and restarted
 
 _stateFile = 'obs-state.txt'
+_stateNumDebugIters = 20
 
 class State (object):
     """Must define: field 'vars'; methods 'iteration', 'next'."""
     
     vars = None
 
-    def __init__ (self):
-    
     def _save (self):
         if noopMode: return
         
@@ -203,8 +203,15 @@ class State (object):
             name, val = l.strip ().split ()
             setattr (self, name, int (val))
 
+    def _keepGoing (self, stopTime, niters):
+        if noopMode:
+            return niters < _stateNumDebugIters
+        else:
+            return not isTimeUp (stopTime)
+
     def runAndExit (self, stopTime):
         retcode = 1
+        niters = 0
 
         if os.path.exists (_stateFile) and not noopMode:
             log ('Loading script state from ' + _stateFile)
@@ -215,18 +222,20 @@ class State (object):
         try:
             log ('Beginning observation loop')
 
-            while not isTimeUp (stopTime, True):
+            while self._keepGoing (stopTime, niters):
                 self.iteration (stopTime)
                 self.next ()
                 self._save ()
+                niters += 1
 
             log ('Script ended normally (time up)')
             retcode = 0
         except Exception, e:
             logAbort (e)
 
+        log ('Completed %d main loop iterations.' % niters)
         sys.exit (retcode)
-            
+
 # Locking servers
 
 _lockInfo = set ()
@@ -343,18 +352,7 @@ def calcStopTime (stopHour):
     log ('Observation planned to last %.1f hours' % durHours)
     return stopTime, durHours
 
-_doneOne = False
-
-def isTimeUp (stopTime, outermost):
-    global _doneOne
-    
-    if noopMode and outermost:
-        if _doneOne:
-            log ('[Exiting in outermost time-up check because we\'re noop]')
-            return True
-        _doneOne = True
-        return False
-
+def isTimeUp (stopTime):
     return time.time () >= stopTime
 
 # Ephemerides
@@ -555,6 +553,10 @@ def _waitForFocus (ants):
     tStart = time.time ()
     log ('Waiting for antennas to reach focus %f' % _curFocus)
 
+    if noopMode:
+        log ('Debug mode, not actually waiting')
+        return
+    
     tol = _focusTol * _curFocus
 
     while time.time () - tStart < _focusWaitTimeout:
@@ -603,9 +605,6 @@ def setFocus (ants, settingInMHz, wait=True):
     # of antennas ...
     global _curFocus
 
-    # don't both pausing if simulating.
-    if noopMode: wait = False
-    
     tStart = time.time ()
     log ('Setting input focus %f for: %s' % (settingInMHz,
                                              ','.join (sorted (ants))))
@@ -740,7 +739,7 @@ def fringeStart (hookup, ebase, freq):
                 msephem, str (freq), os.getcwd (), 'start')
     # Pause to not confuse the ibobs by talking to them too much
     # -- copied from mosfx.sh 9/11/2008
-    time.sleep (10)
+    if not noopMode: time.sleep (10)
     account (_acctFringe, time.time () - tStart)
     
 def fringeStop (hookup):
@@ -751,7 +750,7 @@ def fringeStop (hookup):
                 'ign_eph', 'ign_freq', os.getcwd (), 'stop')
     # Pause to not confuse the ibobs by talking to them too much
     # -- copied from mosfx.sh 9/11/2008
-    time.sleep (5)
+    if not noopMode: time.sleep (5)
     account (_acctFringe, time.time () - tStart)
 
 # Generic observing function

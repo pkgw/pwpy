@@ -103,6 +103,7 @@ atactl.makeAttenKey = attenKey
 # That was all prep. Now let's go!
 
 initScript (reallyDoIt, me + '.log')
+log (SVNID)
 stopTime, durHours = calcStopTime (stopHour)
 h = ataprobe.Hookup (instr)
 state = BBSState (freqs, sources, h, obsDur)
