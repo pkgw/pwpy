@@ -32,10 +32,16 @@ else
 	    rm -rf $d
 	    shhcmd uvcat options=unflagged vis=$v out=$d \
 		select="time($tmin,$bdtime)"
-	    cp $v/ws* $d
-	    echo $curep >$d/ws-epoch
-	    echo $d >>ep.list
 
+	    if [ ! -f $d/visdata ] ; then
+		echo "   Nothing for this epoch" |tee -ia wank.log
+		rm -rf $d
+	    else
+		cp $v/ws* $d
+		echo $curep >$d/ws-epoch
+		echo $d >>ep.list
+	    fi
+	    
 	    curep=`expr $curep + 1`
 	    tmin="$bdtime"
 	done
@@ -45,8 +51,13 @@ else
 	rm -rf $d
 	shhcmd uvcat options=unflagged vis=$v out=$d \
 	    select="time($tmin,$tmax)"
-	cp $v/ws* $d
-	echo $curep >$d/ws-epoch
-	echo $d >>ep.list
+	if [ ! -f $d/visdata ] ; then
+	    echo "   Nothing for this epoch" |tee -ia wank.log
+	    rm -rf $d
+	else
+	    cp $v/ws* $d
+	    echo $curep >$d/ws-epoch
+	    echo $d >>ep.list
+	fi
     done
 fi
