@@ -29,7 +29,11 @@ for src in $srcs ; do
 	    cmd invert vis=$vises map=$mp beam=$bm options=double,mfs sup=0
 	    cmd clean map=$mp beam=$bm out=$cl niters=5000
 	    cmd restor map=$mp beam=$bm model=$cl out=$rm
-	    
+
+	    echo $src >$rm/ws-src
+	    echo $freq >$rm/ws-freq
+	    echo $epoch >$rm/ws-epoch
+
 	    # Imfit. We want to preserve the output so things get
 	    # messier
 	    
