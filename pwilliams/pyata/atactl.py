@@ -142,6 +142,16 @@ def showAccounting ():
     pct = 100.0 * unacct / totalTime
     log ('  %4.1f%% : %8.1f                   : unaccounted for' % (pct, unacct))
 
+def _accountOnExit ():
+    try:
+        showAccounting ()
+    except Exception, e:
+        log ('Unable to show time accounting info: ' + str (e))
+
+atexit.register (_accountOnExit)
+
+# Executing commands (with logging)
+
 def runCommand (*args):
     if noopMode:
         log ('WOULD execute: %s' % (' '.join (args))) 
@@ -169,26 +179,15 @@ def runCommand (*args):
 # and restarted
 
 _stateFile = 'obs-state.txt'
+
 class State (object):
-    """Must define: field vars; methods init, map, inc."""
+    """Must define: field 'vars'; methods 'iteration', 'next'."""
     
     vars = None
-    
-    def __init__ (self):
-        self.init ()
-        
-        if os.path.exists (_stateFile) and not noopMode:
-            log ('Loading script state from ' + _stateFile)
-            self._load ()
-        else:
-            log ('Using blank script state.')
-            
-        self.map ()
-    
-    def next (self):
-        self.inc ()
-        self.map ()
 
+    def __init__ (self):
+    
+    def _save (self):
         if noopMode: return
         
         f = file (_stateFile, 'w')
@@ -203,6 +202,30 @@ class State (object):
         for l in f:
             name, val = l.strip ().split ()
             setattr (self, name, int (val))
+
+    def runAndExit (self, stopTime):
+        retcode = 1
+
+        if os.path.exists (_stateFile) and not noopMode:
+            log ('Loading script state from ' + _stateFile)
+            self._load ()
+        else:
+            log ('Using blank script state.')
+
+        try:
+            log ('Beginning observation loop')
+
+            while not isTimeUp (stopTime, True):
+                self.iteration (stopTime)
+                self.next ()
+                self._save ()
+
+            log ('Script ended normally (time up)')
+            retcode = 0
+        except Exception, e:
+            logAbort (e)
+
+        sys.exit (retcode)
             
 # Locking servers
 

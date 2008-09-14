@@ -1,31 +1,67 @@
 #! /usr/bin/python
 #
 # Broadband spectra observing script, going by frequency
-# From bbs.py
 
-import atactl, ataprobe
+import sys, atactl, ataprobe
 from atactl import *
-import os, time, sys
 
-# Some parameters that are unlikely to be tweaked.
+SVNID = '$Id$'
+me = 'bbsf'
 
-me = 'bbsft'
+# Observing script state. A bit cumbersome, but this lets us
+# resume the script if we're canceled in the middle of an
+# observation. The logic here controls ALL of the observations
+# except for the script initialization.
+
+class BBSState (State):
+    vars = ['ifreq', 'isrc']
+
+    def __init__ (self, freqs, sources, hookup, obsDur):
+        self.freqs = freqs
+        self.sources = sources
+        self.hookup = hookup
+        self.obsDur = obsDur
+        self.ifreq = self.isrc = 0
+
+    def next (self):
+        self.ifreq += 1
+
+        if self.ifreq == len (self.freqs):
+            self.ifreq = 0
+
+            self.isrc += 1
+            if self.isrc == len (self.sources):
+                self.isrc = 0
+    
+    def iteration (self, stopTime):
+        src = self.sources[self.isrc]
+        freq = self.freqs[self.ifreq]
+
+        log ('State: %s %d' % (src, freq))
+        
+        if not isSourceUp (src, self.obsDur):
+            log ('Would observe %s, but not up; skipping' % src)
+        else:
+            observe (self.hookup, me, src, freq, self.obsDur)
+
+# Default values.
+
 obsDur = 60 # seconds
 
 # Load config file and check that it sets our
 # vital parameters
 
 sys.path = ['.'] + sys.path
-from bbsftcfg import *
-cfgFile = sys.modules['bbsftcfg'].__file__
+from config import *
+cfgFile = sys.modules['config'].__file__
 del sys.path[0]
 
-if len (sciSources) < 1:
-    print >>sys.stderr, '"sciSources" not set in config file', cfgFile
+if len (sources) < 1:
+    print >>sys.stderr, '"sources" not set in config file', cfgFile
     sys.exit (1)
 
-if len (obsFreqs) < 1:
-    print >>sys.stderr, '"obsFreqs" not set in config file', cfgFile
+if len (freqs) < 1:
+    print >>sys.stderr, '"freqs" not set in config file', cfgFile
     sys.exit (1)
     
 # Settings from the commandline
@@ -48,40 +84,11 @@ if instr == 'default': instr = None
 
 stopHour = float (sys.argv[3])
 
-# Define state structure
-
-class BBSState (State):
-    vars = ['ifreq', 'isci']
-
-    def init (self):
-        self.ifreq = self.isci = 0
-
-    def map (self):
-        self.freq = obsFreqs[self.ifreq]
-        self.src = sciSources[self.isci]
-
-    def inc (self):
-        self.ifreq += 1
-
-        if self.ifreq == len (obsFreqs):
-            self.ifreq = 0
-
-            self.isci += 1
-            if self.isci == len (sciSources):
-                self.isci = 0
-        
-# OK, let's go!
-
-initScript (reallyDoIt, me + '.log')
-stopTime, durHours = calcStopTime (stopHour)
-S = BBSState ()
-
-# Initial setup
-
-h = ataprobe.Hookup (instr)
-initAntennas (h.ants ())
-setIntegTime ()
-fringeKill ()
+# Tweak the focus-setting and attemplifier-setting
+# logic: use the same settings for all sky frequencies
+# in the same GHz range. This saves time since
+# setting attemplifiers and especially focusing are
+# slow operations.
 
 def roundFocus (s):
     return s - (s % 1000)
@@ -92,41 +99,22 @@ def attenKey (src, freq):
     return freq - (freq % 1000)
 
 atactl.makeAttenKey = attenKey
-
-# Stuff
-
-def mainLoop ():
-    while not isTimeUp (stopTime, True):
-        log ('State: %s %d' % (S.src, S.freq))
         
-        # Now our main obs
+# That was all prep. Now let's go!
 
-        if not isSourceUp (S.src, obsDur):
-            log ('Would observe %s, but not up; skipping' % S.src)
-        else:
-            observe (me, h, 'obs', S.src, S.freq, obsDur)
-        
-        if isTimeUp (stopTime, False): break
-        S.next ()
+initScript (reallyDoIt, me + '.log')
+stopTime, durHours = calcStopTime (stopHour)
+h = ataprobe.Hookup (instr)
+state = BBSState (freqs, sources, h, obsDur)
 
-retcode = 1
+# Initial hardware setup. setIntegTime takes a while
+# but only happens once per invocation.
 
-try:
-    try:
-        log ('Locking server and beginning observing script.')
-        lockServer ('lo' + h.lo)
-        mainLoop ()
-        log ('Script ended normally (time up)')
-        retcode = 0
-    except Exception, e:
-        logAbort (e)
-finally:
-    try: showAccounting ()
-    except: pass
-    for src in sciSources:
-        try: os.unlink (src + '.nsephem')
-        except: pass
-        try: os.unlink (src + '.msephem')
-        except: pass
+lockServer ('lo' + h.lo)
+initAntennas (h.ants ())
+setIntegTime ()
+fringeKill ()
 
-sys.exit (retcode)
+# Enter main loop and run until done.
+
+state.runAndExit (stopTime)
