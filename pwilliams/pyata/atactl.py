@@ -611,9 +611,10 @@ def setFocus (ants, settingInMHz, wait=True):
     
     s = roundFocusSetting (settingInMHz)
 
-    if s < 1000:
-        log ('Clamping focus value from %f to %f', s, 1000)
-        s = 1000
+    if s < 1400:
+        # 1400 seems to be as low as they will go.
+        log ('Clamping focus value from %f to %f', s, 1400)
+        s = 1400
     if s > 9000:
         log ('Clamping focus value from %f to %f', s, 9000)
         s = 9000
