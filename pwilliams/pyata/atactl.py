@@ -1,16 +1,51 @@
-"""HACKY Routines for controlling the ATA.
+"""Routines for controlling the ATA.
 
-This works by executing the various ata* commands, which
-is obviously highly suboptimal. But I want to be able to
-write my observing scripts in a scripting language, not
-Java. And I want to use a scripting language that can do
-math (ie not shell) and that doesn't make me want to kill
-myself (Perl). Python doesn't have a phenomenal infrastructure
-for executing subprocesses, but it's good enough.
+This module provides a framework for writing ATA observing
+scripts. Some of the nice higher-level features that it provides are:
 
-Jython would have been kind of nice to do all this in, but
-it seems to be a dead project. Jruby has been recommended and
-should be looked into.
+ - Comprehensive logging of all actions
+ - Accounting of how observing time is spent
+ - Saving of script state and resuming in-place if the script
+   crashes or is killed.
+
+It also implements the usual elements of an observing script:
+
+ - Stopping at a given cutoff time
+ - Checking for source visibility
+ - Generating ephemeris files
+ - Setting the sky frequency
+ - Steering antennas
+ - Taking data
+ - Controlling antenna focus
+ - Controlling the fringe rotation
+ - Controlling the attemplifiers
+
+In most cases, these all come together in one function:
+
+   observe (hookup, outBase, src, freq, integTimeSeconds)
+
+where the arguments are
+
+           hookup - A structure holding information about the 
+                    correlator
+          outBase - A prefix for the names of the data files 
+                    that will be generated
+              src - The name of the source to observe
+             freq - The observing frequency in MHz
+ integTimeSeconds - The integration time in seconds
+
+observe() will set the focus, steer the antennas (generating an
+ephemeris if necessary), tune the LOs (if necessary), set the
+attemplifiers (if necessary), start the fringe rotator, run the
+datacatcher, and stop the fringe rotaor.
+
+This module controls and interrogates that ATA by executing the ata*
+commands, which isn't ideal, since the ATA can be controlled natively
+in Java. But it's nice to be able to write scripts in a scripting
+language. Two options to pursue are:
+
+ - Ruby, which has an active JRuby project to bridge Ruby and Java
+ - Groovy, a scripting language that targets the JVM.
 """
 
 import subprocess, sys, os, time, atexit
@@ -487,13 +522,17 @@ def roundFocusSetting (settingInMHz):
 _focusWaitInterval = 15
 _focusWaitTimeout = 90.
 
+# how close to we have to be to the commanded focus 
+# frequency (fractionally) to be considered on-focus?
+_focusTol = 0.008
+
 def _waitForFocus (ants):
     from ataprobe import getFocusSettings
     allThere = False
     tStart = time.time ()
     log ('Waiting for antennas to reach focus %f' % _curFocus)
 
-    tol = 0.005 * _curFocus
+    tol = _focusTol * _curFocus
 
     while time.time () - tStart < _focusWaitTimeout:
         notThere = set ()
@@ -698,7 +737,7 @@ _lastFreq = 0
 _lastSrc = None
 _lastSrcExpire = 0
 
-def observe (me, hookup, kind, src, freq, integTimeSeconds):
+def observe (hookup, outBase, src, freq, integTimeSeconds):
     global _lastFreq, _lastSrc, _lastSrcExpire
 
     assert _integTime is not None # save time in this case
@@ -726,22 +765,22 @@ def observe (me, hookup, kind, src, freq, integTimeSeconds):
     setupAttens (src, freq, hookup)
 
     # Start this last to not tickle the ibobs too much before --
-    # auto-attening can fail with this going.
+    # auto-attening can fail with this going, I think.
     fringeStart (hookup, src, freq)
 
-    # Wait to finish tracking. This reissues the trackephem command,
-    # but we're already on the way so I don't think it will slow
-    # things down much.
-    if needTrackWait:
-        trackEphem (hookup.ants (), src, True)
-
-    # Wait for the ants to reach their focus if they haven't
-    # already.
-    waitForFocus (hookup.ants ())
-
     try:
-        log ('@@ Beginning %s observations (%s, %d MHz)' % (kind, src, freq))
-        outBase = me + '-' + kind
+        # Wait to finish tracking. This reissues the trackephem command,
+        # but we're already on the way so I don't think it will slow
+        # things down much.
+        if needTrackWait:
+            trackEphem (hookup.ants (), src, True)
+
+        # Wait for the ants to reach their focus if they haven't
+        # already.
+        waitForFocus (hookup.ants ())
+
+        log ('@@ Beginning observations (%s, %s, %d MHz)' % (outBase, src, freq))
         launchCatcher (hookup, src, freq, radec, integTimeSeconds, outBase, src)
     finally:
+        # Make sure to always kill the frotter.
         fringeStop (hookup)
