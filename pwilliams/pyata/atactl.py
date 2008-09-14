@@ -93,9 +93,15 @@ def log (text):
         print >>logFile, '%s: %s' % (stamp, text)
     print '%s: %s' % (stamp, text)
 
-def logAbort (exc):
-    log ('Exception raised!')
-    log ('Error: ' + str (exc))
+def logAbort (exc_info):
+    import traceback
+
+    tup = traceback.extract_tb (exc_info[2])
+    # report info for innermost frame
+    fn, line, funcname, text = tup[-1]
+
+    log ('Exception raised in \'%s\' at %s:%d!' % (funcname, fn, line))
+    log (exc_info[1].__class__.__name__ + ': ' + str (exc_info[1]))
     log ('Aborting after %f hours elapsed' % ((time.time () - _startTime) / 3600.0))
 
 import ataprobe
@@ -230,8 +236,8 @@ class State (object):
 
             log ('Script ended normally (time up)')
             retcode = 0
-        except Exception, e:
-            logAbort (e)
+        except:
+            logAbort (sys.exc_info ())
 
         log ('Completed %d main loop iterations.' % niters)
         sys.exit (retcode)
@@ -347,7 +353,7 @@ def calcStopTime (stopHour):
     stop[4] = int ((stopHour - stop[3]) * 60)
     stopTime = time.mktime (tuple (stop))
 
-    assert (stopTime > _startTime)
+    assert stopTime > _startTime, 'Should already have stopped?'
     durHours = (stopTime - _startTime) / 3600.0
     log ('Observation planned to last %.1f hours' % durHours)
     return stopTime, durHours
@@ -489,7 +495,7 @@ def setIntegTime (itime=None):
     account ('setting integration time', time.time () - tStart)
 
 def launchCatcher (hookup, src, freq, radec, durationSeconds, outbase, ebase):
-    assert _integTime is not None
+    assert _integTime is not None, 'Unknown integration time'
     
     tStart = time.time ()
     ndumps = int (math.ceil (durationSeconds / _integTime))
@@ -665,7 +671,7 @@ def autoAttenAll (hookup, rms=13.0):
             out = _fakeAtten
         else:
             out = _slurp (cmd)
-            assert len (out) == 1
+            assert len (out) == 1, 'Unexpected output from autoatten.rb'
             out = out[0]
 
         log (out)
@@ -763,7 +769,8 @@ _lastSrcExpire = 0
 def observe (hookup, outBase, src, freq, integTimeSeconds):
     global _lastFreq, _lastSrc, _lastSrcExpire
 
-    assert _integTime is not None # save time in this case
+    # save time in this case
+    assert _integTime is not None, 'Unknown integration time'
 
     # Start the ants focusing. Don't wait for them, so that
     # we can do other stuff while they're moving around.
@@ -790,7 +797,7 @@ def observe (hookup, outBase, src, freq, integTimeSeconds):
     # Start this last to not tickle the ibobs too much before --
     # auto-attening can fail with this going, I think.
     fringeStart (hookup, src, freq)
-
+    
     try:
         # Wait to finish tracking. This reissues the trackephem command,
         # but we're already on the way so I don't think it will slow
