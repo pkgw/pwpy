@@ -97,7 +97,7 @@ for (time, gains) in gr.readSeq ():
     if rankMode:
         # rank mode: print list of ants sorted by gain
         print
-        info = [(a, abs (gains[a * gr.nfeeds])) for a in ants]
+        info = [(a + 1, abs (gains[a * gr.nfeeds])) for a in ants]
         info.sort (key = lambda tup: tup[1], reverse=False)
         for tup in info[0:opts.rank]:
             print '   % 3d: %g' % tup
