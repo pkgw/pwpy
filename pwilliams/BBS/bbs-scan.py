@@ -12,7 +12,7 @@ from miriad import VisData
 
 # Version of this script
 
-SVNID = '$Id aa 1 xx $'
+SVNID = '$Id$'
 print 'scannerRev', SVNID.split ()[2]
 
 # Find our position in the archive
@@ -63,11 +63,14 @@ def getScriptInfo (archDir):
         elif a[3] == 'fxconf.rb':
             instrument = a[5][1:-1]
             break
+        elif a[1] == 'Initializing':
+            break
 
     # Fix up oldest data
     if scriptRev == 0:
         if archDir.startswith ('2008/04'):
             scriptRev = 10
+            instrument = 'fx64a:fxa'
         elif archDir == '2008/09/12/williams/bbsft1':
             scriptRev = 125
         elif archDir.startswith ('2008/09/12/williams/bbs-'):
