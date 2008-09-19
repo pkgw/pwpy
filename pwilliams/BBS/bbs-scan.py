@@ -102,7 +102,7 @@ def getScans (archDir, scriptName, scriptRev):
     if scriptName == 'bbs-freqtest.py':
         if scriptRev < 124:
             catcherType = 'fxmir'
-            prefix = 'fx64a'
+            prefix = 'bbsft'
         else:
             catcherType = 'atafx+fxmir'
             prefix = 'bbsft'
