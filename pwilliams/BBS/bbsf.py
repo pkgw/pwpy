@@ -63,7 +63,19 @@ if len (sources) < 1:
 if len (freqs) < 1:
     print >>sys.stderr, '"freqs" not set in config file', cfgFile
     sys.exit (1)
-    
+
+# Check that we have a UUID file before we do anything.
+
+def checkUUID ():
+    from os.path import exists
+
+    if exists ('bbs.uuid'): return
+
+    print >>sys.stderr, 'Error: no such file "bbs.uuid" in current directory.'
+    sys.exit (1)
+
+checkUUID ()
+
 # Settings from the commandline
 
 if len (sys.argv) != 4:
