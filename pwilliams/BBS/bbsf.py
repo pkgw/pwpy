@@ -1,6 +1,24 @@
 #! /usr/bin/python
-#
-# Broadband spectra observing script, going by frequency
+"""bbsf - Broadband spectra observing script, going by frequency.
+
+Usage: bbsf.py MODE INSTRUMENT STOPHOUR
+
+MODE is the mode to run the script in: "debug" or "real". No
+other values are accepted. If "debug", the script does not actually
+issue any array-control commands. If "real", the script does
+use the array.
+
+INSTRUMENT is the correlator instrument to use. Use "default" to
+use the embedded default value, which is currently fx64a:fxa.
+
+STOPHOUR is the hour to stop observing, a floating-point number
+between 0 and 24.0. The script stops when the local time passes
+the specified hour.
+
+This script is mostly high-level logic defining the sequence of
+observations used. All of the magic that actually controls the array
+is in the "atactl" Python module, in mmm/pwilliams/pyata/atactl.py.
+"""
 
 import sys, atactl, ataprobe
 from atactl import *
