@@ -103,6 +103,7 @@ stopHour = float (sys.argv[3])
 # slow operations.
 
 def roundFocus (s):
+    if s % 1000 == 0: return s
     return s - (s % 1000) + 1000
 
 atactl.roundFocusSetting = roundFocus
