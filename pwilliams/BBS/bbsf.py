@@ -14,28 +14,35 @@ me = 'bbsf'
 # except for the script initialization.
 
 class BBSState (State):
-    vars = ['ifreq', 'isrc']
+    vars = ['ifreq', 'isrc', 'ilist']
 
-    def __init__ (self, freqs, sources, hookup, obsDur):
-        self.freqs = freqs
+    def __init__ (self, freqLists, sources, hookup, obsDur):
+        self.freqLists = freqLists
         self.sources = sources
         self.hookup = hookup
         self.obsDur = obsDur
-        self.ifreq = self.isrc = 0
+        self.ifreq = self.isrc = self.ilist = 0
 
     def next (self):
         self.ifreq += 1
 
-        if self.ifreq == len (self.freqs):
-            self.ifreq = 0
+        if self.ifreq < len (self.freqLists[self.ilist]): return
 
-            self.isrc += 1
-            if self.isrc == len (self.sources):
-                self.isrc = 0
+        self.ifreq = 0
+        self.isrc += 1
+
+        if self.isrc < len (self.sources): return
+
+        self.isrc = 0
+        self.ilist += 1
+
+        if self.ilist < len (self.freqLists): return
+
+        self.ilist = 0
     
     def iteration (self, stopTime):
         src = self.sources[self.isrc]
-        freq = self.freqs[self.ifreq]
+        freq = self.freqLists[self.ilist][self.ifreq]
 
         log ('State: %s %d' % (src, freq))
         
@@ -60,8 +67,8 @@ if len (sources) < 1:
     print >>sys.stderr, '"sources" not set in config file', cfgFile
     sys.exit (1)
 
-if len (freqs) < 1:
-    print >>sys.stderr, '"freqs" not set in config file', cfgFile
+if len (freqLists) < 1:
+    print >>sys.stderr, '"freqLists" not set in config file', cfgFile
     sys.exit (1)
 
 # Check that we have a UUID file before we do anything.
@@ -119,7 +126,7 @@ initScript (reallyDoIt, me + '.log')
 log (SVNID)
 stopTime, durHours = calcStopTime (stopHour)
 h = ataprobe.Hookup (instr)
-state = BBSState (freqs, sources, h, obsDur)
+state = BBSState (freqLists, sources, h, obsDur)
 
 # Initial hardware setup. setIntegTime takes a while
 # but only happens once per invocation.
