@@ -18,6 +18,11 @@ print 'scannerRev', SVNID.split ()[2]
 # Find our position in the archive
 
 def getArchiveDir ():
+    if len (sys.argv) > 1:
+        d = sys.argv[1]
+        assert d.startswith ('200')
+        return d
+    
     cwd = os.getcwd ()
     parts = cwd.split (os.sep)
     for i in xrange (0, len (parts)):
