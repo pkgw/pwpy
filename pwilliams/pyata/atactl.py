@@ -565,6 +565,16 @@ def _waitForFocus (ants):
     
     tol = _focusTol * _curFocus
 
+    # Make all antnames start with 'ant' since atagetfocus
+    # will prefix that and otherwise we start getting
+    # confused trying to compare 5g and ant5g.
+
+    def pfx (a):
+        if a.startswith ('ant'): return a
+        return 'ant' + a
+    
+    ants = [pfx (a) for a in ants]
+    
     while time.time () - tStart < _focusWaitTimeout:
         notThere = set ()
         unknown = set ()
@@ -572,8 +582,6 @@ def _waitForFocus (ants):
         log (str (settings))
             
         for ant in ants:
-            if not ant.startswith ('ant'): ant = 'ant' + ant
-                
             if ant not in settings:
                 unknown.add (ant)
                 continue
@@ -619,10 +627,10 @@ def setFocus (ants, settingInMHz, wait=True):
 
     if s < 1400:
         # 1400 seems to be as low as they will go.
-        log ('Clamping focus value from %f to %f', s, 1400)
+        log ('Clamping focus value from %f to %f' % (s, 1400))
         s = 1400
     if s > 9000:
-        log ('Clamping focus value from %f to %f', s, 9000)
+        log ('Clamping focus value from %f to %f' % (s, 9000))
         s = 9000
         
     log ('Focus value %f mapped to %f' % (settingInMHz, s))
