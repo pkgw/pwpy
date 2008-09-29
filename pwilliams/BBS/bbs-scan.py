@@ -121,7 +121,7 @@ def getScans (archDir, scriptName, scriptRev):
         assert False, 'Unhandled scriptName for catcherType determination.'
 
     if catcherType == 'atafx' or catcherType == 'atafx+fxmir':
-        if archDir.startswith ('2008/09/1'):
+        if archDir.startswith ('2008/09/'):
             catcherRev = 1273
             
     for v in os.listdir ('.'):
