@@ -427,8 +427,18 @@ class FitBase (object):
 
         return self
 
+    def assumeParams (self, *params):
+        self.params = _N.asarray (params)
+        self.uncerts = _N.zeros_like (self.params)
+        self.mfunc = self.makeModel (*self.params)
+        self.mdata = self.mfunc (self.x)
+        self.resids = self.y - self.mdata
+        self.rchisq = ((self.resids / self.sigmas)**2).sum () / \
+                          (self.x.size - len (self.params))
+        return self
+    
     def printParams (self):
-        lmax = 0
+        lmax = len ('RChiSq')
 
         for pn in self._paramNames:
             if len (pn) > lmax: lmax = len (pn)
@@ -437,6 +447,7 @@ class FitBase (object):
             frac = abs (100. * uncert / val)
             print '%s: %14g +/- %14g (%.2f%%)' % (pn.rjust (lmax), val, uncert, frac)
 
+        print '%s: %14g' % ('RChiSq'.rjust (lmax), self.rchisq)
         return self
 
     def plot (self, dlines=True, smoothModel=True):
@@ -454,15 +465,23 @@ class FitBase (object):
             pass
         
         vb = omega.layout.VBox (2)
-        
-        vb[0] = vb.pData = omega.quickXY (self.x, self.y, 'Data', lines=dlines)
+
+        if self.sigmas is not None:
+            vb.pData = omega.quickXYErr (self.x, self.y, self.sigmas, 'Data', lines=dlines)
+        else:
+            vb.pData = omega.quickXY (self.x, self.y, 'Data', lines=dlines)
+
+        vb[0] = vb.pData
         vb[0].addXY (modx, mody, 'Model')
         vb[0].setYLabel ('Y')
         vb[0].nudgeBounds (False, True)
         
         vb[1] = vb.pResid = omega.RectPlot ()
         vb[1].defaultField.xaxis = vb[1].defaultField.xaxis
-        vb[1].addXY (self.x, self.resids, 'Resid.', lines=False)
+        if self.sigmas is not None:
+            vb[1].addXYErr (self.x, self.resids, self.sigmas, 'Resid.', lines=False)
+        else:
+            vb[1].addXY (self.x, self.resids, 'Resid.', lines=False)
         vb[1].setLabels ('X', 'Residuals')
         vb[1].nudgeBounds (False, True)
         
