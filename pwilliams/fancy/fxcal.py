@@ -73,9 +73,6 @@ polsVaried = False
 windowVars = ['ischan', 'nschan', 'nspect', 'restfreq',
               'sdf', 'sfreq', 'systemp', 'xtsys', 'ytsys']
 
-lastTime = None
-autos = crosses = None
-
 def dump (dOut, autos, crosses):
     for (pol, subtab) in autos.iteritems ():
         dOut.writeVarInt ('pol', pol)
@@ -108,6 +105,10 @@ def dump (dOut, autos, crosses):
             fFinal = N.asarray (fFinal, dtype=N.int32)
             
             dOut.write (preamble, dFinal, fFinal, fFinal.size)
+
+lastTime = None
+autos = {}
+crosses = {}
 
 for dIn, preamble, data, flags, nread in uvdat.readAll ():
     anyChange = False
@@ -205,16 +206,17 @@ for dIn, preamble, data, flags, nread in uvdat.readAll ():
 
     # Hey! We actually have some data processing to do!
 
-    if time != lastTime:
-        if autos is not None:
-            # Dump out previous accumulation of data.
-            dump (dOut, autos, crosses)
+    if lastTime is not None:
+        if abs (time - lastTime) > 1e-6:
+            if autos is not None:
+                # Dump out previous accumulation of data.
+                dump (dOut, autos, crosses)
             
-        # Reset accumulators
-        autos = {}
-        crosses = {}
-    elif anyChange:
-        raise Exception ('File params changed in middle of a dump!')
+            # Reset accumulators
+            autos = {}
+            crosses = {}
+        elif anyChange:
+            raise Exception ('File params changed in middle of a dump!')
         
     # Accumulate current dump.
     
