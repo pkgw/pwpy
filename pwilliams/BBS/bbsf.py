@@ -34,11 +34,12 @@ me = 'bbsf'
 class BBSState (State):
     vars = ['ifreq', 'isrc', 'ilist']
 
-    def __init__ (self, freqLists, sources, hookup, obsDur):
+    def __init__ (self, freqLists, sources, hookup, obsDurs, dfObsDur):
         self.freqLists = freqLists
         self.sources = sources
         self.hookup = hookup
-        self.obsDur = obsDur
+        self.obsDurs = obsDurs
+        self.dfObsDur = dfObsDur
         self.ifreq = self.isrc = self.ilist = 0
 
     def next (self):
@@ -64,14 +65,20 @@ class BBSState (State):
 
         log ('State: %s %d' % (src, freq))
         
-        if not isSourceUp (src, self.obsDur):
+        if src in self.obsDurs:
+            dur = self.obsdurs[src]
+        else:
+            dur = self.dfObsDur
+
+        if not isSourceUp (src, dur):
             log ('Would observe %s, but not up; skipping' % src)
         else:
-            observe (self.hookup, me, src, freq, self.obsDur)
+            observe (self.hookup, me, src, freq, dur)
 
 # Default values.
 
-obsDur = 60 # seconds
+defaultObsDur = 60 # seconds
+obsDurs = {}
 
 # Load config file and check that it sets our
 # vital parameters
@@ -144,7 +151,7 @@ initScript (reallyDoIt, me + '.log')
 log (SVNID)
 stopTime, durHours = calcStopTime (stopHour)
 h = ataprobe.Hookup (instr)
-state = BBSState (freqLists, sources, h, obsDur)
+state = BBSState (freqLists, sources, h, obsDurs, defaultObsDur)
 
 # Initial hardware setup. setIntegTime takes a while
 # but only happens once per invocation.
