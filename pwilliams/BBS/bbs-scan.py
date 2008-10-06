@@ -123,6 +123,8 @@ def getScans (archDir, scriptName, scriptRev):
     if catcherType == 'atafx' or catcherType == 'atafx+fxmir':
         if archDir.startswith ('2008/09/'):
             catcherRev = 1273
+        elif archDir.startswith ('2008/10/0'):
+            catcherRev = 1348
             
     for v in os.listdir ('.'):
         if not v.startswith (prefix): continue
