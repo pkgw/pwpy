@@ -66,7 +66,7 @@ class BBSState (State):
         log ('State: %s %d' % (src, freq))
         
         if src in self.obsDurs:
-            dur = self.obsdurs[src]
+            dur = self.obsDurs[src]
         else:
             dur = self.dfObsDur
 
