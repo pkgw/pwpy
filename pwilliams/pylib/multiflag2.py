@@ -87,6 +87,14 @@
      input datasets is specified with the "freq=" keyword to
      MULTIFLAG2 and is NOT verified in the actual data.
 
+   freqs=FMIN,FMAX
+
+     The 'freqs' clause behaves like the 'freq' clause except that a
+     range of sky frequencies is specifiable. Any sky frequency
+     between FMIN and FMAX inclusively is matched. Either FMIN or FMAX
+     may be the text '*' to indicate no upper or lower bound,
+     respectively.
+     
    time=TIME1,TIME2
 
      The 'time' clause matches those records which have timestamps
@@ -215,13 +223,22 @@ class MultiFlag2 (object):
                     ignore = ignore or self.half != int (arg)
                 elif cond == 'freq':
                     ignore = ignore or self.freq != int (arg)
+                elif cond == 'freqs':
+                    smin, smax = arg.split (',')
+                    assert not (smin == '*' and smax == '*')
+                    if smin == '*':
+                        ignore = ignore or self.freq > int (smax)
+                    elif smax == '*':
+                        ignore = ignore or self.freq < int (smin)
+                    else:
+                        ignore = ignore or self.freq < int (smin) or self.freq > int (smax)
                 elif cond == 'time':
                     shared.append ('time(%s)' % arg)
                 elif cond == 'uvrange':
                     shared.append ('uvrange(%s)' % arg)
                 elif cond == 'shadow':
                     shared.append ('shadow(%s)' % arg)
-                else: assert False, 'Unknown condition'
+                else: assert False, 'Unknown condition ' + cond
 
             if ignore: continue
 
