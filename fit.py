@@ -691,3 +691,17 @@ class LameQuadraticFit (LeastSquaresFit):
         self.a, self.b, self.c = self.params
         self.sigma_a, self.sigma_b, self.sigma_c = self.uncerts
         self.xExtremum = -self.b / 2 / self.c
+
+# Todo: visibility amplitude and phase fitters
+# cf. Thompson, Moran & Swenson 6.56a, 6.65b
+# amplitude is Rice distribution reducing to Rayleigh distribution for |signal| = 0
+# "the presence of a weak signal is more easily detected by examining the
+# visibility phase than by examining the amplitude."
+# cf. also TMS section 9.3, eqns 9.36 +
+# if |signal|/sigma >> 1, sigma_phi ~= sigma / |signal|,
+# where sigma is uncert in real and imag parts.
+#
+# if T_Sys / sqrt(2 BW tau) << T_a << T_sys,
+#
+# sigma_ph = T_Sys / (eta_quant T_a sqrt (2 BW tau))
+#
