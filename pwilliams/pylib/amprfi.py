@@ -75,7 +75,9 @@ class AmpRfi (object):
         self.fname = fname
         self.freq = freq
         self.half = half
-
+        
+        self.yBounds = None
+        
         print 'Working on freq %04d half %d' % (freq, half)
 
         afa = AmpFlagsAccum ()
@@ -189,23 +191,43 @@ class AmpRfi (object):
         for bound in flaglist:
             bmin = max (0, bound[0] - pad)
             bmax = min (self.numChans - 1, bound[1] + pad)
+            startIdx = -1
+            endIdx = -1
 
+            # Find the parts of the merged list that we overlap or subsume
+            
             for i in xrange (0, len (merged)):
                 mmin, mmax = merged[i]
 
                 if mmax < bmin: continue
             
                 if mmin > bmax:
-                    # We need to insert a new entry here
-                    merged.insert (i, (bmin, bmax))
+                    endIdx = i - 1
                     break
+                
+                if startIdx == -1:
+                    startIdx = i
 
-                newmin = min (mmin, bmin)
-                newmax = max (mmax, bmax)
-                merged[i] = (newmin, newmax)
-                break
+            #print 'm', merged
+            
+            if startIdx == -1 and endIdx == -1:
+                #print 'creating new entry', bmin, bmax
+                # We're off the end of the list one one side or the other
+                if len (merged) == 0 or bmax < merged[0][0]:
+                    merged.insert (0, (bmin, bmax))
+                else:
+                    merged.append ((bmin, bmax))
+            elif endIdx == -1:
+                # We overwrite the last entry.
+                bmin = min (bmin, merged[-1][0])
+                bmax = max (bmax, merged[-1][1])
+                merged[-1] = (bmin, bmax)
             else:
-                merged.append ((bmin, bmax))
+                #print 'inserting into middle', startIdx, endIdx, bmin, bmax
+                bmin = min (bmin, merged[startIdx][0])
+                bmax = max (bmax, merged[endIdx][1])
+                del merged[startIdx:endIdx+1]
+                merged.insert (startIdx, (bmin, bmax))
 
         return merged
     
@@ -225,13 +247,17 @@ class AmpRfi (object):
             r = omega.rect.XBand (*bound)
             p.add (r)
 
-        p.setBounds (0, self.numChans)
+        if self.yBounds is None:
+            p.setBounds (0, self.numChans)
+        else:
+            p.setBounds (0, self.numChans, self.yBounds[0], self.yBounds[1])
         return p
 
     def show (self):
         self.p = self.plot ().show ('amprfi')
 
     def ybounds (self, ymin, ymax):
+        self.yBounds = (ymin, ymax)
         self.p.setBounds (ymin=ymin, ymax=ymax)
     
     def write (self, extraCond=None):
