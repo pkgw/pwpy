@@ -1,37 +1,56 @@
 # Routines for doing basic fits with numpy
 
-import numpy as _numpy
+import numpy as _N
 
-def linear (x, y, weights = None):
-    """Perform a linear fit through the points given in x, y.
-    If specified, 'weights' gives the weight that is assigned to each
-    point; if not specified, each point is weighted equally. (Suggested
-    weights: 1 / err). Thus x, y, and weights should all have the same
-    length.
+# Histogram binning suggestions
+#
+# Sturges' formula: N_bins = ceil(log_2(N_pts) + 1) (want n >~ 30)
+# Sturges, H.A., 1926, "The choice of a class interval", J Am Stat Assn, 65-66
+#
+# Scott: bin_width = 3.5 sigma / n^(1/3)
+# Scott, D.W., 1979, "On optimal and data-based histograms", Biometrika 66(3) 605-610
+# doi:10.1093/biomet/66.3.605
+#
+# Freedman-Diaconis: bin_width = 2 * IQR(data) / n^(1/3)
+# Here IQR is the interquartile range, IQR = 75th percentile - 25th percentile.
+# Freedman, D & Diaconis, P, 1981, "On the histogram as a density estimator: 
+# L_2 theory", Zeitschrift fur Wahrscheinlichkeitstheorie und verwandte Gebiete
+# 57 (4) 453-476 doi:10.1007/BF01025868
 
-    Returns: (A, B), where A is the slope of the best-fit line, and
-    B is the y-intercept of that line. So 'A * x + B' yields the best-fit
-    points.
-    """
+def autohist (data, choice='scott', std=None, range=None, **kwargs):
+    """Histogram with automatically-chosen bin sizes.
 
-    from scipy.linalg import lstsq
-    
-    x = _numpy.asarray (x)
-    y = _numpy.asarray (y)
+choice: one of 'scott', 'sturges', or 'f-d' (for Freedman-Diaconis)
+"""
 
-    if weights is None:
-        weights = _numpy.ones (len (x))
+    if range is None: range = (data.min (), data.max ())
+
+    if choice == 'scott':
+        if std is None: std = data.std ()
+        wbin = 3.5 * std / data.size**0.33333
+        wdata = range[1] - range[0]
+        n = int (_N.ceil (wdata / wbin))
+        delta = (n * wbin - wdata) / 2
+        range = (range[0] - delta, range[1] + delta)
+    elif choice == 'sturges':
+        n = int (_N.ceil (_N.log2 (data.size) + 1))
+    elif choice == 'f-d':
+        from scipy.stats import scoreatpercentile as sap
+
+        iqr = sap (data, 75) - sap (data, 25)
+        wbin = 2 * iqr / data.size**0.33333
+        wdata = range[1] - range[0]
+        n = int (_N.ceil (wdata / wbin))
+        delta = (n * wbin - wdata) / 2
+        range = (range[0] - delta, range[1] + delta)
+    elif choice == 'custom':
+        pass
     else:
-        weights = _numpy.asarray (weights)
+        raise Exception ('Unknown histogram binning choice %s' % choice)
 
-    # lstsq finds x that minimizes A * x = B, with all
-    # of the above being matrices.
-    
-    fitA = _numpy.vstack ((x * weights, weights)).T
-    fitB = (y * weights).T
+    return _N.histogram (data, n, range, **kwargs)
 
-    res = lstsq (fitA, fitB)[0]
-    return (res[0], res[1])
+# Some cheesy fits
 
 def linearConstrained (x, y, x0, y0, weights = None):
     """Perform a linear fit through the points given in x, y that is
@@ -45,13 +64,13 @@ def linearConstrained (x, y, x0, y0, weights = None):
     yields the best-fit points.
     """
 
-    x = _numpy.asarray (x)
-    y = _numpy.asarray (y)
+    x = _N.asarray (x)
+    y = _N.asarray (y)
 
     if weights is None:
-        weights = _numpy.ones (len (x))
+        weights = _N.ones (len (x))
     else:
-        weights = _numpy.asarray (weights)
+        weights = _N.asarray (weights)
 
     A = (x - x0) * weights
     B = (y - y0) * weights
@@ -61,123 +80,7 @@ def linearConstrained (x, y, x0, y0, weights = None):
     # a float? If all the inputs are float32's, we should also
     # return a float32.
     
-    return _numpy.float64 (_numpy.dot (A, B)) / _numpy.dot (A, A)
-
-_exp = _numpy.exp
-
-def makeGaussian (params):
-    """Return a lambda function that evaluates a Gaussian
-    corresponding to the given parameters.
-
-    Parameters: Gaussian fit tuple. Decomposes into (height,
-      xmid, width).
-    """
-
-    height, xmid, width = params
-    return lambda x: height * _exp (-0.5 * ((x - xmid)/width)**2)
-
-def guessGaussianParams (x, y):
-    """Guess initial Gaussian parameters using the moments of the
-    given data."""
-
-    from numpy import asarray, abs, sqrt
-    
-    x = asarray (x)
-    y = asarray (y)
-    
-    height = y.max ()
-
-    ytotal = y.sum ()
-    byx = y * x
-    xmid = byx.sum () / ytotal
-
-    # Not at all sure if this is a good algorithm. Seems to
-    # work OK.
-    width = sqrt (abs ((x - xmid)**2 * y).sum () / ytotal)
-
-    return (height, xmid, width)
-    
-def gaussian (x, y, params=None):
-    """Fit a Gaussian to the data in x and y, optionally starting
-    with the parameters given in params. Params is a tuple of
-    (height, xmid, width) ; if unspecified, the initial guess
-    is taken from the moments of the data.
-
-    Returns: a parameter tuple after performing a fit. Has the
-    same form of (height, xmid, width)."""
-
-    from numpy import asarray, ravel
-    from scipy import optimize
-
-    x = asarray (x)
-    y = asarray (y)
-    
-    if params is None: params = guessGaussianParams (x, y)
-
-    def error (p):
-        return ravel (makeGaussian (p)(x) - y)
-
-    pfit, xx, xx, msg, success = optimize.leastsq (error, params,
-                                                   full_output=True)
-
-    if success != 1:
-        raise Exception ('Least square fit failed: ' + msg)
-
-    return pfit
-
-def generic (model, x, y, params, weights=None, **kwargs):
-    """Generic least-squares fitting algorithm. Parameters are:
-
-    model    - A function of N+1 variables: an ndarray of X values,
-               then N tunable parameters.
-    x        - The data X values.
-    y        - The data Y values.
-    params   - A tuple of N values that are the initial guesses for
-               the parameters to model().
-    weights  - Optional array of weights to assign to the data points.
-               Typically, weights = 1 / uncertainties. The sum of the
-               weights need not be 1 (or any other particular value).
-    **kwargs - Optional extra parameters to pass to the fitting
-               function, scipy.optimize.leastsq().
-
-    Returns: a tuple of N parameters that minimize the least-squares
-    difference between the model function and the data.
-    """
-
-    from numpy import asarray, ravel
-    from scipy import optimize
-
-    x = asarray (x)
-    y = asarray (y)
-
-    if weights is None:
-        def error (p):
-            return ravel (model (x, *p) - y)
-    else:
-        weights = asarray (weights)
-        
-        def error (p):
-            return ravel ((model (x, *p) - y) * weights)
-
-    pfit, xx, xx, msg, success = optimize.leastsq (error, params,
-                                                   full_output=True, **kwargs)
-
-    if success < 1 or success > 4:
-        raise Exception ('Least square fit failed: ' + msg)
-
-    return pfit
-
-def _gausslinModel (x, y0, m, height, xmid, width):
-    return (y0 + x * m) + height * _exp (-0.5 * ((x - xmid)/width)**2)
-
-def gausslin (x, y, params=None, weights=None):
-    """Least-squares fit of a Gaussian plus a linear offset. The parameter
-    tuple is of the form (y0, m, height, xmid, width)."""
-    
-    if params is None:
-        params = (0, 0) + guessGaussianParams (x, y)
-
-    return generic (_gausslinModel, x, y, params, weights)
+    return _N.float64 (_N.dot (A, B)) / _N.dot (A, A)
 
 # This is all copied from the Scipy Cookbook page on "Fitting Data"
 
@@ -211,8 +114,8 @@ def gauss2d (data, guess=None, getResid=False, **kwargs):
     if guess is None: guess = guessGauss2dParams (data)
 
     def err (params):
-        model = makeGauss2dFunc (*params)(*_numpy.indices (data.shape))
-        return _numpy.ravel (model - data)
+        model = makeGauss2dFunc (*params)(*_N.indices (data.shape))
+        return _N.ravel (model - data)
 
     pfit, xx, xx, msg, success = optimize.leastsq (err, guess,
                                                    full_output=True, **kwargs)
@@ -222,34 +125,10 @@ def gauss2d (data, guess=None, getResid=False, **kwargs):
 
     if not getResid: return pfit
 
-    model = makeGauss2dFunc (*pfit)(*_numpy.indices (data.shape))
+    model = makeGauss2dFunc (*pfit)(*_N.indices (data.shape))
     return pfit, data - model
 
-def power (x, y, params=None, weights=None, **kwargs):
-    """Least-squares fit of a power law: y = q * x**alpha.
-
-    Returns: q, alpha.
-    """
-    
-    l = _numpy.log
-    
-    def model (x, q, alpha):
-        return q * x ** alpha
-
-    if params is None:
-        dlogx = l (x.max ()) - l (x.min ())
-        dlogy = l (y.max ()) - l (y.min ())
-        alpha = dlogy / dlogx
-
-        mlogx = l (x).mean ()
-        mlogy = l (y).mean ()
-        q = _numpy.exp (- mlogy / alpha / mlogx)
-
-        params = (q, alpha)
-
-    return generic (model, x, y, params, weights, **kwargs)
-
-import numpy as _N
+# More organized fitting.
 
 class FitBase (object):
     """A object holding information in a generic fitting operation.
@@ -312,23 +191,6 @@ class FitBase (object):
 
         return self
 
-    _lowerEdges = None
-    
-    def setDataDistrib (self, a, bins=10, range=None):
-        counts, lowerEdges = _N.histogram (a, bins, range)
-
-        upperEdges = lowerEdges.copy ()
-        upperEdges[:-1] = lowerEdges[1:]
-        upperEdges[-1] = 2 * lowerEdges[-1] - lowerEdges[-2]
-
-        self._lowerEdges = lowerEdges
-        self.x = (upperEdges + lowerEdges) / 2
-        self.y = counts
-        self.sigmas = _N.sqrt (counts)
-        self.sigmas[_N.where (self.sigmas == 0.)] = 1. # better choice?
-        
-        return self
-    
     def fakeSigmas (self, val):
         """Set the uncertainty of every data point to a fixed value."""
         self.sigmas = _N.zeros_like (self.x) + val
@@ -460,10 +322,6 @@ class FitBase (object):
             modx = _N.linspace (self.x.min (), self.x.max (), 400)
             mody = self.mfunc (modx)
 
-        if self._lowerEdges is not None:
-            # Plot data as histogram
-            pass
-        
         vb = omega.layout.VBox (2)
 
         if self.sigmas is not None:
@@ -608,20 +466,6 @@ class GaussianFit (LeastSquaresFit):
         self.height, self.xmid, self.width = self.params
         self.sigma_h, self.sigma_x, self.sigma_w = self.uncerts
 
-class DemoLinearFit (LeastSquaresFit):
-    _paramNames = ['a', 'b']
-    
-    def guess (self):
-        f = LinearFit ().setData (self.x, self.y, self.sigmas).fit ()
-        return f.params
-
-    def makeModel (self, a, b):
-        return lambda x: a + b * x
-
-    def _fitExport (self):
-        self.a, self.b = self.params
-        self.sigma_a, self.sigma_b = self.uncerts
-
 class PowerLawFit (LeastSquaresFit):
     _paramNames = ['q', 'alpha']
     
@@ -685,7 +529,7 @@ class LameQuadraticFit (LeastSquaresFit):
         return (a, b, c)
 
     def makeModel (self, a, b, c):
-        return _numpy.poly1d ([c, b, a])
+        return _N.poly1d ([c, b, a])
 
     def _fitExport (self):
         self.a, self.b, self.c = self.params
@@ -705,3 +549,23 @@ class LameQuadraticFit (LeastSquaresFit):
 #
 # sigma_ph = T_Sys / (eta_quant T_a sqrt (2 BW tau))
 #
+
+# Temporary, more later ...
+# This is sorta implemented by scipy.stats.distributions.rice.fit,
+# but 1) a lot of that generic distribution code seems broken, and
+# more importantly 2) that function lets location and width parameters
+# float freely, while we know location = 0.
+
+def ricefit (d):
+    from scipy.optimize import fmin
+    from numpy import log
+    from scipy.special import i0
+
+    def likelihood (params):
+        v = params[0]
+        s = params[1]
+        return -(log (d/s**2 * i0 (d*v/s**2)) - (d**2 + v**2)/2/s**2).sum ()
+
+    p = _N.array ((d.mean (), d.std ()))
+
+    return fmin (likelihood, p)
