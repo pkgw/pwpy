@@ -37,6 +37,9 @@
 
  'best'    Print out the best closure values rather than the worst
 
+ 'blhist'  Plot a histogram of the average closure values for each
+           baseline. Requires the Python module 'omega'.
+
  'rmshist' Plot a histogram of the computed closure values. Requires
            the Python module 'omega'.
 
@@ -76,7 +79,7 @@ keys.keyword ('interval', 'd', 10.)
 keys.keyword ('ntrip', 'i', 10)
 keys.keyword ('nbl', 'i', 10)
 keys.keyword ('nant', 'i', 10)
-keys.option ('rmshist', 'best', 'uvdplot')
+keys.option ('rmshist', 'best', 'uvdplot', 'blhist')
 keys.doUvdat ('dsl3xw', True)
 
 integData = {}
@@ -239,7 +242,7 @@ blStats = AccDict (StatsAccumulator, lambda sa, rms: sa.add (rms))
 antStats = AccDict (StatsAccumulator, lambda sa, rms: sa.add (rms))
 
 if args.rmshist:
-    allrms = GrowingArray (N.double, 1)
+    allrms = GrowingVector ()
 
 def processTriples ():
     for (key, ga) in allData.iteritems ():
@@ -299,8 +302,16 @@ if args.rmshist:
     print 'Showing histogram of RMS values ...'
     import omega
     allrms.doneAdding ()
-    n = int (N.sqrt (len (allrms)))
-    omega.quickHist (allrms.col (0), n).showBlocking ()
+    n = int (N.ceil (N.log2 (len (allrms)) + 1))
+    omega.quickHist (allrms.arr, n).showBlocking ()
+
+if args.blhist:
+    print
+    print 'Showing histogram of baseline closure values ...'
+    import omega
+    n = int (N.ceil (N.log2 (len (blStats)) + 1))
+    values = [x.mean () for x in blStats.itervalues ()]
+    omega.quickHist (values, n).showBlocking ()
 
 if args.uvdplot:
     print
