@@ -156,6 +156,7 @@
 
 import sys
 from mirexec import TaskUVFlag
+from os.path import basename
 
 # Conditions are:
 #
@@ -199,6 +200,7 @@ class MultiFlag2 (object):
             multi = None
             lmulti = None
             ignore = False
+            fileparts = []
             
             for b in bits:
                 split = b.split ('=', 2)
@@ -238,6 +240,11 @@ class MultiFlag2 (object):
                     shared.append ('uvrange(%s)' % arg)
                 elif cond == 'shadow':
                     shared.append ('shadow(%s)' % arg)
+                elif cond == 'filepart':
+                    pieces = arg.split (';')
+                    for bit in pieces:
+                        part, val = bit.split (',', 1)
+                        fileparts.append ((int (part), val))
                 else: assert False, 'Unknown condition ' + cond
 
             if ignore: continue
@@ -254,15 +261,27 @@ class MultiFlag2 (object):
             if lmulti is not None:
                 for x in selects:
                     for y in lmulti:
-                        self.lines.append ((x, y))
+                        self.lines.append ((x, y, fileparts))
             else:
                 for x in selects:
-                    self.lines.append ((x, None))
+                    self.lines.append ((x, None, fileparts))
 
     def applyDataSet (self, dset, banner):
         t = TaskUVFlag (vis=dset, flagval='f')
         
-        for select, line in self.lines:
+        for select, line, fileparts in self.lines:
+            if len (fileparts) > 0:
+                # Filename-based filtering happens now ...
+                foundIt = False
+                a = basename (dset.base).split ('-')
+
+                for nump1, match in fileparts:
+                    if a[nump1-1] == match:
+                        foundIt = True
+                        break
+
+                if not foundIt: continue
+            
             t.select = select
             t.line = line
             t.run ()
