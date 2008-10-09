@@ -102,7 +102,6 @@ class AmpRfi (object):
             print
         
         self.ch, self.y = afa.ch, afa.y
-        self.manualFlag = []
 
         if self.y.size == 0:
             print 'All data flagged for this!'
@@ -115,9 +114,6 @@ class AmpRfi (object):
 
     def showRaw (self):
         self.rawPlot = self.plotRaw ().show ('amprfi-raw')
-        
-    def manualFlag (self, start, num):
-        self.manualFlag.append ((start, start + num))
         
     def suggFlag (self, mfactor=15, boxcar=1):
         deltas = self.y[1:] - self.y[:-1]
@@ -167,7 +163,11 @@ class AmpRfi (object):
         
         self.toFlagSugg = toFlag
         self.mergeRegions ()
-        
+
+    def suggestYCutoff (self, cutoff):
+        self.toFlagSugg = [(ch, ch) for ch in self.ch[N.where (self.y > cutoff)]]
+        self.mergeRegions ()
+    
     def plotDeltas (self, boxcar=1, ylim=None):
         deltas = self.y[1:] - self.y[:-1]
         if boxcar > 1:
@@ -209,7 +209,7 @@ class AmpRfi (object):
 
         return merged
     
-    def mergeRegions (self, pad=2):
+    def mergeRegions (self, pad=4):
         self.pad = pad
         self.toFlag = self._mergeImpl (self.toFlagSugg, pad)
         self.show ()
