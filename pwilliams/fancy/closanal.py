@@ -1,5 +1,8 @@
 #! /usr/bin/env python
 
+# TODO: 'closure' can compute theoretical RMS closure values. Should
+# find out how they do that.
+
 """= closanal.py - Attempt to diagnose bad baselines based on phase triple closures
 & pkgw
 : uv Analysis
@@ -70,23 +73,25 @@ from numutils import *
 import sys
 
 SVNID = '$Id$'
-banner = util.printBannerSvn ('closanal', 'attempt to diagnose bad baselines based on ' +
-                              'phase triple closures', SVNID)
+banner = util.printBannerSvn ('closanal', 'attempt to identify bad baselines based on ' +
+                              'closure quantities', SVNID)
 
 SECOND = 1.0 / 3600. / 24.
 
 keys.keyword ('interval', 'd', 10.)
+keys.keyword ('nquad', 'i', 10)
 keys.keyword ('ntrip', 'i', 10)
 keys.keyword ('nbl', 'i', 10)
 keys.keyword ('nant', 'i', 10)
-keys.option ('rmshist', 'best', 'uvdplot', 'blhist')
+keys.option ('rmshist', 'best', 'uvdplot', 'blhist', 'amplitude')
 keys.doUvdat ('dsl3xw', True)
 
 integData = {}
 accData = {}
 
-def cr (): return GrowingArray (N.double, 3)
-allData = AccDict (cr, lambda ga, tup: ga.add (*tup))
+#def cr (): return GrowingArray (N.double, 3)
+#allData = AccDict (cr, lambda ga, tup: ga.add (*tup))
+allData = AccDict (GrowingVector, lambda o, v: o.add (v))
 
 seenants = set ()
 seenpols = set ()
@@ -100,7 +105,10 @@ def blfmt (pol, ant1, ant2):
 def tripfmt (pol, ant1, ant2, ant3):
     return '%s-%d-%d-%d' % (util.polarizationName (pol), ant1, ant2, ant3)
 
-def flushInteg (time):
+def quadfmt (pol, ant1, ant2, ant3, ant4):
+    return '%s-%d-%d-%d-%d' % (util.polarizationName (pol), ant1, ant2, ant3, ant4)
+
+def flushInteg3 ():
     global integData
     ants = sorted (seenants)
 
@@ -112,10 +120,18 @@ def flushInteg (time):
                 for k in xrange (0, j):
                     ant1 = ants[k]
 
-                    flushOneInteg (time, pol, ant1, ant2, ant3)
+                    flushOneInteg3 (pol, ant1, ant2, ant3)
     integData = {}
 
-def flushOneInteg (time, pol, ant1, ant2, ant3):
+def _flagAnd (flags1, flags2, *rest):
+    isect = N.logical_and (flags1, flags2)
+
+    for f in rest:
+        N.logical_and (isect, f, isect)
+
+    return isect
+
+def flushOneInteg3 (pol, ant1, ant2, ant3):
     tup12 = integData.get (((ant1, ant2), pol))
     tup13 = integData.get (((ant1, ant3), pol))
     tup23 = integData.get (((ant2, ant3), pol))
@@ -123,27 +139,79 @@ def flushOneInteg (time, pol, ant1, ant2, ant3):
     if tup12 is None or tup13 is None or tup23 is None:
         return
 
-    (d12, f12, v12) =  tup12
-    (d13, f13, v13) =  tup13
-    (d23, f23, v23) =  tup23
+    (d12, f12, v12, t12) =  tup12
+    (d13, f13, v13, t13) =  tup13
+    (d23, f23, v23, t23) =  tup23
 
-    w = N.where (N.logical_and (f12, N.logical_and (f13, f23)))
+    assert t12 == t13 and t12 == t23
+    
+    w = N.where (_flagAnd (f12, f13, f23))
     n = len (w[0])
 
     if n == 0: return
     
-    c = (d12[w] * d23[w] * d13[w].conj ()).sum ()
-    v = n * (v12 + v13 + v23)
-    t = n * time
+    t = n * t12
+    c = (d12[w].sum () * d23[w].sum () * d13[w].sum ().conj ()) * t
+    v = (v12 + v13 + v23) * t
     
     accKey = (pol, ant1, ant2, ant3)
     if accKey not in accData:
-        accData[accKey] = (t, n, c, v)
+        accData[accKey] = (t, c, v)
     else:
-        (t0, n0, c0, v0) = accData[accKey]
-        accData[accKey] = (t + t0, n + n0, c + c0, v + v0)
+        (t0, c0, v0) = accData[accKey]
+        accData[accKey] = (t + t0, c + c0, v + v0)
     
-def flushAcc ():
+def flushInteg4 ():
+    global integData
+    ants = sorted (seenants)
+
+    for pol in seenpols:
+        for i in xrange (0, len (ants)):
+            ant4 = ants[i]
+            for j in xrange (0, i):
+                ant3 = ants[j]
+                for k in xrange (0, j):
+                    ant2 = ants[k]
+                    for l in xrange (0, k):
+                        ant1 = ants[l]
+
+                        flushOneInteg4 (pol, ant1, ant2, ant3, ant4)
+    integData = {}
+
+def flushOneInteg4 (pol, ant1, ant2, ant3, ant4):
+    tup12 = integData.get (((ant1, ant2), pol))
+    tup13 = integData.get (((ant1, ant3), pol))
+    tup24 = integData.get (((ant2, ant4), pol))
+    tup34 = integData.get (((ant3, ant4), pol))
+
+    if tup12 is None or tup13 is None or tup24 is None or tup34 is None:
+        return
+
+    (d12, f12, v12, t12) =  tup12
+    (d13, f13, v13, t13) =  tup13
+    (d24, f24, v24, t24) =  tup24
+    (d34, f34, v34, t34) =  tup34
+
+    assert t12 == t13 and t12 == t24 and t12 == t34
+
+    # Avoid div-by-zero
+    w = N.where (_flagAnd (f12, f13, f24, f34, d13 != 0, d24 != 0))
+    n = len (w[0])
+
+    if n == 0: return
+    
+    t = n * t12
+    c = (d12[w].sum () * d34[w].sum () / d13[w].sum () / d24[w].sum ().conj ()) * t
+    v = (v12 + v13 + v24 + v34) * t
+
+    accKey = (pol, ant1, ant2, ant3, ant4)
+    if accKey not in accData:
+        accData[accKey] = (t, c, v)
+    else:
+        (t0, c0, v0) = accData[accKey]
+        accData[accKey] = (t + t0, c + c0, v + v0)
+
+def flushAcc3 ():
     global accData
     ants = sorted (seenants)
 
@@ -155,29 +223,74 @@ def flushAcc ():
                 for k in xrange (0, j):
                     ant1 = ants[k]
 
-                    flushOneAcc (pol, ant1, ant2, ant3)
+                    flushOneAcc3 (pol, ant1, ant2, ant3)
     accData = {}
 
-def flushOneAcc (pol, ant1, ant2, ant3):
+def flushOneAcc3 (pol, ant1, ant2, ant3):
     key = (pol, ant1, ant2, ant3)
     tup = accData.get (key)
     if tup is None:
         return
 
-    (time, n, c, v) = tup
+    (time, c, v) = tup
 
-    # note! not dividing by n since that doesn't affect phase.
+    # note! not dividing by time since that doesn't affect phase.
     # Does affect amp though.
     ph = 180/N.pi * N.arctan2 (c.imag, c.real)
 
-    #print pol, ant1, ant2, ant3, time/n, ph
-    
-    allData.accum (key, (time / n, ph, v / n))
+    allData.accum (key, ph)
+    #allData.accum (key, (time, ph, v / time))
+
+def flushAcc4 ():
+    global accData
+    ants = sorted (seenants)
+
+    for pol in seenpols:
+        for i in xrange (0, len (ants)):
+            ant4 = ants[i]
+            for j in xrange (0, i):
+                ant3 = ants[j]
+                for k in xrange (0, j):
+                    ant2 = ants[k]
+                    for l in xrange (0, k):
+                        ant1 = ants[l]
+
+                        flushOneAcc4 (pol, ant1, ant2, ant3, ant4)
+    accData = {}
+
+def flushOneAcc4 (pol, ant1, ant2, ant3, ant4):
+    key = (pol, ant1, ant2, ant3, ant4)
+    tup = accData.get (key)
+    if tup is None:
+        return
+
+    (time, c, v) = tup
+    amp = N.abs (c) / time
+    allData.accum (key, amp)
 
 args = keys.process ()
 
 interval = args.interval / 60. / 24.
 print 'Averaging interval: %g minutes' % (args.interval)
+
+if args.amplitude:
+    flushInteg = flushInteg4
+    flushAcc = flushAcc4
+    item = 'amplitude'
+    datum = 'quads'
+    capdatum = 'Quads'
+    ndatum = 'nQuad'
+    identfmt = quadfmt
+else:
+    flushInteg = flushInteg3
+    flushAcc = flushAcc3
+    item = 'phase'
+    datum = 'triples'
+    capdatum = 'Triples'
+    ndatum ='nTrip'
+    identfmt = tripfmt
+
+print 'Calculating %s closure %s' % (item, datum)
 
 if args.uvdplot:
     uvdists = AccDict (StatsAccumulator, lambda sa, v: sa.add (v))
@@ -195,7 +308,8 @@ for (inp, preamble, data, flags, nread) in uvdat.readAll ():
     bl = util.decodeBaseline (preamble[4])
     pol = uvdat.getPol ()
     var = uvdat.getVariance ()
-
+    inttime = inp.getVarFloat ('inttime')
+    
     # Some first checks.
     
     if not util.polarizationIsInten (pol): continue
@@ -215,7 +329,7 @@ for (inp, preamble, data, flags, nread) in uvdat.readAll ():
     t = time - time0
 
     if abs (t - tprev) > SECOND:
-        flushInteg (tprev)
+        flushInteg ()
         tprev = t
 
     if (t - tmin) > interval or (tmax - t) > interval:
@@ -226,15 +340,15 @@ for (inp, preamble, data, flags, nread) in uvdat.readAll ():
     
     tmin = min (tmin, t)
     tmax = max (tmax, t)
-    integData[(bl, pol)] = (data, flags, var)
+    integData[(bl, pol)] = (data, flags, var, inttime)
 
     if args.uvdplot:
         uvdists.accum ((pol, bl[0], bl[1]), N.sqrt ((preamble[0:3]**2).sum ()))
 
-flushInteg (t)
+flushInteg ()
 flushAcc ()
 
-print ' ... done. Read %d triples.' % len (allData)
+print ' ... done. Read %d %s closure %s.' % (len (allData), item, datum)
 
 # OK, now do our fancy analysis.
 
@@ -245,10 +359,10 @@ if args.rmshist:
     allrms = GrowingVector ()
 
 def processTriples ():
-    for (key, ga) in allData.iteritems ():
-        ga.doneAdding ()    
+    for (key, gv) in allData.iteritems ():
+        gv.doneAdding ()    
         (pol, ant1, ant2, ant3) = key
-        phs = ga.col (1)
+        phs = gv.arr
         rms = N.sqrt (N.mean (phs**2))
 
         if args.rmshist:
@@ -261,41 +375,96 @@ def processTriples ():
         antStats.accum ((pol, ant2), rms)
         antStats.accum ((pol, ant3), rms)
 
-        yield pol, ant1, ant2, ant3, rms
+        yield (pol, ant1, ant2, ant3), rms
 
-worstTrips = sorted (processTriples (), key=lambda x: x[4], reverse=not args.best)
-worstTrips = worstTrips[0:args.ntrip]
+def processQuads ():
+    seenQuads = set ()
+    
+    for (key, gv) in allData.iteritems ():
+        gv.doneAdding ()    
+        (pol, ant1, ant2, ant3, ant4) = key
+
+        # Cf. Pearson & Readhead 1984 ARAA 22 97:
+        # if we know the closure of k-l-m-n and k-l-n-m,
+        # then k-n-m-l adds no information
+        # here, 1=k, 2=n, 3=m, 4=l, so we need to check for
+        # 1-4-3-2 and 1-4-2-3
+        
+        if (pol, ant1, ant4, ant3, ant2) in seenQuads and \
+           (pol, ant1, ant2, ant2, ant3) in seenQuads:
+            continue
+
+        seenQuads.add (key)
+
+        # This quad is not redundant.
+        
+        amps = gv.arr
+        lrms = N.log (N.mean (amps**2)) / 2 # log of the rms
+
+        if args.rmshist:
+            allrms.add (lrms)
+
+        blStats.accum ((pol, ant1, ant2), lrms)
+        blStats.accum ((pol, ant1, ant3), lrms)
+        blStats.accum ((pol, ant2, ant4), lrms)
+        blStats.accum ((pol, ant3, ant4), lrms)
+        antStats.accum ((pol, ant1), lrms)
+        antStats.accum ((pol, ant2), lrms)
+        antStats.accum ((pol, ant3), lrms)
+        antStats.accum ((pol, ant4), lrms)
+
+        yield (pol, ant1, ant2, ant3, ant4), lrms
+
+if args.amplitude:
+    process = processQuads
+    key = lambda x: abs (x[1])
+    collkey = lambda x: x[1].rms ()
+    statkey = lambda sa: sa.rms ()
+    stat = 'RMS'
+else:
+    process = processTriples
+    key = lambda x: x[1]
+    collkey = lambda x: x[1].mean ()
+    statkey = lambda sa: sa.mean ()
+    stat = 'Mean'
+
+worstCls = sorted (process (), key=key, reverse=not args.best)
+
+#for k, v in worstCls:
+#    print identfmt (*k), v
+
+worstCls = worstCls[0:args.ntrip]
 
 worstBls = sorted ((x for x in blStats.iteritems ()),
-                   key=lambda x: x[1].mean (), reverse=not args.best)
+                   key=collkey, reverse=not args.best)
 worstBls = worstBls[0:args.nbl]
 
 worstAnts = sorted ((x for x in antStats.iteritems ()),
-                    key=lambda x: x[1].mean (), reverse=not args.best)
+                    key=collkey, reverse=not args.best)
 worstAnts = worstAnts[0:args.nant]
 
 if args.best: adj = 'best'
 else: adj = 'worst'
 
-if len (worstTrips) > 0:
+if len (worstCls) > 0:
     print
-    print 'Triples with %s phase closure values:' % adj
-    for pol, ant1, ant2, ant3, rms in worstTrips:
-        print '%14s: %10g' % (tripfmt (pol, ant1, ant2, ant3), rms)
-
+    print '%s with %s %s closure values:' % (capdatum, adj, item)
+    for ident, rms in worstCls:
+        print '%14s: %10g' % (identfmt (*ident), rms)
+    
 if len (worstBls) > 0:
     print
-    print 'Baselines with %s phase closure values:' % adj
-    print '%14s  %10s (%10s, %5s)' % ('Baseline', 'Mean', 'StdDev', 'nTrip')
+    print 'Baselines with %s %s closure values:' % (adj, item)
+    print '%14s  %10s (%10s, %5s)' % ('Baseline', stat, 'StdDev', ndatum)
     for key, sa in worstBls:
-        print '%14s: %10g (%10g, %5d)' % (blfmt (*key), sa.mean (), sa.std (), sa.num ())
+        print '%14s: %10g (%10g, %5d)' % (blfmt (*key), statkey (sa), sa.std (), sa.num ())
 
 if len (worstAnts) > 0:
     print
-    print 'Antennas with %s phase closure values:' % adj
-    print '%14s  %10s (%10s, %5s)' % ('Antenna', 'Mean', 'StdDev', 'nTrip')
+    print 'Antennas with %s %s closure values:' % (adj, item)
+    print '%14s  %10s (%10s, %5s)' % ('Antenna', stat, 'StdDev', ndatum)
     for key, sa in worstAnts:
-        print '%14s: %10g (%10g, %5d)' % (antfmt (*key), sa.mean (), sa.std (), sa.num ())
+        print '%14s: %10g (%10g, %5d)' % (antfmt (*key), statkey (sa), sa.std (), sa.num ())
 
 if args.rmshist:
     print
