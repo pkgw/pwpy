@@ -3,20 +3,30 @@
 # TODO: 'closure' can compute theoretical RMS closure values. Should
 # find out how they do that.
 
-"""= closanal.py - Attempt to diagnose bad baselines based on phase triple closures
+"""= closanal.py - Attempt to identify bad baselines based on closure quantities
 & pkgw
 : uv Analysis
 +
- CLOSANAL is a utility for diagnosing which antennas and/or baselines
- are bad in a given dataset. It computes phase triple closures from
- the data and computes RMS values for each baseline and
- antenna from the closures for each triple that they contribute
- to. The worst triple, baseline, and antenna closure values are then
- printed.
 
- Besides the RMS phase closure value for baselines and antennas, the
+ CLOSANAL is a utility for identifying which antennas and/or baselines
+ are bad in a given dataset based on closure quantities. It can
+ compute phase triple closures or amplitude quad closures from the
+ data and shows RMS values for each baseline and antenna from the
+ closures for each closure quantity that they contribute to. The worst
+ triple/quad, baseline, and antenna closure values are then printed.
+
+ If phase triple closures are computed, the reported quantities are
+ the closure value in degrees. If amplitude quad closures are
+ computed, the reported quantities are the natural logarithm of the
+ dimensionles amplitude closure value. This means that a "perfect"
+ closure value for a point source in both cases is zero, and that
+ raw amplitude closures of K and 1/K have the same value but opposite
+ signs.
+
+ Besides the RMS closure value for each baseline and antenna, the
  standard deviation of those values ("StdDev") and the number of
- triples used in the computation ("nTrip") are also printed.
+ closure quantities used in the computation ("nTrip" or "nQuad") are
+ also printed.
  
 < vis
 
@@ -25,8 +35,8 @@
  this be set to a few minutes to damp out noise. Default is 10. An
  extremely small number such as 0.01 will result in no averaging.
 
-@ ntrip
- The number of triple closure values to print. Default is 10.
+@ nclos
+ The number of closure quantities to print. Default is 10.
 
 @ nbl
  The number of RMS baseline closure values to print. Default is 10.
@@ -38,7 +48,10 @@
  Multiple options can be specified, separated by commas, and
  minimum-match is used.
 
- 'best'    Print out the best closure values rather than the worst
+ 'amplitude' Compute amplitude quad closures. The default is to
+             compute phase triple closures.
+
+ 'best'    Print out the best closure values rather than the worst.
 
  'blhist'  Plot a histogram of the average closure values for each
            baseline. Requires the Python module 'omega'.
@@ -46,7 +59,7 @@
  'rmshist' Plot a histogram of the computed closure values. Requires
            the Python module 'omega'.
 
- 'uvdplot' Plot a scatter diagram of RMS baseline phase closure versus
+ 'uvdplot' Plot a scatter diagram of RMS baseline closure versus
            average baseline UV distance. Requires the Python module
            'omega'
 
@@ -79,8 +92,7 @@ banner = util.printBannerSvn ('closanal', 'attempt to identify bad baselines bas
 SECOND = 1.0 / 3600. / 24.
 
 keys.keyword ('interval', 'd', 10.)
-keys.keyword ('nquad', 'i', 10)
-keys.keyword ('ntrip', 'i', 10)
+keys.keyword ('nclos', 'i', 10)
 keys.keyword ('nbl', 'i', 10)
 keys.keyword ('nant', 'i', 10)
 keys.option ('rmshist', 'best', 'uvdplot', 'blhist', 'amplitude')
@@ -108,6 +120,14 @@ def tripfmt (pol, ant1, ant2, ant3):
 def quadfmt (pol, ant1, ant2, ant3, ant4):
     return '%s-%d-%d-%d-%d' % (util.polarizationName (pol), ant1, ant2, ant3, ant4)
 
+def _flagAnd (flags1, flags2, *rest):
+    isect = N.logical_and (flags1, flags2)
+
+    for f in rest:
+        N.logical_and (isect, f, isect)
+
+    return isect
+
 def flushInteg3 ():
     global integData
     ants = sorted (seenants)
@@ -122,14 +142,6 @@ def flushInteg3 ():
 
                     flushOneInteg3 (pol, ant1, ant2, ant3)
     integData = {}
-
-def _flagAnd (flags1, flags2, *rest):
-    isect = N.logical_and (flags1, flags2)
-
-    for f in rest:
-        N.logical_and (isect, f, isect)
-
-    return isect
 
 def flushOneInteg3 (pol, ant1, ant2, ant3):
     tup12 = integData.get (((ant1, ant2), pol))
@@ -429,11 +441,7 @@ else:
     stat = 'Mean'
 
 worstCls = sorted (process (), key=key, reverse=not args.best)
-
-#for k, v in worstCls:
-#    print identfmt (*k), v
-
-worstCls = worstCls[0:args.ntrip]
+worstCls = worstCls[0:args.nclos]
 
 worstBls = sorted ((x for x in blStats.iteritems ()),
                    key=collkey, reverse=not args.best)
