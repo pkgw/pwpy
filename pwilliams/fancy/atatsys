@@ -283,7 +283,18 @@ class SysTemps (object):
 
         # Make sure we end with a newline
         print
+
+    def _log (self, fn):
+        ants = self.ants
+        soln = self.soln
         
+        f = file (fn, 'w')
+
+        for i in xrange (0, self.nant):
+            print >>f, '%d %#6g' % (ants[i], soln[i])
+
+        f.close ()
+    
     def _show (self):
         ants = self.ants
         tsyses = self.tsyses
@@ -339,6 +350,7 @@ class SysTemps (object):
             self._reflattenFiltered (badAnts)
         
         #self._show ()
+        if doLog: self._log (args.log)
 
 # Keywords and argument checking
 
@@ -346,6 +358,7 @@ keys.keyword ('interval', 'd', 5.)
 keys.keyword ('flux', 'd', -1)
 keys.keyword ('maxtsys', 'd', 350.)
 keys.keyword ('vis', 'f', ' ')
+keys.keyword ('log', 'f', ' ')
 
 args = keys.process ()
 
@@ -361,6 +374,8 @@ else:
 
 if args.maxtsys <= 0:
     print >>sys.stderr, 'Error: invalid maximum TSys', maxtsys
+
+doLog = args.log != ' '
 
 vis = VisData (args.vis)
 
