@@ -25,7 +25,13 @@ from scipy.optimize import fmin_l_bfgs_b
 SVNID = '$Id$'
 banner = util.printBannerSvn ('atatsys', 'magic!', SVNID)
 
-etaQ = 1
+# Tables
+
+# These values come from Thompson, Moran, & Swenson, table 8.1.
+etaQs = { (2, 1): 0.64, (2, 2): 0.74,
+          (3, 1): 0.81, (3, 2): 0.89,
+          (4, 1): 0.88, (4, 2): 0.94 }
+
 SECOND = 1. / 24 / 3600
 
 # Iterative averaging TSys computer
@@ -332,7 +338,8 @@ class SysTemps (object):
         while True:
             self._solve ()
             self._print ()
-            #self._show ()
+
+            if args.showall: self._show ()
             
             badAnts = []
             for i in xrange (0, self.nant):
@@ -348,8 +355,10 @@ class SysTemps (object):
             badAnts = [t[0] for t in badAnts[0:3]]
             
             self._reflattenFiltered (badAnts)
+
+        # If showall, we already showed this solution up above.
+        if args.showfinal and not args.showall: self._show ()
         
-        #self._show ()
         if doLog: self._log (args.log)
 
 # Keywords and argument checking
@@ -359,8 +368,11 @@ keys.keyword ('flux', 'd', -1)
 keys.keyword ('maxtsys', 'd', 350.)
 keys.keyword ('vis', 'f', ' ')
 keys.keyword ('log', 'f', ' ')
+keys.keyword ('quant', 'i', None, 2)
+keys.option ('showfinal', 'showall')
 
 args = keys.process ()
+print 'Configuration:'
 
 if args.vis == ' ':
     print >>sys.stderr, 'Error: no UV input specified.'
@@ -368,12 +380,13 @@ if args.vis == ' ':
 
 calibrated = args.flux < 0
 if calibrated:
-    print 'Assuming data are calibrated to Jansky units.'
+    print '  Assuming data are calibrated to Jansky units.'
 else:
-    print 'Assuming data are uncalibrated, using source flux %3g' % args.flux
+    print '  Assuming data are uncalibrated, using source flux %3g' % args.flux
 
 if args.maxtsys <= 0:
     print >>sys.stderr, 'Error: invalid maximum TSys', maxtsys
+print '  Flagging TSyses above %g' % args.maxtsys
 
 doLog = args.log != ' '
 
@@ -382,7 +395,29 @@ vis = VisData (args.vis)
 interval = args.interval / 60. / 24.
 if interval <= 0:
     print >>sys.stderr, 'Error: invalid interval', interval
-print 'Averaging interval: %#4g minutes' % args.interval
+print '  Averaging interval: %#4g minutes' % args.interval
+
+q = args.quant
+
+if len (q) == 0:
+    etaQ = 1
+else:
+    bits = q[0]
+
+    if len (q) > 1:
+        beta = q[1]
+    else:
+        beta = 1
+
+    if (bits, beta) in etaQs:
+        print '  Using quantization efficiency for %d bits and %d times Nyquist sampling' % (bits, beta)
+        etaQ = etaQs[(bits, beta)]
+    else:
+        print >>sys.stderr, 'Warning: no tabulated quantization efficiency for %d bits and' % bits
+        print >>sys.stderr, '  %d times Nyquist sampling. Defaulting to unity.' % beta
+        etaQ = 1
+
+print '  Quantization efficiency: %g' % etaQ
 
 # Let's go!
 
