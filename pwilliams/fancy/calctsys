@@ -1,11 +1,11 @@
 #! /usr/bin/env python
 # -*- python -*-
 
-"""= atatsys - 
+"""= calctsys - 
 & pkgw
 : Calibration
 +
- ATATSYS ...
+ CALCTSYS ...
 
 < vis
 
@@ -23,7 +23,7 @@ from scipy.special import erf, erfc
 from scipy.optimize import fmin_l_bfgs_b
 
 SVNID = '$Id$'
-banner = util.printBannerSvn ('atatsys', 'magic!', SVNID)
+banner = util.printBannerSvn ('calctsys', 'magic!', SVNID)
 
 # Tables
 
