@@ -39,8 +39,14 @@ SECOND = 1. / 24 / 3600
 class SysTemps (object):
     def __init__ (self):
         self.integData = {}
+        self.tmin = None
 
-    def accumulate (self, bl, data, flags, inttime):
+    def accumulate (self, time, bl, data, flags, inttime):
+        if self.tmin is None:
+            self.tmin = time
+        else:
+            self.tmin = min (self.tmin, time)
+        
         times = flags * inttime
         dt = data * times
 
@@ -80,7 +86,7 @@ class SysTemps (object):
         gai.doneAdding ()
 
         del self.integData
-
+        
         self.ants = sorted (seenAnts)
         self.gaa = gaa
         self.gai = gai
@@ -361,12 +367,20 @@ class SysTemps (object):
         
         if doLog: self._log (args.log)
 
+        tmin = self.tmin
+        
+        self.integData = {}
+        self.tmin = None
+
+        return tmin, dict (zip (self.ants, self.soln))
+
 # Keywords and argument checking
 
 keys.keyword ('interval', 'd', 5.)
 keys.keyword ('flux', 'd', -1)
 keys.keyword ('maxtsys', 'd', 350.)
 keys.keyword ('vis', 'f', ' ')
+keys.keyword ('out', 'f', ' ')
 keys.keyword ('log', 'f', ' ')
 keys.keyword ('quant', 'i', None, 2)
 keys.option ('showfinal', 'showall')
@@ -377,6 +391,10 @@ print 'Configuration:'
 if args.vis == ' ':
     print >>sys.stderr, 'Error: no UV input specified.'
     sys.exit (1)
+
+rewrite = args.out != ' '
+if not rewrite:
+    print '  Computing gains only, not writing new dataset.'
 
 calibrated = args.flux < 0
 if calibrated:
@@ -424,6 +442,7 @@ print '  Quantization efficiency: %g' % etaQ
 sts = SysTemps ()
 first = True
 thePol = None
+solutions = []
 
 for inp, preamble, data, flags, nread in vis.readLowlevel (False):
     time = preamble[3]
@@ -437,7 +456,8 @@ for inp, preamble, data, flags, nread in vis.readLowlevel (False):
         assert nants > 0
         nspect = inp.getVarFirstInt ('nspect', 0)
         nwide = inp.getVarFirstInt ('nwide', 0)
-        assert nspect > 0 or nwide > 0
+        #assert nspect > 0 or nwide > 0 FIXME: support all this
+        assert nspect == 1 and nwide == 0
         jyperk = inp.getVarFirstFloat ('jyperk', 0.0)
         assert jyperk > 0
         inttime = inp.getVarFirstFloat ('inttime', 10.0)
@@ -490,12 +510,139 @@ for inp, preamble, data, flags, nread in vis.readLowlevel (False):
             sys.exit (1)
 
     if (time - tmin) > interval or (tmax - time) > interval:
-        sts.flush (jyperk, sdf)
+        solutions.append (sts.flush (jyperk, sdf))
         tmin = tmax = time
 
-    sts.accumulate (bl, data, flags, inttime)
+    sts.accumulate (time, bl, data, flags, inttime)
 
-sts.flush (jyperk, sdf)
+# Finish off last chunk of data, then sort by time
+solutions.append (sts.flush (jyperk, sdf))
 
-# All done.
+if not rewrite:
+    # All done in this case.
+    sys.exit (0)
+    
+solutions.sort (key = lambda t: t[0])
+solutions.append ((solutions[-1][0] + interval, None))
+
+# Now write the new dataset with TSys data embedded.
+
+dOut = VisData (args.out).open ('w')
+dOut.setPreambleType ('uvw', 'time', 'baseline')
+
+first = True
+nextSolnIdx = 0
+
+for inp, preamble, data, flags, nread in vis.readLowlevel (False):
+    if first:
+        first = False
+
+        toTrack = ['nants', 'jyperk', 'inttime']        
+
+        nants = inp.getVarFirstInt ('nants', 0)
+        assert nants > 0
+        nspect = inp.getVarFirstInt ('nspect', 0)
+        nwide = inp.getVarFirstInt ('nwide', 0)
+        assert nspect > 0 or nwide > 0
+        jyperk = inp.getVarFirstFloat ('jyperk', 0.0)
+        assert jyperk > 0
+        inttime = inp.getVarFirstFloat ('inttime', 10.0)
+        assert inttime > 0.
+        
+        if nspect > 0:
+            sdf = inp.getVarDouble ('sdf', nspect)
+            toTrack.append ('sdf')
+            toTrack.append ('nspect')
+        if nwide > 0:
+            toTrack.append ('nwide')
+        
+        t = inp.makeVarTracker ()
+        t.track (*toTrack)
+
+        corrType, corrLen, corrUpd = inp.probeVar ('corr')
+
+        if corrType != 'r' and corrType != 'j' and corrType != 'c':
+            raise Exception ('No channels to copy')
+
+        dOut.setCorrelationType (corrType)
+        inp.copyHeader (dOut, 'history')
+        inp.initVarsAsInput (' ') # ???
+        
+    if t.updated ():
+        nants = inp.getVarInt ('nants')
+        assert nants > 0
+        if 'nspect' in toTrack:
+            nspect = inp.getVarInt ('nspect')
+        if 'nwide' in toTrack:
+            nwide = inp.getVarInt ('nwide')
+        #assert nspect > 0 or nwide > 0 FIXME: implement all this
+        assert nspect == 1 and nwide == 0
+        jyperk = inp.getVarFloat ('jyperk')
+        assert jyperk > 0
+        inttime = inp.getVarFloat ('inttime')
+        assert inttime > 0.
+
+        if nspect > 0:
+            sdf = inp.getVarDouble ('sdf', nspect)
+
+        dOut.writeVarInt ('nants', nants)
+        dOut.writeVarFloat ('jyperk', jyperk)
+        dOut.writeVarFloat ('inttime', inttime)
+
+        if nspect > 0:
+            dOut.writeVarInt ('nspect', nspect)
+            dOut.writeVarInt ('nschan', inp.getVarInt ('nschan', nspect))
+            dOut.writeVarInt ('ischan', inp.getVarInt ('ischan', nspect))
+            dOut.writeVarDouble ('sdf', sdf)
+            dOut.writeVarDouble ('sfreq', inp.getVarDouble ('sfreq', nspect))
+            dOut.writeVarDouble ('restfreq', inp.getVarDouble ('restfreq', nspect))
+            
+        if nwide > 0:
+            dOut.writeVarInt ('nwide', nwide)
+            dOut.writeVarDouble ('wfreq', inp.getVarDouble ('wfreq', nwide))
+
+        tup = inp.probeVar ('xyphase')
+        if tup is not None:
+            dOut.writeVarFloat ('xyphase', inp.getVarFloat ('xyphase', tup[1]))
+
+    time = preamble[3]
+    bl = util.decodeBaseline (preamble[4])
+    pol = uvdat.getPol ()
+
+    # Write a new systemp entry?
+
+    if time >= solutions[nextSolnIdx][0]:
+        solns = solutions[nextSolnIdx][1]
+        assert solns is not None, 'Bizarre interval calculation issues?'
+        
+        systemps = N.zeros (nants, dtype=N.float32)
+        skipAnts = set ()
+        
+        for i in xrange (0, nants):
+            ant = i + 1 # stupid indexing differences
+
+            if ant in solns:
+                systemps[i] = solns[ant]
+            else:
+                skipAnts.add (ant)
+
+        dOut.writeVarFloat ('systemp', systemps)
+        nextSolnIdx += 1
+
+    if bl[0] in skipAnts or bl[1] in skipAnts:
+        # No TSys solution, flag out the data
+        flags.fill (0)
+    
+    inp.copyLineVars (dOut)
+    dOut.writeVarInt ('pol', pol)
+    dOut.write (preamble, data, flags, nread)
+
+# All done. 
+
+dOut.openHistory ()
+dOut.writeHistory (banner)
+dOut.logInvocation ('CALCTSYS')
+dOut.closeHistory ()
+dOut.close ()
+
 sys.exit (0)
