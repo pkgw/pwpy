@@ -87,7 +87,7 @@ echo "Stop hours: $stopHours" |tee -ia mbbsf.log
 
 @ part = 1
 
-while (`$obsbin/stopnow.csh $begin $stopHour` != stop && $part <= $nparts)
+while (($mode == debug || `$obsbin/stopnow.csh $begin $stopHour` != stop) && $part <= $nparts)
     set cfg = $planDir/config$part.py
     set partDir = part$part
     set stop = $stopHours[$part] # 1-based indices ...
