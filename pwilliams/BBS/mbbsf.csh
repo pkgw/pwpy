@@ -41,6 +41,7 @@ endif
 # Note our start
 
 echo "Running $0 at `date`" |tee -ia mbbsf.log
+echo "SVN ident: $svnid" |tee -ia mbbsf.log
 
 # Scan the config files to make sure everything is cool
 
@@ -76,7 +77,7 @@ end
 @ nparts = $part - 1
 
 if ($t != $stopHour) then
-    echo "Warning: planned stop hour ($t) and command stop hour ($stopHour) disagree"
+    echo " - Warning: planned stop hour ($t) and command stop hour ($stopHour) disagree" |tee -ia mbbsf.log
 endif
 
 echo "$nparts part(s) to the observing plan." |tee -ia mbbsf.log
@@ -87,28 +88,26 @@ echo "Stop hours: $stopHours" |tee -ia mbbsf.log
 @ part = 1
 
 while (`$obsbin/stopnow.csh $begin $stopHour` != stop && $part <= $nparts)
-    @ idx = $part - 1
     set cfg = $planDir/config$part.py
-    set stop = $stopHours[$idx]
+    set partDir = part$part
+    set stop = $stopHours[$part] # 1-based indices ...
 
     set now = `date +'%H %M' |awk '{print $1 + ($2/60)}'`
 
     # print y if $now is later than $stop with a 12 hour margin
     set skip = `echo $stop $now |awk '{if (($2 - $1 + 12) % 24 > 12) print "y"}'`
 
-    if ($skip == y) then
-	echo "Skipping part $part, its time has elapsed." |tee -ie mbbsf.log
+    if (($skip == y && $mode == real) || ($mode == debug && -d $partDir)) then
+	echo "Advancing to next part: now = $now, stop for part $part = $stop." |tee -ia mbbsf.log
 	@ part++
 	continue
     endif
 
     # We should observe this guy
 
-    set partDir = part$part
-
     mkdir -p $partDir
     cp -f $cfg $partDir/config.py
     egrep '^# uuid [-0-9a-fA-F]+' $cfg |cut -d' ' -f3 >$partDir/bbs.uuid
+    echo " - $script $mode $instr $stop in $partDir" |tee -ia mbbsf.log
     (cd $partDir && $script $mode $instr $stop)
-    @ part++
 end
