@@ -6,8 +6,7 @@
 # 
 # The observations take place in subdirectories of PWD.
 
-#set planDir = /home/pkwill/plans
-set planDir = .
+set planDir = /home/pkwill/plans
 set obsbin = /home/obs/bin
 set script = /home/obs/mmm/pwilliams/BBS/bbsf.py
 set begin = `date +'%H %M' |awk '{print $1 + ($2/60)}'`
