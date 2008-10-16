@@ -1,0 +1,96 @@
+#! /usr/bin/env python
+
+"""= byant -- blah
+& pkgw
+: Tools
++
+
+--
+"""
+
+import sys
+import numpy as N
+import omega
+from numutils import GrowingArray, AccDict
+from mirtask import uvdat, keys, util
+
+# The things we can plot
+
+def _uvd (inp, preamble, datum):
+    return 0.001 * N.sqrt (preamble[0]**2 + preamble[1]**2)
+
+def _ti (inp, preamble, datum):
+    return preamble[3]
+
+def _ph (inp, preamble, datum):
+    return N.arctan2 (datum.imag, datum.real) * 180 / N.pi
+
+def _amp (inp, preamble, datum):
+    return N.abs (datum)
+
+funcs = { 'uvdistance': _uvd, 'phase': _ph, 'amplitude': _amp,
+          'time': _ti }
+
+# Process args
+
+keys.keymatch ('axis', 2, funcs.keys ())
+keys.doUvdat ('dsl3', True)
+opts = keys.process ()
+
+if len (opts.axis) < 1:
+    opts.axis.append ('uvdistance')
+if len (opts.axis) < 2:
+    opts.axis.append ('phase')
+
+xaxis, yaxis = opts.axis
+xfunc = funcs[xaxis]
+yfunc = funcs[yaxis]
+        
+# Load data
+
+def _cr ():
+    return GrowingArray (N.float, 2)
+
+def _acc (ga, tup):
+    ga.add (tup[0], tup[1])
+    
+byAnt = AccDict (_cr, _acc)
+
+for dIn, p, d, f, n in uvdat.readAll ():
+    # Average down this visibility
+
+    w = N.where (f[0:n] != 0)
+    nok = len (w[0])
+    if nok == 0: continue
+
+    d = d[w].sum () / nok
+    
+    # Collect data
+    
+    bl = util.decodeBaseline (p[4])
+
+    x = xfunc (dIn, p, d)
+    y = yfunc (dIn, p, d)
+    
+    byAnt.accum (bl[0], (x, y))
+
+    if bl[1] != bl[0]:
+        byAnt.accum (bl[1], (x, y))
+    
+# Plot it
+
+sants = sorted (byAnt.iterkeys ())
+
+for ant in sants:
+    ga = byAnt[ant]
+    ga.doneAdding ()
+    x = ga.col (0)
+    y = ga.col (1)
+
+    p = omega.quickXY (x, y, 'Ant %d' % ant, lines=False)
+    p.setLabels (xaxis, yaxis)
+
+    try:
+        p.showBlocking ()
+    except KeyboardInterrupt:
+        break
