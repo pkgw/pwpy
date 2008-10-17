@@ -231,13 +231,13 @@ class SysTemps (object):
         bounds = [(1., None)] * self.nant
         soln, chisq, info = fmin_l_bfgs_b (chisq, guess, grad, bounds=bounds, factr=1e9)
         rchisq = chisq / (self.nbl - self.nant)
-        print 'RChiSq:', rchisq
+        print '   Pseudo-RChiSq:', rchisq
 
         if info['warnflag'] != 0:
-            print 'Noooo'
-            print 'soln, chisq:', soln, chisq
-            print 'info:', info
-            raise Exception ('Solution failed')
+            print >>sys.stderr, 'Error: Failed to find a solution!'
+            print >>sys.stderr, 'soln, chisq:', soln, chisq
+            print >>sys.stderr, 'info:', info
+            raise Exception ('Failed to find a solution')
 
         self.soln = soln
         self.rchisq = rchisq
@@ -341,27 +341,34 @@ class SysTemps (object):
         self._flatten ()
         self._computeBLSysTemps (jyperk, sdf)
 
+        print 'Iteratively flagging ...'
+        
         while True:
             self._solve ()
-            self._print ()
+            #self._print ()
 
             if args.showall: self._show ()
             
             badAnts = []
             for i in xrange (0, self.nant):
                 if self.soln[i] > args.maxtsys:
-                    print '   Bad antenna: %d has TSys %#5g > %#5g' % \
-                          (self.ants[i], self.soln[i], args.maxtsys)
                     badAnts.append ((self.ants[i], self.soln[i]))
 
             if len (badAnts) == 0: break
 
             # Let's not flag too many at once here
-            badAnts.sort (key = lambda t: t[1], reverse=True)    
-            badAnts = [t[0] for t in badAnts[0:3]]
+            badAnts.sort (key = lambda t: t[1], reverse=True)
+            badAnts = badAnts[0:3]
             
-            self._reflattenFiltered (badAnts)
+            for ant, soln in badAnts:
+                print '      Flagging antenna %2d: TSys %#4g > %#4g' % \
+                      (ant, soln, args.maxtsys)
 
+            self._reflattenFiltered ([t[0] for t in badAnts])
+
+        print
+        self._print ()
+        
         # If showall, we already showed this solution up above.
         if args.showfinal and not args.showall: self._show ()
         
