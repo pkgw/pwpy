@@ -72,7 +72,7 @@ class SysTemps (object):
 
         for bl, (dt, times) in self.integData.iteritems ():
             w = N.where (times > 0)
-            if len (w[0]) == 0: continue
+            if len (w[0]) < 2: continue # if only 1 item, can't calc meaningful std
             tw = times[w]
             dt = dt[w] / tw
 
@@ -89,6 +89,8 @@ class SysTemps (object):
         gaa.doneAdding ()
         gai.doneAdding ()
 
+        assert len (gaa) > 0, 'No data accepted!'
+        
         del self.integData
         
         self.ants = sorted (seenAnts)
