@@ -28,11 +28,18 @@ def _ph (inp, preamble, datum):
 def _amp (inp, preamble, datum):
     return N.abs (datum)
 
-funcs = { 'uvdistance': _uvd, 'phase': _ph, 'amplitude': _amp,
-          'time': _ti }
+def _partner (theant, otherant, inp, preamble, datum):
+    return otherant
+
+funcs = { 'uvdistance': (_uvd, False),
+          'phase': (_ph, False),
+          'amplitude': (_amp, False),
+          'time': (_ti, False),
+          'partner': (_partner, True) }
 
 # Process args
 
+keys.keyword ('only', 'i', -1)
 keys.keymatch ('axis', 2, funcs.keys ())
 keys.doUvdat ('dsl3', True)
 opts = keys.process ()
@@ -43,9 +50,11 @@ if len (opts.axis) < 2:
     opts.axis.append ('phase')
 
 xaxis, yaxis = opts.axis
-xfunc = funcs[xaxis]
-yfunc = funcs[yaxis]
-        
+xfunc, xantdep = funcs[xaxis]
+yfunc, yantdep = funcs[yaxis]
+
+only = opts.only
+
 # Load data
 
 def _cr ():
@@ -59,7 +68,7 @@ byAnt = AccDict (_cr, _acc)
 for dIn, p, d, f, n in uvdat.readAll ():
     # Average down this visibility
 
-    w = N.where (f[0:n] != 0)
+    w = N.where (f[0:n])
     nok = len (w[0])
     if nok == 0: continue
 
@@ -69,13 +78,26 @@ for dIn, p, d, f, n in uvdat.readAll ():
     
     bl = util.decodeBaseline (p[4])
 
-    x = xfunc (dIn, p, d)
-    y = yfunc (dIn, p, d)
-    
-    byAnt.accum (bl[0], (x, y))
+    if not xantdep: x = xfunc (dIn, p, d)
+    if not yantdep: y = yfunc (dIn, p, d)
 
-    if bl[1] != bl[0]:
-        byAnt.accum (bl[1], (x, y))
+    if only > 0:
+        if only in bl:
+            if only == bl[0]: other = bl[1]
+            else: other = bl[0]
+            
+            if xantdep: x = xfunc (only, other, dIn, p, d)
+            if yantdep: y = yfunc (only, other, dIn, p, d)
+            byAnt.accum (only, (x, y))
+    else:
+        if xantdep: x = xfunc (bl[0], bl[1], dIn, p, d)
+        if yantdep: y = yfunc (bl[0], bl[1], dIn, p, d)
+        byAnt.accum (bl[0], (x, y))
+    
+        if bl[1] != bl[0]:
+            if xantdep: x = xfunc (bl[1], bl[0], dIn, p, d)
+            if yantdep: y = yfunc (bl[1], bl[0], dIn, p, d)
+            byAnt.accum (bl[1], (x, y))
     
 # Plot it
 
