@@ -288,8 +288,9 @@ class SysTemps (object):
 
         idxs = N.abs (resid).argsort ()
         col = 0
-
-        for i in xrange (-10, 0):
+        lb = max (-10, -len (idxs))
+        
+        for i in xrange (lb, 0):
             idx = idxs[i]
             bl = ('%d-%d' % (ants[a1s[idx]], ants[a2s[idx]])).rjust (6)
             
