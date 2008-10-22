@@ -82,6 +82,7 @@
 
 import numpy as N
 from mirtask import keys, util, uvdat
+from mirtask.util import fmtPBP
 from numutils import *
 import sys
 
@@ -105,22 +106,16 @@ accData = {}
 #allData = AccDict (cr, lambda ga, tup: ga.add (*tup))
 allData = AccDict (GrowingVector, lambda o, v: o.add (v))
 
-seenants = set ()
+seenaps = {}
 seenpols = set ()
 
-def antfmt (pol, ant):
-    return '%s-%d' % (util.polarizationName (pol), ant)
+p2p = lambda ap1, ap2: util.paps2pbp ((ap1, ap2))
 
-def blfmt (pol, ant1, ant2):
-    return '%s-%d-%d' % (util.polarizationName (pol), ant1, ant2)
-
-def tripfmt (pol, ant1, ant2, ant3):
-    return '%s-%d-%d-%d' % (util.polarizationName (pol), ant1, ant2, ant3)
-
-def quadfmt (pol, ant1, ant2, ant3, ant4):
-    return '%s-%d-%d-%d-%d' % (util.polarizationName (pol), ant1, ant2, ant3, ant4)
+def format (*aps):
+    return '-'.join (util.fmtPAP (x) for x in aps)
 
 def _flagAnd (flags1, flags2, *rest):
+    # Avoid allocation of many temporary arrays here.
     isect = N.logical_and (flags1, flags2)
 
     for f in rest:
@@ -130,23 +125,24 @@ def _flagAnd (flags1, flags2, *rest):
 
 def flushInteg3 ():
     global integData
-    ants = sorted (seenants)
 
     for pol in seenpols:
-        for i in xrange (0, len (ants)):
-            ant3 = ants[i]
+        aps = sorted (seenaps[pol])
+        
+        for i in xrange (0, len (aps)):
+            ap3 = aps[i]
             for j in xrange (0, i):
-                ant2 = ants[j]
+                ap2 = aps[j]
                 for k in xrange (0, j):
-                    ant1 = ants[k]
+                    ap1 = aps[k]
 
-                    flushOneInteg3 (pol, ant1, ant2, ant3)
+                    flushOneInteg3 (ap1, ap2, ap3)
     integData = {}
 
-def flushOneInteg3 (pol, ant1, ant2, ant3):
-    tup12 = integData.get (((ant1, ant2), pol))
-    tup13 = integData.get (((ant1, ant3), pol))
-    tup23 = integData.get (((ant2, ant3), pol))
+def flushOneInteg3 (ap1, ap2, ap3):
+    tup12 = integData.get (p2p (ap1, ap2))
+    tup13 = integData.get (p2p (ap1, ap3))
+    tup23 = integData.get (p2p (ap2, ap3))
 
     if tup12 is None or tup13 is None or tup23 is None:
         return
@@ -166,7 +162,7 @@ def flushOneInteg3 (pol, ant1, ant2, ant3):
     c = (d12[w].sum () * d23[w].sum () * d13[w].sum ().conj ()) * t
     v = (v12 + v13 + v23) * t
     
-    accKey = (pol, ant1, ant2, ant3)
+    accKey = (ap1, ap2, ap3)
     if accKey not in accData:
         accData[accKey] = (t, c, v)
     else:
@@ -175,26 +171,27 @@ def flushOneInteg3 (pol, ant1, ant2, ant3):
     
 def flushInteg4 ():
     global integData
-    ants = sorted (seenants)
 
     for pol in seenpols:
-        for i in xrange (0, len (ants)):
-            ant4 = ants[i]
-            for j in xrange (0, i):
-                ant3 = ants[j]
-                for k in xrange (0, j):
-                    ant2 = ants[k]
-                    for l in xrange (0, k):
-                        ant1 = ants[l]
+        aps = sorted (seenaps[pol])
 
-                        flushOneInteg4 (pol, ant1, ant2, ant3, ant4)
+        for i in xrange (0, len (aps)):
+            ap4 = aps[i]
+            for j in xrange (0, i):
+                ap3 = aps[j]
+                for k in xrange (0, j):
+                    ap2 = aps[k]
+                    for l in xrange (0, k):
+                        ap1 = aps[l]
+
+                        flushOneInteg4 (ap1, ap2, ap3, ap4)
     integData = {}
 
-def flushOneInteg4 (pol, ant1, ant2, ant3, ant4):
-    tup12 = integData.get (((ant1, ant2), pol))
-    tup13 = integData.get (((ant1, ant3), pol))
-    tup24 = integData.get (((ant2, ant4), pol))
-    tup34 = integData.get (((ant3, ant4), pol))
+def flushOneInteg4 (ap1, ap2, ap3, ap4):
+    tup12 = integData.get (p2p (ap1, ap2))
+    tup13 = integData.get (p2p (ap1, ap3))
+    tup24 = integData.get (p2p (ap2, ap4))
+    tup34 = integData.get (p2p (ap3, ap4))
 
     if tup12 is None or tup13 is None or tup24 is None or tup34 is None:
         return
@@ -216,7 +213,7 @@ def flushOneInteg4 (pol, ant1, ant2, ant3, ant4):
     c = (d12[w].sum () * d34[w].sum () / d13[w].sum () / d24[w].sum ().conj ()) * t
     v = (v12 + v13 + v24 + v34) * t
 
-    accKey = (pol, ant1, ant2, ant3, ant4)
+    accKey = (ap1, ap2, ap3, ap4)
     if accKey not in accData:
         accData[accKey] = (t, c, v)
     else:
@@ -225,21 +222,22 @@ def flushOneInteg4 (pol, ant1, ant2, ant3, ant4):
 
 def flushAcc3 ():
     global accData
-    ants = sorted (seenants)
 
     for pol in seenpols:
-        for i in xrange (0, len (ants)):
-            ant3 = ants[i]
-            for j in xrange (0, i):
-                ant2 = ants[j]
-                for k in xrange (0, j):
-                    ant1 = ants[k]
+        aps = sorted (seenaps[pol])
 
-                    flushOneAcc3 (pol, ant1, ant2, ant3)
+        for i in xrange (0, len (aps)):
+            ap3 = aps[i]
+            for j in xrange (0, i):
+                ap2 = aps[j]
+                for k in xrange (0, j):
+                    ap1 = aps[k]
+
+                    flushOneAcc3 (ap1, ap2, ap3)
     accData = {}
 
-def flushOneAcc3 (pol, ant1, ant2, ant3):
-    key = (pol, ant1, ant2, ant3)
+def flushOneAcc3 (ap1, ap2, ap3):
+    key = (ap1, ap2, ap3)
     tup = accData.get (key)
     if tup is None:
         return
@@ -255,23 +253,24 @@ def flushOneAcc3 (pol, ant1, ant2, ant3):
 
 def flushAcc4 ():
     global accData
-    ants = sorted (seenants)
 
     for pol in seenpols:
-        for i in xrange (0, len (ants)):
-            ant4 = ants[i]
+        aps = sorted (seenaps[pol])
+        
+        for i in xrange (0, len (aps)):
+            ap4 = aps[i]
             for j in xrange (0, i):
-                ant3 = ants[j]
+                ap3 = aps[j]
                 for k in xrange (0, j):
-                    ant2 = ants[k]
+                    ap2 = aps[k]
                     for l in xrange (0, k):
-                        ant1 = ants[l]
+                        ap1 = aps[l]
 
-                        flushOneAcc4 (pol, ant1, ant2, ant3, ant4)
+                        flushOneAcc4 (ap1, ap2, ap3, ap4)
     accData = {}
 
-def flushOneAcc4 (pol, ant1, ant2, ant3, ant4):
-    key = (pol, ant1, ant2, ant3, ant4)
+def flushOneAcc4 (ap1, ap2, ap3, ap4):
+    key = (ap1, ap2, ap3, ap4)
     tup = accData.get (key)
     if tup is None:
         return
@@ -292,7 +291,6 @@ if args.amplitude:
     datum = 'quads'
     capdatum = 'Quads'
     ndatum = 'nQuad'
-    identfmt = quadfmt
 else:
     flushInteg = flushInteg3
     flushAcc = flushAcc3
@@ -300,7 +298,6 @@ else:
     datum = 'triples'
     capdatum = 'Triples'
     ndatum ='nTrip'
-    identfmt = tripfmt
 
 print 'Calculating %s closure %s' % (item, datum)
 
@@ -317,20 +314,25 @@ for (inp, preamble, data, flags, nread) in uvdat.readAll ():
     flags = flags[0:nread].copy ()
 
     time = preamble[3]
-    bl = util.decodeBaseline (preamble[4])
-    pol = uvdat.getPol ()
+    bp = util.mir2pbp (inp, preamble)
+    
     var = uvdat.getVariance ()
     inttime = inp.getVarFloat ('inttime')
     
     # Some first checks.
     
-    if not util.polarizationIsInten (pol): continue
+    if not util.pbpIsInten (bp): continue
     if not flags.any (): continue
     
-    seenpols.add (pol)
-    seenants.add (bl[0])
-    seenants.add (bl[1])
-    
+    for ap in util.pbp2paps (bp):
+        fpol = util.papFPol (ap)
+        seenpols.add (fpol)
+
+        if fpol in seenaps:
+            seenaps[fpol].add (ap)
+        else:
+            seenaps[fpol] = set ((ap, ))
+
     if first:
         time0 = int (time - 0.5) + 0.5
         tmin = time - time0
@@ -352,10 +354,10 @@ for (inp, preamble, data, flags, nread) in uvdat.readAll ():
     
     tmin = min (tmin, t)
     tmax = max (tmax, t)
-    integData[(bl, pol)] = (data, flags, var, inttime)
+    integData[bp] = (data, flags, var, inttime)
 
     if args.uvdplot:
-        uvdists.accum ((pol, bl[0], bl[1]), N.sqrt ((preamble[0:3]**2).sum ()))
+        uvdists.accum (bp, N.sqrt ((preamble[0:3]**2).sum ()))
 
 flushInteg ()
 flushAcc ()
@@ -364,8 +366,8 @@ print ' ... done. Read %d %s closure %s.' % (len (allData), item, datum)
 
 # OK, now do our fancy analysis.
 
-blStats = AccDict (StatsAccumulator, lambda sa, rms: sa.add (rms))
-antStats = AccDict (StatsAccumulator, lambda sa, rms: sa.add (rms))
+bpStats = AccDict (StatsAccumulator, lambda sa, rms: sa.add (rms))
+apStats = AccDict (StatsAccumulator, lambda sa, rms: sa.add (rms))
 
 if args.rmshist:
     allrms = GrowingVector ()
@@ -373,28 +375,28 @@ if args.rmshist:
 def processTriples ():
     for (key, gv) in allData.iteritems ():
         gv.doneAdding ()    
-        (pol, ant1, ant2, ant3) = key
+        (ap1, ap2, ap3) = key
         phs = gv.arr
         rms = N.sqrt (N.mean (phs**2))
 
         if args.rmshist:
             allrms.add (rms)
 
-        blStats.accum ((pol, ant1, ant2), rms)
-        blStats.accum ((pol, ant1, ant3), rms)
-        blStats.accum ((pol, ant2, ant3), rms)
-        antStats.accum ((pol, ant1), rms)
-        antStats.accum ((pol, ant2), rms)
-        antStats.accum ((pol, ant3), rms)
+        bpStats.accum (p2p (ap1, ap2), rms)
+        bpStats.accum (p2p (ap1, ap3), rms)
+        bpStats.accum (p2p (ap2, ap3), rms)
+        apStats.accum (ap1, rms)
+        apStats.accum (ap2, rms)
+        apStats.accum (ap3, rms)
 
-        yield (pol, ant1, ant2, ant3), rms
+        yield (ap1, ap2, ap3), rms
 
 def processQuads ():
     seenQuads = set ()
     
     for (key, gv) in allData.iteritems ():
         gv.doneAdding ()    
-        (pol, ant1, ant2, ant3, ant4) = key
+        (ap1, ap2, ap3, ap4) = key
 
         # Cf. Pearson & Readhead 1984 ARAA 22 97:
         # if we know the closure of k-l-m-n and k-l-n-m,
@@ -402,8 +404,8 @@ def processQuads ():
         # here, 1=k, 2=n, 3=m, 4=l, so we need to check for
         # 1-4-3-2 and 1-4-2-3
         
-        if (pol, ant1, ant4, ant3, ant2) in seenQuads and \
-           (pol, ant1, ant2, ant2, ant3) in seenQuads:
+        if (ap1, ap4, ap3, ap2) in seenQuads and \
+           (ap1, ap2, ap2, ap3) in seenQuads:
             continue
 
         seenQuads.add (key)
@@ -416,16 +418,16 @@ def processQuads ():
         if args.rmshist:
             allrms.add (lrms)
 
-        blStats.accum ((pol, ant1, ant2), lrms)
-        blStats.accum ((pol, ant1, ant3), lrms)
-        blStats.accum ((pol, ant2, ant4), lrms)
-        blStats.accum ((pol, ant3, ant4), lrms)
-        antStats.accum ((pol, ant1), lrms)
-        antStats.accum ((pol, ant2), lrms)
-        antStats.accum ((pol, ant3), lrms)
-        antStats.accum ((pol, ant4), lrms)
+        bpStats.accum (p2p (ap1, ap2), lrms)
+        bpStats.accum (p2p (ap1, ap3), lrms)
+        bpStats.accum (p2p (ap2, ap4), lrms)
+        bpStats.accum (p2p (ap3, ap4), lrms)
+        apStats.accum (ap1, lrms)
+        apStats.accum (ap2, lrms)
+        apStats.accum (ap3, lrms)
+        apStats.accum (ap4, lrms)
 
-        yield (pol, ant1, ant2, ant3, ant4), lrms
+        yield (ap1, ap2, ap3, ap4), lrms
 
 if args.amplitude:
     process = processQuads
@@ -443,13 +445,13 @@ else:
 worstCls = sorted (process (), key=key, reverse=not args.best)
 worstCls = worstCls[0:args.nclos]
 
-worstBls = sorted ((x for x in blStats.iteritems ()),
+worstBps = sorted ((x for x in bpStats.iteritems ()),
                    key=collkey, reverse=not args.best)
-worstBls = worstBls[0:args.nbl]
+worstBps = worstBps[0:args.nbl]
 
-worstAnts = sorted ((x for x in antStats.iteritems ()),
+worstAps = sorted ((x for x in apStats.iteritems ()),
                     key=collkey, reverse=not args.best)
-worstAnts = worstAnts[0:args.nant]
+worstAps = worstAps[0:args.nant]
 
 if args.best: adj = 'best'
 else: adj = 'worst'
@@ -458,21 +460,21 @@ if len (worstCls) > 0:
     print
     print '%s with %s %s closure values:' % (capdatum, adj, item)
     for ident, rms in worstCls:
-        print '%14s: %10g' % (identfmt (*ident), rms)
+        print '%14s: %10g' % (format (*ident), rms)
     
-if len (worstBls) > 0:
+if len (worstBps) > 0:
     print
     print 'Baselines with %s %s closure values:' % (adj, item)
     print '%14s  %10s (%10s, %5s)' % ('Baseline', stat, 'StdDev', ndatum)
-    for key, sa in worstBls:
-        print '%14s: %10g (%10g, %5d)' % (blfmt (*key), statkey (sa), sa.std (), sa.num ())
+    for bp, sa in worstBps:
+        print '%14s: %10g (%10g, %5d)' % (fmtPBP (bp), statkey (sa), sa.std (), sa.num ())
 
-if len (worstAnts) > 0:
+if len (worstAps) > 0:
     print
-    print 'Antennas with %s %s closure values:' % (adj, item)
-    print '%14s  %10s (%10s, %5s)' % ('Antenna', stat, 'StdDev', ndatum)
-    for key, sa in worstAnts:
-        print '%14s: %10g (%10g, %5d)' % (antfmt (*key), statkey (sa), sa.std (), sa.num ())
+    print 'Antpols with %s %s closure values:' % (adj, item)
+    print '%14s  %10s (%10s, %5s)' % ('Antpol', stat, 'StdDev', ndatum)
+    for ap, sa in worstAps:
+        print '%14s: %10g (%10g, %5d)' % (format (ap), statkey (sa), sa.std (), sa.num ())
 
 if args.rmshist:
     print
@@ -486,8 +488,8 @@ if args.blhist:
     print
     print 'Showing histogram of baseline closure values ...'
     import omega
-    n = int (N.ceil (N.log2 (len (blStats)) + 1))
-    values = [x.mean () for x in blStats.itervalues ()]
+    n = int (N.ceil (N.log2 (len (bpStats)) + 1))
+    values = [x.mean () for x in bpStats.itervalues ()]
     omega.quickHist (values, n).showBlocking ()
 
 if args.uvdplot:
@@ -499,9 +501,9 @@ if args.uvdplot:
     rmss = N.ndarray (n)
 
     i = 0
-    for key, uvdsa in uvdists.iteritems ():
+    for bp, uvdsa in uvdists.iteritems ():
         uvds[i] = uvdsa.mean ()
-        rmss[i] = blStats[key].mean ()
+        rmss[i] = bpStats[bp].mean ()
         i += 1
 
     uvds *= 0.001 # express in kilolambda.
