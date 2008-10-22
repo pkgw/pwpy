@@ -36,16 +36,17 @@ SECOND = 1. / 24 / 3600
 # Iterative averaging TSys computer
 
 class SysTemps (object):
-    def __init__ (self, flux, etaQ, maxtsys, showall, showfinal):
+    def __init__ (self, flux, etaQ, maxtsys, showpre, showall, showfinal):
         self.integData = {}
         self.tmin = None
         self.flux = flux
         self.etaQ = etaQ
         self.maxtsys = maxtsys
+        self.showpre = showpre
         self.showall = showall
         self.showfinal = showfinal
 
-    def accumulate (self, time, bl, data, flags, inttime):
+    def accumulate (self, time, bp, data, flags, inttime):
         if self.tmin is None:
             self.tmin = time
         else:
@@ -54,23 +55,23 @@ class SysTemps (object):
         times = flags * inttime
         dt = data * times
 
-        tup = self.integData.get (bl)
+        tup = self.integData.get (bp)
 
         if tup is not None:
             d0, t0 = tup
             times += t0
             dt += d0
 
-        self.integData[bl] = dt, times
+        self.integData[bp] = dt, times
 
     def _flatten (self):
         # Flatten out data into arrays of values we'll need
 
-        seenAnts = set ()
+        seenAps = set ()
         gai = GrowingArray (N.double, 7)
         gaa = GrowingArray (N.int, 2)
 
-        for bl, (dt, times) in self.integData.iteritems ():
+        for bp, (dt, times) in self.integData.iteritems ():
             w = N.where (times > 0)
             if len (w[0]) < 2: continue # if only 1 item, can't calc meaningful std
             tw = times[w]
@@ -81,10 +82,10 @@ class SysTemps (object):
             mimag = dt.imag.mean ()
             simag = dt.imag.std ()
             
-            gaa.add (bl[0], bl[1])
+            gaa.add (bp[0], bp[1])
             gai.add (mreal, sreal, mimag, simag, tw.mean (), 0., 0.)
-            seenAnts.add (bl[0])
-            seenAnts.add (bl[1])
+            seenAps.add (bp[0])
+            seenAps.add (bp[1])
 
         gaa.doneAdding ()
         gai.doneAdding ()
@@ -93,20 +94,20 @@ class SysTemps (object):
         
         del self.integData
         
-        self.ants = sorted (seenAnts)
+        self.aps = sorted (seenAps)
         self.gaa = gaa
         self.gai = gai
         self.tsyses = gai.col (6)
 
-        self.nbl = len (gaa)
-        self.nant = len (seenAnts)
-        self.idxs = xrange (0, self.nbl)
+        self.nbp = len (gaa)
+        self.nap = len (seenAps)
+        self.idxs = xrange (0, self.nbp)
 
-        self._flattenAnts ()
+        self._flattenAps ()
 
-    def _flattenAnts (self):
+    def _flattenAps (self):
         get = self.gaa.get
-        index = self.ants.index
+        index = self.aps.index
         
         for i in self.idxs:
             row = get (i)
@@ -116,7 +117,7 @@ class SysTemps (object):
         self.a1s = self.gaa.col (0)
         self.a2s = self.gaa.col (1)
 
-    def _computeBLSysTemps (self, jyperk, sdf):
+    def _computeBPSysTemps (self, jyperk, sdf):
         # Compute per-baseline tsyses
         flux = self.flux
         etaQ = self.etaQ
@@ -135,64 +136,64 @@ class SysTemps (object):
             tsys = gain * s * etaQ * N.sqrt (2 * sdf * 1e9 * meantime) / jyperk
 
             #if tsys > 300: 
-                #    print '  Crappy %d-%d: TSys = %g' % (bl[0], bl[1], tsys)
+                #    print '  Crappy %s: TSys = %g' % (util.fmtPAPs (bp), tsys)
                 #    print '    real: s, D, p:', sreal, Dr, pr
                 #    print '    imag: s, D, p:', simag, Di, pi
                 #    continue
         
             tsyses[i] = tsys
 
-    def _reflattenFiltered (self, skipAnts):
+    def _reflattenFiltered (self, skipAps):
         # prefix: o = old, n = new
 
-        seenAnts = set ()
+        seenAps = set ()
         nGaa = GrowingArray (N.int, 2)
         nGai = GrowingArray (N.double, 7)
         oA1s = self.a1s
         oA2s = self.a2s
-        oAnts = self.ants
+        oAps = self.aps
         ogaaGet = self.gaa.get
         ogaiGet = self.gai.get
 
         # Copy old data
 
         for i in self.idxs:
-            a1, a2 = oAnts[oA1s[i]], oAnts[oA2s[i]]
-            if a1 in skipAnts or a2 in skipAnts: continue
+            a1, a2 = oAps[oA1s[i]], oAps[oA2s[i]]
+            if a1 in skipAps or a2 in skipAps: continue
 
             nGai.addLine (ogaiGet (i))
             nGaa.add (a1, a2)
-            seenAnts.add (a1)
-            seenAnts.add (a2)
+            seenAps.add (a1)
+            seenAps.add (a2)
 
         nGaa.doneAdding ()
         nGai.doneAdding ()
 
-        assert len (nGaa) > 0, 'Skipped all antennas!'
+        assert len (nGaa) > 0, 'Skipped all antpols!'
         
-        self.ants = ants = sorted (seenAnts)
-        self.nbl = len (nGaa)
-        self.nant = len (seenAnts)
-        self.idxs = idxs = xrange (0, self.nbl)
+        self.aps = aps = sorted (seenAps)
+        self.nbp = len (nGaa)
+        self.nap = len (seenAps)
+        self.idxs = idxs = xrange (0, self.nbp)
         self.gaa = nGaa
         self.gai = nGai
         self.a1s = nGaa.col (0)
         self.a2s = nGaa.col (1)
         self.tsyses = nGai.col (6)
 
-        self._flattenAnts ()
+        self._flattenAps ()
     
     def _solve (self):
-        # Solve for per-ant tsyses
+        # Solve for per-antpol tsyses
         from numpy import sqrt, subtract, square, ndarray, zeros
         idxs = self.idxs
         a1s = self.a1s
         a2s = self.a2s
         tsyses = self.tsyses
         
-        chiwork = ndarray (self.nbl)
-        model = ndarray (self.nbl)
-        resid = ndarray (self.nbl)
+        chiwork = ndarray (self.nbp)
+        model = ndarray (self.nbp)
+        resid = ndarray (self.nbp)
 
         def chisq (g):
             for i in idxs:
@@ -203,7 +204,7 @@ class SysTemps (object):
             square (resid, chiwork)
             return chiwork.sum ()
 
-        gradwork = ndarray (self.nant)
+        gradwork = ndarray (self.nap)
 
         def grad (g):
             gradwork.fill (0.)
@@ -223,8 +224,8 @@ class SysTemps (object):
             #print ' Grad:', gradwork
             return gradwork
 
-        guess = zeros (self.nant)
-        n = zeros (self.nant, dtype=N.int)
+        guess = zeros (self.nap)
+        n = zeros (self.nap, dtype=N.int)
 
         for i in idxs:
             a1, a2, tsys = a1s[i], a2s[i], tsyses[i]
@@ -236,9 +237,9 @@ class SysTemps (object):
 
         guess /= n
         #print 'guess:', guess
-        bounds = [(1., None)] * self.nant
+        bounds = [(1., None)] * self.nap
         soln, chisq, info = fmin_l_bfgs_b (chisq, guess, grad, bounds=bounds, factr=1e9)
-        rchisq = chisq / (self.nbl - self.nant)
+        rchisq = chisq / (self.nbp - self.nap)
         print '   Pseudo-RChiSq:', rchisq
 
         if info['warnflag'] != 0:
@@ -253,7 +254,7 @@ class SysTemps (object):
         self.resid = resid
 
     def _print (self):
-        ants = self.ants
+        aps = self.aps
         tsyses = self.tsyses
         model = self.model
         soln = self.soln
@@ -266,8 +267,8 @@ class SysTemps (object):
         col = 0
         sa = StatsAccumulator ()
         
-        for i in xrange (0, self.nant):
-            # Compute RMS residual for this ant
+        for i in xrange (0, self.nap):
+            # Compute RMS residual for this antpol
             sa.clear ()
             for j in self.idxs:
                 if a1s[j] != i and a2s[j] != i: continue
@@ -276,10 +277,10 @@ class SysTemps (object):
             
             if col == 0: print ' ',
             if col < 3:
-                print ' %3d %#6g (%#4g)' % (ants[i], soln[i], rms),
+                print ' %3s %#6g (%#4g)' % (util.fmtPAP (aps[i]), soln[i], rms),
                 col += 1
             else:
-                print ' %3d %#6g (%#4g)' % (ants[i], soln[i], rms)
+                print ' %3s %#6g (%#4g)' % (util.fmtPAP (aps[i]), soln[i], rms)
                 col = 0
 
         # Make sure we end with a newline
@@ -292,100 +293,106 @@ class SysTemps (object):
         
         for i in xrange (lb, 0):
             idx = idxs[i]
-            bl = ('%d-%d' % (ants[a1s[idx]], ants[a2s[idx]])).rjust (6)
+            bp = util.fmtPAPs ((aps[a1s[idx]], aps[a2s[idx]])).rjust (8)
             
             if col == 0: print ' ',
             if col < 4:
-                print '%s % #6g' % (bl, resid[idx]),
+                print '%s % #6g' % (bp, resid[idx]),
                 col += 1
             else:
-                print '%s % #6g' % (bl, resid[idx])
+                print '%s % #6g' % (bp, resid[idx])
                 col = 0
 
         # Make sure we end with a newline
         print
 
-    def _show (self):
-        ants = self.ants
+    def _show (self, haveModel):
+        aps = self.aps
         tsyses = self.tsyses
-        model = self.model
-        soln = self.soln
         a1s = self.a1s
         a2s = self.a2s
-        
-        for i in xrange (0, self.nant):
+
+        if haveModel:
+            model = self.model
+            soln = self.soln
+
+        for i in xrange (0, self.nap):
             x = []
             yobs = []
             ymod = []
             
             for j in self.idxs:
                 if a1s[j] == i:
-                    x.append (ants[a2s[j]])
+                    x.append (aps[a2s[j]])
                 elif a2s[j] == i:
-                    x.append (ants[a1s[j]])
+                    x.append (aps[a1s[j]])
                 else: continue
 
                 yobs.append (tsyses[j])
-                ymod.append (model[j])
+
+                if haveModel:
+                    ymod.append (model[j])
 
             # print x, yobs, ymod
             p = omega.quickXY (x, yobs, 'Observed', lines=False)
-            p.addXY (x, ymod, 'Model', lines=False)
-            p.addXY ((0, ants[-1]), (soln[i], soln[i]), 'TSys %d' % ants[i])
-            p.setBounds (0, ants[-1], 0)
+            if haveModel:
+                p.addXY (x, ymod, 'Model', lines=False)
+                p.addXY ((0, aps[-1]), (soln[i], soln[i]), 'TSys ' + util.fmtPAP (aps[i]))
+            p.setBounds (0, aps[-1], 0)
             p.showBlocking ()
 
     def flush (self, jyperk, sdf):
         self._flatten ()
-        self._computeBLSysTemps (jyperk, sdf)
+        self._computeBPSysTemps (jyperk, sdf)
 
+        if self.showpre: self._show (False)
+        
         print 'Iteratively flagging ...'
         
         while True:
             self._solve ()
             #self._print ()
 
-            if self.showall: self._show ()
+            if self.showall: self._show (True)
             
-            badAnts = []
-            for i in xrange (0, self.nant):
+            badAps = []
+            for i in xrange (0, self.nap):
                 if self.soln[i] > self.maxtsys:
-                    badAnts.append ((self.ants[i], self.soln[i]))
+                    badAps.append ((self.aps[i], self.soln[i]))
 
-            if len (badAnts) == 0: break
+            if len (badAps) == 0: break
 
             # Let's not flag too many at once here
-            badAnts.sort (key = lambda t: t[1], reverse=True)
-            badAnts = badAnts[0:3]
+            badAps.sort (key = lambda t: t[1], reverse=True)
+            badAps = badAps[0:3]
             
-            for ant, soln in badAnts:
-                print '      Flagging antenna %2d: TSys %#4g > %#4g' % \
-                      (ant, soln, self.maxtsys)
+            for ap, soln in badAps:
+                print '      Flagging antpol %s: TSys %#4g > %#4g' % \
+                      (util.fmtPAP (ap), soln, self.maxtsys)
 
-            self._reflattenFiltered ([t[0] for t in badAnts])
+            self._reflattenFiltered ([t[0] for t in badAps])
 
         print
         self._print ()
         
         # If showall, we already showed this solution up above.
-        if self.showfinal and not self.showall: self._show ()
+        if self.showfinal and not self.showall: self._show (True)
         
         tmin = self.tmin
         
         self.integData = {}
         self.tmin = None
 
-        return tmin, dict (zip (self.ants, self.soln))
+        return tmin, dict (zip (self.aps, self.soln))
 
 # Hooks up the SysTemp calculator to the reading of a dataset
 
 class DataProcessor (object):
-    def __init__ (self, interval, flux, etaQ, maxtsys, showall=False, showfinal=False):
+    def __init__ (self, interval, flux, etaQ, maxtsys, showpre=False, showall=False, showfinal=False):
         self.interval = interval
         
-        self.sts = SysTemps (flux, etaQ, maxtsys, showall, showfinal)
+        self.sts = SysTemps (flux, etaQ, maxtsys, showpre, showall, showfinal)
         self.first = True
-        self.thePol = None
         self.solutions = []
 
     def process (self, inp, preamble, data, flags, nread):
@@ -441,25 +448,16 @@ class DataProcessor (object):
         data = data[0:nread]
         flags = flags[0:nread]
 
-        bl = util.decodeBaseline (preamble[4])
+        bp = util.mir2paps (inp, preamble)
 
-        if bl[0] == bl[1]: return # skip autos
-    
-        pol = uvdat.getPol ()
+        if bp[0] != bp[1] and util.papsAreInten (bp):
+            # We only consider intensity-type cross-correlations ...
 
-        if not util.polarizationIsInten (pol): return
-    
-        if self.thePol is None:
-            self.thePol = pol
-        else:
-            if pol != self.thePol:
-                raise Exception ('Single-pol data only, sorry')
+            if (time - tmin) > self.interval or (tmax - time) > self.interval:
+                self.solutions.append (self.sts.flush (jyperk, sdf))
+                tmin = tmax = time
 
-        if (time - tmin) > self.interval or (tmax - time) > self.interval:
-            self.solutions.append (self.sts.flush (jyperk, sdf))
-            tmin = tmax = time
-
-        self.sts.accumulate (time, bl, data, flags, inttime)
+            self.sts.accumulate (time, bp, data, flags, inttime)
 
         self.tmin, self.tmax, self.tprev = tmin, tmax, tprev
         self.jyperk, self.inttime, self.sdf = jyperk, inttime, sdf
@@ -479,7 +477,8 @@ def rewriteData (banner, vis, out, solutions):
 
     first = True
     nextSolnIdx = 0
-
+    thePol = None
+    
     for inp, preamble, data, flags, nread in vis.readLowlevel (False):
         if first:
             first = False
@@ -553,9 +552,14 @@ def rewriteData (banner, vis, out, solutions):
                 dOut.writeVarFloat ('xyphase', inp.getVarFloat ('xyphase', tup[1]))
 
         time = preamble[3]
-        bl = util.decodeBaseline (preamble[4])
-        pol = uvdat.getPol ()
+        bp = util.mir2paps (inp, preamble)
+        pol = util.paps2ants (bp)[2]
 
+        if thePol is None:
+            thePol = pol
+        elif pol != thePol:
+            raise Exception ('Can only write meaningful systemp values for one set of polarizations at time.')
+        
         # Write a new systemp entry?
 
         if time >= solutions[nextSolnIdx][0]:
@@ -563,21 +567,23 @@ def rewriteData (banner, vis, out, solutions):
             assert solns is not None, 'Bizarre interval calculation issues?'
         
             systemps = N.zeros (nants, dtype=N.float32)
-            skipAnts = set ()
+            skipAps = set ()
         
             for i in xrange (0, nants):
-                ant = i + 1 # stupid indexing differences
+                for fpol in xrange (0, 8):
+                    ap = util.antpol2pap (i + 1, fpol)
 
-                if ant in solns:
-                    systemps[i] = solns[ant]
-                else:
-                    skipAnts.add (ant)
+                    if ap in solns:
+                        systemps[i] = solns[ap]
+                    else:
+                        skipAps.add (ap)
 
             dOut.writeVarFloat ('systemp', systemps)
             nextSolnIdx += 1
+            thePol = None
 
-        if bl[0] in skipAnts or bl[1] in skipAnts:
-            # No TSys solution for one of the ants. Flag the record.
+        if bp[0] in skipAps or bp[1] in skipAps:
+            # No TSys solution for one of the antpols. Flag the record.
             flags.fill (0)
     
         inp.copyLineVars (dOut)
@@ -605,7 +611,7 @@ def task ():
     keys.keyword ('vis', 'f', ' ')
     keys.keyword ('out', 'f', ' ')
     keys.keyword ('quant', 'i', None, 2)
-    keys.option ('showfinal', 'showall')
+    keys.option ('showpre', 'showfinal', 'showall')
 
     args = keys.process ()
     print 'Configuration:'
@@ -660,7 +666,8 @@ def task ():
 
     # Let's go!
 
-    dp = DataProcessor (interval, args.flux, etaQ, args.maxtsys, args.showall, args.showfinal)
+    dp = DataProcessor (interval, args.flux, etaQ, args.maxtsys, args.showpre,
+                        args.showall, args.showfinal)
 
     for tup in vis.readLowlevel (False):
         dp.process (*tup)
