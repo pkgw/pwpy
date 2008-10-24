@@ -102,9 +102,7 @@ keys.doUvdat ('dsl3xw', True)
 integData = {}
 accData = {}
 
-#def cr (): return GrowingArray (N.double, 3)
-#allData = AccDict (cr, lambda ga, tup: ga.add (*tup))
-allData = AccDict (GrowingVector, lambda o, v: o.add (v))
+allData = AccDict (VectorGrower, lambda o, v: o.add (v))
 
 seenaps = {}
 seenpols = set ()
@@ -370,13 +368,12 @@ bpStats = AccDict (StatsAccumulator, lambda sa, rms: sa.add (rms))
 apStats = AccDict (StatsAccumulator, lambda sa, rms: sa.add (rms))
 
 if args.rmshist:
-    allrms = GrowingVector ()
+    allrms = VectorGrower ()
 
 def processTriples ():
-    for (key, gv) in allData.iteritems ():
-        gv.doneAdding ()    
+    for (key, vg) in allData.iteritems ():
+        phs = vg.finish ()
         (ap1, ap2, ap3) = key
-        phs = gv.arr
         rms = N.sqrt (N.mean (phs**2))
 
         if args.rmshist:
@@ -394,8 +391,8 @@ def processTriples ():
 def processQuads ():
     seenQuads = set ()
     
-    for (key, gv) in allData.iteritems ():
-        gv.doneAdding ()    
+    for (key, vg) in allData.iteritems ():
+        amps = vg.finish ()
         (ap1, ap2, ap3, ap4) = key
 
         # Cf. Pearson & Readhead 1984 ARAA 22 97:
@@ -412,7 +409,6 @@ def processQuads ():
 
         # This quad is not redundant.
         
-        amps = gv.arr
         lrms = N.log (N.mean (amps**2)) / 2 # log of the rms
 
         if args.rmshist:
@@ -480,9 +476,9 @@ if args.rmshist:
     print
     print 'Showing histogram of RMS values ...'
     import omega
-    allrms.doneAdding ()
-    n = int (N.ceil (N.log2 (len (allrms)) + 1))
-    omega.quickHist (allrms.arr, n).showBlocking ()
+    rms = allrms.finish ()
+    n = int (N.ceil (N.log2 (rms.size) + 1))
+    omega.quickHist (rms, n).showBlocking ()
 
 if args.blhist:
     print
