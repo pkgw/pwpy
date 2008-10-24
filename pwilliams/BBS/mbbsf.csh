@@ -111,3 +111,20 @@ while (($mode == debug || `$obsbin/stopnow.csh $begin $stopHour` != stop) && $pa
     echo " - $script $mode $instr $stop in $partDir" |tee -ia mbbsf.log
     (cd $partDir && $script $mode $instr $stop)
 end
+
+# If in debug mode, clean up the directories we created.
+# This, well, cleans things up, and also allows us to rerun in debug
+# mode since the loop above tests for the existence of the partN directories
+# to know when to move to the next step.
+#
+# Avoid using rm -rf as a paranoia measure.
+
+if ($mode == debug) then
+    foreach n (`seq 1 $nparts`)
+	set d = part$n
+	rm $d/*.nsephem $d/*.msephem $d/bbs.uuid $d/config.py $d/config.pyc
+	rmdir $d
+    end
+
+    rm mbbsf.log
+endif
