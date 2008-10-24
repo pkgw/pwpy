@@ -115,7 +115,10 @@ def getScans (archDir, scriptName, scriptRev):
         catcherType = 'fxmir'
         prefix = 'bbs'
     elif scriptName == 'bbsf.py':
-        catcherType = 'atafx+fxmir'
+        if scriptRev > 188:
+            catcherType = 'atafx'
+        else:
+            catcherType = 'atafx+fxmir'
         prefix = 'bbsf'
     else:
         assert False, 'Unhandled scriptName for catcherType determination.'

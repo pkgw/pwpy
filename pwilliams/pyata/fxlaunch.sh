@@ -10,11 +10,5 @@ lo="$7"
 nsephem="$8"
 duration="$9"
 
-echo frfx64.csh `pwd` $freq $src $radec $ndumps
-frfx64.csh `pwd` $freq $src $radec $ndumps &
-
 echo atafx $outbase-$src-$freq $antpols $lo $nsephem -duration $duration -noabort -fringeon
-atafx $outbase-$src-$freq $antpols $lo $nsephem -duration $duration -noabort -fringeon
-
-wait
-exit $?
+exec atafx $outbase-$src-$freq $antpols $lo $nsephem -duration $duration -noabort -fringeon

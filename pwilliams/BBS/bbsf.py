@@ -26,6 +26,9 @@ from atactl import *
 SVNID = '$Id$'
 me = 'bbsf'
 
+# This line added to update the script revision for when we
+# stopped taking fxmir data.
+
 # Observing script state. A bit cumbersome, but this lets us
 # resume the script if we're canceled in the middle of an
 # observation. The logic here controls ALL of the observations
