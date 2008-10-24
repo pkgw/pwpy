@@ -68,8 +68,8 @@ class SysTemps (object):
         # Flatten out data into arrays of values we'll need
 
         seenAps = set ()
-        gai = GrowingArray (N.double, 7)
-        gaa = GrowingArray (N.int, 2)
+        aginfo = ArrayGrower (6, N.double)
+        agants = ArrayGrower (2, N.int)
 
         for bp, (dt, times) in self.integData.iteritems ():
             w = N.where (times > 0)
@@ -82,50 +82,41 @@ class SysTemps (object):
             mimag = dt.imag.mean ()
             simag = dt.imag.std ()
             
-            gaa.add (bp[0], bp[1])
-            gai.add (mreal, sreal, mimag, simag, tw.mean (), 0., 0.)
+            agants.add (bp[0], bp[1])
+            aginfo.add (mreal, sreal, mimag, simag, tw.mean (), 0.)
             seenAps.add (bp[0])
             seenAps.add (bp[1])
 
-        gaa.doneAdding ()
-        gai.doneAdding ()
-
-        assert len (gaa) > 0, 'No data accepted!'
-        
         del self.integData
         
         self.aps = sorted (seenAps)
-        self.gaa = gaa
-        self.gai = gai
-        self.tsyses = gai.col (6)
+        self.info = aginfo.finish ()
+        assert len (self.info) > 0, 'No data accepted!'
+        self.ants = agants.finish ()
+        self.tsyses = self.info[:,5]
 
-        self.nbp = len (gaa)
+        self.nbp = len (self.info)
         self.nap = len (seenAps)
         self.idxs = xrange (0, self.nbp)
 
         self._flattenAps ()
 
     def _flattenAps (self):
-        get = self.gaa.get
         index = self.aps.index
         
         for i in self.idxs:
-            row = get (i)
+            row = self.ants[i]
             row[0] = index (row[0])
             row[1] = index (row[1])
-
-        self.a1s = self.gaa.col (0)
-        self.a2s = self.gaa.col (1)
 
     def _computeBPSysTemps (self, jyperk, sdf):
         # Compute per-baseline tsyses
         flux = self.flux
         etaQ = self.etaQ
         tsyses = self.tsyses
-        get = self.gai.get
         
         for i in self.idxs:
-            mreal, sreal, mimag, simag, meantime, tmp1, tmp2 = get (i)
+            mreal, sreal, mimag, simag, meantime, tmp1 = self.info[i]
             s = (sreal + simag) / 2
 
             if flux is None:
@@ -136,7 +127,7 @@ class SysTemps (object):
             tsys = gain * s * etaQ * N.sqrt (2 * sdf * 1e9 * meantime) / jyperk
 
             #if tsys > 300: 
-                #    print '  Crappy %s: TSys = %g' % (util.fmtPAPs (bp), tsys)
+                #    print '  Crappy %s: TSys = %g' % (util.fmtAPs (bp), tsys)
                 #    print '    real: s, D, p:', sreal, Dr, pr
                 #    print '    imag: s, D, p:', simag, Di, pi
                 #    continue
@@ -147,39 +138,35 @@ class SysTemps (object):
         # prefix: o = old, n = new
 
         seenAps = set ()
-        nGaa = GrowingArray (N.int, 2)
-        nGai = GrowingArray (N.double, 7)
-        oA1s = self.a1s
-        oA2s = self.a2s
+        naginfo = ArrayGrower (6, N.double)
+        nagants = ArrayGrower (2, N.int)
+        oAnts = self.ants
         oAps = self.aps
-        ogaaGet = self.gaa.get
-        ogaiGet = self.gai.get
 
         # Copy old data
 
         for i in self.idxs:
-            a1, a2 = oAps[oA1s[i]], oAps[oA2s[i]]
+            oa1, oa2 = oAnts[i]
+            a1, a2 = oAps[oa1], oAps[oa2]
             if a1 in skipAps or a2 in skipAps: continue
 
-            nGai.addLine (ogaiGet (i))
-            nGaa.add (a1, a2)
+            naginfo.addLine (self.info[i])
+            nagants.add (a1, a2)
             seenAps.add (a1)
             seenAps.add (a2)
 
-        nGaa.doneAdding ()
-        nGai.doneAdding ()
+        info = naginfo.finish ()
+        ants = nagants.finish ()
 
-        assert len (nGaa) > 0, 'Skipped all antpols!'
+        assert len (info) > 0, 'Skipped all antpols!'
         
         self.aps = aps = sorted (seenAps)
-        self.nbp = len (nGaa)
+        self.nbp = len (info)
         self.nap = len (seenAps)
         self.idxs = idxs = xrange (0, self.nbp)
-        self.gaa = nGaa
-        self.gai = nGai
-        self.a1s = nGaa.col (0)
-        self.a2s = nGaa.col (1)
-        self.tsyses = nGai.col (6)
+        self.info = info
+        self.ants = ants
+        self.tsyses = info[:,5]
 
         self._flattenAps ()
     
@@ -187,8 +174,7 @@ class SysTemps (object):
         # Solve for per-antpol tsyses
         from numpy import sqrt, subtract, square, ndarray, zeros
         idxs = self.idxs
-        a1s = self.a1s
-        a2s = self.a2s
+        ants = self.ants
         tsyses = self.tsyses
         
         chiwork = ndarray (self.nbp)
@@ -197,7 +183,8 @@ class SysTemps (object):
 
         def chisq (g):
             for i in idxs:
-                chiwork[i] = g[a1s[i]] * g[a2s[i]]
+                a1, a2 = ants[i]
+                chiwork[i] = g[a1] * g[a2]
 
             sqrt (chiwork, model)
             subtract (model, tsyses, resid)
@@ -210,7 +197,8 @@ class SysTemps (object):
             gradwork.fill (0.)
 
             for i in idxs:
-                a1, a2, tsys = a1s[i], a2s[i], tsyses[i]
+                a1, a2 = ants[i]
+                tsys = tsyses[i]
                 model[i] = sqrt (g[a1] * g[a2])
             
                 # chi element = (sqrt(g1 g2) - t12)**2
@@ -228,8 +216,8 @@ class SysTemps (object):
         n = zeros (self.nap, dtype=N.int)
 
         for i in idxs:
-            a1, a2, tsys = a1s[i], a2s[i], tsyses[i]
-
+            a1, a2 = ants[i]
+            tsys = tsyses[i]
             guess[a1] += tsys
             guess[a2] += tsys
             n[a1] += 1
@@ -259,8 +247,7 @@ class SysTemps (object):
         model = self.model
         soln = self.soln
         resid = self.resid
-        a1s = self.a1s
-        a2s = self.a2s
+        ants = self.ants
         
         print 'Systemp solutions:'
 
@@ -271,16 +258,16 @@ class SysTemps (object):
             # Compute RMS residual for this antpol
             sa.clear ()
             for j in self.idxs:
-                if a1s[j] != i and a2s[j] != i: continue
+                if i not in ants[j]: continue
                 sa.add (resid[j])
             rms = sa.rms ()
             
             if col == 0: print ' ',
             if col < 3:
-                print ' %3s %#6g (%#4g)' % (util.fmtPAP (aps[i]), soln[i], rms),
+                print ' %3s %#6g (%#4g)' % (util.fmtAP (aps[i]), soln[i], rms),
                 col += 1
             else:
-                print ' %3s %#6g (%#4g)' % (util.fmtPAP (aps[i]), soln[i], rms)
+                print ' %3s %#6g (%#4g)' % (util.fmtAP (aps[i]), soln[i], rms)
                 col = 0
 
         # Make sure we end with a newline
@@ -293,7 +280,8 @@ class SysTemps (object):
         
         for i in xrange (lb, 0):
             idx = idxs[i]
-            bp = util.fmtPAPs ((aps[a1s[idx]], aps[a2s[idx]])).rjust (8)
+            a1, a2 = ants[idx]
+            bp = util.fmtAPs ((aps[a1], aps[a2])).rjust (8)
             
             if col == 0: print ' ',
             if col < 4:
@@ -309,8 +297,7 @@ class SysTemps (object):
     def _show (self, haveModel):
         aps = self.aps
         tsyses = self.tsyses
-        a1s = self.a1s
-        a2s = self.a2s
+        ants = self.ants
 
         if haveModel:
             model = self.model
@@ -322,10 +309,12 @@ class SysTemps (object):
             ymod = []
             
             for j in self.idxs:
-                if a1s[j] == i:
-                    x.append (aps[a2s[j]])
-                elif a2s[j] == i:
-                    x.append (aps[a1s[j]])
+                a1, a2 = ants[j]
+                
+                if a1 == i:
+                    x.append (aps[a2])
+                elif a2 == i:
+                    x.append (aps[a1])
                 else: continue
 
                 yobs.append (tsyses[j])
@@ -337,7 +326,7 @@ class SysTemps (object):
             p = omega.quickXY (x, yobs, 'Observed', lines=False)
             if haveModel:
                 p.addXY (x, ymod, 'Model', lines=False)
-                p.addXY ((0, aps[-1]), (soln[i], soln[i]), 'TSys ' + util.fmtPAP (aps[i]))
+                p.addXY ((0, aps[-1]), (soln[i], soln[i]), 'TSys ' + util.fmtAP (aps[i]))
             p.setBounds (0, aps[-1], 0)
             p.showBlocking ()
 
@@ -368,7 +357,7 @@ class SysTemps (object):
             
             for ap, soln in badAps:
                 print '      Flagging antpol %s: TSys %#4g > %#4g' % \
-                      (util.fmtPAP (ap), soln, self.maxtsys)
+                      (util.fmtAP (ap), soln, self.maxtsys)
 
             self._reflattenFiltered ([t[0] for t in badAps])
 
@@ -448,9 +437,9 @@ class DataProcessor (object):
         data = data[0:nread]
         flags = flags[0:nread]
 
-        bp = util.mir2paps (inp, preamble)
+        bp = util.mir2aps (inp, preamble)
 
-        if bp[0] != bp[1] and util.papsAreInten (bp):
+        if bp[0] != bp[1] and util.apsAreInten (bp):
             # We only consider intensity-type cross-correlations ...
 
             if (time - tmin) > self.interval or (tmax - time) > self.interval:
@@ -552,8 +541,8 @@ def rewriteData (banner, vis, out, solutions):
                 dOut.writeVarFloat ('xyphase', inp.getVarFloat ('xyphase', tup[1]))
 
         time = preamble[3]
-        bp = util.mir2paps (inp, preamble)
-        pol = util.paps2ants (bp)[2]
+        bp = util.mir2aps (inp, preamble)
+        pol = util.aps2ants (bp)[2]
 
         if thePol is None:
             thePol = pol
@@ -571,7 +560,7 @@ def rewriteData (banner, vis, out, solutions):
         
             for i in xrange (0, nants):
                 for fpol in xrange (0, 8):
-                    ap = util.antpol2pap (i + 1, fpol)
+                    ap = util.antpol2ap (i + 1, fpol)
 
                     if ap in solns:
                         systemps[i] = solns[ap]

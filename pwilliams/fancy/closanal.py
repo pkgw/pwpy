@@ -82,7 +82,7 @@
 
 import numpy as N
 from mirtask import keys, util, uvdat
-from mirtask.util import fmtPBP
+from mirtask.util import fmtBP
 from numutils import *
 import sys
 
@@ -109,10 +109,10 @@ allData = AccDict (GrowingVector, lambda o, v: o.add (v))
 seenaps = {}
 seenpols = set ()
 
-p2p = lambda ap1, ap2: util.paps2pbp ((ap1, ap2))
+p2p = lambda ap1, ap2: util.aps2bp ((ap1, ap2))
 
 def format (*aps):
-    return '-'.join (util.fmtPAP (x) for x in aps)
+    return '-'.join (util.fmtAP (x) for x in aps)
 
 def _flagAnd (flags1, flags2, *rest):
     # Avoid allocation of many temporary arrays here.
@@ -314,18 +314,18 @@ for (inp, preamble, data, flags, nread) in uvdat.readAll ():
     flags = flags[0:nread].copy ()
 
     time = preamble[3]
-    bp = util.mir2pbp (inp, preamble)
+    bp = util.mir2bp (inp, preamble)
     
     var = uvdat.getVariance ()
     inttime = inp.getVarFloat ('inttime')
     
     # Some first checks.
     
-    if not util.pbpIsInten (bp): continue
+    if not util.bpIsInten (bp): continue
     if not flags.any (): continue
     
-    for ap in util.pbp2paps (bp):
-        fpol = util.papFPol (ap)
+    for ap in util.bp2aps (bp):
+        fpol = util.apFPol (ap)
         seenpols.add (fpol)
 
         if fpol in seenaps:
@@ -467,7 +467,7 @@ if len (worstBps) > 0:
     print 'Baselines with %s %s closure values:' % (adj, item)
     print '%14s  %10s (%10s, %5s)' % ('Baseline', stat, 'StdDev', ndatum)
     for bp, sa in worstBps:
-        print '%14s: %10g (%10g, %5d)' % (fmtPBP (bp), statkey (sa), sa.std (), sa.num ())
+        print '%14s: %10g (%10g, %5d)' % (fmtBP (bp), statkey (sa), sa.std (), sa.num ())
 
 if len (worstAps) > 0:
     print
