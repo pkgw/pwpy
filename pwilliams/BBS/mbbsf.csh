@@ -9,7 +9,7 @@
 set planDir = /home/pkwill/plans
 set obsbin = /home/obs/bin
 set script = /home/obs/mmm/pwilliams/BBS/bbsf.py
-set begin = `date +'%H %M' |awk '{print $1 + ($2/60)}'`
+set begin = `date +'%H %M' |awk '{print $1 + ($2/60) - 0.01}'`
 set svnid = '$Id$'
 
 if ($#argv != 4) then
