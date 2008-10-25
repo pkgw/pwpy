@@ -45,6 +45,9 @@ class BBSState (State):
         self.dfObsDur = dfObsDur
         self.ifreq = self.isrc = self.ilist = 0
 
+        atactl.roundFocusSetting = self.roundFocus
+        atactl.makeAttenKey = self.attenKey
+
     def next (self):
         self.ifreq += 1
 
@@ -78,6 +81,23 @@ class BBSState (State):
         else:
             observe (self.hookup, me, src, freq, dur)
 
+    # Tweak the focus-setting and attemplifier-setting
+    # logic: use the same settings for all sky frequencies
+    # in the same GHz range. This saves time since
+    # setting attemplifiers and especially focusing are
+    # slow operations.
+            
+    def roundFocus (self, s):
+        maxFreq = 0
+
+        for f in self.freqLists[self.ilist]:
+            maxFreq = max (maxFreq, f)
+
+        return maxFreq
+
+    def attenKey (self, src, freq):
+        return self.ilist
+        
 # Default values.
 
 defaultObsDur = 60 # seconds
@@ -131,23 +151,6 @@ if instr == 'default': instr = None
 
 stopHour = float (sys.argv[3])
 
-# Tweak the focus-setting and attemplifier-setting
-# logic: use the same settings for all sky frequencies
-# in the same GHz range. This saves time since
-# setting attemplifiers and especially focusing are
-# slow operations.
-
-def roundFocus (s):
-    if s % 1000 == 0: return s
-    return s - (s % 1000) + 1000
-
-atactl.roundFocusSetting = roundFocus
-
-def attenKey (src, freq):
-    return freq - (freq % 1000)
-
-atactl.makeAttenKey = attenKey
-        
 # That was all prep. Now let's go!
 
 initScript (reallyDoIt, me + '.log')
