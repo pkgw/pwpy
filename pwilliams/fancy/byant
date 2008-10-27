@@ -11,7 +11,7 @@
 import sys
 import numpy as N
 import omega
-from numutils import GrowingArray, AccDict
+from numutils import ArrayGrower, AccDict
 from mirtask import uvdat, keys, util
 
 # The things we can plot
@@ -58,12 +58,12 @@ only = opts.only
 # Load data
 
 def _cr ():
-    return GrowingArray (N.float, 2)
+    return ArrayGrower (2, N.float)
 
 def _acc (ga, tup):
     ga.add (tup[0], tup[1])
     
-byAnt = AccDict (_cr, _acc)
+byAp = AccDict (_cr, _acc)
 
 for dIn, p, d, f, n in uvdat.readAll ():
     # Average down this visibility
@@ -76,40 +76,37 @@ for dIn, p, d, f, n in uvdat.readAll ():
     
     # Collect data
     
-    bl = util.decodeBaseline (p[4])
+    bp = util.mir2aps (dIn, p)
 
     if not xantdep: x = xfunc (dIn, p, d)
     if not yantdep: y = yfunc (dIn, p, d)
 
     if only > 0:
         if only in bl:
-            if only == bl[0]: other = bl[1]
-            else: other = bl[0]
+            if only == bp[0]: other = bp[1]
+            else: other = bp[0]
             
             if xantdep: x = xfunc (only, other, dIn, p, d)
             if yantdep: y = yfunc (only, other, dIn, p, d)
-            byAnt.accum (only, (x, y))
+            byAp.accum (only, (x, y))
     else:
-        if xantdep: x = xfunc (bl[0], bl[1], dIn, p, d)
-        if yantdep: y = yfunc (bl[0], bl[1], dIn, p, d)
-        byAnt.accum (bl[0], (x, y))
+        if xantdep: x = xfunc (bp[0], bp[1], dIn, p, d)
+        if yantdep: y = yfunc (bp[0], bp[1], dIn, p, d)
+        byAp.accum (bp[0], (x, y))
     
-        if bl[1] != bl[0]:
-            if xantdep: x = xfunc (bl[1], bl[0], dIn, p, d)
-            if yantdep: y = yfunc (bl[1], bl[0], dIn, p, d)
-            byAnt.accum (bl[1], (x, y))
+        if bp[1] != bp[0]:
+            if xantdep: x = xfunc (bp[1], bp[0], dIn, p, d)
+            if yantdep: y = yfunc (bp[1], bp[0], dIn, p, d)
+            byAp.accum (bp[1], (x, y))
     
 # Plot it
 
-sants = sorted (byAnt.iterkeys ())
+saps = sorted (byAp.iterkeys ())
 
-for ant in sants:
-    ga = byAnt[ant]
-    ga.doneAdding ()
-    x = ga.col (0)
-    y = ga.col (1)
+for ap in saps:
+    arr = byAp[ap].finish ()
 
-    p = omega.quickXY (x, y, 'Ant %d' % ant, lines=False)
+    p = omega.quickXY (arr[:,0], arr[:,1], 'Antpol %s' % util.fmtAP (ap), lines=False)
     p.setLabels (xaxis, yaxis)
 
     try:
