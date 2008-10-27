@@ -574,7 +574,12 @@ def rewriteData (banner, vis, out, solutions):
         if bp[0] in skipAps or bp[1] in skipAps:
             # No TSys solution for one of the antpols. Flag the record.
             flags.fill (0)
-    
+
+        # Convert UVW coordinates from wavelengths back to nanoseconds
+        # (readLowlevel automatically has Miriad do the conversion to
+        # wavelengths when reading data)
+        preamble[0:3] /= inp.getVarDouble ('sfreq')
+        
         inp.copyLineVars (dOut)
         dOut.writeVarInt ('pol', pol)
         dOut.write (preamble, data, flags, nread)
