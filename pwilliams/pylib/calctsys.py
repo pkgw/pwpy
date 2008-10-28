@@ -563,6 +563,7 @@ def rewriteData (banner, vis, out, solutions):
                     if ap in solns:
                         systemps[i] = solns[ap]
                     else:
+                        systemps[i] = 9999
                         skipAps.add (ap)
 
             dOut.writeVarFloat ('systemp', systemps)
