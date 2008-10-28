@@ -612,6 +612,13 @@ def task ():
         print >>sys.stderr, 'Error: no UV input specified.'
         sys.exit (1)
 
+    if args.showpre or args.showfinal or args.showall:
+        try: import omega, omega.gtkUtil
+        except ImportError, e:
+            print >>sys.stderr, 'Unable to load module omega:', e
+            print >>sys.stderr, 'Error: unable to plot solutions'
+            sys.exit (1)
+    
     rewrite = args.out != ' '
     if not rewrite:
         print '  Computing gains only, not writing new dataset.'
