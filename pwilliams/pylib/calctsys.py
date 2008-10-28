@@ -12,14 +12,10 @@
 --
 """
 
-import sys, omega, numpy as N
+import sys, numpy as N
 from numutils import *
 from miriad import *
 from mirtask import keys, util, uvdat
-import fit
-from scipy.stats.distributions import norm
-from scipy.stats import kstest
-from scipy.special import erf, erfc
 from scipy.optimize import fmin_l_bfgs_b
 
 SVNID = '$Id$'
@@ -295,6 +291,8 @@ class SysTemps (object):
         print
 
     def _show (self, haveModel):
+        import omega
+        
         aps = self.aps
         tsyses = self.tsyses
         ants = self.ants

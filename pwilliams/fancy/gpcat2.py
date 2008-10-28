@@ -50,6 +50,7 @@ banner = printBannerSvn ('gpcat2', 'print antenna gains tables', SVNID)
 
 keys.keyword ('vis', 'f', ' ')
 keys.keyword ('rank', 'i', 0)
+keys.option ('phase')
 opts = keys.process ()
 
 if opts.vis == ' ':
@@ -94,10 +95,15 @@ for (time, gains) in gr.readSeq ():
     
     print jdToFull (time) + ':', 
 
+    if opts.phase:
+        v = lambda a: N.arctan2 (gains[a * gr.nfeeds].imag, gains[a * gr.nfeeds].real) * 180 / N.pi
+    else:
+        v = lambda a: abs (gains[a * gr.nfeeds])
+    
     if rankMode:
         # rank mode: print list of ants sorted by gain
         print
-        info = [(a + 1, abs (gains[a * gr.nfeeds])) for a in ants]
+        info = [(a + 1, v(a)) for a in ants]
         info.sort (key = lambda tup: tup[1], reverse=False)
         for tup in info[0:opts.rank]:
             print '   % 3d: %g' % tup
@@ -107,7 +113,7 @@ for (time, gains) in gr.readSeq ():
     else:
         # default mode: print table of gains in numerical order
         for ant in ants:
-            print ' %8.7lg' % (abs (gains[ant * gr.nfeeds])),
+            print ' %8.7lg' % (v(ant)),
     print
 
 # All done.
