@@ -1,14 +1,139 @@
 #! /usr/bin/env python
 # -*- python -*-
 
-"""= calctsys - 
+"""= calctsys - Compute TSys values from data noise properties
 & pkgw
 : Calibration
 +
- CALCTSYS ...
+ CALCTSYS computes the system temperatures of a group of antennas
+ based on the noise properties of a dataset. It prints out the
+ derived temperatures and can optionally generate a copy of the
+ input dataset with the computed values inserted into the 'systemp'
+ UV variable.
+
+ The system temperatures are computed from the variance in the real
+ and imaginary parts across the spectral window of a visibility. The
+ data for each baseline are averaged in time (see the "interval"
+ keyword) before the variances are computed. The effective system
+ temperature for a baseline is computed as:
+
+ TSys = G * (SRe + SIm)/2 * etaQ * sqrt(2 * SDF * tau) / jyperk .
+
+ Here, SRe and SIm are the standard deviations of the real and imaginary
+ parts, respectively, of the averaged spectral window. etaQ is the
+ quantization efficiency of the correlator (see the keyword "quant").
+ SDF is the width of the spectral window. tau is the mean integration
+ time of data feeding into the computation. (This will be different than
+ "interval" if data are flagged or there are no observations for part of
+ the inteval.) jyperk is the current value of the "jyperk" UV variable.
+
+ G is a "gain" parameter used to convert SRe and SIm from their native
+ units into Janskys. By default, G is 1, which is appropriate for
+ datasets with accurate absolute antenna gains. However, if the "flux"
+ keyword is given, the data are assumed to not be amplitude calibrated,
+ and then
+
+ G = flux / sqrt (MRe^2 + MIm^2)
+
+ where MRe and MIm are the mean value across the time-averaged spectral
+ window of the real and imaginary parts, respectively. The TSyses
+ computed in this way will be less reliable than ones computed from a
+ properly-calibrated dataset. If the antenna gains in a dataset have the
+ correct relative calibration but an incorrect absolute calibration,
+ using the "gain" keyword will give you results essentially as good as
+ those obtained from a dataset with correct absolute calibration. (Such
+ datasets might come from running MFCAL with an unknown source or
+ SELFCAL without the "noscale" option.)
+
+ Once TSys values are computed for an ensemble of baselines, TSys values
+ are computed for their contributing antennas by minimizing the
+ chi-squared parameter derived from the model
+
+ TSys_ij = sqrt (TSys_i * TSys_j) .
+
+ Very bad antennas will give poor fits to the baseline-based system
+ temperatures. CALCTSYS will fit iteratively, flagging out antennas
+ with excessively high TSys values. (See the "maxtsys" keyword.) The
+ removal of such antennas generally improves the quality of the fit.
+
+ CALCTSYS will print out its progress as it iteratively solves for the
+ antenna TSys values and then print out the values that it computes as
+ well as the baselines with the worst residuals to the fit. The
+ "Pseudo-RCHiSq" value that is printed is the chi-squared value divided
+ by the number of degrees of freedom; it's not a true reduced chi
+ squared because the uncertainties of the baseline-based TSys
+ computations are unknown. The number in parentheses after each antenna
+ TSys is the RMS residual to the fit of all the baselines involving
+ that antenna.
+
+ If the "out" keyword is given, the input dataset will be copied to a
+ new dataset with the computed TSys values written into the "systemp"
+ UV variable. Any preexisting "systemp" values are destroyed. Any
+ antennas for which no solution was found (by virtue of being either
+ absent or having a computed TSys above "maxtsys") will be given a
+ system temperature of 9999 K. Baselines involving such antennas will
+ written into the new dataset, but be completely flagged.
+ 
+ LIMITATIONS: Currently CALCTSYS can only handle data with a single
+ spectral window and no wide channels. CALCTSYS will only process data
+ of a single polarization -- it is capable of handling multiple
+ polarizations internally, but the author is unclear how best to write
+ out TSys values for multiple feeds on the same antenna. (There are the
+ UV variables "xtsys" and "ytsys" but they don't seem to be hooked up
+ the UVIO code in the same way that "systemp" is.) CALCTSYS doesn't
+ write very useful history entries.
 
 < vis
+ Only a single input file is supported by CALCTSYS.
+ 
+@ flux
+ The assumed flux of the source in Janskys, if the antenna gains in
+ the input dataset are uncalibrated or are only relatively calibrated.
+ Do not specify this keyword if the dataset has correct absolute
+ antenna gains. See the discussion of the gain parameter G above.
+ 
+@ out
+ The name of the output dataset. If given, the input dataset is
+ copied with the computed TSys values inserted into it. If
+ unspecified, no output dataset is created.
 
+@ interval
+ The UV data averaging interval in minutes. Default is 5. The UV data
+ are time-averaged before baseline-based TSys values are computed.
+
+@ maxtsys
+ The maximum allowed TSys for an antenna, in Kelvin. If the TSys
+ computed for an antenna is higher than this number, the antenna is
+ flagged out in the internal data structures and TSys values are
+ recomputed. If an output dataset is being created, visibilities
+ involving any such antenna will be flagged. Default is 350. The
+ input dataset is never modified.
+
+@ quant
+ The nature of the quantization in the correlator. Two integer values
+ can be given: the first is the number of bits per sample and
+ the second is the sampling rate in terms of the Nyquist sampling rate.
+ (E.g., if the second value is 2, the correlator samples at twice the
+ Nyquist rate.) If the second integer is unspecified it is assumed to
+ be 1. The two numbers are used to look up the quantization efficiency
+ in a table. (The table is a copy of Thompson, Moran, & Swenson,
+ Table 8.1) The table contains entries for 2- to 4-bit correlators
+ at 1 or 2 times the Nyquist rate. If unspecified or an unsupported
+ bits-rate pair is given, a quantization efficiency of unity is used.
+
+@ options
+ Multiple options can be specified, separated by commas. Minimum-match
+ is used.
+
+ 'showpre'   Plot the baseline-based TSys values before a fit is
+             attempted. One plot for each antenna is shown. Requries the
+             Python module 'omega'.
+ 'showfinal' Plot the baseline-based TSys values and model results after
+             the fitting process completes. Same requirements and
+             behavior as 'showpre'.
+ 'showall'   Plot values and model results after each iteration of the
+             fitting process. Same requirements and behavior as
+             'showpre'.
 --
 """
 
@@ -594,7 +719,8 @@ def rewriteData (banner, vis, out, solutions):
 # Task implementation.
 
 def task ():
-    banner = util.printBannerSvn ('calctsys', 'magic!', SVNID)
+    banner = util.printBannerSvn ('calctsys',
+                                  'Compute TSys values from data noise properties', SVNID)
     
     # Keywords and argument checking
 
