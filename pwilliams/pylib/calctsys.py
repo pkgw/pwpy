@@ -25,7 +25,7 @@
  SDF is the width of the spectral window. tau is the mean integration
  time of data feeding into the computation. (This will be different than
  "interval" if data are flagged or there are no observations for part of
- the inteval.) jyperk is the current value of the "jyperk" UV variable.
+ the interval.) jyperk is the current value of the "jyperk" UV variable.
 
  G is a "gain" parameter used to convert SRe and SIm from their native
  units into Janskys. By default, G is 1, which is appropriate for
@@ -36,14 +36,16 @@
  G = flux / sqrt (MRe^2 + MIm^2)
 
  where MRe and MIm are the mean value across the time-averaged spectral
- window of the real and imaginary parts, respectively. The TSyses
+ window of the real and imaginary parts, respectively. (This expression
+ will only produce realistic results if the observations are of
+ something similar to a point source at phase center.) The TSyses
  computed in this way will be less reliable than ones computed from a
- properly-calibrated dataset. If the antenna gains in a dataset have the
- correct relative calibration but an incorrect absolute calibration,
- using the "gain" keyword will give you results essentially as good as
- those obtained from a dataset with correct absolute calibration. (Such
- datasets might come from running MFCAL with an unknown source or
- SELFCAL without the "noscale" option.)
+ properly-calibrated dataset. If the antenna gains in a dataset have
+ the correct relative calibration but an incorrect absolute
+ calibration, using the "gain" keyword will give you results essentially
+ as good as those obtained from a dataset with correct absolute
+ calibration. (Such datasets might come from running MFCAL with an
+ unknown source or SELFCAL without the "noscale" option.)
 
  Once TSys values are computed for an ensemble of baselines, TSys values
  are computed for their contributing antennas by minimizing the
@@ -153,6 +155,8 @@ etaQs = { (2, 1): 0.64, (2, 2): 0.74,
           (4, 1): 0.88, (4, 2): 0.94 }
 
 SECOND = 1. / 24 / 3600
+
+reallyBadTSys = 9999
 
 # Iterative averaging TSys computer
 
@@ -688,7 +692,7 @@ def rewriteData (banner, vis, out, solutions):
                     if ap in solns:
                         systemps[i] = solns[ap]
                     else:
-                        systemps[i] = 9999
+                        systemps[i] = reallyBadTSys
                         skipAps.add (ap)
 
             dOut.writeVarFloat ('systemp', systemps)
