@@ -512,15 +512,16 @@ class DataProcessor (object):
         
             self.t = inp.makeVarTracker ()
             self.t.track (*toTrack)
-
+            self.toTrack = toTrack
+            
             tmin = tmax = tprev = time
 
         if self.t.updated ():
             nants = inp.getVarInt ('nants')
             assert nants > 0
-            if 'nspect' in toTrack:
+            if 'nspect' in self.toTrack:
                 nspect = inp.getVarInt ('nspect')
-            if 'nwide' in toTrack:
+            if 'nwide' in self.toTrack:
                 nwide = inp.getVarInt ('nwide')
             assert nspect > 0 or nwide > 0
             jyperk = inp.getVarFloat ('jyperk')
