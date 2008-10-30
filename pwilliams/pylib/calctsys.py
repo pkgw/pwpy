@@ -128,7 +128,7 @@
  is used.
 
  'showpre'   Plot the baseline-based TSys values before a fit is
-             attempted. One plot for each antenna is shown. Requries the
+             attempted. One plot for each antenna is shown. Requires the
              Python module 'omega'.
  'showfinal' Plot the baseline-based TSys values and model results after
              the fitting process completes. Same requirements and
@@ -143,7 +143,6 @@ import sys, numpy as N
 from numutils import *
 from miriad import *
 from mirtask import keys, util, uvdat
-from scipy.optimize import fmin_l_bfgs_b
 
 SVNID = '$Id$'
 
@@ -296,75 +295,45 @@ class SysTemps (object):
         self._flattenAps ()
     
     def _solve (self):
-        # Solve for per-antpol tsyses
-        from numpy import sqrt, subtract, square, ndarray, zeros
+        from mirtask.util import linLeastSquares
+
         idxs = self.idxs
         ants = self.ants
         tsyses = self.tsyses
+
+        # T_ij = sqrt (T_i T_j)
+        # square and take logarithm:
+        # 2 * log (T_ij) = log (T_i) + log (T_j)
+        #
+        # transform problem into log space and populate
+        # the data matrices for the solver.
         
-        chiwork = ndarray (self.nbp)
-        model = ndarray (self.nbp)
-        resid = ndarray (self.nbp)
+        coeffs = N.zeros ((self.nap, self.nbp))
+        
+        for i in idxs:
+            a1, a2 = ants[i]
+            coeffs[a1,i] = 1
+            coeffs[a2,i] = 1
 
-        def chisq (g):
-            for i in idxs:
-                a1, a2 = ants[i]
-                chiwork[i] = g[a1] * g[a2]
+        vals = 2 * N.log (tsyses)
 
-            sqrt (chiwork, model)
-            subtract (model, tsyses, resid)
-            square (resid, chiwork)
-            return chiwork.sum ()
+        logTs = linLeastSquares (coeffs, vals)
+        
+        self.soln = soln = N.exp (logTs)
 
-        gradwork = ndarray (self.nap)
+        # Populate useful arrays.
 
-        def grad (g):
-            gradwork.fill (0.)
-
-            for i in idxs:
-                a1, a2 = ants[i]
-                tsys = tsyses[i]
-                model[i] = sqrt (g[a1] * g[a2])
-            
-                # chi element = (sqrt(g1 g2) - t12)**2
-                # d(elt)/dg1 = 2 (sqrt(g1 g2) - t12) * / 2 / sqrt(g1 g2) * g2
-                #  = g2 * (1 - t1/sqrt(g1 g2))
-
-                v = 1 - tsys / model[i]
-                gradwork[a1] += v * g[a2]
-                gradwork[a2] += v * g[a1]
-
-            #print ' Grad:', gradwork
-            return gradwork
-
-        guess = zeros (self.nap)
-        n = zeros (self.nap, dtype=N.int)
+        self.model = model = N.ndarray (self.nbp)
 
         for i in idxs:
             a1, a2 = ants[i]
-            tsys = tsyses[i]
-            guess[a1] += tsys
-            guess[a2] += tsys
-            n[a1] += 1
-            n[a2] += 1
+            model[i] = soln[a1] * soln[a2]
 
-        guess /= n
-        #print 'guess:', guess
-        bounds = [(1., None)] * self.nap
-        soln, chisq, info = fmin_l_bfgs_b (chisq, guess, grad, bounds=bounds, factr=1e9)
-        rchisq = chisq / (self.nbp - self.nap)
-        print '   Pseudo-RChiSq:', rchisq
+        N.sqrt (model, model)
 
-        if info['warnflag'] != 0:
-            print >>sys.stderr, 'Error: Failed to find a solution!'
-            print >>sys.stderr, 'soln, chisq:', soln, chisq
-            print >>sys.stderr, 'info:', info
-            raise Exception ('Failed to find a solution')
-
-        self.soln = soln
-        self.rchisq = rchisq
-        self.model = model
-        self.resid = resid
+        self.resid = tsyses - model
+        self.rchisq = (self.resid**2).sum () / (self.nbp - self.nap)
+        print '   Pseudo-RChiSq:', self.rchisq
 
     def _print (self):
         aps = self.aps
@@ -466,6 +435,7 @@ class SysTemps (object):
         print 'Iteratively flagging ...'
         
         while True:
+            #self._solve_miriad ()
             self._solve ()
             #self._print ()
 
