@@ -653,24 +653,19 @@ def rewriteData (banner, vis, out, solutions):
             solns = solutions[nextSolnIdx][1]
             assert solns is not None, 'Bizarre interval calculation issues?'
         
-            systemps = N.zeros (nants, dtype=N.float32)
-            skipAps = set ()
+            systemps = N.zeros (nants, dtype=N.float32) + reallyBadTSys
+            goodAps = set ()
         
-            for i in xrange (0, nants):
-                for fpol in xrange (0, 8):
-                    ap = util.antpol2ap (i + 1, fpol)
-
-                    if ap in solns:
-                        systemps[i] = solns[ap]
-                    else:
-                        systemps[i] = reallyBadTSys
-                        skipAps.add (ap)
+            for ap, tsys in solns.iteritems ():
+                goodAps.add (ap)
+                ant = util.apAnt (ap)
+                systemps[ant-1] = tsys
 
             dOut.writeVarFloat ('systemp', systemps)
             nextSolnIdx += 1
             thePol = None
 
-        if bp[0] in skipAps or bp[1] in skipAps:
+        if bp[0] not in goodAps or bp[1] not in goodAps:
             # No TSys solution for one of the antpols. Flag the record.
             flags.fill (0)
 
@@ -695,7 +690,7 @@ def rewriteData (banner, vis, out, solutions):
 
 def task ():
     banner = util.printBannerSvn ('calctsys',
-                                  'Compute TSys values from data noise properties', SVNID)
+                                  'compute TSys values from data noise properties', SVNID)
     
     # Keywords and argument checking
 
@@ -708,8 +703,9 @@ def task ():
     keys.option ('showpre', 'showfinal', 'showall')
 
     args = keys.process ()
-    print 'Configuration:'
 
+    # Verify arguments that can be invalid
+    
     if args.vis == ' ':
         print >>sys.stderr, 'Error: no UV input specified.'
         sys.exit (1)
@@ -721,6 +717,18 @@ def task ():
             print >>sys.stderr, 'Error: unable to plot solutions'
             sys.exit (1)
     
+    if args.maxtsys <= 0:
+        print >>sys.stderr, 'Error: invalid maximum TSys', maxtsys
+        sys.exit (1)
+
+    interval = args.interval / 60. / 24.
+    if interval <= 0:
+        print >>sys.stderr, 'Error: invalid interval', interval
+        sys.exit (1)
+
+    # Print out summary of config
+    
+    print 'Configuration:'
     rewrite = args.out != ' '
     if not rewrite:
         print '  Computing gains only, not writing new dataset.'
@@ -731,16 +739,10 @@ def task ():
     else:
         print '  Assuming data are uncalibrated, using source flux %3g' % args.flux
 
-    if args.maxtsys <= 0:
-        print >>sys.stderr, 'Error: invalid maximum TSys', maxtsys
-
     print '  Flagging TSyses above %g' % args.maxtsys
 
     vis = VisData (args.vis)
 
-    interval = args.interval / 60. / 24.
-    if interval <= 0:
-        print >>sys.stderr, 'Error: invalid interval', interval
     print '  Averaging interval: %#4g minutes' % args.interval
 
     q = args.quant
