@@ -600,7 +600,11 @@ def rewriteData (banner, vis, out, solutions):
             dOut.setCorrelationType (corrType)
             inp.copyHeader (dOut, 'history')
             inp.initVarsAsInput (' ') # ???
-        
+
+            dOut.openHistory ()
+            dOut.writeHistory (banner)
+            dOut.logInvocation ('CALCTSYS')
+
         if t.updated ():
             nants = inp.getVarInt ('nants')
             assert nants > 0
@@ -655,15 +659,21 @@ def rewriteData (banner, vis, out, solutions):
         
             systemps = N.zeros (nants, dtype=N.float32) + reallyBadTSys
             goodAps = set ()
+
+            jd = util.jdToFull (solutions[nextSolnIdx][0])
+            dOut.writeHistory ('CALCTSYS: soln %s: temps for %d antpols' % (jd, len (solns)))
         
-            for ap, tsys in solns.iteritems ():
+            for ap, tsys in sorted (solns.iteritems (), key=lambda x: x[0]):
                 goodAps.add (ap)
                 ant = util.apAnt (ap)
                 systemps[ant-1] = tsys
+                dOut.writeHistory ('CALCTSYS:  %5s %f' % (util.fmtAP (ap), tsys))
 
             dOut.writeVarFloat ('systemp', systemps)
+
             nextSolnIdx += 1
             thePol = None
+
 
         if bp[0] not in goodAps or bp[1] not in goodAps:
             # No TSys solution for one of the antpols. Flag the record.
@@ -680,9 +690,6 @@ def rewriteData (banner, vis, out, solutions):
 
     # All done. 
 
-    dOut.openHistory ()
-    dOut.writeHistory (banner)
-    dOut.logInvocation ('CALCTSYS')
     dOut.closeHistory ()
     dOut.close ()
 
