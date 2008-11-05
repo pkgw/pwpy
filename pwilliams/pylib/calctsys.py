@@ -113,15 +113,16 @@
 
 @ quant
  The nature of the quantization in the correlator. Two integer values
- can be given: the first is the number of bits per sample and
+ can be given: the first is the number of quantization levels and
  the second is the sampling rate in terms of the Nyquist sampling rate.
  (E.g., if the second value is 2, the correlator samples at twice the
  Nyquist rate.) If the second integer is unspecified it is assumed to
  be 1. The two numbers are used to look up the quantization efficiency
  in a table. (The table is a copy of Thompson, Moran, & Swenson,
  Table 8.1) The table contains entries for 2- to 4-bit correlators
- at 1 or 2 times the Nyquist rate. If unspecified or an unsupported
- bits-rate pair is given, a quantization efficiency of unity is used.
+ and 3-level quantization at 1 or 2 times the Nyquist rate. If
+ unspecified or an unsupported bits-rate pair is given, a
+ quantization efficiency of unity is used.
 
 @ options
  Multiple options can be specified, separated by commas. Minimum-match
@@ -149,9 +150,13 @@ SVNID = '$Id$'
 # Tables
 
 # These values come from Thompson, Moran, & Swenson, table 8.1.
+# The 4-bit value comes from later in the section, citing a
+# private communication from D. T. Emerson
+
 etaQs = { (2, 1): 0.64, (2, 2): 0.74,
           (3, 1): 0.81, (3, 2): 0.89,
-          (4, 1): 0.88, (4, 2): 0.94 }
+          (4, 1): 0.88, (4, 2): 0.94,
+          (16, 1): 0.97 }
 
 SECOND = 1. / 24 / 3600
 
@@ -757,18 +762,19 @@ def task ():
     if len (q) == 0:
         etaQ = 1
     else:
-        bits = q[0]
+        levels = q[0]
 
         if len (q) > 1:
             beta = q[1]
         else:
             beta = 1
 
-        if (bits, beta) in etaQs:
-            print '  Using quantization efficiency for %d bits and %d times Nyquist sampling' % (bits, beta)
-            etaQ = etaQs[(bits, beta)]
+        if (levels, beta) in etaQs:
+            print ('  Using quantization efficiency for %d levels '
+                   'and %d times Nyquist sampling' % (levels, beta))
+            etaQ = etaQs[(levels, beta)]
         else:
-            print >>sys.stderr, 'Warning: no tabulated quantization efficiency for %d bits and' % bits
+            print >>sys.stderr, 'Warning: no tabulated quantization efficiency for %d levels and' % levels
             print >>sys.stderr, '  %d times Nyquist sampling. Defaulting to unity.' % beta
             etaQ = 1
 
