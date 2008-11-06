@@ -25,6 +25,12 @@
  visibilities. The contents of the logfile are intended to be plotted
  in whatever means are convenient to the user.
 
+@ options
+ Multiple options can be specified, separated by commas. Minumum-match
+ is used.
+
+ 'show'  Plot the summed spectrum in a window. Requires the Python
+         module "omega".
 --
 """
 
@@ -42,6 +48,7 @@ banner = util.printBannerSvn ('ampadd', 'average UV amplitudes over everything b
 
 keys.keyword ('log', 'f', ' ')
 keys.keyword ('vis', 'f', None, 64)
+keys.option ('show')
 
 class AmpFlagsAccum (object):
     def __init__ (self):
@@ -119,7 +126,7 @@ if len (args.vis) < 1:
     print >>sys.stderr, 'Error: No input datasets specified!'
     sys.exit (1)
 
-if args.log == ' ':
+if args.log == ' ' and not args.show:
     print >>sys.stderr, 'Error: No output logfile specified!'
     sys.exit (1)
 
@@ -137,16 +144,21 @@ for v in args.vis:
 
 afa.done ()
 
-fout = file (args.log, 'w')
-print 'Writing', args.log, '...'
+if args.show:
+    from omega import quickXY
+    quickXY (afa.ch, afa.y, 'Added amps').showBlocking ()
+else:
+    fout = file (args.log, 'w')
+    print 'Writing', args.log, '...'
 
-for i in xrange (0, afa.ch.size):
-    ch = afa.ch[i] + 1
-    y = afa.y[i]
-    freq = afa.sfreq + i * afa.sdf
+    for i in xrange (0, afa.ch.size):
+        ch = afa.ch[i] + 1
+        y = afa.y[i]
+        freq = afa.sfreq + i * afa.sdf
 
-    print >>fout, '%d %g %g' % (ch, freq, y)
+        print >>fout, '%d %g %g' % (ch, freq, y)
 
-fout.close ()
+        fout.close ()
+
 print 'Done.'
 sys.exit (0)
