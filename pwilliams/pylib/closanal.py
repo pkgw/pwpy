@@ -237,14 +237,18 @@ class ClosureComputer (object):
         import omega
         rms = self.allrms.finish ()
         n = int (N.ceil (N.log2 (rms.size) + 1))
-        return omega.quickHist (rms, n)
+        p = omega.quickHist (rms, n, keyText=self.datum)
+        p.setLabels ('%s closure' % self.item, 'Number of %s' % self.datum)
+        return p
 
 
     def bpHist (self):
         import omega
         n = int (N.ceil (N.log2 (len (self.bpData)) + 1))
         values = [t[1] for t in self.bpData]
-        return omega.quickHist (values, n)
+        p = omega.quickHist (values, n, keyText='Basepols')
+        p.setLabels ('%s closure' % self.item, 'Number of basepols')
+        return p
 
     def _printGeneric (self, data, capname, haveStats, n, best):
         if n == 0 or len (data) == 0: return
@@ -563,8 +567,9 @@ class ClosureProcessor (object):
 
         d = d.finish ()
 
-        return omega.quickXY (d[:,0], d[:,1], lines=False)
-
+        p = omega.quickXY (d[:,0], d[:,1], 'Closure values', lines=False)
+        p.setLabels ('UV Distance (kilolambda)', '%s closure' % self.ccs[0].item)
+        return p
 
 # Task functionality
 
