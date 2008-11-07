@@ -570,6 +570,7 @@ def rewriteData (banner, vis, out, solutions):
     first = True
     nextSolnIdx = 0
     thePol = None
+    flaggedAps = None
     
     for inp, preamble, data, flags, nread in vis.readLowlevel (False):
         if first:
@@ -661,7 +662,13 @@ def rewriteData (banner, vis, out, solutions):
         if time >= solutions[nextSolnIdx][0]:
             solns = solutions[nextSolnIdx][1]
             assert solns is not None, 'Bizarre interval calculation issues?'
-        
+
+            if flaggedAps is not None:
+                dOut.writeHistory ('CALCTSYS: in previous solution, '
+                                   'flagged %d antpols' % len (flaggedAps))
+                for ap in flaggedAps:
+                    dOut.writeHistory ('CALCTSYS:   flagged ' + util.fmtAP (ap))
+            
             systemps = N.zeros (nants, dtype=N.float32) + reallyBadTSys
             goodAps = set ()
 
@@ -678,10 +685,14 @@ def rewriteData (banner, vis, out, solutions):
 
             nextSolnIdx += 1
             thePol = None
+            flaggedAps = set ()
 
-
-        if bp[0] not in goodAps or bp[1] not in goodAps:
+        if bp[0] not in goodAps:
             # No TSys solution for one of the antpols. Flag the record.
+            flaggedAps.add (bp[0])
+            flags.fill (0)
+        elif bp[1] not in goodAps:
+            flaggedAps.add (bp[1])
             flags.fill (0)
 
         # Convert UVW coordinates from wavelengths back to nanoseconds
@@ -695,6 +706,12 @@ def rewriteData (banner, vis, out, solutions):
 
     # All done. 
 
+    if flaggedAps is not None:
+        dOut.writeHistory ('CALCTSYS: in previous solution, '
+                           'flagged %d antpols' % len (flaggedAps))
+        for ap in flaggedAps:
+            dOut.writeHistory ('CALCTSYS:   flagged ' + util.fmtAP (ap))
+    
     dOut.closeHistory ()
     dOut.close ()
 
