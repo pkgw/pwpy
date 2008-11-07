@@ -687,12 +687,17 @@ def rewriteData (banner, vis, out, solutions):
             thePol = None
             flaggedAps = set ()
 
+        bad = False
+        
         if bp[0] not in goodAps:
             # No TSys solution for one of the antpols. Flag the record.
             flaggedAps.add (bp[0])
-            flags.fill (0)
-        elif bp[1] not in goodAps:
+            bad = True
+        if bp[1] not in goodAps:
             flaggedAps.add (bp[1])
+            bad = True
+
+        if bad:
             flags.fill (0)
 
         # Convert UVW coordinates from wavelengths back to nanoseconds
