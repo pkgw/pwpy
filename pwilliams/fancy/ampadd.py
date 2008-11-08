@@ -158,7 +158,7 @@ else:
 
         print >>fout, '%d %g %g' % (ch, freq, y)
 
-        fout.close ()
+    fout.close ()
 
 print 'Done.'
 sys.exit (0)
