@@ -482,7 +482,7 @@ class ClosureProcessor (object):
         if uvdPlot:
             self.uvdists = AccDict (StatsAccumulator, lambda sa, v: sa.add (v))
         
-    def readUVDat (self):
+    def _read (self, gen):
         ccs = self.ccs
         first = True
         interval = self.interval
@@ -497,7 +497,7 @@ class ClosureProcessor (object):
         
         # Go!
         
-        for (inp, preamble, data, flags, nread) in uvdat.readAll ():
+        for (inp, preamble, data, flags, nread) in gen:
             data = data[0:nread].copy ()
             flags = flags[0:nread].copy ()
 
@@ -543,6 +543,12 @@ class ClosureProcessor (object):
         
         for fi in fis: fi ()
         for fa in fas: fa ()
+
+    def readUVDat (self):
+        self._read (uvdat.readAll ())
+
+    def readVis (self, vis):
+        self._read (vis.readLowlevel (False))
     
     def plotUVDs (self):
         import omega
