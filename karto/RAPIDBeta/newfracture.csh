@@ -1,5 +1,5 @@
 #! /usr/bin/tcsh -f
-
+# $Id$
 set date1 = `date +%s.%N`
 
 onintr fail

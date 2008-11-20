@@ -1,6 +1,6 @@
 #! /usr/bin/tcsh -f
-#  calculates mean and rms phase per baseline    jrf - 05jan08
-
+#
+# $Id$
 #    exit script cleanly  on interrupt
 
 onintr fail

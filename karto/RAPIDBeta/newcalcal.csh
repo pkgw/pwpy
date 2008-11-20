@@ -1,4 +1,5 @@
 #! /usr/bin/tcsh -f
+# $Id$
 #Calibrates a calibrator...
 
 onintr fail

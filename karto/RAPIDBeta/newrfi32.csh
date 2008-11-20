@@ -1,5 +1,5 @@
 #! /usr/bin/tcsh -f
-
+# $Id$
 onintr finish
 
 if ($#argv == 0) then

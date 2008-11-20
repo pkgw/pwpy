@@ -1,5 +1,5 @@
 #! /usr/bin/tcsh -f
-#omega
+# $Id$
 
 onintr fail
 
