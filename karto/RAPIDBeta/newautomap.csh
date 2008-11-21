@@ -55,7 +55,7 @@ set autopha = 1 # Automatically selfcal phases in "auto" mode?
 set autoamp = 0 # Automatically selfcal amplitudes in "auto" mode?
 set scint = 10 # Selfcal soln interval
 set sctol = .05 # Selfcal limiting tolerance iterative cycles
-set scsigma = 5 # Sigma clipping limit for selfcal
+set scsigma = 10 # Sigma clipping limit for selfcal
 set scmode = "dr" # Selfcal optimiztion (either fidelity or dynamic range)
 set wmode = "natural" # Weighting mode for the invert step
 set imsize # Size of image (in pixels)
@@ -75,6 +75,9 @@ set intamplim = 0 # Initial amp limit for data, non-init
 set plotscale # Plotting scale for map
 set sopt # slop parameter for invert, should be used if MFS is not
 set wrath # Muah ha ha ha, let no RFI escape...
+set autolim
+set sysflux = 2
+
 ###############################################
 
 if ($#argv == 0) then
@@ -120,6 +123,9 @@ else if ("$argv[1]" =~ 'select='*) then
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'scsigma='*) then
     set scsigma = `echo $argv[1] | sed 's/scsigma=//'`
+    shift argv; if ("$argv" == "") set argv = "finish"
+else if ("$argv[1]" =~ 'sysflux='*) then
+    set sysflux = `echo $argv[1] | sed 's/sysflux=//'`
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'interval='*) then
     set interval = `echo $argv[1] | sed 's/interval=//'`
@@ -212,6 +218,8 @@ else if ("$argv[1]" =~ 'options='*) then
 	    set savedata = 2	    
 	else if ($option == "wrath") then
 	    set wrath = 1
+	else if ($option == "autolim") then
+	    set autolim = 1
 	else
 	    set badopt = ($badopt $option)
 	endif
@@ -301,7 +309,6 @@ if ($cellsize == "") set cellsize = `echo 30 | awk '{print $1*1430/freq}' freq=$
 set arc = `echo 4500 | awk '{print $1*1430/freq}' freq=$freq`# fov of displayed plot in arcsec
 
 echo "Imaging report for $vis" > $wd/imgrpt #Reporting tools
-
 set noflct = 1
 #set noflct = `uvplt vis=$vis device=/null options=2pass,nobase | grep Plot | awk '{print $2}'` # Quick count of spectra in original dataset
 
@@ -383,25 +390,31 @@ foreach type (map beam clean cm rs)
 end
 
 #Grid an invert visabilities.
-
+echo -n "Gridding and inverting data..."
 invert vis=`echo $vislist | tr ' ' ','` map=$wd/tempmap.map beam=$wd/tempmap.beam cell=$cellsize imsize=$imsize sup=$sup select=$sel $iopt $sopt >& /dev/null 
 
 
 if !(-e $wd/tempmap.map && -e $wd/tempmap.beam) then
     echo "FATAL ERROR: INVERT has failed to complete (most likely a buffer space issue)"
     goto enderr
+else
+    echo "complete!"
 endif
 
 # Intelligent cleaning... there is such a thing! Basically, first step is a "quick" clean, second step is a clean that uses the number of point sources to determine the number of clean cycles to use. Final step makes sure that there are no extra reminants in the residuals to clean up after.
 
 if ($intclean) then
     echo "Performing preliminary clean, deriving model for calculations"
-    clean map=$wd/tempmap.map beam=$wd/tempmap.beam out=$wd/tempmap.clean niters=500 "$cregion" >& /dev/null 
+    clean map=$wd/tempmap.map beam=$wd/tempmap.beam out=$wd/tempmap.clean niters=1000 "$cregion" >& /dev/null 
     restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd/tempmap.cm >& /dev/null 
     restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd/tempmap.rs mode=residual >& /dev/null 
     set imstats = (`imstat in=$wd/tempmap.rs | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
-    sfind in=$wd/tempmap.cm options=oldsfind,auto rmsbox=256 xrms=3 labtyp=arcsec >& /dev/null 
-    mv sfind.log $wd/sfind.log
+
+    cd $wd
+    rm -f sfind.log
+    sfind in=tempmap.cm options=oldsfind,auto rmsbox=256 xrms=3 labtyp=arcsec >& /dev/null 
+    cd ..
+
     set niters = `grep -v "#" $wd/sfind.log | awk '{if ($7 > 0) cycles+=log((3000*noise)/$7)/log(.9)} END {print int(cycles)}' noise=$imstats[3]`
     if ($niters < 250) then
 	echo "Derived value for niters was $niters... invoking safegaurd and putting niters at 250."
@@ -422,14 +435,16 @@ restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd
 
 set imstats = (`imstat in=$wd/tempmap.rs | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
 
-sfind in=$wd/tempmap.rs options=oldsfind,auto rmsbox=256 xrms=3 labtyp=arcsec >& /dev/null 
-mv sfind.log $wd/sfind.log
+cd $wd
+rm -f sfind.log
+sfind in=tempmap.rs options=oldsfind,auto,nofit rmsbox=256 xrms=3 labtyp=arcsec >& /dev/null 
+cd ..
 
 #Verify that the residual maps look clean. If not, reclean or advise the user that recleaning needs to be performed
 echo "Currently at $niters cycles..."
-if (`grep -v "#" $wd/sfind.log | awk '{if ($7 > 0) cycles+=log((3000*noise)/$7)/log(.9)} END {print int(cycles)*1}' noise=$imstats[3]` > `echo $niters | awk '{print int(.1*$1)}'` && $niters != 25000) then
+if (`grep -v "#" $wd/sfind.log | awk '{if ($3 > 3000*noise) cycles+=log((3000*noise)/$3)/log(.9)} END {print int(cycles)*1}' noise=$imstats[3]` > `echo $niters | awk '{print int(.05*$1)}'` && $niters != 25000) then
     if ($intclean) then
-	set niters = `grep -v "#" $wd/sfind.log | awk '{ cycles+=log((3000*noise)/$7)/log(.9)} END {print int(cycles)+niters}' noise=$imstats[3] niters=$niters`
+	set niters = `grep -v "#" $wd/sfind.log | awk '{ cycles+=log((3000*noise)/$3)/log(.9)} END {print int(cycles)+niters}' noise=$imstats[3] niters=$niters`
 	if ($niters < 250) then
 	    echo "Derived value for $niters was $niters... invoking safegaurd and putting niters at 250."
 	    set niters = 250
@@ -457,11 +472,6 @@ cd $wd; rm -f sfind.log
 sfind in=tempmap.cm options=oldsfind,auto rmsbox=256 xrms=5 labtyp=arcsec >& /dev/null
 cd ..
 
-if ($intamplim) then
-    set maxflux = `grep -v "#" sfind.log | awk '{flux += $7} END {print flux/1000}'`
-    set minflux = `grep -v "#" sfind.log | awk '{if ($7 > lim) lim=$7; flux += $7} END {print ((2*lim)-flux)/1000}'`
-endif
-
 # Find some stats about the map...
 #Imstat: 1) Sum 2) Mean 3) RMS 4) Max 5) Min 6) Npoints
 
@@ -469,6 +479,15 @@ set imstats = (`imstat in=$wd/tempmap.rs region=relcen,arcsec,"box(-$arc,-$arc,$
 set imstats2 = (`imstat in=$wd/tempmap.cm region=relcen,arcsec,"box(-$arc,-$arc,$arc,$arc)" | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
 set range = `echo $imstats[3] $imstats2[4] | awk '{print $2/$1}'`
 set alevel = `echo $imstats[3] $imstats2[5] | awk '{print $2/$1}'`
+
+if ($autolim) then
+    set nsources = `grep -vc "#" $wd/sfind.log`
+    set amplim = (0 5000 10000)
+    set amplim[2] = `imstat in=$wd/tempmap.clean | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | sed 's/\([0-9][0-9]\)-/\1 -/g' | awk '{print (nsources*3*2*noise)+(1.25*$1)+sysflux}' nsources=$nsources noise=$imstats[3] sysflux=$sysflux`
+    set amplim[3] = `echo $amplim[2] $nchan $sysflux | awk '{print $1+(1.25*$3*($2^.5))}'`
+    set amplim[1] = `echo $imstats2[4] $amplim[2] | awk '{if ($1 < $2) print 0; else print $1-$2}'` 
+    echo "Amp limits automatically derived - $amplim[1] low, $amplim[2] high, $amplim[3] spectral."
+endif
 
 if ($mode == "auto") goto auto # Skip display during the auto cycle
 
@@ -625,7 +644,7 @@ if ($autoflag) then
 	uvaflag vis=$file tvis=$wd/tempmap2 >& /dev/null
 	rm -rf $wd/tempmap2 $wd/amplog $wd/ampinfo
     end
-    if ($sflags < `echo $totlinelim | awk '{print $1*30}'` && $totlim < $totlinelim) goto autocal
+    if ($sflags < `echo $totlinelim | awk '{print $1*30}'` && $totlim < $totlinelim) goto wrath
     @ fli++
     echo "Restarting cycle!"
     echo " "
@@ -633,6 +652,37 @@ if ($autoflag) then
 endif
 
 wrath:
+
+if ($wrath) then
+    echo "Beginning WRATH clean, performing invert..."
+    invert vis=`echo $vislist | tr ' ' ','` map=$wd/wrath.map beam=$wd/wrath.beam cell=$cellsize imsize=$imsize sup=$sup select=$sel options=double slop=1 >& /dev/null 
+    if !(-e $wd/wrath.map && -e $wd/wrath.beam) then
+	echo "FATAL ERROR: INVERT has failed to complete (most likely a buffer space issue)"
+	goto enderr
+    endif
+    echo -n "Cleaning channel maps..."
+    clean map=$wd/wrath.map beam=$wd/wrath.beam out=$wd/wrath.clean niters=$niters "$cregion" >& /dev/null 
+    echo "restoring..."
+    restor map=$wd/wrath.map beam=$wd/wrath.beam model=$wd/wrath.clean out=$wd/wrath.rs mode=residual >& /dev/null
+
+    imstat in=$wd/wrath.rs options=noheader | sed -e 1d -e 's/\([0-9][0-9]\)-/\1 -/g' | awk '{if ($5 !=0) printf "%s %.24f\n",$1,$5}' | sort -nk2 > $wd/wrathstats
+    set midplane = `wc -l $wd/wrathstats | awk '{print int(.5+$1/2)}' | awk '{if ($1 < 1) print 1; else print $1}'`
+    set midnoise = `sed -n {$midplane}p $wd/wrathstats | awk '{print $2}'`
+    set midrms = `awk '{if ($2 <= midnoise) {idx++; sms += ($2-midnoise)^2}} END {if (idx > 0) {print (sms/idx)^.5}}' midnoise=$midnoise $wd/wrathstats`
+    set badchans = (`awk '{if ($2 > midnoise+(log(midplane*2)*midrms)) print $1}' midnoise=$midnoise midplane=$midplane midrms=$midrms $wd/wrathstats`)
+    echo "$#badchans RFI afflicted images planes found...blasting RFI!"
+    echo -n "Beginning flagging"
+
+    foreach chan ($badchans)
+	echo -n "."
+	foreach file ($vislist)
+	    uvflag vis=$file options=none flagval=f line=chan,1,$chan > /dev/null
+	end
+    end
+    echo "complete!"
+    set wrath = 0
+    if ("$badchans" != "") goto invert
+endif
 
 autocal:
 
@@ -655,9 +705,8 @@ echo " "
 goto invert
 
 enderr:
-
-    rm -r $wd
-    exit 1
+rm -r $wd
+exit 1
 
 failsafe:
 
@@ -748,7 +797,7 @@ if ($savedata != 2) then
     foreach chan (`echo $crange`)
         newautomap.csh vis="$wd/*.S$idx" mode=skip options=nomfs,$switch outfile=$outfile/SLine$idx cleanlim=$niters
     end
-    echo "Imaging report now available under $file/imgrpt"
+    echo "Imaging report now available under $outfile/imgrpt"
     mv $wd/imgrpt $outfile/imgrpt
 endif
 
