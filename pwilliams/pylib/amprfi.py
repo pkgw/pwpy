@@ -309,7 +309,7 @@ if __name__ == '__main__':
     a.setupNext (vises, flags, freq, half)
     
     ns = {'a': a, 'vises': vises, 'freq': freq, 'half': half, 'fname': flags}
-    sys.argv = sys.argv[0:1]
+    sys.argv = [sys.argv[0], '-gthread']
     sh = IPython.Shell.start (ns)
     print 'AmpRfi instance is in variable "a". Exit to write'
     sh.mainloop ('')
