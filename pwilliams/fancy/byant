@@ -40,6 +40,7 @@ funcs = { 'uvdistance': (_uvd, False),
 # Process args
 
 keys.keyword ('only', 'i', -1)
+keys.keyword ('odest', 'a', ' ')
 keys.keymatch ('axis', 2, funcs.keys ())
 keys.doUvdat ('dsl3', True)
 opts = keys.process ()
@@ -103,6 +104,11 @@ for dIn, p, d, f, n in uvdat.readAll ():
 
 saps = sorted (byAp.iterkeys ())
 
+if opts.odest == ' ':
+    pg = omega.makeDisplayPager ()
+else:
+    pg = omega.makePager (opts.odest, mustPage=True)
+
 for ap in saps:
     arr = byAp[ap].finish ()
 
@@ -110,6 +116,8 @@ for ap in saps:
     p.setLabels (xaxis, yaxis)
 
     try:
-        p.showBlocking ()
+        p.sendTo (pg)
     except KeyboardInterrupt:
         break
+
+pg.done ()

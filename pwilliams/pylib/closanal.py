@@ -632,17 +632,17 @@ def task (argv):
     if args.uvdplot:
         print
         print 'Showing baseline closure errors as function of UV distance ...'
-        cp.plotUVDs ().showBlocking ()
+        cp.plotUVDs ().show ()
 
     if args.rmshist:
         print
         print 'Showing histogram of closure quantities ...'
-        cc.valHist ().showBlocking ()
+        cc.valHist ().show ()
 
     if args.blhist:
         print
         print 'Showing histogram of baseline closure values ...'
-        cc.bpHist ().showBlocking ()
+        cc.bpHist ().show ()
 
     # All done!
     

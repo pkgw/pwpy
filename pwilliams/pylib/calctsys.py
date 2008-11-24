@@ -405,6 +405,8 @@ class SysTemps (object):
             model = self.model
             soln = self.soln
 
+        pg = omega.makeDisplayPager ()
+
         for i in xrange (0, self.nap):
             x = []
             yobs = []
@@ -430,7 +432,9 @@ class SysTemps (object):
                 p.addXY (x, ymod, 'Model', lines=False)
                 p.addXY ((0, aps[-1]), (soln[i], soln[i]), 'TSys ' + util.fmtAP (aps[i]))
             p.setBounds (0, aps[-1], 0)
-            p.showBlocking ()
+            p.sendTo (pg)
+
+        pg.done ()
 
     def flush (self, jyperk, sdf):
         self._flatten ()
@@ -746,7 +750,7 @@ def task ():
         sys.exit (1)
 
     if args.showpre or args.showfinal or args.showall:
-        try: import omega, omega.gtkUtil
+        try: import omega, omega.gtkInteg
         except ImportError, e:
             print >>sys.stderr, 'Unable to load module omega:', e
             print >>sys.stderr, 'Error: unable to plot solutions'

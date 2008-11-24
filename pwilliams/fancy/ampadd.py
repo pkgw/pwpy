@@ -146,7 +146,7 @@ afa.done ()
 
 if args.show:
     from omega import quickXY
-    quickXY (afa.ch, afa.y, 'Added amps').showBlocking ()
+    quickXY (afa.ch, afa.y, 'Added amps').show ()
 else:
     fout = file (args.log, 'w')
     print 'Writing', args.log, '...'
