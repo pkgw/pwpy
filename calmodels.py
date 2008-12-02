@@ -34,6 +34,8 @@ def initCasA (year):
 
 
 # Other models from Baars et al. 1977
+# Data from Table 5 in that paper
+# Some of these will be overwritten by VLA models below.
 
 def _makeGenericBaars (a, b, c, fmin, fmax):
     from numpy import log10, any
@@ -50,25 +52,64 @@ def _makeGenericBaars (a, b, c, fmin, fmax):
 def _addGenericBaars (src, a, b, c, fmin, fmax):
     models[src] = _makeGenericBaars (a, b, c, fmin, fmax)
 
-# Data from Baars et al. 1977 Table 5
+baarsParameters = {
+    '3c48': (2.345, 0.071, -0.138, 405., 15000.),
+    '3c123': (2.921, -0.002, -0.124, 405., 15000.),
+    '3c147': (1.766, 0.447, -0.184, 405., 15000.),
+    '3c161': (1.633, 0.498, -0.194, 405., 10700.),
+    '3c218': (4.497, -0.910, 0.0, 405., 10700.),
+    '3c227': (3.460, -0.827, 0.0, 405, 15000.),
+    '3c249.1': (1.230, 0.288, -0.176, 405., 15000.),
+    '3c286': (1.480, 0.292, -0.124, 405., 15000.),
+    '3c295': (1.485, 0.759, -0.255, 405., 15000.),
+    '3c348': (4.963, -1.052, 0., 405., 10700.),
+    '3c353': (2.944, -0.034, -0.109, 405., 10700.),
+    'DR21': (1.81, -0.122, 0., 7000., 31000.),
+    'NGC7027': (1.32, -0.127, 0., 10000., 31000.)
+}
 
-_addGenericBaars ('3c48', 2.345, 0.071, -0.138, 405., 15000.)
-_addGenericBaars ('3c123', 2.921, -0.002, -0.124, 405., 15000.)
-_addGenericBaars ('3c147', 1.766, 0.447, -0.184, 405., 15000.)
-_addGenericBaars ('3c161', 1.633, 0.498, -0.194, 405., 10700.)
-_addGenericBaars ('3c218', 4.497, -0.910, 0.0, 405., 10700.)
-_addGenericBaars ('3c227', 3.460, -0.827, 0.0, 405, 15000.)
-_addGenericBaars ('3c249.1', 1.230, 0.288, -0.176, 405., 15000.)
-_addGenericBaars ('3c286', 1.480, 0.292, -0.124, 405., 15000.)
-_addGenericBaars ('3c295', 1.485, 0.759, -0.255, 405., 15000.)
-_addGenericBaars ('3c348', 4.963, -1.052, 0., 405., 10700.)
-_addGenericBaars ('3c353', 2.944, -0.034, -0.109, 405., 10700.)
-_addGenericBaars ('DR21', 1.81, -0.122, 0., 7000., 31000.)
-_addGenericBaars ('NGC7027', 1.32, -0.127, 0., 10000., 31000.)
+for src, info in baarsParameters.iteritems ():
+    _addGenericBaars (src, *info)
 
-# Custom models from VLA data
+# VLA models of calibrators:
+# see http://www.vla.nrao.edu/astro/calib/manual/baars.html
+# These are the 1999.2 values. This makes them pretty out
+# of date, but still a lot more recent than Baars.
 
-def modelFromVLA (Lband, Cband):
+def _makeVLAModel (a, b, c, d):
+    from numpy import log10, any
+
+    def f (freqInMHz):
+        if any (freqInMHz < 300) or any (freqInMHz > 50000):
+            raise Exception ('Going beyond frequency limits of model!')
+        
+        lghz = log10 (freqInMHz) - 3
+        return 10.**(a + b * lghz + c * lghz**2 + d * lghz**3)
+
+    return f
+
+def _addVLAModel (src, a, b, c, d):
+    models[src] = _makeVLAModel (a, b, c, d)
+
+vlaParameters = {
+    '3c48': (1.31752, -0.74090, -0.16708, +0.01525),
+    '3c138': (1.00761, -0.55629, -0.11134, -0.01460),
+    '3c147': (1.44856, -0.67252, -0.21124, +0.04077),
+    '3c286': (1.23734, -0.43276, -0.14223, +0.00345),
+    '3c295': (1.46744, -0.77350, -0.25912, +0.00752)
+}
+
+for src, info in vlaParameters.iteritems ():
+    _addVLAModel (src, *info)
+
+# Crappier power-law models based on VLA Calibrator Manual
+# catalog. It is not clear whether values in the catalog
+# should be taken to supersede those given in the analytic
+# models above, for those five sources that have analytic
+# models. The catalog entries do not seem to necessarily
+# be more recent than the analytic models.
+
+def modelFromVLAObs (Lband, Cband):
     """Generate spectral model parameters from VLA calibrator
     table data. Lband is the L-band (20 cm) flux in Jy, Cband
     is the C-band (6 cm) flux in Jy.
@@ -81,8 +122,8 @@ def modelFromVLA (Lband, Cband):
     import cgs
     from math import log10
     
-    fL = log10 (cgs.c / 20 / 1e6)
-    fC = log10 (cgs.c / 6 / 1e6)
+    fL = log10 (1425)
+    fC = log10 (4860)
 
     lL = log10 (Lband)
     lC = log10 (Cband)
@@ -91,8 +132,8 @@ def modelFromVLA (Lband, Cband):
 
     return m, lL - m * fL
 
-def funcFromVLA (Lband, Cband):
-    A, B = modelFromVLA (Lband, Cband)
+def funcFromVLAObs (Lband, Cband):
+    A, B = modelFromVLAObs (Lband, Cband)
     from numpy import log10
     
     def f (freqInMHz):
@@ -100,15 +141,16 @@ def funcFromVLA (Lband, Cband):
 
     return f
 
-def addFromVLA (src, Lband, Cband):
+def addFromVLAObs (src, Lband, Cband):
     """Add an entry into the models table for a source based on the
     Lband and Cband entries from the VLA catalog."""
 
     if src in models: raise Exception ('Already have a model for ' + src)
-    models[src] = funcFromVLA (Lband, Cband)
+    models[src] = funcFromVLAObs (Lband, Cband)
 
-addFromVLA ('3c84', 23.9, 23.3)
-addFromVLA ('3c138', 8.47, 3.78)
+# addFromVLA ('3c48', 16.50, 5.48)
+addFromVLAObs ('3c84', 23.9, 23.3)
+# addFromVLA ('3c138', 8.47, 3.78)
 
 # If we're executed as a program, print out a flux given a source
 # name
@@ -128,28 +170,28 @@ Prints the flux in Jy of the specified calibrator at the
 specified frequency.""" % argv[0]
     exit (0)
     
-def _interactive ():
-    from sys import argv, exit, stderr
+def _interactive (args):
+    from sys import exit, stderr
 
-    if len (argv) < 2: _usage ()
+    if len (args) < 1: _usage ()
 
-    source = argv[1]
+    source = args[0]
 
     if source == 'CasA':
-        if len (argv) != 4: _usage ()
+        if len (args) != 3: _usage ()
 
         try:
-            year = float (argv[3])
+            year = float (args[2])
             initCasA (year)
         except Exception, e:
-            print >>stderr, 'Unable to parse year \"%s\":' % argv[3], e
+            print >>stderr, 'Unable to parse year \"%s\":' % args[2], e
             exit (1)
-    elif len (argv) != 3: _usage ()
+    elif len (args) != 2: _usage ()
 
     try:
-        freq = float (argv[2])
+        freq = float (args[1])
     except Exception, e:
-        print >>stderr, 'Unable to parse frequency \"%s\":' % argv[2], e
+        print >>stderr, 'Unable to parse frequency \"%s\":' % args[1], e
         exit (1)
         
     if source not in models:
@@ -167,4 +209,5 @@ def _interactive ():
         exit (1)
 
 if __name__ == '__main__':
-    _interactive ()
+    from sys import argv
+    _interactive (argv[1:])
