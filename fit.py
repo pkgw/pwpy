@@ -384,6 +384,29 @@ class LinearFit (FitBase):
         self.params = _N.asarray ((self.a, self.b))
         self.uncerts = _N.asarray ((self.sigma_a, self.sigma_b))
 
+class SlopeFit (FitBase):
+    _paramNames = ['m']
+    
+    def guess (self):
+        return (0, )
+
+    def makeModel (self, m):
+        return lambda x: m * x
+
+    def _fitImpl (self, x, y, sig, guess):
+        # Ignore the guess since we can solve this exactly
+
+        sm2 = sig ** -2
+        
+        Sxx = (x**2 * sm2).sum ()
+        Sxy = (x * y * sm2).sum ()
+
+        self.m = Sxy / Sxx
+        self.sigma_m = 1. / _N.sqrt (Sxx)
+        
+        self.params = _N.asarray ((self.m, ))
+        self.uncerts = _N.asarray ((self.sigma_m, ))
+
 class LeastSquaresFit (FitBase):
     """A Fit object that implements its fit via a generic least-squares
     minimization algorithm. Extra fields are:
@@ -569,3 +592,13 @@ def ricefit (d):
     p = _N.array ((d.mean (), d.std ()))
 
     return fmin (likelihood, p)
+
+def ricefit2 (d, s):
+    from scipy.optimize import fmin
+    from numpy import log
+    from scipy.special import i0
+
+    def likelihood (v):
+        return -(log (d/s**2 * i0 (d*v/s**2)) - (d**2 + v**2)/2/s**2).sum ()
+
+    return fmin (likelihood, d.mean ())[0]
