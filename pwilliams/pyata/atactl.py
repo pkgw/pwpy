@@ -523,7 +523,7 @@ def trackEphem (ants, ebase, wait):
     # Sort the list of antennas to put 3f,3g,3h next to each other. This gets them
     # moving at nearly the same time and reduces the likelihood of the collision
     # server getting angry at us.
-    args = []
+    args = ['atatrackephem']
     if wait: args.append ('-w')
     args += [','.join (sorted (ants)), f]
     runAta (*args)
