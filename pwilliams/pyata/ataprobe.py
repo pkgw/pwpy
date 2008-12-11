@@ -161,7 +161,7 @@ def getFocusSettings (ants):
     estimated focus frequency in MHz. Antennas with uncalibrated
     focus settings are not present in the dictionary."""
 
-    lines = _slurp ('atagetfocus "%s"' % ','.join (ants))
+    lines = _slurp (ataArgs ('atagetfocus', ','.join (ants)))
 
     res = {}
 
@@ -209,7 +209,7 @@ class Hookup (object):
         self.lo = self.tab = self.sants = None
         
     def load (self):
-        lines = _slurp ('fxconf.rb hookup_tab "%s"' % self.instr)
+        lines = _slurp (obsRubyArgs ('fxconf.rb', 'hookup_tab', self.instr))
 
         tab = {}
         ants = set ()

@@ -138,7 +138,7 @@ def logAbort (exc_info):
 import ataprobe
 
 def _logProbeCommand (cmd):
-    log ('running (probe): ' + cmd)
+    log ('running (probe): ' + ' '.join (cmd))
     
 ataprobe.runLogger = _logProbeCommand
 
@@ -715,17 +715,17 @@ _fakeAtten = \
 _acctAttemp = 'controlling attemplifiers'
 
 def autoAttenAll (hookup, rms=13.0):
-    from ataprobe import _slurp
+    from ataprobe import _slurp, obsRubyArgs
     
     tStart = time.time ()
     log ('@@ Auto-attening all antpols')
     settings = {}
     
     for (antpol, (ibob, inp)) in hookup.apIbobs ():
-        cmd = 'autoatten.rb %s in%d %f 0' % (ibob, inp, rms)
+        cmd = obsRubyArgs ('autoatten.rb', ibob, 'in%d' % inp, rms, 0)
 
         if noopMode:
-            log ('WOULD slurp: ' + cmd)
+            log ('WOULD slurp: ' + ' '.join (cmd))
             out = _fakeAtten
         else:
             out = _slurp (cmd)
