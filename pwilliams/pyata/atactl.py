@@ -402,7 +402,7 @@ def makeCatalogEphemsOwned (owner, src, durHours, outbase):
     tStart = time.time ()
 
     _makeCatalogEphemOwned (owner, src, durHours, 'now', outbase +
-                            '.nsephem', '')
+                            '.ephem', '')
     t = time.gmtime ()
     stUTC = time.strftime ('%Y-%m-%dT%H:%M:00.000Z', time.gmtime ())
     _makeCatalogEphemOwned (owner, src, durHours, stUTC,
@@ -465,12 +465,12 @@ def ensureEphem (src, ebase, obsDurSeconds):
     return radec
 
 def trackEphem (ants, ebase, wait):
-    f = ebase + '.nsephem'
+    f = ebase + '.ephem' # Use the ephem in ns, not ms
     log ('@@ Tracking antennas: %s' % ','.join (ants))
     log (' ... to ephemeris in file: %s' % f)
     tStart = time.time ()
     # Sort the list of antennas to put 3f,3g,3h next to each other. This gets them
-    # moving at the same time and hopefully reduces the likelihood of the collision
+    # moving at nearly the same time and reduces the likelihood of the collision
     # server getting angry at us.
     args = ['/bin/sh', _bindir + 'atatrackephem']
     if wait: args.append ('-w')
@@ -499,7 +499,7 @@ def launchCatcher (hookup, src, freq, radec, durationSeconds, outbase, ebase):
     
     tStart = time.time ()
     ndumps = int (math.ceil (durationSeconds / _integTime))
-    nsephem = ebase + '.nsephem'
+    nsephem = ebase + '.ephem'
     
     log ('@@ Launching data catcher: %s at %s MHz on %s' % (src, freq, hookup.instr))
     log ('        atafx output base: %s' % outbase)
@@ -737,35 +737,25 @@ def setupAttens (src, freq, hookup):
 
 _acctFringe = 'controlling fringe rotation'
 
-def fringeKill ():
+def fringeKill (hookup):
     tStart = time.time ()
-    runCommand ('/bin/csh', _obsbindir + 'frot.csh', 'ign_gr',
+    runCommand ('/bin/csh', _obsbindir + 'frot.csh', hookup.instr,
                 'ign_eph', 'ign_freq', os.getcwd (), 'kill')
     account (_acctFringe, time.time () - tStart)
-
-atexit.register (fringeKill)
 
 def fringeStart (hookup, ebase, freq):
     tStart = time.time ()
     msephem = ebase + '.msephem'
     log ('@@ Starting fringe rotation server')
-    group = hookup.instr.split (':')[1]
-    runCommand ('/bin/csh', _obsbindir + 'frot.csh', group,
+    runCommand ('/bin/csh', _obsbindir + 'frot.csh', hookup.instr,
                 msephem, str (freq), os.getcwd (), 'start')
-    # Pause to not confuse the ibobs by talking to them too much
-    # -- copied from mosfx.sh 9/11/2008
-    if not noopMode: time.sleep (10)
     account (_acctFringe, time.time () - tStart)
     
 def fringeStop (hookup):
     tStart = time.time ()
     log ('@@ Stopping fringe rotation')
-    group = hookup.instr.split (':')[1]
-    runCommand ('/bin/csh', _obsbindir + 'frot.csh', group,
+    runCommand ('/bin/csh', _obsbindir + 'frot.csh', hookup.instr,
                 'ign_eph', 'ign_freq', os.getcwd (), 'stop')
-    # Pause to not confuse the ibobs by talking to them too much
-    # -- copied from mosfx.sh 9/11/2008
-    if not noopMode: time.sleep (5)
     account (_acctFringe, time.time () - tStart)
 
 # Generic observing function
@@ -773,6 +763,7 @@ def fringeStop (hookup):
 _lastFreq = 0
 _lastSrc = None
 _lastSrcExpire = 0
+_registeredFringeKill = set ()
 
 def observe (hookup, outBase, src, freq, integTimeSeconds):
     global _lastFreq, _lastSrc, _lastSrcExpire
@@ -804,6 +795,11 @@ def observe (hookup, outBase, src, freq, integTimeSeconds):
 
     # Start this last to not tickle the ibobs too much before --
     # auto-attening can fail with this going, I think.
+
+    if hookup not in _registeredFringeKill:
+        atexit.register (lambda: fringeKill (hookup))
+        _registeredFringeKill.add (hookup)
+
     fringeStart (hookup, src, freq)
     
     try:

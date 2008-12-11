@@ -194,9 +194,13 @@ class Hookup (object):
             antpol = antinfo[0:3]
             lo = antinfo[3]
 
+            # "Analog" LO output number -- doesn't
+            # do much of anything right now, I believe.
+            outp = int (antinfo[4])
+
             mirnum = int (mirinfo[:-1])
         
-            tab[antpol] = (ibob, inp, lo, walsh, num, mirnum)
+            tab[antpol] = (ibob, inp, lo, outp, walsh, num, mirnum)
             ants.add (antpol[0:2])
             los.add (lo)
 
