@@ -129,18 +129,21 @@ def getFocusSettings (ants):
     res = {}
 
     for l in lines:
+        l = l.strip ()
+        if len (l) == 0: continue
+
         a = l.split ()
 
-        if a[0][-1] == ':':
-            # Error-message ant. Have seen: uncalibrated; no rim box
-            # "focus not calibrated" can indicate that we're in the
-            # middle of focusing the antenna after a 'atasetfocus
-            # ANT VAL --cal'.
+        try:
+            freq = float (a[1])
+        except ValueError:
+            # there's an error message for this ant
             continue
-        
-        assert len (a) == 2
-        freq = float (a[1])
+
         ant = a[0]
+
+        # Handle the fact that we may refer to an ant as '3f'
+        # but getfocus will print out 'ant3f' as the name.
 
         if ant in ants:
             res[ant] = freq
