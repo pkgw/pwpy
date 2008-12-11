@@ -488,13 +488,13 @@ defaultIntegTime = 10.0 # in s
 _integTime = None
 import math
 
-def setIntegTime (itime=None):
+def setIntegTime (hookup, itime=None):
     global _integTime
     
     if itime is None: itime = defaultIntegTime
 
     tStart = time.time ()
-    runCommand ('/bin/csh', _obsbindir + 'setint64.csh', str (itime))
+    runCommand ('/bin/csh', _obsbindir + 'setintfx.csh', str (itime), hookup.instr)
     _integTime = itime
     account ('setting integration time', time.time () - tStart)
 

@@ -39,7 +39,7 @@ initScript (reallyDoIt, me + '.log')
 try:
     h = ataprobe.Hookup (instr)
     initAntennas (h.ants ())
-    setIntegTime ()
+    setIntegTime (h)
     lockServer ('lo' + h.lo)
     observe (h, 'scan', source, freq, durMins * 60)
     retcode = 0
