@@ -29,6 +29,7 @@ retcode = 1
 
 initScript (reallyDoIt, me + '.log',
             realwarn=False, # Don't pause and give the "actually going to run" message
+            useattens=False, # Don't bother to find and set optimal attemplifier settings.
             )
 
 try:

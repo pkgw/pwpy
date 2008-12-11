@@ -56,6 +56,7 @@ SVNID = '$Id$'
 noopMode = True
 logFile = None
 _startTime = None
+useAttens = True
 
 defaultIntegTime = 10.0 # in s
 
@@ -92,12 +93,13 @@ def getHookup (s):
     return ataprobe.Hookup (s)
 
 
-def initScript (doAnything, logname, realwarn=True):
-    global logFile, noopMode, _startTime
+def initScript (doAnything, logname, realwarn=True, useattens=True):
+    global logFile, noopMode, _startTime, useAttens
     import ataprobe
     
     noopMode = not doAnything
-
+    useAttens = bool (useattens)
+    
     if doAnything and realwarn:
         print '>>> This script is actually going to run! You have 5 seconds to cancel <<<'
         try:
@@ -846,9 +848,10 @@ def observe (hookup, outBase, src, freq, integTimeSeconds):
         setSkyFreq (hookup.lo, freq)
         _lastFreq = freq
 
-    setupAttens (src, freq, hookup)
+    if useAttens:
+        setupAttens (src, freq, hookup)
 
-    # Start this last to not tickle the ibobs too much before --
+    # Fringe rotation. Start this last to not tickle the ibobs too much --
     # auto-attening can fail with this going, I think.
 
     if hookup not in _registeredFringeKill:
@@ -859,8 +862,7 @@ def observe (hookup, outBase, src, freq, integTimeSeconds):
     
     try:
         # Wait to finish tracking. This reissues the trackephem command,
-        # but we're already on the way so I don't think it will slow
-        # things down much.
+        # but we're already on the way so it doesn't take long to finish.
         if needTrackWait:
             trackEphem (hookup.ants (), src, True)
 
