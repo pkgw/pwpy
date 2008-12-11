@@ -78,15 +78,17 @@ set wrath # Muah ha ha ha, let no RFI escape...
 set autolim
 set sysflux = 2
 
-###############################################
-
 if ($#argv == 0) then
     echo "AUTOMAP: No input files detected!"
     exit 0
 endif
 
-###############################################
-# Much like the new RFI program, this program is designed to do most of it's dirty work in a single working directory. This helps to keep the data directory clean of garbage, and makes it a lot easier to debug when things go wrong.
+#################################################################
+# The automapping creates a temp directory to work in within the
+# data directory being used. This is done to make operations
+# "cleaner", as several MIRIAD results are dumped to temp files
+# to be parsed later.
+#################################################################
 
 set wd = (`mktemp -d mapXXXX`)
 
@@ -95,8 +97,12 @@ if !( -e $wd) then
     exit 1
 endif
 
-###############################################
-# Here is the varassign code, much like that in all RAPID software.
+#################################################################
+# Here is the keyword/value pairing code. It basically operates
+# by going through each argument, attempting to figure out which
+# keyword matches (via an if arguement) and sets the value
+# accordingly
+#################################################################
 
 varassign:
 
@@ -245,9 +251,11 @@ foreach file ($vis)
     endif
 end
 
-##################################################################
-
-# There are variables that the user does NOT have control over, but are set for successful operation of the program. Most of them are simply indicies of different process cycles, etc.
+#################################################################
+# Below are a few other variables (counts) and some basic data
+# capture about the observation (i.e. frequency, num of channels
+# , etc.
+#################################################################
 
 if ($imsize == "") set imsize = 512
 set badcal # Debugging var to tell what happened if auto-selfcal fails
@@ -297,10 +305,11 @@ echo "Mapping $source..."
 set sidx = 0 # Index marker
 set oldrange = 1 # Measure of dynamic range for auto-selfcal
 set sel = "-auto" # This will be used later for different imaging options 
-if ($autopha) then
-    set scopt = pha # Starting point for selfcal
+
+if ($autopha) then # Determine whether to start with a phase or amp selfcal during the autocal cycle.
+    set scopt = pha
 else
-    set scopt = amp # Starting point for selfcal
+    set scopt = amp
 endif
 
 set flct = 0 # Flagged spectra count
@@ -326,7 +335,17 @@ else
     echo "star arcmin arcmin star no 0 0 20 20 0 0" > $wd/olay
 endif
 
-#Begin selecting data for analysis. We want to move the dataset into a temporary file for working on, and then deselect specific channels for imaging. Images are done individually using automap using the "skip" and "nomfs" options, with the gains derived from continuum.
+#################################################################
+# Because selfcal doesn't want to create indepenant gains soln's
+# for different pols on the same ant, files are split into x and
+# y pols. x-pol files and y-pol files are then group together 
+# and combined in the invert step.
+#
+# If "special" gains files are found in the original folder
+# (currently only created by calcal.csh) - normally named
+# gains.xx and gains.yy - then automap will apply those gains
+# soln's after the file is split.
+#################################################################
 
 set vislist
 set idx = 0
@@ -365,6 +384,14 @@ foreach file ($vis)
     echo "done!"
 end
 
+#################################################################
+# Automap assumes that the image is a continuum image, unless
+# the user specifies spectral channels via the "crange" keyword.
+# If specline channels are specified, automap will excise those
+# channels for later imaging, and concentrate only on those cont
+# channels.
+#################################################################
+
 foreach file ($vislist)
     set idx = 0
     foreach chan (`echo $crange`)
@@ -401,7 +428,24 @@ else
     echo "complete!"
 endif
 
-# Intelligent cleaning... there is such a thing! Basically, first step is a "quick" clean, second step is a clean that uses the number of point sources to determine the number of clean cycles to use. Final step makes sure that there are no extra reminants in the residuals to clean up after.
+
+#################################################################
+# Below is code for "intelligent cleaning". If requested by the
+# user, automap will make a "first pass" at cleaning using an
+# arbitrary number (in this case 1000), calculate the strength
+# of all the point sources in the field, calculate the noise and
+# determine the number of clean cycles neccessary to "clean" all
+# of the sources down to 3 sigma. Automap then cleans this 
+# number of times, looking for point sources in the residual map
+# if enough additional sources are found, then automap will
+# increase the number of clean cycles . If no sources are found,
+# automap will move on.
+#
+# So far this method is effective in fields that have even a
+# moderate amount of extended emission, but it's not known how
+# well it does when the emission comes close to filling the
+# primary beam.
+################################################################# 
 
 if ($intclean) then
     echo "Performing preliminary clean, deriving model for calculations"
@@ -479,6 +523,19 @@ set imstats = (`imstat in=$wd/tempmap.rs region=relcen,arcsec,"box(-$arc,-$arc,$
 set imstats2 = (`imstat in=$wd/tempmap.cm region=relcen,arcsec,"box(-$arc,-$arc,$arc,$arc)" | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
 set range = `echo $imstats[3] $imstats2[4] | awk '{print $2/$1}'`
 set alevel = `echo $imstats[3] $imstats2[5] | awk '{print $2/$1}'`
+
+################################################################# 
+# Below is the automatic calculator for amplitudes. It works by
+# taking the sum of the clean components (which should hold
+# nearly all of the flux of the map), adding some additional
+# flux based on possible errors in the clean components,
+# possible sources below the 3 sigma noise limit and the 
+# "system" flux. The lower limit is established by taking the
+# peak flux in the map and subtracting the "total" flux
+# calculated above. The spectral channel limit is established by
+# adding additional flux based on the "sysflux" to the "total"
+# flux.
+################################################################# 
 
 if ($autolim) then
     set nsources = `grep -vc "#" $wd/sfind.log`
@@ -561,9 +618,30 @@ endif
 goto invert
 
 auto:
-# First thing to do during the auto cycle is to see whether or not more calibration is needed. sidx is a measure of the number of cycles that have passed without improvement of dynamic range of image fidelity.
- 
-# Alright, first step is to check whether or not data needs to be flagged. This check should usually be performed even if automatic calibration is not neccessary, mostly because outliers should probably be captured before serious problems arise. 
+
+################################################################# 
+# First thing to do during the auto cycle is to see whether or 
+# not more calibration is needed. Automap keeps track of the
+# current image quality, and whether or not the image quality is
+# degrading, stable or improving. If degrading, automap will
+# itself two tries to bring the quality of the map back up to
+# the previous best. If it succeeds, it proceeds like normal. If
+# it cannot repoduce the "best" map, then it enters failsafe
+# mode and copys back the flags and gains solutions from the
+# best previous cycle
+#
+# If the image quality is stable, then automap declares success,
+# makes sure that no more calibration needs to be done (i.e. it
+# wont exit out if you told it to perform an amp self-cal and
+# it's only performed phase self-cals up to this stage) and maps
+# and exits accordingly. If all of the automated stages have not
+# been completed (i.e. only flagging has been performed when you
+# have asked for self-cal as well) or the image quality is still
+# improving, then automap will continue along it's merry way
+# until one of the two above scenarios are met.
+################################################################# 
+
+# This will eventually be expanded to include image fidelity
 
 echo "Dynamic range for this cycle was $range, with an RMS noise of $imstats[3]"
 if (`echo $range $oldrange $sctol | awk '{if (($1/$2) < (1-$3)) print "go"}'` == "go") then
@@ -595,6 +673,23 @@ else
 endif
 
 autoflag:
+
+################################################################# 
+# Autoflagging is fairly simple, automap uses uvaver to apply
+# the gains solution (if there is one) and uses uvlist to calc
+# the amplitude of each integrated spectra. If the amplitude
+# falls outside of some preset limit (amplim[1] being the lower
+# limit and amplim[2] being the higher limit), then automap will
+# flag that spectra as being bad. Additionally, any spectral
+# channels that exceed amplim[3] are flagged as bad (which is
+# much simplier, since uvflag allows for that kind of selection)
+# and the flagged file is used as a "template" to flag the
+# original file (where the gains have not been engrained into
+# the visibilities). Flagging for spectral line data only takes
+# place based on the "wideband" (i.e. integrated spectra)
+# flagging - any spectra that is entirely flagged in the cont
+# dataset will also be flagged in the spectral line dataset.
+################################################################# 
 
 if ($autoflag) then
     set sflags = 0
@@ -653,6 +748,16 @@ endif
 
 wrath:
 
+################################################################# 
+# Wrath is a new option for automap. Basically once all of the
+# "obviously bad" data points have been culled, automap will go
+# through on a channel by channel basis and look for any channel
+# maps that don't clean out as well as others.  Any channel maps
+# that exceed the noise limit are excised (that limit being
+# dervived so that only one non-polluted channel will be outside
+# that limit by gaussian stats).
+################################################################# 
+
 if ($wrath) then
     echo "Beginning WRATH clean, performing invert..."
     invert vis=`echo $vislist | tr ' ' ','` map=$wd/wrath.map beam=$wd/wrath.beam cell=$cellsize imsize=$imsize sup=$sup select=$sel options=double slop=1 >& /dev/null 
@@ -685,8 +790,15 @@ if ($wrath) then
 endif
 
 autocal:
-
-# Autocal is simple, just performs either a phase or amp selfcal based on results.
+################################################################# 
+# The autocal step is fairly simple, basically it performs an
+# amp or phase selfcal based on what the user has specified.
+# Automap will attempt to run a phase selfcal (as it should!)
+# before it runs an amp selfcal. The new gains solutions are
+# then used to make the next map, and the cycle continues. Once
+# finalized, the solutions are copied to the spectral line data
+# (if they exist) during the last part of the program.
+################################################################# 
 
 if !($autoamp || $autopha) goto invert
 if ($scopt == "pha") @ psci++
@@ -710,7 +822,14 @@ exit 1
 
 failsafe:
 
-echo "Failsafe initiated! Continuum images will only be produced..."
+echo "Failsafe initiated!"
+
+################################################################# 
+# Under failsafe mode, automap will copy back the "best" flags
+# and gains solution for each file (that derived the best map).
+# Currently, automap WILL produce spectral line images (if
+# specified by the user via the crange keyword).
+################################################################# 
 
 foreach file ($vislist)
     if (-e $file/buflags) mv $file/buflags $file/flags
@@ -725,7 +844,7 @@ goto invert
 
 finish:
 
-# Below this is all reporting code, nothing terribly interesting, so nothing has been extensively commented...
+# Below this is all reporting code. All of this code will need to be changed...
 
 echo "The following parameters were used for this auto-mapping iteration:" >> $wd/imgrpt
 
@@ -754,6 +873,23 @@ echo "Below is the ImStat report for the area within the primary beam." >> $wd/i
 echo " " >> $wd/imgrpt
 imstat in=$wd/tempmap.cm region=relcen,arcsec,box"(-$arc,-$arc,$arc,$arc)" >> $wd/imgrpt
 echo "---------------------------------------------------------">> $wd/imgrpt
+
+################################################################# 
+# After reporting is finished, automap will move the images into
+# a directory. If the user specifies a directory, everything
+# will be moved there, otherwise automap creates a directory
+# with the syntax "source-maps{.idx}", where the idx parameter
+# is used if the "source-maps" directory already exists (i.e.
+# automap attempt to avoid overwriting previous results). 
+#
+# The default is to save the dirty, clean and residual maps, the
+# beam, the clean model and the imaging report. The user can
+# also specify to save the reduced dataset or save nothing.
+#
+# After this, if any spectral line ranges have been specified,
+# automap will move through and image them, placing them in the
+# same folder as the continuum image.
+################################################################# 
 
 set idx = 0
 if ("$outdir" == "") then
