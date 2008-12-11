@@ -27,7 +27,9 @@ durMins = int (sys.argv[5])
 
 retcode = 1
 
-initScript (reallyDoIt, me + '.log')
+initScript (reallyDoIt, me + '.log',
+            realwarn=False, # Don't pause and give the "actually going to run" message
+            )
 
 try:
     h.load ()

@@ -1,12 +1,39 @@
-"""Routines for extracting information about the ATA. Should be written
-in Jython to use the native Java APIs, but Jython is broken right now.
+"""Routines for extracting information about the ATA. Would be nice
+if we could bridge directly to the Java APIs -- for a discussion of
+that, see atactl.py.
 """
 
 SVNID = '$Id$'
 
 runLogger = None
 
-def _slurp (cmd, checkCode=True):
+
+# Some utilities for constructing commandlines. These are actually
+# not used much in this module, but come into play a lot in atactl.py
+
+_bindir = '/hcro/atasys/ata/run/'
+_rubydir = '/home/obs/ruby/bin/'
+_obsbindir = '/home/obs/bin/'
+
+def ataArgs (command, *rest):
+    a = ['/bin/sh', _bindir + command]
+    for x in rest: a.append (str (x))
+    return a
+
+
+def obsArgs (command, *rest):
+    a = ['/bin/csh', _obsbindir + command]
+    for x in rest: a.append (str (x))
+    return a
+
+
+def obsRubyArgs (command, *rest):
+    a = ['/usr/bin/env', 'ruby', _rubydir + command]
+    for x in rest: a.append (str (x))
+    return a
+
+
+def _slurp (args, checkCode=True):
     """Return the output of a cmd, which is executed in a shell.
 
     If checkCode is True, an exception is raised if the exit code of
@@ -19,12 +46,10 @@ def _slurp (cmd, checkCode=True):
     
     import subprocess, os
 
-    cmd = str (cmd)
-    
     if runLogger is not None:
-        runLogger (cmd)
+        runLogger (args)
     
-    proc = subprocess.Popen (cmd, shell=True, stdin=file (os.devnull, 'r'),
+    proc = subprocess.Popen (args, shell=False, stdin=file (os.devnull, 'r'),
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE, close_fds=True)
     (stdout, stderr) = proc.communicate (None)
@@ -40,7 +65,7 @@ def getLAST ():
     """Return the local apparent sidereal time, according to the ATA
     system."""
 
-    lines = _slurp ('atamainsystime --csv -s')
+    lines = _slurp (ataArgs ('atamainsystime', '--csv', '-s'))
     if len (lines) != 1: raise Exception ('Expected only one line from atamainsystime')
     return float (lines[0].split (',')[1])
 
@@ -58,7 +83,7 @@ def check (source):
 
     import re
     
-    (code, stdout, stderr) = _slurp ('atacheck "%s"' % source, False)
+    (code, stdout, stderr) = _slurp (ataArgs ('atacheck', source), False)
 
     # Get rid of warning about ambiguous catalog entries to make
     # our assumptions simpler.
@@ -104,7 +129,7 @@ def getPAMDefaults (ants):
     (XPamDefault, YPamDefault).
     """
 
-    lines = _slurp ('atasetpams "%s"' % ','.join (ants))
+    lines = _slurp (ataArgs ('atasetpams', ','.join (ants)))
 
     if len (lines) != len (ants):
         raise Exception ('Unexpected output from atasetpams!')
@@ -114,6 +139,18 @@ def getPAMDefaults (ants):
         return (float (a[1]), float (a[2]))
 
     return [parse (l) for l in lines]
+
+
+# Integration time
+
+def getIntegTime (hookup):
+    """Returns the integration time for the specified hookup object,
+    measured in seconds."""
+    
+    lines = _slurp (obsArgs ('getintfx.csh', hookup.instr))
+    integ = float (lines[0])
+    return integ
+
 
 # Focus stuff
 

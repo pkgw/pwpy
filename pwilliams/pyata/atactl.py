@@ -55,9 +55,6 @@ SVNID = '$Id$'
 
 noopMode = True
 logFile = None
-_bindir = '/hcro/atasys/ata/run/'
-_rubydir = '/home/obs/ruby/bin/'
-_obsbindir = '/home/obs/bin/'
 _startTime = None
 
 defaultIntegTime = 10.0 # in s
@@ -94,13 +91,13 @@ def getHookup (s):
 
     return ataprobe.Hookup (s)
 
-def initScript (doAnything, logname):
+def initScript (doAnything, logname, realwarn=True):
     global logFile, noopMode, _startTime
     import ataprobe
     
     noopMode = not doAnything
 
-    if doAnything:
+    if doAnything and realwarn:
         print '>>> This script is actually going to run! You have 5 seconds to cancel <<<'
         try:
             time.sleep (5)
@@ -197,7 +194,7 @@ atexit.register (_accountOnExit)
 
 # Executing commands (with logging)
 
-def runCommand (*args):
+def runCommand (args):
     if noopMode:
         log ('WOULD execute: %s' % (' '.join (args))) 
         return
@@ -219,6 +216,22 @@ def runCommand (*args):
     if proc.returncode != 0:
         log ('process returned error code %d!' % proc.returncode)
         raise Exception ("Command failed")
+
+
+from ataprobe import ataArgs, obsArgs, obsRubyArgs
+
+
+def runAta (*args):
+    return runCommand (ataArgs (*args))
+
+
+def runObs (*args):
+    return runCommand (obsArgs (*args))
+
+
+def runObsRuby (*args):
+    return runCommand (obsRubyArgs (*args))
+
 
 # Script state save/restore in case the script gets interrupted
 # and restarted
@@ -300,7 +313,7 @@ _lockKey = _getLockKey ()
 
 def _releaseLocks ():
     for server in _lockInfo:
-        runCommand ('/bin/sh', _bindir + 'ataunlockserver', server, _lockKey)
+        runAta ('ataunlockserver', server, _lockKey)
 
 atexit.register (_releaseLocks)
 
@@ -310,7 +323,7 @@ def lockServer (server):
     if server in _lockInfo: raise Exception ('Trying to re-lock server %s' % server)
 
     tStart = time.time ()
-    runCommand ('/bin/sh', _bindir + 'atalockserver', server, _lockKey)
+    runAta ('atalockserver', server, _lockKey)
     _lockInfo.add (server)
     account (_acctLock, time.time () - tStart)
 
@@ -318,7 +331,7 @@ def unlockServer (server):
     if server not in _lockInfo: raise Exception ('Trying to unlock un-held server %s' % server)
 
     tStart = time.time ()
-    runCommand ('/bin/sh', _bindir + 'ataunlockserver', server, _lockKey)
+    runAta ('ataunlockserver', server, _lockKey)
     _lockInfo.remove (server)
     account (_acctLock, time.time () - tStart)
 
@@ -345,8 +358,8 @@ def initAntennas (ants):
     antlist = ','.join (ants)
     log ('@@ Initializing PAMs and LNAs for antennas: %s' % ','.join (ants))
     tStart = time.time ()
-    runCommand ('/bin/sh', _bindir + 'atasetpams', antlist)
-    runCommand ('/bin/sh', _bindir + 'atalnaon', antlist)
+    runAta ('atasetpams', antlist)
+    runAta ('atalnaon', antlist)
     account ('initializing PAMs and LNAs', time.time () - tStart)
 
 _acctPAM = 'setting PAM values'
@@ -354,20 +367,20 @@ _acctPAM = 'setting PAM values'
 def setAllPAMsToDefaults ():
     log ('Setting all PAMs to their defaults')
     tStart = time.time ()
-    runCommand ('/bin/sh', _bindir + 'atasetpams', 'all')
+    runAta ('atasetpams', 'all')
     account (_acctPAM, time.time () - tStart)
 
 def setPAM (ants, xval, yval):
     log ('Setting PAMs to [%.1f, %.1f] for antennas: %s' % (xval, yval, ','.join (ants)))
     tStart = time.time ()
-    runCommand ('/bin/sh', _bindir + 'atasetpams', ','.join (ants), str (xval), str (yval))
+    runAta ('atasetpams', ','.join (ants), xval, yval)
     account (_acctPAM, time.time () - tStart)
     
 def setSkyFreq (lo, freqInMhz):
     log ('@@ Setting sky frequency to %d MHz' % freqInMhz)
     unlockServer ('lo' + lo)
     tStart = time.time ()
-    runCommand ('/bin/sh', _bindir + 'atasetskyfreq', str (lo), str (freqInMhz))
+    runAta ('atasetskyfreq', lo, freqInMhz)
     account ('setting the sky frequency', time.time () - tStart)
     lockServer ('lo' + lo)
 
@@ -434,7 +447,7 @@ def _makeCatalogEphemOwned (owner, src, durHours, start, outfile, args):
         raise Exception ("Command failed")
 
     # Wrap ephem to avoid hitting limits.
-    runCommand ('/bin/sh', _bindir + 'atawrapephem', outfile)
+    runAta ('atawrapephem', outfile)
 
 def makeCatalogEphemsOwned (owner, src, durHours, outbase):
     tStart = time.time ()
@@ -510,10 +523,10 @@ def trackEphem (ants, ebase, wait):
     # Sort the list of antennas to put 3f,3g,3h next to each other. This gets them
     # moving at nearly the same time and reduces the likelihood of the collision
     # server getting angry at us.
-    args = ['/bin/sh', _bindir + 'atatrackephem']
+    args = []
     if wait: args.append ('-w')
     args += [','.join (sorted (ants)), f]
-    runCommand (*args)
+    runAta (*args)
     account ('tracking to sources', time.time () - tStart)
 
 # Launching the data catcher
@@ -527,7 +540,7 @@ def setIntegTime (hookup, itime=None):
     if itime is None: itime = defaultIntegTime
 
     tStart = time.time ()
-    runCommand ('/bin/csh', _obsbindir + 'setintfx.csh', str (itime), hookup.instr)
+    runObs ('setintfx.csh', itime, hookup.instr)
     _integTime = itime
     account ('setting integration time', time.time () - tStart)
 
@@ -574,9 +587,9 @@ def _setFocus (ants, settingInMHz, calMode):
     antstr = ','.join (sorted (ants))
     log ('@@ Setting focus of %f for antennas: %s' % (settingInMHz, antstr))
 
-    args = ['/bin/sh', _bindir + 'atasetfocus', antstr, str (settingInMHz)]
+    args = ['atasetfocus', antstr, str (settingInMHz)]
     if calMode: args.append ('--cal')
-    runCommand (*args)
+    runAta (*args)
 
 _curFocus = None
 
@@ -739,8 +752,7 @@ def setAttens (settings):
         if flag != 'ok':
             log ('!! Warning: flag = %s ; what to do ?' % flag)
         
-        runCommand ('/usr/bin/env', 'ruby', _rubydir + 'setatten.rb', ibob,
-                    'in%d' % inp, str (db), '0')
+        runObsRuby ('setatten.rb', ibob, 'in%d' % inp, db, '0')
 
     account (_acctAttemp, time.time () - tStart)
 
@@ -776,23 +788,20 @@ _acctFringe = 'controlling fringe rotation'
 
 def fringeKill (hookup):
     tStart = time.time ()
-    runCommand ('/bin/csh', _obsbindir + 'frot.csh', hookup.instr,
-                'ign_eph', 'ign_freq', os.getcwd (), 'kill')
+    runObs ('frot.csh', hookup.instr, 'ign_eph', 'ign_freq', os.getcwd (), 'kill')
     account (_acctFringe, time.time () - tStart)
 
 def fringeStart (hookup, ebase, freq):
     tStart = time.time ()
     msephem = ebase + '.msephem'
     log ('@@ Starting fringe rotation server')
-    runCommand ('/bin/csh', _obsbindir + 'frot.csh', hookup.instr,
-                msephem, str (freq), os.getcwd (), 'start')
+    runObs ('frot.csh', hookup.instr, msephem, str (freq), os.getcwd (), 'start')
     account (_acctFringe, time.time () - tStart)
     
 def fringeStop (hookup):
     tStart = time.time ()
     log ('@@ Stopping fringe rotation')
-    runCommand ('/bin/csh', _obsbindir + 'frot.csh', hookup.instr,
-                'ign_eph', 'ign_freq', os.getcwd (), 'stop')
+    runObs ('frot.csh', hookup.instr, 'ign_eph', 'ign_freq', os.getcwd (), 'stop')
     account (_acctFringe, time.time () - tStart)
 
 # Generic observing function
