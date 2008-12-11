@@ -41,10 +41,9 @@ try:
     initAntennas (h.ants ())
     setIntegTime ()
     lockServer ('lo' + h.lo)
-    observe (me, h, 'scan', source, freq, durMins * 60)
-    showAccounting ()
+    observe (h, 'scan', source, freq, durMins * 60)
     retcode = 0
-except Exception, e:
-    logAbort (e)
+except Exception:
+    logAbort (sys.exc_info ())
     
 sys.exit (retcode)
