@@ -107,7 +107,8 @@ def initScript (doAnything, logname, realwarn=True, useattens=True):
         except:
             print 'Canceled!'
             sys.exit (0)
-        
+
+    if doAnything:
         logFile = file (logname, 'a')
 
     _startTime = time.time ()
