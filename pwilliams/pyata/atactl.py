@@ -55,7 +55,7 @@ SVNID = '$Id$'
 
 noopMode = True
 logFile = None
-_bindir = '/opt/atasys/ata/run/'
+_bindir = '/hcro/atasys/ata/run/'
 _rubydir = '/home/obs/ruby/bin/'
 _obsbindir = '/home/obs/bin/'
 _startTime = None
