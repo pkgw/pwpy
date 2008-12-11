@@ -123,6 +123,10 @@ def account (desc, duration):
         _accountInfo[desc] = (n + 1, time + duration)
 
 def showAccounting ():
+    if _startTime is None:
+        # We didn't even get initialized. Exit silently
+        return
+    
     import time
     totalTime = time.time () - _startTime
     accounted = 0.0
