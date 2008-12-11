@@ -91,6 +91,7 @@ def getHookup (s):
 
     return ataprobe.Hookup (s)
 
+
 def initScript (doAnything, logname, realwarn=True):
     global logFile, noopMode, _startTime
     import ataprobe
@@ -533,6 +534,14 @@ def trackEphem (ants, ebase, wait):
 
 _integTime = None
 import math
+
+
+def checkIntegTime (hookup):
+    global _integTime
+
+    cur = ataprobe.getIntegTime (hookup)
+    log ('@@ Current integration time: %.2f' % cur)
+    _integTime = cur
 
 def setIntegTime (hookup, itime=None):
     global _integTime

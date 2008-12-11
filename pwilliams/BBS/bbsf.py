@@ -147,12 +147,11 @@ stopTime, durHours = calcStopTime (stopHour)
 h.load ()
 state = BBSState (freqLists, sources, h, obsDurs, defaultObsDur)
 
-# Initial hardware setup. setIntegTime takes a while
-# but only happens once per invocation.
+# Initial hardware setup.
 
 lockServer ('lo' + h.lo)
 initAntennas (h.ants ())
-setIntegTime (h)
+checkIntegTime (h)
 fringeKill ()
 
 # Enter main loop and run until done.

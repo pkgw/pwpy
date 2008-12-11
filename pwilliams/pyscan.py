@@ -34,7 +34,7 @@ initScript (reallyDoIt, me + '.log',
 try:
     h.load ()
     initAntennas (h.ants ())
-    setIntegTime (h)
+    checkIntegTime (h)
     lockServer ('lo' + h.lo)
     observe (h, 'scan', source, freq, durMins * 60)
     retcode = 0
