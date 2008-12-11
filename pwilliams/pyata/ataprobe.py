@@ -169,9 +169,9 @@ class Hookup (object):
         if instr is None: instr = _defaultInstrument
 
         self.instr = instr
-        self._read ()
-
-    def _read (self):
+        self.lo = self.tab = self.sants = None
+        
+    def load (self):
         lines = _slurp ('fxconf.rb hookup_tab "%s"' % self.instr)
 
         tab = {}

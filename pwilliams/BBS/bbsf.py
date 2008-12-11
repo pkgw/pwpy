@@ -26,9 +26,6 @@ from atactl import *
 SVNID = '$Id$'
 me = 'bbsf'
 
-# This line added to update the script revision for when we
-# stopped taking fxmir data.
-
 # Observing script state. A bit cumbersome, but this lets us
 # resume the script if we're canceled in the middle of an
 # observation. The logic here controls ALL of the observations
@@ -138,17 +135,8 @@ if len (sys.argv) != 4:
     print >>sys.stderr, 'E.g.: %s debug default 3.0' % sys.argv[0]
     sys.exit (1)
 
-if sys.argv[1] == 'real':
-    reallyDoIt = True
-elif sys.argv[1] == 'debug':
-    reallyDoIt = False
-else:
-    print >>sys.stderr, 'First argument must be "debug" or "real"; got', sys.argv[1]
-    sys.exit (1)
-
-instr = sys.argv[2]
-if instr == 'default': instr = None
-
+reallyDoIt = parseMode (sys.argv[1])
+h = getHookup (sys.argv[2])
 stopHour = float (sys.argv[3])
 
 # That was all prep. Now let's go!
@@ -156,7 +144,7 @@ stopHour = float (sys.argv[3])
 initScript (reallyDoIt, me + '.log')
 log (SVNID)
 stopTime, durHours = calcStopTime (stopHour)
-h = ataprobe.Hookup (instr)
+h.load ()
 state = BBSState (freqLists, sources, h, obsDurs, defaultObsDur)
 
 # Initial hardware setup. setIntegTime takes a while

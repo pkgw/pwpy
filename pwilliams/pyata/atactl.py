@@ -60,6 +60,40 @@ _rubydir = '/home/obs/ruby/bin/'
 _obsbindir = '/home/obs/bin/'
 _startTime = None
 
+defaultIntegTime = 10.0 # in s
+
+# Common argument parsing and script initialization
+
+def parseMode (s):
+    """Utility for parsing a string describing the script operation mode.
+    Accepts exactly "debug" or "real"; anything else is an error and causes
+    the program to exit. The rationale is that you want to be sure that the
+    user has consciously chosen whether to control the hardware or not; you
+    don't want an accidentally malformatted argument causing the array to
+    spring into action when that wasn't intended."""
+    
+    if s == 'real':
+        return True
+    if s == 'debug':
+        return False
+
+    print >>sys.stderr, 'Mode argument must be "debug" or "real"; got', s
+    sys.exit (1)
+
+
+def getHookup (s):
+    """Utility for parsing a string describing the instrument to use
+    and converting it a Hookup object. The only thing special here is
+    that the string "default" indicates that the default instrument be
+    used. The default is specified in ataprobe.py and at one point in
+    time was fx64a:fxa."""
+
+    import ataprobe
+    
+    if s == 'default': s = None
+
+    return ataprobe.Hookup (s)
+
 def initScript (doAnything, logname):
     global logFile, noopMode, _startTime
     import ataprobe
@@ -484,7 +518,6 @@ def trackEphem (ants, ebase, wait):
 
 # Launching the data catcher
 
-defaultIntegTime = 10.0 # in s
 _integTime = None
 import math
 
