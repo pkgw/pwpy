@@ -199,7 +199,10 @@ for dIn, p, d, f, n in uvdat.readAll ():
 
     for (v, vlen, get, formatter) in vinfo:
         #print v, get, formatter, vtype, vlen
-        f = formatter (get ())
+        if vlen == 1:
+            f = formatter (get ())
+        else:
+            f = formatter (get ()[1])
 
         if len (f) < 20:
             s += f.ljust (20)
