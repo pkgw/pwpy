@@ -122,7 +122,7 @@ end
 if ($mode == debug) then
     foreach n (`seq 1 $nparts`)
 	set d = part$n
-	rm $d/*.nsephem $d/*.msephem $d/bbs.uuid $d/config.py $d/config.pyc
+	rm $d/*.ephem $d/*.msephem $d/bbs.uuid $d/config.py $d/config.pyc
 	rmdir $d
     end
 
