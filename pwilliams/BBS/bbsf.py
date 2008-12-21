@@ -152,7 +152,7 @@ state = BBSState (freqLists, sources, h, obsDurs, defaultObsDur)
 lockServer ('lo' + h.lo)
 initAntennas (h.ants ())
 checkIntegTime (h)
-fringeKill ()
+fringeKill (h)
 
 # Enter main loop and run until done.
 
