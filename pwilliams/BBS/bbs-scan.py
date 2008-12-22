@@ -68,6 +68,9 @@ def getScriptInfo (archDir):
         elif a[3] == 'fxconf.rb':
             instrument = a[5][1:-1]
             break
+        elif len (a) > 7 and a[6] == 'hookup_tab':
+            instrument = a[7]
+            break
         elif a[1] == 'Initializing':
             break
 
@@ -136,6 +139,13 @@ def getScans (archDir, scriptName, scriptRev):
 
         if catcherType == 'fxmir' and catcherRev == 0:
             l = file (os.path.join (v, 'history'), 'r').readline ()
+            catcherRev = int (l.split ()[4])
+
+        if catcherType == 'atafx' and catcherRev == 0:
+            f = file (os.path.join (v, 'history'), 'r')
+            f.readline ()
+            f.readline ()
+            l = f.readline ()
             catcherRev = int (l.split ()[4])
 
         vis = VisData (v)
