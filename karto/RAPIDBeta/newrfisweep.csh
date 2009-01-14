@@ -35,7 +35,7 @@ endif
 
 set date1 = `date +%s.%N`
 
-set fsel
+set fsel = ("pol(xx)" "pol(yy)")
 set vis # Files to be scanned for RFI and flagged
 set vis2 # Files to be flagged for RFI, but NOT scanned!
 set inttime = 12.5 # RFI integration time for the subinterval
@@ -58,6 +58,8 @@ set rescan = 0
 set corrcycle = 4
 set seedcorr = 0
 set restart
+set autoedge = 0
+set autoedgechan = 100
 
 #Alright, lets see if I can finally properly comment this code...
 #Below is the variable assignment listing, further documentation on this will be available shortly
@@ -71,7 +73,7 @@ if ("$argv[1]" =~ 'vis='*) then
 else if ("$argv[1]" =~ 'vis2='*) then
     set vis2 = "`echo '$argv[1]/' | sed 's/vis2=//'`"
     set vis2 = (`echo $vis2 | sed 's/\/ / /g' | sed 's/\(.*\)\//\1/g' | tr ',' ' '`)
-    shift argv; if ("$argv" == "") set argv = "finish"
+    shift argv; if ("$argv" == "") set argv = "finset csel = "$csel,-(1),-("`echo $nchan $autoedgechan | awk '{print $1+1-$2","$1}'`")"ish"
 else if ("$argv[1]" =~ 'options='*) then
     set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
     set badopt
@@ -109,6 +111,10 @@ else if ("$argv[1]" =~ 'options='*) then
 	else if ($option == "debug") then
 	    set debug = 1
 	    set display = "display,verbose"
+	else if ($option == "autoedge") then
+	    set autoedge = 1
+	else if ($option == "noautoedge") then
+	    set autoedge = 0
 	else if ($option == "rescan") then
 	    set rescan = 1
 	else
@@ -163,10 +169,14 @@ set listlim = `echo $fulllist | wc -w`
 set idx = 1
 
 while ($idx <= $listlim)
-    if !(-e $fulllist[$idx]/specdata || $rescan) then
+    if (! -e $fulllist[$idx]/specdata || $rescan) then
         if (-e $fulllist[$idx]/visdata) then
             echo "Spectral scanning data not found, running scanner..."
-            newrfi.csh vis=$fulllist[$idx] interval=1
+            if ($autoedge) then
+		newrfi.csh vis=$fulllist[$idx] interval=1 options=autoedge
+	    else
+		newrfi.csh vis=$fulllist[$idx] interval=1
+	    endif
         else
             echo "FATAL ERROR: No specdata or visibilities found!"
             exit 1
@@ -195,6 +205,23 @@ while ($idx <= $listlim)
     cat $fulllist[$idx]/specdata | awk '{print filename,$4,($5-$4)*1440,"vis"}' filename=$fulllist[$idx] >> $wd/vistimes
     @ idx++
 end
+
+if ($autoedge) then
+    if ($csel == "") set csel = 'crange='
+    set templist = (`head -n 1 $wd/vis/specdata`)
+    set nchan = `echo $#templist | awk '{print $1-14}'`
+    if (`echo $templist[9-10] | awk '{if ($1 == $2) print "go"}'` == "go") then
+	set autoedgetype = 1
+	set csel = "$csel,-(1),-("`echo $nchan $autoedgechan | awk '{print $1+1-$2","$1}'`")"
+    else if (`echo $nchan $templist[8-10] | awk '{if (($1-1)*$2+$3 < $4) print "go"}'` == "go") then
+	set autoedgetype = 2
+	set csel = "$csel,-(1,$autoedgechan)"
+    else
+	set autoedgetype = 3
+	set csel = "$csel,-(1,$autoedgechan),-("`echo $nchan $autoedgechan | awk '{print $1+1-$2","$1}'`"),-("`echo $nchan | awk '{print int($1/2)-1","int($1/2)+1}'`")"
+    endif
+    set csel = `echo "$csel" | sed 's/=,/=/'`
+endif
 
 set fulllist = (`echo $vis2`)
 set listlim = `echo $fulllist | wc -w`
@@ -297,6 +324,8 @@ set idx = 1
 set postidx = 2
 set dpostidx = 3
 
+
+################################################################
 #Here begins flagging
 
 while ($idx <= $lim)
@@ -327,11 +356,11 @@ while ($idx <= $lim)
     # Here is corruption/decorruption cycle
     if (`echo $idx $corrcycle | awk '{if ($2 != 0) print $1%$2; else print 0}'` == 1) then
 	set blim = `echo $idx $corrcycle| awk '{if  ($1 <= int($2/2)) print 1; else print $1-int($2/2)}'`
-	set ulim = `echo $idx $lim $corrcycle | awk '{if  ($1+1+$3 >= $2) print $2; else print $1+$3}'`
+	set ulim = `echo $idx $lim $corrcycle | awk '{if  ($1+int($3/2) >= $2) print 1+$2; else print $1+int($3/2)}'`
+	if ($seedcorr) set blim = $idx
 	if ($seedcorr) set ulim = `echo $idx | awk '{print $1+1}'`
-	set tlim = `echo $idx $lim $corrcycle | awk '{if  ($1+1+$3 >= $2) print $2; else print $1+1+$3}'`
 	set corrfilelist
-	while ($blim <= $ulim)
+	while ($blim <= `echo $ulim | awk '{print $1-1}'`)
 	    set altcycle = `echo $blim | awk '{print 1000+$1}' | sed 's/1//'`
 	    set corrvals = (`sed -n {$blim}p $wd/obslist`)
 	    if ($corrvals[3] == ",") set corrvals[3]
@@ -408,11 +437,19 @@ if ($outsource != "outsource") goto finish
 set fulllist = (`echo $vis $vis2`)
 set listlim = `echo $fulllist | wc -w`
 set idx = 1
-
 while ($idx <= $listlim)
     echo "$fulllist[$idx] final flagging..." 
     uvaver vis=$wd/$fulllist[$idx]'*' options=relax,nocal,nopass,nopol out=$wd/s$fulllist[$idx]
     uvaflag vis=$fulllist[$idx] tvis=$wd/s$fulllist[$idx]
+    if ($autoedge) then
+	if ($autoedgetype == 1) then
+	    uvflag vis=$fulllist[$idx] flagval=f options=none edge=1,$autoedgechan,0 > /dev/null
+	else if ($autoedgetype == 2) then
+	    uvflag vis=$fulllist[$idx] flagval=f options=none edge=$autoedgechan,0,0 > /dev/null
+	else if ($autoedgetype == 3) then
+	    uvflag vis=$fulllist[$idx] flagval=f options=none edge=$autoedgechan,$autoedgechan,3 > /dev/null
+	endif
+    endif
     @ idx++
 end
 

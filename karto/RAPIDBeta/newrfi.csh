@@ -36,6 +36,8 @@ set nocal = "nocal" #Switch to apply gains to data
 set nopass = "nopass" #Switch to apply bandpass corrections to data
 set nopol = "nopol" #Switch to apply polarization corrections to data
 set crosspol = "nocross" #Swtich to exclude XY and YX polarization - should be done if bandpass and pol correction information are not available
+set autoedge = 0
+set autoedgechan = 100
 
 varassign:
 
@@ -73,6 +75,10 @@ else if ("$argv[1]" =~ 'options='*) then
 	    set nopol = "nopol"
 	else if ($option == "crosspol") then
 	    set crosspol = "crosspol"
+	else if ($option == "autoedge") then
+	    set autoedge = 1
+	else if ($option == "noautoedge") then
+	    set autoedge = 0
 	else
 	    set badopt = ($badopt $option)
 	endif
@@ -133,6 +139,7 @@ end
 #Data is prepared, file scanning begins
 
 foreach file (`echo $vis`)
+
     #First step is collecting meta-data, program attempts to speed this up by collecting metadata from a single antenna first
     echo "Performing Az/El/UTC data scan..."
     set ants = ( `uvlist vis=$file options=list | sed '1,9d' | awk '{print $7,$8}'` )
@@ -200,7 +207,19 @@ foreach file (`echo $vis`)
 	if ($grabchan[1] == "nchan") set ilim = $grabchan[2]
 	shift grabchan
     end
-    
+
+    if ($autoedge) then
+	if (`echo $sfreq $freq | awk '{if ($1 == $2) print "go"}'` == "go") then
+	    if (-e $wd/$file-xpol/visdata) uvflag vis=$wd/$file-xpol edge=1,$autoedgechan,0 options=none flagval=f > /dev/null
+	    if (-e $wd/$file-ypol/visdata) uvflag vis=$wd/$file-ypol edge=1,$autoedgechan,0 options=none flagval=f > /dev/null
+	else if (`echo $ilim $sdf $sfreq $freq | awk '{if ((($1-1)*$2)+$3 < $freq) print "go"}'` == "go") then
+	    if (-e $wd/$file-xpol/visdata) uvflag vis=$wd/$file-xpol edge=$autoedgechan,0,0 options=none flagval=f > /dev/null
+	    if (-e $wd/$file-ypol/visdata) uvflag vis=$wd/$file-ypol edge=$autoedgechan,0,0 options=none flagval=f > /dev/null
+	else
+	    if (-e $wd/$file-xpol/visdata) uvflag vis=$wd/$file-xpol edge=$autoedgechan,$autoedgechan,3 options=none flagval=f > /dev/null
+	    if (-e $wd/$file-ypol/visdata) uvflag vis=$wd/$file-ypol edge=$autoedgechan,$autoedgechan,3 options=none flagval=f > /dev/null
+	endif
+
     set idx = 1
 
     #Build an empty spectra to reset count spectra each time cycle
