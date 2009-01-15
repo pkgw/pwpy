@@ -10,19 +10,21 @@ set plim = $2
 set plim2 = $3
 set clim = $4
 set clim2 = $5
+set stime = $6
+set etime = $7
 
 if ("$plim" == "") set plim = 20
 if ("$plim2" == "") set plim2 = 0.001
-if ("$clim" == "") set plim = 180
-if ("$clim2" == "") set plim2 = 0
+if ("$clim" == "") set clim = 180
+if ("$clim2" == "") set clim2 = 0
 
 set wd = `mktemp -d "eprmsXXXX"`
 
 set timerange
 if ("$stime" != "") set timerange = "time($stime,$etime),"
 #    log phase vs time for given scan and pol for all baselines
-uvplt vis=$vis device=/null axis=time,pha options=log,2pass log=$wd/xphalog select="window(1),pol(xx),""$timerange""-auto" >& /dev/null 
-uvplt vis=$vis device=/null axis=time,pha options=log,2pass log=$wd/yphalog select="window(1),pol(yy),""$timerange""-auto" >& /dev/null
+uvplt vis=$vis device=/null axis=time,pha options=log,2pass,unwrap log=$wd/xphalog select="window(1),pol(xx),""$timerange""-auto" >& /dev/null 
+uvplt vis=$vis device=/null axis=time,pha options=log,2pass,unwrap log=$wd/yphalog select="window(1),pol(yy),""$timerange""-auto" >& /dev/null
 
 if (-e $wd/xphalog) then
 sed 1,7d $wd/xphalog | grep 'Baseline' | tr -d '-' | sort -nk1 | awk '{print $2,$3,$5}' > $wd/xbase

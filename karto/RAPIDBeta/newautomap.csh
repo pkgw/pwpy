@@ -345,6 +345,11 @@ endif
 # (currently only created by calcal.csh) - normally named
 # gains.xx and gains.yy - then automap will apply those gains
 # soln's after the file is split.
+#
+# Gains information now "force" applied via UVAVER, i.e. they
+# cannot be removed once applied. This is done for the sake of
+# the calibration cycle, since MIRIAD will overwrite the old
+# gains sol'n (unless you take "special" steps).
 #################################################################
 
 set vislist
@@ -362,11 +367,22 @@ foreach file ($vis)
     if !(-e $wd/tempmap$idx.xpol) then
 	rm -rf $wd/tempmap$idx.xpol
     else
-	if (-e $file/gains.xx) then
+	if (-e $file/gains.xx || -e $file/bandpass.xx) then
 	    echo ""; echo -n "Applying diff xx gains..."
-	    mv $file/gains $file/gains.maptemp; mv $file/gains.xx $file/gains
+	    if (-e $file/gains) mv $file/gains $file/tempgains
+	    if (-e $file/bandpass) mv $file/bandpass $file/tempbandpass
+	    if (-e $file/gains.xx) mv $file/gains.xx $file/gains
+	    if (-e $file/bandpass.xx) mv $file/bandpass.xx $file/bandpass
 	    gpcopy vis=$file out=$wd/tempmap$idx.xpol > /dev/null
+	    if (-e $file/bandpass) mv $file/bandpass $file/bandpass.xx
+	    if (-e $file/gains) mv $file/gains $file/gains.xx
+	    if (-e $file/tempbandpass) mv $file/tempbandpass $file/bandpass
+	    if (-e $file/tempgains) mv $file/tempgains $file/gains
+
+	    uvaver vis=$wd/tempmap$idx.xpol out=$wd/tempmap2 options=relax > /dev/null
+	    rm -rf $wd/tempmap$idx.xpol; mv $wd/tempmap2 $wd/tempmap$idx.xpol
 	    mv $file/gains $file/gains.xx; mv $file/gains.maptemp $file/gains
+
 	endif
 	set vislist = ($vislist $wd/tempmap$idx.xpol)
     endif
@@ -375,8 +391,18 @@ foreach file ($vis)
     else
 	if (-e $file/gains.yy) then
 	    echo ""; echo -n "Applying diff yy gains..."
-	    mv $file/gains $file/gains.maptemp; mv $file/gains.yy $file/gains
+	    if (-e $file/gains) mv $file/gains $file/tempgains
+	    if (-e $file/bandpass) mv $file/bandpass $file/tempbandpass
+	    if (-e $file/gains.yy) mv $file/gains.yy $file/gains
+	    if (-e $file/bandpass.yy) mv $file/bandpass.yy $file/bandpass
 	    gpcopy vis=$file out=$wd/tempmap$idx.ypol > /dev/null
+	    if (-e $file/bandpass) mv $file/bandpass $file/bandpass.yy
+	    if (-e $file/gains) mv $file/gains $file/gains.yy
+	    if (-e $file/tempbandpass) mv $file/tempbandpass $file/bandpass
+	    if (-e $file/tempgains) mv $file/tempgains $file/gains
+
+	    uvaver vis=$wd/tempmap$idx.ypol out=$wd/tempmap2 options=relax > /dev/null
+	    rm -rf $wd/tempmap$idx.ypol; mv $wd/tempmap2 $wd/tempmap$idx.xpol
 	    mv $file/gains $file/gains.yy; mv $file/gains.maptemp $file/gains
 	endif
 	set vislist = ($vislist $wd/tempmap$idx.ypol)

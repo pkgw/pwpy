@@ -33,9 +33,10 @@ set sysflux = 5 # Additional flux from tsys (at three sigma point, say)
 set addflux = 1 # Additional flux in the field, definitely good to keep track of
 set retlim = 20
 set outsource = 1
-set foffset = 0 # Flux offset parameter
-set mapopt = "options=savemaps"
+set mapopt = "options=savedata"
 set display = 0
+set polsplit = 0
+
 varassign:
 
 if ("$argv[1]" =~ 'vis='*) then
@@ -66,8 +67,10 @@ else if ("$argv[1]" =~ 'options='*) then
 	    set outsource = 0
 	else if ($option == "outsource") then
 	    set outsource = 1
-	else if ($option == "foffset") then
-	    set foffset = 1
+	else if ($option == "polsplit") then
+	    set polsplit = 1
+	else if ($option == "nopolsplit") then
+	    set polsplit = 0
 	else if ($option == "savedata") then
 	    set mapopt = "$mapopt"",savedata"
 	else if ($option == "display") then
@@ -126,7 +129,7 @@ if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.bu
 if (-e $vis/gains) mv $vis/gains $vis/gains.bu
 
 foreach tfile ($tvis)
-    if (-e $tfile/flags) mv $tfile/flags $tfile/flags.bu
+    if (-e $tfile/flags) cp $tfile/flags $tfile/flags.bu
     if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/bandpass.bu
     if (-e $tfile/gains) mv $tfile/gains $tfile/gains.bu
 end
@@ -214,7 +217,26 @@ set ibcount
 set fbcount
 set fccount
 
-uvaver vis=$vis select='window(1),pol(xx,yy),-auto' out=$wd/tempcal options=relax,nocal,nopass,nopol >& /dev/null
+set pollist = ("xxyy")
+
+if ($polsplit) then
+    set pollist = ("xx" "yy")
+    uvaver vis=$vis select='window(1),pol(xx),-auto' out=$wd/tempcalxx options=relax,nocal,nopass,nopol >& /dev/null
+    uvaver vis=$vis select='window(1),pol(xx,yy),-auto' out=$wd/tempcalyy options=relax,nocal,nopass,nopol >& /dev/null
+else
+    uvaver vis=$vis select='window(1),pol(xx,yy),-auto' out=$wd/tempcalxxyy options=relax,nocal,nopass,nopol >& /dev/null
+endif
+
+if !(-e $wd/tempcalxxyy || -e $wd/tempcalxx || -e $wd/tempcalyy) then
+    echo "FATAL ERROR: No visibilities exist!"
+    goto fail
+else if (! -e $wd/tempcalxx/visdata && -e $wd/tempcalyy/visdata) then
+    set pollist = ("yy")
+    echo "No x-pol data found, continuing..."
+else if (! -e $wd/tempcalyy/visdata && -e $wd/tempcalxx/visdata) then
+    set pollist = ("xx")
+    echo "No y-pol data found, continuing..."
+endif
 
 #uvplt vis=$wd/tempcal select='window(1),pol(xx,yy),-auto' options=2pass,nobase device=/null >& $wd/tempcount
 echo 1 > $wd/tempcount
@@ -233,22 +255,28 @@ cat $wd/ibaselist | tr "-" " "| awk '{printf "%s\n%s\n",$1,$2}' | sort -nu > $wd
 
 set idx = 2; set postidx = 3
 set tviscount = 0
+
+
 while ($idx < $#regtimes)
     set cycle = `echo $idx | awk '{print 999+$1}' | sed 's/1//'`
     echo -n "Preparing file "`echo $idx | awk '{print $1-1}'`" of "`echo $#regtimes | awk '{print $1-2}'`"..."
-    uvaver vis=$wd/tempcal out=$wd/tempcalp$cycle options=relax,nocal,nopass,nopol select="window(1),time($regtimes[$idx],$regtimes[$postidx]),pol(xx,yy)" >& /dev/null
+    foreach pol (`echo $pollist | sed 's/xxyy/xx,yy/'`)
+	uvaver vis=$wd/tempcal`echo $pol | tr -d ','` out=$wd/tempcali`echo $pol | tr -d ','`$cycle options=relax,nocal,nopass,nopol select="window(1),time($regtimes[$idx],$regtimes[$postidx]),pol($pol)" >& /dev/null
+    end
     if ($outsource && "$tvis[1]" != "") then
-	set tviscount = ($tviscount 0)
+        set tviscount = ($tviscount 0)
 	foreach tfile ($tvis)
 	    @ tviscount[$idx]++
 	    uvaver vis=$tfile out=$wd/tvis$tfile$cycle options=relax,nocal,nopass,nopol select="time($regtimes[$idx],$regtimes[$postidx])" >& /dev/null
-	    if !(-e $wd/$tfile$cycle/visdata) rm -rf $wd/$tfile$cycle
-	    if !(-e $wd/$tfile$cycle/visdata) @ tviscount[$idx]--
-	end
+	    if !(-e $wd/tvis$tfile$cycle/visdata) rm -rf $wd/tvis$tfile$cycle
+	    if !(-e $wd/tvis$tfile$cycle/visdata) @ tviscount[$idx]--
+        end
     endif
     echo "complete."
     @ idx++ postidx++
 end
+
+
 echo " "
 echo " "
 echo "Starting flagging and calibration."
@@ -256,56 +284,325 @@ if ($outsource && "$tvis[1]" != "") then
     foreach tfile ($tvis)
 	@ tviscount[1]++
         uvaver vis=$tfile out=$wd/tvis{$tfile}000 options=relax,nocal,nopass,nopol select="time($regtimes[1],$regtimes[2])" >& /dev/null
-        if !(-e $wd/{$tfile}000/visdata) rm -rf $wd/{$tfile}000
-        if !(-e $wd/{$tfile}000/visdata) @ tviscount[1]--
+        if !(-e $wd/tvis{$tfile}000/visdata) rm -rf $wd/tvis{$tfile}000
+        if !(-e $wd/tvis{$tfile}000/visdata) @ tviscount[1]--
     end
 endif
 
-set idx = 0; set mididx = 1; set postidx = 2
+foreach ipol ($pollist)
+    set idx = 0; set mididx = 1; set postidx = 2
+    foreach file ($wd/tempcali{$ipol}*)
+	@ idx++ midxidx++ postidx++
+	set cycletime = "`date +%s.%N`"
+	set cycle =  `echo $idx | awk '{print 1000+$1}' | sed 's/1//'`
+	set precycle =  `echo $idx | awk '{print 999+$1}' | sed 's/1//'`
+	set sfilelist
+	set prefiles
+	set postfiles
+	if ($outsource && "$tvis[1]" != "") then
+	    if ($tviscount[$idx]) set prefiles = "$wd/tvis*$precycle"
+	    if ($tviscount[$mididx]) set postfiles = "$wd/tvis*$cycle"
+	    set sfilelist = ($prefiles $postfiles)
+	else
+	    foreach sfile ($tvis)
+		if (`uvplt vis=$sfile select="time($regtimes[$idx],$regtimes[$postidx])" device=/null | grep -c "Baseline"`) set sfilelist = ($sfilelist $sfile
+	    end
+	endif
+	touch $wd/xbase; touch $wd/ybase
+	if ("$pollist" =~ *"xx"*) uvplt vis=$file options=2pass device=/null options=2pass,all select='pol(xx),-auto' | grep Baseline | awk '{print $2,$3,$5}' | sed 's/-//g' > $wd/xbase
+	if ("$pollist" =~ *"yy"*) uvplt vis=$file options=2pass device=/null options=2pass,all select='pol(yy),-auto' | grep Baseline | awk '{print $2,$3,$5}' | sed 's/-//g' > $wd/ybase
+	echo -n "Starting $idx of "`echo $#regtimes | awk '{print $1-2}'`" cycles. Beginning phase RMS scanning."
 
-foreach file (`echo $wd/tempcalp*`)
-    @ idx++ midxidx++ postidx++
-    set cycletime = "`date +%s.%N`"
-    set cycle =  `echo $idx | awk '{print 1000+$1}' | sed 's/1//'`
-    set precycle =  `echo $idx | awk '{print 999+$1}' | sed 's/1//'`
-    set sfilelist
-    set prefiles
-    set postfiles
-    if ($outsource && "$tvis[1]" != "") then
-	if ($tviscount[$idx]) set prefiles = "$wd/tvis*$precycle"
-	if ($tviscount[$mididx]) set postfiles = "$wd/tvis*$cycle"
-	set sfilelist = ($prefiles $postfiles)
-    else
-	foreach sfile ($tvis)
-	    if (`uvplt vis=$sfile select="time($regtimes[$idx],$regtimes[$postidx])" device=/null | grep -c "Baseline"`) set sfilelist = ($sfilelist $sfile)
-	end
-    endif
+	if ($idx != $#regtimes) then
+	    foreach badbase (`neweprms.csh $file $plim`)
+		uvflag vis=$file select="$badbase" flagval=f options=none > /dev/null
+		echo -n "."
+	    end
+	endif
 
-    uvplt vis=$file options=2pass device=/null options=2pass,all select='pol(xx),-auto' | grep Baseline | awk '{print $2,$3,$5}' | sed 's/-//g' > $wd/xbase
-    uvplt vis=$file options=2pass device=/null options=2pass,all select='pol(yy),-auto' | grep Baseline | awk '{print $2,$3,$5}' | sed 's/-//g' > $wd/ybase
-    echo -n "Starting $idx of "`echo $#regtimes | awk '{print $1-2}'`" cycles. Beginning phase RMS scanning."
+	echo "phase scanning/flagging complete."
 
-    if ($idx != $#regtimes) then
-	foreach badbase (`neweprms.csh $file $plim`)
-	    uvflag vis=$file select="$badbase" flagval=f options=none > /dev/null
+	set xants = (`awk '{printf "%s\n%s\n",$1,$2}' $wd/xbase | sort -n | uniq`)
+	set yants = (`awk '{printf "%s\n%s\n",$1,$2}' $wd/ybase | sort -n | uniq`)
+	set xantcount = $#xants
+	set yantcount = $#yants
+	if ("$xants" == "") set xantcount = 0
+	if ("$yants" == "") set yantcount = 0
+
+    jumper:
+	touch $wd/phaselog
+	touch $wd/amplog
+	set checkamp = (1000 100000)
+
+	if ($autoref) then
+	    uvplt vis=$file options=2pass select='-auto' axis=ti,pha device=/null | grep "Baseline" | awk '{print $2,$3,$5}' | tr -d '-' > $wd/refantstat
+	    set antstat = 0
+	    set refant = 0
+	    foreach ant (`awk '{printf "%s\n%s\n",$1,$2}' $wd/refantstat | sort -nu`)
+		if ($antstat < `awk '{if ($1 == ant || $2 == ant) sum += $3} END {print sum}' ant=$ant $wd/refantstat`) then
+		    set antstat = `awk '{if ($1 == ant || $2 == ant) sum += $3} END {print sum}' ant=$ant $wd/refantstat`
+		    set refant = $ant
+		endif
+	    end
+	    echo -n "Refant $refant choosen! "
+	endif
+    
+	mfcal vis=$file refant=$refant options=interpolate minants=4 flux=$flux interval=$calint >& /dev/null
+	
+	uvaver vis=$file out=$wd/tempcal2 options=relax >& /dev/null
+	
+	set sflags = 0
+	if ($display) uvplt vis=$wd/tempcal2 select='-auto' device=/xs options=2pass,nobase,equal,source axis=re,im >& /dev/null
+	uvlist vis=$wd/tempcal2 select='-auto' recnum=0 line=chan,1,1,$nchan | sed 1,9d | awk '{if ($1*1 ==0); else if ($8*1 != 0 || $9*1 != 0) print $1,$9,(($8*cos(pi*$9/180)-flux)^2+($8*sin(pi*$9/180))^2)^.5}' flux=$calflux pi=3.141592 | sort -nk3 > $wd/ampinfo
+    
+	set linecheck = `wc -l $wd/ampinfo | awk '{print int($1*.95)}'`
+	set linelim = `wc -l $wd/ampinfo | awk '{print int($1*exp(-1*siglim))}' siglim=$siglim`
+	set linemax = `wc -l $wd/ampinfo | awk '{print 1+int($1*.05)}'`
+	set intcheck = `tail -n 1 $wd/ampinfo | awk '{print $3}'`
+    
+	if ($linelim < 10) set linelim = 10
+	echo "Minimum flagging line is $linelim, maximum is $linemax."
+	
+	if (`sed -n {$linecheck}p $wd/ampinfo | awk '{if ($3*1 < (addflux+sysflux)) print "go"; else if ($3*1 < intcheck/10 && (addflux+sysflux) < intcheck/10) print "go"}' addflux=$addflux sysflux=$sysflux intcheck=$intcheck` == "go") then
+	    if (`echo $intcheck $addflux $sysflux | awk '{if ($1/10 > ($2+$3)) print "go"}'` == "go") then
+		awk '{if ($3 > (intcheck/10)) print $1}' intcheck=$intcheck $wd/ampinfo | sort -nk1 > $wd/amplog
+		set checkamp[1] = `echo $intcheck | awk '{print $1/10}'`
+	    else
+		awk '{if ($3 > (addflux+sysflux)) print $1}' addflux=$addflux sysflux=$sysflux $wd/ampinfo | sort -nk1 > $wd/amplog
+		set checkamp[1] = `echo $addflux $sysflux | awk '{print $1+$2}'`
+	    endif
+	else
+	    sed 1,{$linecheck}d $wd/ampinfo | awk '{print $1}' | sort -nk1 > $wd/amplog
+	    set checkamp[1] =  `sed -n {$linecheck}p $wd/ampinfo | awk '{print $3}'`
+	endif
+    
+	set asel = `echo $checkamp[1] $intcheck $nchan | awk '{if ($2/10 > $1*1.25*($3^.5)) print "amp("$2/10")";else print "amp("$1*1.25*($3^.5)")"}'`
+	set checkamp[2] = `echo $asel | tr -d 'amp()'`
+	set sflags = `uvflag vis=$wd/tempcal2 select="$asel" options=brief,noquery flagval=f | grep "Changed to bad:" | awk '{sum += $7} END {print 1*sum}'`
+
+#########################################################################
+	flagging:
+	echo "Flagging commencing, outer-limit for flux noise is $checkamp[1] Jy for integrated spectra, $checkamp[2] Jy for individual channels."
+	set llim=1
+	set ulim=50
+	set lim = `wc -w $wd/amplog | awk '{print $1}'`
+    
+	echo -n "$lim integrated records to flag and $sflags spectral records to flag..."
+	cat $wd/phaselog >> $wd/amplog
+	while ($llim <= $lim)
+	    set flags = `sed -n {$llim},{$ulim}p $wd/amplog | awk '{printf "%s","vis("$1"),"}' ulim=$ulim`
+	    uvflag vis=$wd/tempcal2 flagval=f options=none select=$flags >& /dev/null
+	    set llim = `echo $llim | awk '{print $1+50}'`
+	    set ulim = `echo $ulim | awk '{print $1+50}'`
 	    echo -n "."
 	end
-    endif
+	echo " "
+	uvaflag vis=$file tvis=$wd/tempcal2 >& /dev/null
+	rm -rf $wd/tempcal2 $wd/amplog $wd/ampinfo $wd/phaselog $wd/phaseinfo
+    
+	set pols = (x y)
+	if ("$retlim" == 0) set pols
+    
+	if (`echo $sflags $linelim $lim | awk '{if ($1 > $2*(nchan^.5)) print "go"; else if ($2 < $3) print "go"}' nchan=$nchan` == "go" || `echo $intcheck $addflux $sysflux | awk '{if ($1/10 > ($2+$3)) print "go"}'` == "go") then
+	    echo " "
+	    rm -f $wd/ampinfo $wd/amplog $wd/phaseinfo $wd/phaselog
+	    echo "Flagging complete, continuing cycle $idx of "`echo $#regtimes | awk '{print $1-2}'`"..."
+	    goto jumper
+	endif
+    
+	uvplt vis=$file options=2pass device=/null select='pol(xx),-auto' | grep Baseline | awk '{print $2,$3,$5}' | sed 's/-//g' > $wd/xbasetemp
+	uvplt vis=$file options=2pass device=/null select='pol(yy),-auto' | grep Baseline | awk '{print $2,$3,$5}' | sed 's/-//g' > $wd/ybasetemp
+    
+    # Begin data retention check
+	set badjump = 0
+	set pols = (x y)
+	if ("$xants" == "") set pols = (y)
+	if ("$yants" == "") set pols = (x)
+	if ("$xants" == ""  && "$yants" == "") set pols
+	if ("$retlim" == 0) set pols
+	foreach pol ($pols)
+	    set jidx = 1
+	    echo -n "Checking preliminary $pol pol retention..."
+	    set antlist
+	    set badants
+	    set antlist = (`awk '{printf "%s\n%s\n",$1,$2}' $wd/{$pol}basetemp | sort -n | uniq`)
+	    if ("$pol" == "x") set antcount = $xantcount
+	    if ("$pol" == "y") set antcount = $yantcount
+	    if ($#antlist <= 1) set antlist
+	
+	    if (`echo $#antlist $antcount | awk '{print int (100*$1/$2)}'` < $retlim) then
+		@ badjump++; @ badjump++
+		echo "$pol-pol data appears to be unusable, beginning removal."
+		uvflag vis=$file options=none flagval=f select="pol($pol$pol)" > /dev/null
+		foreach sfile (`echo $sfilelist`)
+		    uvflag vis=$sfile options=none flagval=f select="pol($pol$pol),time($regtimes[$idx],$regtimes[$postidx])" > /dev/null
+		end
+		echo "" > $wd/{$pol}base
+		if ("$pol" == "x") set xants
+		if ("$pol" == "y") set yants
+	    endif
+	    echo " "
+    ###
+	    set jidx = 1
+	    echo -n "Checking preliminary $pol antenna retention..."
+	    set antlist
+	    set badants
+	    if ("$pol" == "x") set antlist = ($xants)
+	    if ("$pol" == "y") set antlist = ($yants)
+	    if ("$pol" == "x") set antcount = $xantcount
+	    if ("$pol" == "y") set antcount = $yantcount
+	    if ($#antlist <= 1) set antlist
+	    foreach ant (`echo $antlist`)
+		set vals = (`awk '{if ($1 == ant || $2 == ant) count += 1} END {print int(100*count/(ocount-1))}' ocount=$#antlist ant=$ant $wd/{$pol}basetemp`)
+		if ($vals[1] < $retlim) then
+		    @ badjump++; @ badjump++
+		    echo -n "."
+		    set badants = ($badants $ant)
+		    set antlist[$jidx]
+		    if ("$pol" == "x") set xants[$jidx]
+		    if ("$pol" == "y") set yants[$jidx]
+		    awk '{if ($1 != ant && $2 != ant) print $0}' ant=$ant $wd/{$pol}base > $wd/{$pol}base2
+		    mv $wd/{$pol}base2 $wd/{$pol}base
+		endif
+		@ jidx++
+	    end
+	    if ("$badants" != "") then
+		if ("$pol" == "x") set xants = (`echo $xants`)
+		if ("$pol" == "y") set yants = (`echo $yants`)
+		set antlist = (`echo $antlist`)
+		set flagcmd = "ant("`echo $badants | tr ' ' ','`"),pol($pol$pol)"
+		set flagcmd = `echo "$flagcmd"`
+		uvflag vis=$file options=none flagval=f select="$flagcmd" > /dev/null
+		foreach sfile (`echo $sfilelist`)
+		    uvflag vis=$sfile options=none flagval=f select="$flagcmd,time($regtimes[$idx],$regtimes[$postidx])" > /dev/null
+		end
+	    endif
+	    echo " "
 
-    echo "phase scanning/flagging complete."
+######
 
-    set xants = (`awk '{printf "%s\n%s\n",$1,$2}' $wd/xbase | sort -n | uniq`)
-    set yants = (`awk '{printf "%s\n%s\n",$1,$2}' $wd/ybase | sort -n | uniq`)
-    set xantcount = $#xants
-    set yantcount = $#yants
-
-jumper:
-    touch $wd/phaselog
-    touch $wd/amplog
-    set checkamp = (1000 100000)
+	    set jidx = 1
+	    echo -n "Checking $pol$pol baseline retention..."
+	    rm -f $wd/bad{$pol}base; touch $wd/bad{$pol}base
+	    while ($jidx < `wc -l $wd/{$pol}base | awk '{print $1}'`)
+		set vals = (`sed -n {$jidx}p $wd/{$pol}base`)
+		set vals2 = (`awk '{if ($1 == ant1 && $2 == ant2) npoint += $3} END {print int(100*npoint/opoint)}' ant1=$vals[1] ant2=$vals[2] opoint=$vals[3] $wd/{$pol}basetemp`)
+		if ($vals2[1] < $retlim) then
+		    @ badjump++
+		    echo $vals >> $wd/bad{$pol}base
+		    sed {$jidx}d $wd/{$pol}base > $wd/{$pol}base2
+		    mv $wd/{$pol}base2 $wd/{$pol}base
+		else
+		    @ jidx++
+		endif
+	    end
+	    # This ends the search for bad baselines
+	    set antlist = (`sed 's/-/ /g' $wd/bad{$pol}base | awk '{printf "%s\n%s\n",$1,$2}' | sort -n | uniq`)
+	    while (`wc -w $wd/bad{$pol}base | awk '{print $1}'`)
+		set kidx = 0
+		set nant = 0
+		set mcount = 0
+		set icount = 0
+		foreach ant ($antlist)
+		    @ kidx++
+		    set icount = `sed 's/-/ /g' $wd/bad{$pol}base | awk '{if ($1 == ant || $2 == ant) lidx += 1} END {print lidx}' ant=$ant`
+		    if ($icount > $mcount) then
+			set nant = $kidx
+			set mcount = $icount
+		    endif
+		end
+		set ant = $antlist[$nant]
+		set flagcmds = (`sed 's/-/ /g' $wd/bad{$pol}base | awk '{if ($1 == ant) {printf "%s,",$2; idx +=1}; if ($2 == ant) {printf "%s,",$1; idx +=1}; if (idx%11 == 10) print ")"} END {if (idx%11 != 10) print ")"}' ant=$ant | sed 's/,)//g' | tr -d ")"`)
+		foreach flagcmd ($flagcmds)
+		uvflag vis=$file options=none flagval=f select="ant($ant)($flagcmd),pol($pol$pol)" > /dev/null
+		foreach sfile (`echo $sfilelist`)
+		    uvflag vis=$sfile options=none flagval=f select="ant($ant)($flagcmd),pol($pol$pol),time($regtimes[$idx],$regtimes[$postidx])" > /dev/null
+		end
+		end
+		echo -n "."
+		set antlist[$nant]
+		set antlist = (`echo $antlist`)
+		sed 's/-/ /g' $wd/bad{$pol}base | awk '{if ($1 != ant && $2 != ant) print $1"-"$2}' ant=$ant > $wd/bad{$pol}base2
+		mv $wd/bad{$pol}base2 $wd/bad{$pol}base
+	    end
+	    
+	    echo " "
+    ###
+	
+	    uvplt vis=$file options=2pass device=/null select="pol($pol$pol),-auto" | grep Baseline | awk '{print $2,$3,$5}' | sed 's/-//g' > $wd/{$pol}basetemp
+	
+	    set jidx = 1
+	    echo -n "Checking secondary $pol antenna retention..."
+	    set antlist
+	    set badants
+	    if ("$pol" == "x") set antlist = ($xants)
+	    if ("$pol" == "y") set antlist = ($yants)
+	    if ("$pol" == "x") set antcount = $xantcount
+	    if ("$pol" == "y") set antcount = $yantcount
+	    if ($#antlist <= 1) set antlist
+	    foreach ant (`echo $antlist`)
+		set vals = (`awk '{if ($1 == ant || $2 == ant) count += 1} END {print int(100*count/(ocount-1))}' ocount=$#antlist ant=$ant $wd/{$pol}basetemp`)
+		if ($vals[1] < $retlim) then
+		    @ badjump++; @ badjump++
+		    echo -n "."
+		    set badants = ($badants $ant)
+		    set antlist[$jidx]
+		    if ("$pol" == "x") set xants[$jidx]
+		    if ("$pol" == "y") set yants[$jidx]
+		    awk '{if ($1 != ant && $2 != ant) print $0}' ant=$ant $wd/{$pol}base > $wd/{$pol}base2
+		    mv $wd/{$pol}base2 $wd/{$pol}base
+		endif
+		@ jidx++
+	    end
+	    if ("$badants" != "") then
+		if ("$pol" == "x") set xants = (`echo $xants`)
+		if ("$pol" == "y") set yants = (`echo $yants`)
+		set antlist = (`echo $antlist`)
+		set flagcmd = "ant("`echo $badants | tr ' ' ','`"),pol($pol$pol)"
+		set flagcmd = `echo "$flagcmd"`
+		uvflag vis=$file options=none flagval=f select="$flagcmd" > /dev/null
+		foreach sfile (`echo $sfilelist`)
+		    uvflag vis=$sfile options=none flagval=f select="$flagcmd,time($regtimes[$idx],$regtimes[$postidx])" > /dev/null
+		end
+	    endif
+	    echo " "
+	
+	    if (`echo $#antlist $antcount | awk '{print int (100*$1/$2)}'` < $retlim) then
+		@ badjump++; @ badjump++
+		echo "$pol-pol data appears to be unusable, beginning removal."
+		uvflag vis=$file options=none flagval=f select="pol($pol$pol)" > /dev/null
+		foreach sfile (`echo $sfilelist`)
+		    uvflag vis=$sfile options=none flagval=f select="pol($pol$pol),time($regtimes[$idx],$regtimes[$postidx])" > /dev/null
+		end
+		echo "" > $wd/{$pol}base
+		if ("$pol" == "x") set xants
+		if ("$pol" == "y") set yants
+	    endif
+	end
+    # End data retention check - trying to do it one cycle at a time might be a bad idea...
+	if ($badjump) @ badjump--
+	if ($badjump) then
+	    rm -f $wd/ampinfo $wd/amplog
+	    echo "Culling complete, continuing cycle $idx of "`echo $#regtimes | awk '{print $1-2}'`"..."
+	    echo " "
+	    goto jumper
+	endif
+    
+	if ($postidx >= $#regtimes) then
+	    uvaver vis="$wd/tempcali$ipol*" out=$wd/tempcal2 options=relax > /dev/null
+	    uvaflag vis=$wd/tempcal$ipol tvis=$wd/tempcal2 > /dev/null
+	    echo "Moving to final cycle!"
+	    rm -rf $wd/tempcal2
+	else
+	    set cycletimes = (`date +%s.%N | awk '{print int(($1-date1)/60),int(($1-date1)%60)}' date1=$cycletime` 0 0)
+	    echo "Cycle complete! Calibration cycle took $cycletimes[1] minute(s) and $cycletimes[2] second(s). Moving on..."    
+	endif
+	echo " "
+    end
+#Final cycle
 
     if ($autoref) then
-	uvplt vis=$file options=2pass select='pol(xx,yy),-auto' axis=ti,pha device=/null | grep "Baseline" | awk '{print $2,$3,$5}' | tr -d '-' > $wd/refantstat
+	uvplt vis=$file options=2pass select='-auto' axis=ti,pha device=/null | grep "Baseline" | awk '{print $2,$3,$5}' | tr -d '-' > $wd/refantstat
 	set antstat = 0
 	set refant = 0
 	foreach ant (`awk '{printf "%s\n%s\n",$1,$2}' $wd/refantstat | sort -nu`)
@@ -317,316 +614,103 @@ jumper:
 	echo -n "Refant $refant choosen! "
     endif
 
-    mfcal vis=$file refant=$refant options=interpolate minants=4 flux=$flux interval=$calint >& /dev/null
-    
-    uvaver vis=$file out=$wd/tempcal2 options=relax >& /dev/null
-    
-    set sflags = 0
-    if ($display) uvplt vis=$wd/tempcal2 select='pol(xx,yy),-auto' device=/xs options=2pass,nobase,equal axis=re,im >& /dev/null
-    uvlist vis=$wd/tempcal2 select='pol(xx,yy),-auto' recnum=0 line=chan,1,1,$nchan | sed 1,9d | awk '{if ($1*1 ==0); else if ($8*1 != 0 || $9*1 != 0) print $1,$9,(($8*cos(pi*$9/180)-flux)^2+($8*sin(pi*$9/180))^2)^.5}' flux=$calflux pi=3.141592 | sort -nk3 > $wd/ampinfo
-
-    set linecheck = `wc -l $wd/ampinfo | awk '{print int($1*.95)}'`
-    set linelim = `wc -l $wd/ampinfo | awk '{print int($1*exp(-1*siglim))}' siglim=$siglim`
-    set linemax = `wc -l $wd/ampinfo | awk '{print 1+int($1*.05)}'`
-    set intcheck = `tail -n 1 $wd/ampinfo | awk '{print $3}'`
-
-    if ($linelim < 10) set linelim = 10
-    echo "Minimum flagging line is $linelim, maximum is $linemax."
-    
-    if (`sed -n {$linecheck}p $wd/ampinfo | awk '{if ($3*1 < (addflux+sysflux)) print "go"; else if ($3*1 < intcheck/10 && (addflux+sysflux) < intcheck/10) print "go"}' addflux=$addflux sysflux=$sysflux intcheck=$intcheck` == "go") then
-	if (`echo $intcheck $addflux $sysflux | awk '{if ($1/10 > ($2+$3)) print "go"}'` == "go") then
-	    awk '{if ($3 > (intcheck/10)) print $1}' intcheck=$intcheck $wd/ampinfo | sort -nk1 > $wd/amplog
-	    set checkamp[1] = `echo $intcheck | awk '{print $1/10}'`
-	else
-	    awk '{if ($3 > (addflux+sysflux)) print $1}' addflux=$addflux sysflux=$sysflux $wd/ampinfo | sort -nk1 > $wd/amplog
-	    set checkamp[1] = `echo $addflux $sysflux | awk '{print $1+$2}'`
-	endif
-    else
-	sed 1,{$linecheck}d $wd/ampinfo | awk '{print $1}' | sort -nk1 > $wd/amplog
-	set checkamp[1] =  `sed -n {$linecheck}p $wd/ampinfo | awk '{print $3}'`
-    endif
-
-    set asel = `echo $checkamp[1] $intcheck $nchan | awk '{if ($2/10 > $1*1.25*($3^.5)) print "amp("$2/10")";else print "amp("$1*1.25*($3^.5)")"}'`
-    set checkamp[2] = `echo $asel | tr -d 'amp()'`
-    set sflags = `uvflag vis=$wd/tempcal2 select="$asel" options=brief,noquery flagval=f | grep "Changed to bad:" | awk '{sum += $7} END {print 1*sum}'`
-
-#########################################################################
-    flagging:
-    echo "Flagging commencing, outer-limit for flux noise is $checkamp[1] Jy for integrated spectra, $checkamp[2] Jy for individual channels."
-    set llim=1
-    set ulim=50
-    set lim = `wc -w $wd/amplog | awk '{print $1}'`
-
-    echo -n "$lim integrated records to flag and $sflags spectral records to flag..."
-    cat $wd/phaselog >> $wd/amplog
-    while ($llim <= $lim)
-	set flags = `sed -n {$llim},{$ulim}p $wd/amplog | awk '{printf "%s","vis("$1"),"}' ulim=$ulim`
-	uvflag vis=$wd/tempcal2 flagval=f options=none select=$flags >& /dev/null
-	set llim = `echo $llim | awk '{print $1+50}'`
-	set ulim = `echo $ulim | awk '{print $1+50}'`
-	echo -n "."
-    end
-    echo " "
-    uvaflag vis=$file tvis=$wd/tempcal2 >& /dev/null
-    rm -rf $wd/tempcal2 $wd/amplog $wd/ampinfo $wd/phaselog $wd/phaseinfo
-
-    set pols = (x y)
-    if ("$retlim" == 0) set pols
-
-    if (`echo $sflags $linelim $lim | awk '{if ($1 > $2*(nchan^.5)) print "go"; else if ($2 < $3) print "go"}' nchan=$nchan` == "go" || `echo $intcheck $addflux $sysflux | awk '{if ($1/10 > ($2+$3)) print "go"}'` == "go") then
-	echo " "
-	rm -f $wd/ampinfo $wd/amplog $wd/phaseinfo $wd/phaselog
-	echo "Flagging complete, continuing cycle $idx of "`echo $#regtimes | awk '{print $1-2}'`"..."
-	goto jumper
-    endif
-
-    uvplt vis=$file options=2pass device=/null select='pol(xx),-auto' | grep Baseline | awk '{print $2,$3,$5}' | sed 's/-//g' > $wd/xbasetemp
-    uvplt vis=$file options=2pass device=/null select='pol(yy),-auto' | grep Baseline | awk '{print $2,$3,$5}' | sed 's/-//g' > $wd/ybasetemp
-
-# Begin data retention check
-    set badjump = 0
-    set pols = (x y)
-    if ("$xants" == "") set pols = (y)
-    if ("$yants" == "") set pols = (x)
-    if ("$xants" == ""  && "$yants" == "") set pols
-    if ("$retlim" == 0) set pols
-    foreach pol ($pols)
-	set jidx = 1
-	echo -n "Checking preliminary $pol pol retention..."
-	set antlist
-	set badants
-	set antlist = (`awk '{printf "%s\n%s\n",$1,$2}' $wd/{$pol}basetemp | sort -n | uniq`)
-	if ("$pol" == "x") set antcount = $xantcount
-	if ("$pol" == "y") set antcount = $yantcount
-	if ($#antlist <= 1) set antlist
-
-	if (`echo $#antlist $antcount | awk '{print int (100*$1/$2)}'` < $retlim) then
-	    @ badjump++; @ badjump++
-	    echo "$pol-pol data appears to be unusable, beginning removal."
-	    uvflag vis=$file options=none flagval=f select="pol($pol$pol)" > /dev/null
-	    foreach sfile (`echo $sfilelist`)
-		uvflag vis=$sfile options=none flagval=f select="pol($pol$pol),time($regtimes[$idx],$regtimes[$postidx])" > /dev/null
-	    end
-	    echo "" > $wd/{$pol}base
-	    if ("$pol" == "x") set xants
-	    if ("$pol" == "y") set yants
-	endif
-	echo " "
-###
-	set jidx = 1
-	echo -n "Checking preliminary $pol antenna retention..."
-	set antlist
-	set badants
-	if ("$pol" == "x") set antlist = ($xants)
-	if ("$pol" == "y") set antlist = ($yants)
-	if ("$pol" == "x") set antcount = $xantcount
-	if ("$pol" == "y") set antcount = $yantcount
-	if ($#antlist <= 1) set antlist
-	foreach ant (`echo $antlist`)
-	    set vals = (`awk '{if ($1 == ant || $2 == ant) count += 1} END {print int(100*count/(ocount-1))}' ocount=$#antlist ant=$ant $wd/{$pol}basetemp`)
-	    if ($vals[1] < $retlim) then
-		@ badjump++; @ badjump++
-		echo -n "."
-		set badants = ($badants $ant)
-		set antlist[$jidx]
-		if ("$pol" == "x") set xants[$jidx]
-		if ("$pol" == "y") set yants[$jidx]
-		awk '{if ($1 != ant && $2 != ant) print $0}' ant=$ant $wd/{$pol}base > $wd/{$pol}base2
-	       	mv $wd/{$pol}base2 $wd/{$pol}base
-	    endif
-	    @ jidx++
-	end
-	if ("$badants" != "") then
-	    if ("$pol" == "x") set xants = (`echo $xants`)
-	    if ("$pol" == "y") set yants = (`echo $yants`)
-	    set antlist = (`echo $antlist`)
-	    set flagcmd = "ant("`echo $badants | tr ' ' ','`"),pol($pol$pol)"
-	    set flagcmd = `echo "$flagcmd"`
-	    uvflag vis=$file options=none flagval=f select="$flagcmd" > /dev/null
-	    foreach sfile (`echo $sfilelist`)
-		uvflag vis=$sfile options=none flagval=f select="$flagcmd,time($regtimes[$idx],$regtimes[$postidx])" > /dev/null
-	    end
-	endif
-	echo " "
-
-######
-
-	set jidx = 1
-	echo -n "Checking $pol$pol baseline retention..."
-	rm -f $wd/bad{$pol}base; touch $wd/bad{$pol}base
-	while ($jidx < `wc -l $wd/{$pol}base | awk '{print $1}'`)
-	    set vals = (`sed -n {$jidx}p $wd/{$pol}base`)
-	    set vals2 = (`awk '{if ($1 == ant1 && $2 == ant2) npoint += $3} END {print int(100*npoint/opoint)}' ant1=$vals[1] ant2=$vals[2] opoint=$vals[3] $wd/{$pol}basetemp`)
-	    if ($vals2[1] < $retlim) then
-		@ badjump++
-		echo $vals >> $wd/bad{$pol}base
-		sed {$jidx}d $wd/{$pol}base > $wd/{$pol}base2
-		mv $wd/{$pol}base2 $wd/{$pol}base
-	    else
-		@ jidx++
-	    endif
-	end
-	# This ends the search for bad baselines
-	set antlist = (`sed 's/-/ /g' $wd/bad{$pol}base | awk '{printf "%s\n%s\n",$1,$2}' | sort -n | uniq`)
-	while (`wc -w $wd/bad{$pol}base | awk '{print $1}'`)
-	    set kidx = 0
-	    set nant = 0
-	    set mcount = 0
-	    set icount = 0
-	    foreach ant ($antlist)
-		@ kidx++
-		set icount = `sed 's/-/ /g' $wd/bad{$pol}base | awk '{if ($1 == ant || $2 == ant) lidx += 1} END {print lidx}' ant=$ant`
-		if ($icount > $mcount) then
-		    set nant = $kidx
-		    set mcount = $icount
-		endif
-	    end
-	    set ant = $antlist[$nant]
-	    set flagcmds = (`sed 's/-/ /g' $wd/bad{$pol}base | awk '{if ($1 == ant) {printf "%s,",$2; idx +=1}; if ($2 == ant) {printf "%s,",$1; idx +=1}; if (idx%11 == 10) print ")"} END {if (idx%11 != 10) print ")"}' ant=$ant | sed 's/,)//g' | tr -d ")"`)
-	    foreach flagcmd ($flagcmds)
-	    uvflag vis=$file options=none flagval=f select="ant($ant)($flagcmd),pol($pol$pol)" > /dev/null
-	    foreach sfile (`echo $sfilelist`)
-		    uvflag vis=$sfile options=none flagval=f select="ant($ant)($flagcmd),pol($pol$pol),time($regtimes[$idx],$regtimes[$postidx])" > /dev/null
-	    end
-	    end
-	    echo -n "."
-	    set antlist[$nant]
-	    set antlist = (`echo $antlist`)
-	    sed 's/-/ /g' $wd/bad{$pol}base | awk '{if ($1 != ant && $2 != ant) print $1"-"$2}' ant=$ant > $wd/bad{$pol}base2
-	    mv $wd/bad{$pol}base2 $wd/bad{$pol}base
-	end
-	
-	echo " "
-###
-
-	uvplt vis=$file options=2pass device=/null select="pol($pol$pol),-auto" | grep Baseline | awk '{print $2,$3,$5}' | sed 's/-//g' > $wd/{$pol}basetemp
-
-	set jidx = 1
-	echo -n "Checking secondary $pol antenna retention..."
-	set antlist
-	set badants
-	if ("$pol" == "x") set antlist = ($xants)
-	if ("$pol" == "y") set antlist = ($yants)
-	if ("$pol" == "x") set antcount = $xantcount
-	if ("$pol" == "y") set antcount = $yantcount
-	if ($#antlist <= 1) set antlist
-	foreach ant (`echo $antlist`)
-	    set vals = (`awk '{if ($1 == ant || $2 == ant) count += 1} END {print int(100*count/(ocount-1))}' ocount=$#antlist ant=$ant $wd/{$pol}basetemp`)
-	    if ($vals[1] < $retlim) then
-		@ badjump++; @ badjump++
-		echo -n "."
-		set badants = ($badants $ant)
-		set antlist[$jidx]
-		if ("$pol" == "x") set xants[$jidx]
-		if ("$pol" == "y") set yants[$jidx]
-		awk '{if ($1 != ant && $2 != ant) print $0}' ant=$ant $wd/{$pol}base > $wd/{$pol}base2
-	       	mv $wd/{$pol}base2 $wd/{$pol}base
-	    endif
-	    @ jidx++
-	end
-	if ("$badants" != "") then
-	    if ("$pol" == "x") set xants = (`echo $xants`)
-	    if ("$pol" == "y") set yants = (`echo $yants`)
-	    set antlist = (`echo $antlist`)
-	    set flagcmd = "ant("`echo $badants | tr ' ' ','`"),pol($pol$pol)"
-	    set flagcmd = `echo "$flagcmd"`
-	    uvflag vis=$file options=none flagval=f select="$flagcmd" > /dev/null
-	    foreach sfile (`echo $sfilelist`)
-		uvflag vis=$sfile options=none flagval=f select="$flagcmd,time($regtimes[$idx],$regtimes[$postidx])" > /dev/null
-	    end
-	endif
-	echo " "
-
-	if (`echo $#antlist $antcount | awk '{print int (100*$1/$2)}'` < $retlim) then
-	    @ badjump++; @ badjump++
-	    echo "$pol-pol data appears to be unusable, beginning removal."
-	    uvflag vis=$file options=none flagval=f select="pol($pol$pol)" > /dev/null
-	    foreach sfile (`echo $sfilelist`)
-		uvflag vis=$sfile options=none flagval=f select="pol($pol$pol),time($regtimes[$idx],$regtimes[$postidx])" > /dev/null
-	    end
-	    echo "" > $wd/{$pol}base
-	    if ("$pol" == "x") set xants
-	    if ("$pol" == "y") set yants
-	endif
-    end
-# End data retention check - trying to do it one cycle at a time might be a bad idea...
-    if ($badjump) @ badjump--
-    if ($badjump) then
-	rm -f $wd/ampinfo $wd/amplog
-	echo "Culling complete, continuing cycle $idx of "`echo $#regtimes | awk '{print $1-2}'`"..."
-	echo " "
-	goto jumper
-    endif
-
-    if ($postidx >= $#regtimes) then
-	uvaver vis="$wd/tempcalp*" out=$wd/tempcal2 options=relax > /dev/null
-	uvaflag vis=$wd/tempcal tvis=$wd/tempcal2 > /dev/null
-	echo "Moving to final cycle!"
-    else
-	set cycletimes = (`date +%s.%N | awk '{print int(($1-date1)/60),int(($1-date1)%60)}' date1=$cycletime` 0 0)
-	echo "Cycle complete! Calibration cycle took $cycletimes[1] minute(s) and $cycletimes[2] second(s). Moving on..."    
-    endif
-    echo " "
+    mfcal vis=$wd/tempcal$ipol refant=$refant options=interpolate minants=4 flux=$flux interval=$calint >& /dev/null
 end
-#Final cycle
 
-if ($autoref) then
-    uvplt vis=$file options=2pass select='pol(xx,yy),-auto' axis=ti,pha device=/null | grep "Baseline" | awk '{print $2,$3,$5}' | tr -d '-' > $wd/refantstat
-    set antstat = 0
-    set refant = 0
-    foreach ant (`awk '{printf "%s\n%s\n",$1,$2}' $wd/refantstat | sort -nu`)
-	if ($antstat < `awk '{if ($1 == ant || $2 == ant) sum += $3} END {print sum}' ant=$ant $wd/refantstat`) then
-	    set antstat = `awk '{if ($1 == ant || $2 == ant) sum += $3} END {print sum}' ant=$ant $wd/refantstat`
-	    set refant = $ant
-        endif
-    end
-    echo -n "Refant $refant choosen! "
-endif
+uvaver vis=`echo " $pollist" | sed -e 's/ /,'$wd'\/tempcal/g' -e 's/,//'` options=relax out=$wd/tempcalfin
 
-set outfile = "cal-$source-maps"
+set outfile = "$wd/cal-$source-maps"
+
 set idx = 0
-
 while (-e $outfile)
     @ idx++
     set outfile = "cal-$source-maps.$idx"
 end
-
-mfcal vis=$wd/tempcal refant=$refant options=interpolate minants=4 flux=$flux interval=$calint >& /dev/null
-
-newautomap.csh vis=$wd/tempcal mode=auto outdir=$outfile $mapopt $olay
-
-if (-e $outfile/$source.1.xx/gains) then
-    puthd in=$outfile/$source.1.xx/interval value=.5 > /dev/null
-    gpcopy vis=$outfile/$source.1.xx out=$vis
-    mv $vis/gains $vis/gains.xx
-endif
-
-if (-e $outfile/$source.1.yy/gains) then
-    puthd in=$outfile/$source.1.yy/interval value=.5 > /dev/null
-    gpcopy vis=$outfile/$source.1.yy out=$vis
-    mv $vis/gains $vis/gains.yy
-endif
+    
+newautomap.csh vis=$wd/tempcalfin mode=auto outdir=$outfile $mapopt $olay
 
 echo "Copying gains back to original file ($vis)"
 
-puthd in=$wd/tempcal/interval value=.5 > /dev/null
-gpcopy vis=$wd/tempcal out=$vis > /dev/null
-
-foreach sfile ($tvis)
-    echo "Copying gains to $sfile"
+if ($polsplit && $#pollist > 1) then
     if (-e $outfile/$source.1.xx/gains) then
+	puthd in=$outfile/$source.1.xx/interval value=.5 > /dev/null
+	gpcopy vis=$outfile/$source.1.xx out=$wd/tempcalxx mode=apply
+	puthd in=$wd/tempcalxx value=.5 > /dev/null
+	gpcopy vis=$wd/tempcalxx out=$vis
+	if (-e $vis/gains) mv $vis/gains $vis/gains.xx
+	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.xx
+    endif
+    if (-e $outfile/$source.1.yy/gains) then
+	puthd in=$outfile/$source.1.yy/interval value=.5 > /dev/null
+	gpcopy vis=$outfile/$source.1.yy out=$wd/tempcalyy mode=apply
+	puthd in=$wd/tempcalyy value=.5 > /dev/null
+	gpcopy vis=$outfile/$source.1.yy out=$vis
+	if (-e $vis/gains) mv $vis/gains $vis/gains.yy
+	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.yy
+    endif
+else if ($polsplit) then
+    if (-e $outfile/$source.1.$pollist[1]/gains) then
+	puthd in=$outfile/$source.1.$pollist[1]/interval value=.5 > /dev/null
+	gpcopy vis=$outfile/$source.1.$pollist[1] out=$wd/tempcal$pollist[1] mode=apply
+	puthd in=$wd/tempcal$pollist[1] value=.5 > /dev/null
+	gpcopy vis=$outfile/$source.1.$pollist[1] out=$vis
+	if (-e $vis/gains) mv $vis/gains $vis/gains.$pollist[1]
+	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.$pollist[1]
+    endif
+else
+    if (-e $outfile/$source.1.xx/gains) then
+	puthd in=$outfile/$source.1.xx/interval value=.5 > /dev/null
 	gpcopy vis=$outfile/$source.1.xx out=$vis
 	mv $vis/gains $vis/gains.xx
     endif
     if (-e $outfile/$source.1.yy/gains) then
+	puthd in=$outfile/$source.1.yy/interval value=.5 > /dev/null
 	gpcopy vis=$outfile/$source.1.yy out=$vis
 	mv $vis/gains $vis/gains.yy
     endif
-    gpcopy vis=$wd/tempcal out=$sfile > /dev/null
+    puthd in=$wd/tempcal$pollist[1]/interval value=.5 > /dev/null
+    gpcopy vis=$wd/tempcal$pollist[1] out=$vis > /dev/null
+endif
+
+foreach tfile ($tvis)
+    echo "Copying gains to $tfile"
+    if (-e $vis/gains) then
+	gpcopy vis=$vis out=$tfile
+    endif
+    if (-e $vis/gains.xx || -e $vis/bandpass.xx) then
+	if (-e $vis/gains) mv $vis/gains $vis/tempgains
+	if (-e $vis/bandpass) mv $vis/bandpass $vis/tempbandpass
+	if (-e $vis/gains.xx) mv $vis/gains.xx $vis/gains
+	if (-e $vis/bandpass.xx) mv $vis/bandpass.xx $vis/bandpass
+	if (-e $tfile/gains) mv $tfile/gains $tfile/tempgains
+	if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/tempbandpass
+	gpcopy vis=$vis out=$tfile
+	if (-e $tfile/gains) mv $tfile/gains $tfile/gains.xx
+	if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/bandpass.xx
+	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.xx
+	if (-e $vis/gains) mv $vis/gains $vis/gains.xx
+	if (-e $vis/tempbandpass) mv $vis/tempbandpass $vis/bandpass
+	if (-e $vis/tempgains) mv $vis/tempgains $vis/gains
+    endif
+    if (-e $vis/gains.yy || -e $vis/bandpass.yy) then
+	if (-e $vis/gains) mv $vis/gains $vis/tempgains
+	if (-e $vis/bandpass) mv $vis/bandpass $vis/tempbandpass
+	if (-e $vis/gains.yy) mv $vis/gains.yy $vis/gains
+	if (-e $vis/bandpass.yy) mv $vis/bandpass.yy $vis/bandpass
+	if (-e $tfile/gains) mv $tfile/gains $tfile/tempgains
+	if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/tempbandpass
+	gpcopy vis=$vis out=$tfile
+	if (-e $tfile/gains) mv $tfile/gains $tfile/gains.yy
+	if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/bandpass.yy
+	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.yy
+	if (-e $vis/gains) mv $vis/gains $vis/gains.yy
+	if (-e $vis/tempbandpass) mv $vis/tempbandpass $vis/bandpass
+	if (-e $vis/tempgains) mv $vis/tempgains $vis/gains
+    endif
 end
 
 if ($outsource && "$tvis[1]" != "") then
-    foreach tfile ($tvis)  
+    foreach tfile ($tvis)
 	echo "Applying flags for $tfile..."
         uvaver vis="$wd/tvis$tfile*" out=$wd/tvis$tfile options=relax,nocal,nopass,nopol >& /dev/null
 	uvaflag vis=$tvis tvis=$wd/tvis$tfile > /dev/null
@@ -701,5 +785,5 @@ exit 0
 
 fail:
 echo "Calibration failed for unknown reason! Now exiting..."
-rm -rf $wd
+#rm -rf $wd
 exit 1
