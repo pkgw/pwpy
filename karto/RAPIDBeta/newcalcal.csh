@@ -619,7 +619,7 @@ end
 
 uvaver vis=`echo " $pollist" | sed -e 's/ /,'$wd'\/tempcal/g' -e 's/,//'` options=relax out=$wd/tempcalfin
 
-set outfile = "$wd/cal-$source-maps"
+set outfile = "cal-$source-maps"
 
 set idx = 0
 while (-e $outfile)
