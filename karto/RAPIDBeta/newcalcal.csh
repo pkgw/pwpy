@@ -309,8 +309,12 @@ foreach ipol ($pollist)
 	    end
 	endif
 	touch $wd/xbase; touch $wd/ybase
-	if ("$pollist" =~ *"xx"*) uvplt vis=$file options=2pass device=/null options=2pass,all select='pol(xx),-auto' | grep Baseline | awk '{print $2,$3,$5}' | sed 's/-//g' > $wd/xbase
-	if ("$pollist" =~ *"yy"*) uvplt vis=$file options=2pass device=/null options=2pass,all select='pol(yy),-auto' | grep Baseline | awk '{print $2,$3,$5}' | sed 's/-//g' > $wd/ybase
+	if ("$pollist" =~ *"xx"*) then
+	    uvplt vis=$file options=2pass device=/null options=2pass,all select='pol(xx),-auto' | grep Baseline | awk '{print $2,$3,$5}' | sed 's/-//g' > $wd/xbase
+	endif
+	if ("$pollist" =~ *"yy"*) then 
+	    uvplt vis=$file options=2pass device=/null options=2pass,all select='pol(yy),-auto' | grep Baseline | awk '{print $2,$3,$5}' | sed 's/-//g' > $wd/ybase
+	endif
 	echo -n "Starting $idx of "`echo $#regtimes | awk '{print $1-2}'`" cycles. Beginning phase RMS scanning."
 
 	if ($idx != $#regtimes) then
@@ -410,9 +414,12 @@ foreach ipol ($pollist)
 	    goto jumper
 	endif
     
-	uvplt vis=$file options=2pass device=/null select='pol(xx),-auto' | grep Baseline | awk '{print $2,$3,$5}' | sed 's/-//g' > $wd/xbasetemp
+	if ("$pollist" =~ *"xx"*) then
+	    uvplt vis=$file options=2pass device=/null select='pol(xx),-auto' | grep Baseline | awk '{print $2,$3,$5}' | sed 's/-//g' > $wd/xbasetemp
+	endif
+	if ("$pollist" =~ *"yy"*) then	
 	uvplt vis=$file options=2pass device=/null select='pol(yy),-auto' | grep Baseline | awk '{print $2,$3,$5}' | sed 's/-//g' > $wd/ybasetemp
-    
+	endif
     # Begin data retention check
 	set badjump = 0
 	set pols = (x y)
@@ -780,7 +787,7 @@ cat $wd/rpttemp >> $cal.calrpt
 finish:
 set times = (`date +%s.%N | awk '{print int(($1-date1)/60),int(($1-date1)%60)}' date1=$date1` 0 0)
 echo "Calibration cycle took $times[1] minute(s) and $times[2] second(s)."
-rm -rf $wd
+#rm -rf $wd
 exit 0 
 
 fail:
