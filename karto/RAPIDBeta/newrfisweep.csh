@@ -258,9 +258,9 @@ if ($vals[4] == "vis2") set clist = ($clist $vals[1])
 while ($idx <= $lim) 
     set vals = (`sed -n {$idx}p $wd/timecheck2`)
     if ($starttime == "0") then
-	set starttime = $vals[2]
-	set mastertime = ($mastertime `echo $vals[2] | awk '{printf "%7.6f\n",$1+2400000.5}'`)
-	set mastertime2 = ($mastertime2 `echo $vals[2] | awk '{printf "%7.6f\n",$1}'`)
+	set starttime = `echo $vals[2] | awk '{printf "%7.6f\n",$1-(.5/86400)}'`
+	set mastertime = ($mastertime `echo $vals[2] | awk '{printf "%7.6f\n",$1+2400000.5-(.5/86400)}'`)
+	set mastertime2 = ($mastertime2 `echo $vals[2] | awk '{printf "%7.6f\n",$1-(.5/86400)}'`)
     endif
     set timeint = `echo $timeint $vals[3] | awk '{print $1+$2}'`
     if  !(" "`echo $clist $slist`" " =~ *" $vals[1] "*) then
@@ -269,7 +269,7 @@ while ($idx <= $lim)
     endif
     if (`echo $timeint | awk '{if ($1 > inttime) print "go"}' inttime=$inttime` == "go" || `echo $vals[2] $vals[3] $starttime | awk '{if (((1440*($1-$3))+$2) > 2*inttime) print "go"}' inttime=$inttime` == go) then
 	set finstarttime = `echo $starttime | awk '{printf "%7.6f",$1+2400000.5}'`
-	set finstoptime = `echo $vals[2] $vals[3] | awk '{printf "%7.6f",$1+($2/1440)+2400000.5}'`
+	set finstoptime = `echo $vals[2] $vals[3] | awk '{printf "%7.6f",$1+($2/1440)+2400000.5+(.5/86400)}'`
 	set finslist = `echo $slist | tr ' ' ','`","
  	set finclist = `echo $clist | tr ' ' ','`","
 	echo $finstarttime $finstoptime $finslist $finclist >> $wd/obslist
@@ -439,9 +439,10 @@ set listlim = `echo $fulllist | wc -w`
 set idx = 1
 while ($idx <= $listlim)
     echo "$fulllist[$idx] final flagging..." 
-    uvaver vis=$wd/$fulllist[$idx]'*' options=relax,nocal,nopass,nopol out=$wd/s$fulllist[$idx]
-    uvaflag vis=$fulllist[$idx] tvis=$wd/s$fulllist[$idx]
+    uvaver vis=$wd/$fulllist[$idx]'*' options=relax,nocal,nopass,nopol out=$wd/s$fulllist[$idx] 
+    uvaflag vis=$fulllist[$idx] tvis=$wd/s$fulllist[$idx] 
     if ($autoedge) then
+    echo "Edge flagging $fulllist[$idx]"
 	if ($autoedgetype == 1) then
 	    uvflag vis=$fulllist[$idx] flagval=f options=none edge=1,$autoedgechan,0 > /dev/null
 	else if ($autoedgetype == 2) then
@@ -450,6 +451,7 @@ while ($idx <= $listlim)
 	    uvflag vis=$fulllist[$idx] flagval=f options=none edge=$autoedgechan,$autoedgechan,3 > /dev/null
 	endif
     endif
+    echo "Flagging of $fulllist[$idx] complete!" 
     @ idx++
 end
 
