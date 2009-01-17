@@ -36,6 +36,7 @@ set outsource = 1
 set mapopt = "options=savedata"
 set display = 0
 set polsplit = 0
+set debug = 0
 
 varassign:
 
@@ -75,6 +76,8 @@ else if ("$argv[1]" =~ 'options='*) then
 	    set mapopt = "$mapopt"",savedata"
 	else if ($option == "display") then
 	    set display = 1
+	else if ($option == "debug") then
+	    set debug = 1
 	else
 	    set badopt = ($badopt $option)
 	endif
@@ -114,7 +117,7 @@ endif
 
 ###################################
 
-set wd = (`mktemp -d calXXXXX`)
+set wd = (`mktemp -d cal2XXXX`)
 
 if !( -e $wd) then
     echo "FATAL ERROR: Unable to create working directory, please make sure that you have read/write permissions for this area."
@@ -222,7 +225,7 @@ set pollist = ("xxyy")
 if ($polsplit) then
     set pollist = ("xx" "yy")
     uvaver vis=$vis select='window(1),pol(xx),-auto' out=$wd/tempcalxx options=relax,nocal,nopass,nopol >& /dev/null
-    uvaver vis=$vis select='window(1),pol(xx,yy),-auto' out=$wd/tempcalyy options=relax,nocal,nopass,nopol >& /dev/null
+    uvaver vis=$vis select='window(1),pol(yy),-auto' out=$wd/tempcalyy options=relax,nocal,nopass,nopol >& /dev/null
 else
     uvaver vis=$vis select='window(1),pol(xx,yy),-auto' out=$wd/tempcalxxyy options=relax,nocal,nopass,nopol >& /dev/null
 endif
@@ -308,11 +311,11 @@ foreach ipol ($pollist)
 		if (`uvplt vis=$sfile select="time($regtimes[$idx],$regtimes[$postidx])" device=/null | grep -c "Baseline"`) set sfilelist = ($sfilelist $sfile
 	    end
 	endif
-	touch $wd/xbase; touch $wd/ybase
-	if ("$pollist" =~ *"xx"*) then
+	rm -f $wd/xbase $wd/ybase; touch $wd/xbase; touch $wd/ybase
+	if ("$ipol" =~ *"xx"*) then
 	    uvplt vis=$file options=2pass device=/null options=2pass,all select='pol(xx),-auto' | grep Baseline | awk '{print $2,$3,$5}' | sed 's/-//g' > $wd/xbase
 	endif
-	if ("$pollist" =~ *"yy"*) then 
+	if ("$ipol" =~ *"yy"*) then 
 	    uvplt vis=$file options=2pass device=/null options=2pass,all select='pol(yy),-auto' | grep Baseline | awk '{print $2,$3,$5}' | sed 's/-//g' > $wd/ybase
 	endif
 	echo -n "Starting $idx of "`echo $#regtimes | awk '{print $1-2}'`" cycles. Beginning phase RMS scanning."
@@ -414,10 +417,10 @@ foreach ipol ($pollist)
 	    goto jumper
 	endif
     
-	if ("$pollist" =~ *"xx"*) then
+	if ("$ipol" =~ *"xx"*) then
 	    uvplt vis=$file options=2pass device=/null select='pol(xx),-auto' | grep Baseline | awk '{print $2,$3,$5}' | sed 's/-//g' > $wd/xbasetemp
 	endif
-	if ("$pollist" =~ *"yy"*) then	
+	if ("$ipol" =~ *"yy"*) then	
 	uvplt vis=$file options=2pass device=/null select='pol(yy),-auto' | grep Baseline | awk '{print $2,$3,$5}' | sed 's/-//g' > $wd/ybasetemp
 	endif
     # Begin data retention check
@@ -641,38 +644,38 @@ echo "Copying gains back to original file ($vis)"
 if ($polsplit && $#pollist > 1) then
     if (-e $outfile/$source.1.xx/gains) then
 	puthd in=$outfile/$source.1.xx/interval value=.5 > /dev/null
-	gpcopy vis=$outfile/$source.1.xx out=$wd/tempcalxx mode=apply
-	puthd in=$wd/tempcalxx value=.5 > /dev/null
-	gpcopy vis=$wd/tempcalxx out=$vis
+	gpcopy vis=$outfile/$source.1.xx out=$wd/tempcalxx mode=apply > /dev/null
+	puthd in=$wd/tempcalxx/interval value=.5 > /dev/null 
+	gpcopy vis=$wd/tempcalxx out=$vis > /dev/null
 	if (-e $vis/gains) mv $vis/gains $vis/gains.xx
 	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.xx
     endif
     if (-e $outfile/$source.1.yy/gains) then
 	puthd in=$outfile/$source.1.yy/interval value=.5 > /dev/null
-	gpcopy vis=$outfile/$source.1.yy out=$wd/tempcalyy mode=apply
-	puthd in=$wd/tempcalyy value=.5 > /dev/null
-	gpcopy vis=$outfile/$source.1.yy out=$vis
+	gpcopy vis=$outfile/$source.1.yy out=$wd/tempcalyy mode=apply > /dev/null
+	puthd in=$wd/tempcalyy/interval value=.5 > /dev/null
+	gpcopy vis=$outfile/$source.1.yy out=$vis > /dev/null
 	if (-e $vis/gains) mv $vis/gains $vis/gains.yy
 	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.yy
     endif
 else if ($polsplit) then
     if (-e $outfile/$source.1.$pollist[1]/gains) then
 	puthd in=$outfile/$source.1.$pollist[1]/interval value=.5 > /dev/null
-	gpcopy vis=$outfile/$source.1.$pollist[1] out=$wd/tempcal$pollist[1] mode=apply
-	puthd in=$wd/tempcal$pollist[1] value=.5 > /dev/null
-	gpcopy vis=$outfile/$source.1.$pollist[1] out=$vis
+	gpcopy vis=$outfile/$source.1.$pollist[1] out=$wd/tempcal$pollist[1] mode=apply > /dev/null
+	puthd in=$wd/tempcal$pollist[1]/interval value=.5 > /dev/null
+	gpcopy vis=$outfile/$source.1.$pollist[1] out=$vis > /dev/null
 	if (-e $vis/gains) mv $vis/gains $vis/gains.$pollist[1]
 	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.$pollist[1]
     endif
 else
     if (-e $outfile/$source.1.xx/gains) then
 	puthd in=$outfile/$source.1.xx/interval value=.5 > /dev/null
-	gpcopy vis=$outfile/$source.1.xx out=$vis
+	gpcopy vis=$outfile/$source.1.xx out=$vis > /dev/null
 	mv $vis/gains $vis/gains.xx
     endif
     if (-e $outfile/$source.1.yy/gains) then
 	puthd in=$outfile/$source.1.yy/interval value=.5 > /dev/null
-	gpcopy vis=$outfile/$source.1.yy out=$vis
+	gpcopy vis=$outfile/$source.1.yy out=$vis > /dev/null
 	mv $vis/gains $vis/gains.yy
     endif
     puthd in=$wd/tempcal$pollist[1]/interval value=.5 > /dev/null
@@ -787,10 +790,10 @@ cat $wd/rpttemp >> $cal.calrpt
 finish:
 set times = (`date +%s.%N | awk '{print int(($1-date1)/60),int(($1-date1)%60)}' date1=$date1` 0 0)
 echo "Calibration cycle took $times[1] minute(s) and $times[2] second(s)."
-#rm -rf $wd
+if !($debug) rm -rf $wd
 exit 0 
 
 fail:
 echo "Calibration failed for unknown reason! Now exiting..."
-#rm -rf $wd
+if !($debug) rm -rf $wd
 exit 1
