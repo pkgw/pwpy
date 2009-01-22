@@ -145,7 +145,7 @@ foreach file (`echo $vis`)
     set ants = ( `uvlist vis=$file options=list | sed '1,9d' | awk '{print $7,$8}'` )
     uvlist vis=$file select="ant($ants[1])($ants[2])" options=list recnum=0 | sed '1,9d' | awk '{if ($1*1 > 0 && $3 != last) {printf "%s %3.2f %3.2f\n",$3,(540-$12)%360,$13*1; last=$3}}' | awk '{print $2,$3}' > $wd/$file.obstimes #Get Az/El information
     echo "Scanning source/freq information..."
-    uvlist vis=$file recnum=0 select="ant($ants[1])($ants[2])" options=var,full | sed -e '/Header/b' -e '/source  :/b' -e '/sfreq   :/b' -e '/sdf     :/b' -e '/dec     :/b' -e '/ra      :/b' -e '/freq    :/b' -e d | uniq | awk '{if ($1 == "Header") printf "\n%s %s\n",$1,$4; else printf "%s ",$0}' | sed '1d' | awk '{if ($1 == "Header") system("julian options=quiet date="$2); else print $0}' | grep '.' | sed 's/ : /   /g' > $wd/details #Get source/freq information
+    uvlist vis=$file recnum=0 select="ant($ants[1])($ants[2])" options=var,full | sed -e '/Header/b' -e '/source  :/b' -e '/sfreq   :/b' -e '/sdf     :/b' -e '/dec     :/b' -e '/ra      :/b' -e '/freq    :/b' -e d | uniq | tr -d '()' | awk '{if ($1 == "Header") printf "\n%s %s\n",$1,$4; else printf "%s ",$0}' | sed '1d' | awk '{if ($1 == "Header") system("julian options=quiet date="$2); else print $0}' | grep '.' | sed 's/ : /   /g' > $wd/details #Get source/freq information
     #Convert dates to Julian Date, and combine metadata
     set idx = 1
     set lim = `wc -l $wd/details | awk '{print $1}'`
