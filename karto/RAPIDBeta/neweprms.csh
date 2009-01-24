@@ -27,11 +27,11 @@ uvplt vis=$vis device=/null axis=time,pha options=log,2pass,unwrap log=$wd/xphal
 uvplt vis=$vis device=/null axis=time,pha options=log,2pass,unwrap log=$wd/yphalog select="window(1),pol(yy),""$timerange""-auto" >& /dev/null
 
 if (-e $wd/xphalog) then
-sed 1,7d $wd/xphalog | grep 'Baseline' | tr -d '-' | sort -nk1 | awk '{print $2,$3,$5}' > $wd/xbase
+sed 1,7d $wd/xphalog | grep 'Baseline' | tr -d '-' | awk '{print ($2*1000)+$3,$2,$3,$5}' | sort -nk1 | awk '{print $2,$3,$4}' > $wd/xbase
 sed 1,7d $wd/xphalog | grep -v 'Baseline' > $wd/xpha
 endif
 if (-e $wd/yphalog) then
-sed 1,7d $wd/yphalog | grep 'Baseline' | tr -d '-' | sort -nk1 | awk '{print $2,$3,$5}' > $wd/ybase
+sed 1,7d $wd/yphalog | grep 'Baseline' | tr -d '-' | awk '{print ($2*1000)+$3,$2,$3,$5}' | sort -nk1 | awk '{print $2,$3,$4}' > $wd/ybase
 sed 1,7d $wd/yphalog | grep -v 'Baseline' > $wd/ypha
 endif
  
