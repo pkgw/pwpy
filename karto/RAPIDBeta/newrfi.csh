@@ -152,9 +152,9 @@ foreach file (`echo $vis`)
     rm -f $wd/moredetails
     while ($idx <= $lim)
 	set vars = (`sed -n {$idx}p $wd/details` "dummy")
-	if ("$idx$#vars" == 12) then	
+	if ("$idx" == 1 && "$#vars" == 2) then
 	    set time = `echo $vars[1] | awk '{printf "%5.6f\n",$1-2400000.5}'`
-	else if ("$#vars$idx" == "2$lim") then
+	else if ("$#vars" == 2 && "$idx" == "$lim") then
 	    echo $time $pvars >> $wd/moredetails
 	    set time = `echo $vars[1] | awk '{printf "%5.6f\n",$1-2400000.5}'`
    	    echo $time $pvars >> $wd/moredetails
