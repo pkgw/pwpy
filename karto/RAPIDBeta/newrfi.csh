@@ -252,15 +252,15 @@ foreach file (`echo $vis`)
     if (`awk '{print $1}' $wd/temp.xlist2 | sort -u | wc -l` != `wc -l $wd/$file.obstimes | awk '{print $1}'`) then
 	echo "Initial obstimes detection failed, moving to brute force method..."
 	uvlist vis=$file options=list recnum=0 | sed '1,9d' | awk '{if ($1*1 > 0 && $3 != last) {printf "%s %3.2f %3.2f\n",$3,(540-$12)%360,$13*1; last=$3}}' | awk '{print $2,$3}' > $wd/$file.obstimes #Get Az/El information
-	uvlist vis=$file recnum=0 options=var,full | sed -e '/Header/b' -e '/source  :/b' -e '/sfreq   :/b' -e '/sdf     :/b' -e '/dec     :/b' -e '/ra      :/b' -e '/freq    :/b' -e d | uniq | awk '{if ($1 == "Header") printf "\n%s %s\n",$1,$4; else printf "%s ",$0}' | sed '1d' | awk '{if ($1 == "Header") system("julian options=quiet date="$2); else print $0}' | grep '.' | sed 's/ : /   /g' > $wd/details
+	uvlist vis=$file recnum=0 options=var,full | sed -e '/Header/b' -e '/source  :/b' -e '/sfreq   :/b' -e '/sdf     :/b' -e '/dec     :/b' -e '/ra      :/b' -e '/freq    :/b' -e d | uniq | tr -d '()' | awk '{if ($1 == "Header") printf "\n%s %s\n",$1,$4; else printf "%s ",$0}' | sed '1d' | awk '{if ($1 == "Header") system("julian options=quiet date="$2); else print $0}' | grep '.' | sed 's/ : /   /g' > $wd/details
 	set idx = 1
 	set lim = `wc -l $wd/details | awk '{print $1}'`
 	rm -f $wd/moredetails
 	while ($idx <= $lim)
 	    set vars = (`sed -n {$idx}p $wd/details` "dummy")
-	    if ("$idx$#vars" == 12) then	
+	    if ("$idx" == 1 && "$#vars" == 2) then	
 		set time = `echo $vars[1] | awk '{printf "%5.6f\n",$1-2400000.5}'`
-	    else if ("$#vars$idx" == "2$lim") then
+	    else if ("$#vars" == 2 && "$idx" == "$lim") then
 		echo $time $pvars >> $wd/moredetails
 		set time = `echo $vars[1] | awk '{printf "%5.6f\n",$1-2400000.5}'`
 		echo $time $pvars >> $wd/moredetails
