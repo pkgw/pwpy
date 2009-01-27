@@ -143,6 +143,9 @@ for dIn, preamble, data, flags, nread in uvdat.readAll ():
         first = False
 
     if nPol == 0:
+        # We're on to a new set of baselines. Get the number
+        # of pols in this next set and remind ourselves to
+        # update the 'npol' variable if necessary.
         nPol = uvdat.getNPol ()
         doneNPol = False
 
@@ -196,9 +199,14 @@ for dIn, preamble, data, flags, nread in uvdat.readAll ():
     data = data[0:nread]
 
     if not doneNPol:
+        # If necessary, write out a new value for the
+        # 'npol' variable. If npol has changed, note
+        # that so that we know not to write a
+        # dataset-wide npol header variable.
+        
         if nPol != saveNPol:
             dOut.writeVarInt ('npol', nPol)
-            polsVaried = saveNPol != 0
+            polsVaried = polsVaried or saveNPol != 0
             saveNPol = nPol
         doneNPol = True
 
@@ -229,14 +237,17 @@ for dIn, preamble, data, flags, nread in uvdat.readAll ():
 
     lastTime = time
         
-    # I don't understand what this does ...
+    # Count down the number of polarizations left for this baseline.
+    # When we reach zero, we may reset the npol variable.
     nPol -= 1
 
+# Write out the last round of data
 dump (dOut, autos, crosses)
 
 if not polsVaried:
-    # wrhdi (dOut, saveNPol)
-    pass
+    # Number of pols never varied, so it's valid to write out
+    # a single 'npol' in the header of the entire dataset.
+    dout.writeHeaderInt ('npol', saveNPol)
 
 # All done. Write history entry and quit.
 
