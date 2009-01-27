@@ -38,6 +38,7 @@ set nopol = "nopol" #Switch to apply polarization corrections to data
 set crosspol = "nocross" #Swtich to exclude XY and YX polarization - should be done if bandpass and pol correction information are not available
 set autoedge = 0
 set autoedgechan = 100
+set debug = 0
 
 varassign:
 
@@ -79,6 +80,8 @@ else if ("$argv[1]" =~ 'options='*) then
 	    set autoedge = 1
 	else if ($option == "noautoedge") then
 	    set autoedge = 0
+	else if ($option == "debug") then
+	    set debug = 1
 	else
 	    set badopt = ($badopt $option)
 	endif
@@ -360,13 +363,13 @@ end
 set times = (`date +%s.%N | awk '{print int(($1-date1)/60),int(($1-date1)%60)}' date1=$date1`)
 echo "Scanning process took $times[1] minute(s) $times[2] second(s)."
 
-rm -r $wd
+if !($debug) rm -r $wd
 
 finish:
 
 exit 0
 
 fail:
-rm -rf $wd
+if !($debug) rm -rf $wd
 echo "Houston, we have a problem..."
 exit 1

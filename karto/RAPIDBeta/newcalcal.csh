@@ -1,11 +1,11 @@
 #! /usr/bin/tcsh -f
 # $Id$
-#Calibrates a calibrator...
+# Calibrates a calibrator...
 
 onintr fail
 
 if ($#argv == 0) then
-    echo "NEWCALCAL.CSH"
+    echo "CALCAL.CSH"
     echo "newcalcal.csh is designed as an 'all-in-one' data reduction utility for calibrator data. newcalcal will derive (and copy) gains solutions and create maps of calibrator data. Note: newcalcal is currently designed for calibrators with at least 4 Jy worth of flux, although a minimum of 12 Jy is much more preferable"
     echo "Calling sequence: newcalcal.csh vis=vis plim=plim clim=clim calint=calint flux=flux addflux=addflux refant=refant"
     echo "REQUIRED INPUTS:"
@@ -24,7 +24,7 @@ set vis # The file to be processed
 set tvis # Files to be flagged and gains copied to
 set olay # Overlay file for display
 set plim = 20 # Phase RMS limit for all baselines
-set siglim = 5
+set siglim = 5 # 
 set calint = 10 # Interval period for sol'ns
 set flux # Flux for the calibrator (note, no longer automatically supplied!)
 set refant # Reference antenna for calibration
