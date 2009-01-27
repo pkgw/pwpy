@@ -9,7 +9,7 @@
  based on the noise properties of a dataset. It prints out the
  derived temperatures and can optionally generate a copy of the
  input dataset with the computed values inserted into the 'systemp'
- UV variable.
+ UV variable. Temperatures are listed in Kelvin.
 
  The system temperatures are computed from the variance in the real
  and imaginary parts across the spectral window of a visibility. The
@@ -244,6 +244,8 @@ class SysTemps (object):
         flux = self.flux
         etaQ = self.etaQ
         tsyses = self.tsyses
+
+        print 'Computing temps in Kelvin, using Jy/K =', jyperk, '(from "jyperk" in dataset)'
         
         for i in self.idxs:
             mreal, sreal, mimag, simag, meantime, tmp1 = self.info[i]
