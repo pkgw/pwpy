@@ -7,34 +7,174 @@
 onintr fail
 
 if ($#argv == 0) then
-    echo "NEWAUTOMAP.CSH"
-    echo "newautomap.csh is designed to be a totally automated imaging program for source data. Note, this program assumes that calibration has already been applied to the dataset. newautomap will produce severl maps and an imaging report at the end of it's cycle."
-    echo "Calling sequence: vis=vis mode=mode amplim=amplim cleanlim=cleanlim cregion=cregion dregion=dregion scint=scint sctol=sctol scsigma=scsigma imsize=imsize cellsize=cellsize dispmode=dispmode outdir=outdir wmode=wmode crange=crange olay options={autoflag autocal scmode intclean mfs savedata}"
-    echo "REQUIRED INPUTS:"
-    echo "vis - Name of file to be imaged."
-    echo "OPTIONAL INPUTS:"
-    echo "mode - Operating mode for newautomap. Either 'inter' (interactive mode), 'skip' (just map and exit), or 'auto' (full automated processing)."
-    echo "amplim - Up to three numbers, i.e. (1,10,30) establishing the lower wideband, upper wideband, and upper channel limits for the dataset. Data outside of this range is flagged during automated flagging."
-    echo "cleanlim - The threshold limit for the clean/mem cycle (in niters of noise in Jy). Default is 2500 niters for CLEAN, autoselect for MEM."
-    echo "cregion - Cleaning region, specified in the normal MIRIAD way. Default is the entire map"
-    echo "dregion - Display region, specified in the normal MIRIAD way. Default is the area covering the primary beam"
-    echo "scint - Self-cal integration time (in minutes) for automated calibration. Default is 10"
-    echo "scsigma - Multipier to the RMS noise to establish the 'lower-limit' flux for automated self-calibration. Default is 5"
-    echo "imsize - Image size (in pixels). Default is 512x512."
-    echo "cellsize - Cell size (in arcsec) of pixels. Default is automated selection based on observing frequency"
-    echo "dispmode - Display mode for resulting maps. Default is /xs"
-    echo "outdir - newautomap normally chooses what folder to put resulting maps in - use this to override the programs choice."
-    echo "crange - lists of channel ranges to map seperately from continuum images (in spectral line mode)."
-    echo "olay - Name of overlay file for mapping"
-    echo "wmode - Weighting mode for mapping, either 'natural' or 'uniform'. Default is natural."
-    echo "Options:"
-	echo "autoflag (autoflag/noautoflag) - Whether or not to automatically flag data"
-	echo "autoca; (autocal/autopha/autoamp/nocal) - Whether to perform fully automated calibration, just automated phase selfcal, just automated amp selfcal, or no automated calibration. Default is full auto selfcal."
-	echo "scmode (drmax,fidmax) - Either auto selfcal based on dynamic range or image fidelity. Default is drmax. "
-	echo "intclean (intclean/nointclean) - Whether or not to let newautomap to choose the limits for cleaning. Default is yes."
-	echo "mfs (mfs,nomfs) - Whether or not to create an MFS map. Default is yes"
-	echo "savedata (savedata,savemaps,junk) - Whether to save the processed data and maps, just save the maps or junk all files when done. Default is to save maps."
-    exit 0
+      #################################################################
+echo "================================================================="
+echo "AUTOMAP - All in one mapping program"
+echo "'Why should optical astronomers have all the pretty pictures?'"
+echo ""
+echo "CALLS - newautomap.csh (recursive), scompare.csh (TBI),  MIRIAD"
+echo "    (uvplt,uvflag,uvplt,uvaflag,cgdisp,invert,clean,restor,"
+echo "    selfcal,uvlist,blflag,mem,uvcal,gpcopy,imstat,sfind)"
+echo "PURPOSE - Creates a full suite of maps for a dataset."
+echo "RESPONSIBLE - Karto (karto@hcro.org)"
+echo "================================================================="
+echo ""
+echo "AUTOMAP is designed as an 'all-in-one' mapping utility for source"
+echo "data. AUTOMAP will build gains and flags solutions to improve"
+echo "the image quality, and produce a full suite of maps. The"
+echo "reduction requires datasets to already be calibrated, and works"
+echo "best when noisy baselines and RFI have been removed from the"
+echo "data."
+echo ""
+echo "AUTOMAP in automated mode works by iteratively processing the"
+echo "data - deriving the number of deconvolution cycles, flagging bad"
+echo "data and building better gains solutions each iteration. Once"
+echo "the 'best' flags and gains solutions are found, final maps are"
+echo "created and stored on the hard drive"
+echo ""
+echo "AUTOMAP will create 5 maps in total: residual, clean component,"
+echo "dirty, clean, and beam. These maps, along with a imaging report"
+echo "and (optionally) the final datasets are moved to a directory"
+echo "created by the program (the path of which can be specified by "
+echo "the user). Maps - by default - will not be overwritten, nor will"
+echo "any changes be made to the imaged dataset."
+echo ""
+echo "AUTOMAP currently only supports automated mapping, and currently"
+echo "only supports Stokes I imaging."
+echo ""
+echo "TECHNICAL NOTE: AUTOMAP creates a temporary directory to work"
+echo "from, named mapXXXX (where X is a random character). These"
+echo "directories should be automatically deleted after AUTOMAP"
+echo "completes, but might remain in the event of a program error."
+echo "Remnant directories can be safely deleted."
+echo ""
+echo "TECHNICAL NOTE: AUTOMAP will automatically pol-specific gains"
+echo "files produced by CALCAL. More on this can be found in the"
+echo "CALCAL documentation."
+echo ""
+echo "CALLING SEQUENCE: newautomap.csh vis=vis (mode=[auto,inter,skip]"
+echo "    crange=crange interval=interval weightmode=[natural,uniform]"
+echo "    imsize=imsize1,imsize2 cellsize=cellsize cleantpye=[clean,"
+echo "    mem] cregion=cregion cleanlim=cleanlim amplim=amplim1,amplim2"
+echo "    ,amplim3 sysflux=sysflux refant=refant selfcalint=selfcalint"
+echo "    selfcaltol=selfcaltol selfcalsigma=selfcalsigma"
+echo "    dregion=dregion outdir=outdir olay=olay options=[autoflag,"
+echo "    noflag],[autoamp,noamp],[autopha,nopha],[autocal,nocal],"
+echo "    [drmax,fidmax],[intclean,nointclean],[savedata,savemaps,junk]"
+echo "    ,autolim,autoref,[mfs,nomfs]"
+echo ""
+echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+echo ""
+echo "REQUIRED INPUTS:"
+echo " vis - Name of the files contraining calibrator data. Supports"
+echo "    wildcard expansion and multiple files. No default."
+echo ""
+echo "OPTIONAL INPUTS"
+echo " mode - Operating mode for AUTOMAP. Supported modes include full"
+echo "    automation (auto), user guided mapping (inter), or no extra"
+echo "    processing (skip). Default is auto."
+echo ""
+echo " crange - Groups of channels to be imaged seperately. This"
+echo "    parameter should be used for channels containing spectral"
+echo "    line emission. Can be specified with one number (e.g." 
+echo "    crange=(10) will only image channel 10 seperately) two "
+echo "    numbers (e.g. crange=(10,20) will image channels 10 through"
+echo "    20 seperately) or three numbers (e.g. crange=(10,20,11) will"
+echo "    image channels 10 through 20 seperately, but will average"
+echo "    over the 11 channels in that range before imaging, producing"
+echo "    only one image). No default."
+echo ""
+echo " interval - Interval (in minutes) to average the source data"
+echo "    before beginning processing. Default in 1."
+echo ""
+echo " select - Data to be processed by AUTOMAP. See MIRIAD for more"
+echo "    details. Default is all data."
+echo ""
+echo " weightmode - Weighting mode for the invert stage of imaging."
+echo "    Supported modes include natural weighting and uniform"
+echo "    weighting. Default is natural"
+echo ""
+echo " imsize - Image size (in pixels). Can be specified with one"
+echo "    number (e.g. imsize=100, which will make the image 100 by"
+echo "    100 pixels) or two numbers (e.g. imsize=10,20, which will"
+echo "    make the image 10 by 20 pixels). Default is 512."
+echo ""
+echo " cellsize - Size of pixels (in arcsec) in the image. Default is"
+echo "    automatically scaled to the observing frequency, and is"
+echo "    usually on the order of one-third the size of the beam."
+echo ""
+echo " cleantype - Deconvolution algorithm to use. Supported modes"
+echo "    include clean and mem (to be implemented. Dedfault is clean."
+echo ""
+echo " cregion - Region to be cleaned. See MIRIAD for more details."
+echo "    Default is the entire map."
+echo ""
+echo " cleanlim - Number of iterations that CLEAN is limited to."
+echo "    Default is 2500"
+echo ""
+echo " amplim - Amplitude limits (in Jy) for automated flagging, the"
+echo "    first number specifying the minimum flux, the second number"
+echo "    specifying the maximum flux, and the third number specifying"
+echo "    the maximum flux for a single channel (e.g. amplim=(1,5,10)"
+echo "    will flag integrated spectra with fluxes below 1 Jy or above"
+echo "    5 Jy, and individual channels above 10 Jy). Default is"
+echo "    (0,5000,10000)"
+echo " sysflux - Expected variation (in Jy) of source measurements"
+echo "    due to system noise. Default is 2."
+echo ""
+echo " refant - Reference antenna (MIRIAD number) for selfcal"
+echo "    solutions. No default."
+echo ""
+echo " selfcalint - Interval period (in minutes) for self-calibration."
+echo "    Default is 5."
+echo ""
+echo " selfcaltol - Minimum improvement neccessary for automated"
+echo "    selfcal to continue. Default is .05 (i.e. 5%)."
+echo ""
+echo " selfcalsigma - How far above the noise (in sigma) to establish"
+echo "    the calibration cut-off for selfcal. Default it 10."
+echo ""
+echo " dregion - Region to be displayed in PS/X-Window images. See"
+echo "    MIRIAD for more details. Default is the area of the primary"
+echo "    beam."
+echo ""
+echo " outdir - Directory to place finished maps and reports. Default"
+echo "    is 'source name'-maps."
+echo ""
+echo " olay - Overlay file to be used when making final images. No"
+echo "    default."
+echo ""
+echo " options=[autoflag,noflag],[autoamp,noamp],[autopha,nopha],"
+echo "    [autocal,nocal],[drmax,fidmax],[intclean,nointclean],"
+echo "    [savedata,savemaps,junk],autolim,autoref,[mfs,nomfs]"
+echo "    autoflag - Automatically flag bad based on amplitude ranges"
+echo "        specified (Default)."
+echo "    noflag - No automated flagging."
+echo "    autoamp - Automatically self-cal for amplitudes."
+echo "    noamp - Do not auto self-cal for amplitudes (Default)."
+echo "    autopha - Automatically self-cal for phases (Default)."
+echo "    nopha - Do not auto self-cal for phases."
+echo "    autocal - Automatically self-cal for phase and amplitudes."
+echo "    nocal - Do not perform any automated self calibration."
+echo "    drmax - Optimize the image for maximum dynamic range"
+echo "        (Default)."
+echo "    fidmax - Optimize the image for maximum fidelity (to be"
+echo "        integrated)".
+echo "    intclean - Automatically determine the number of"
+echo "        deconvolution cycles to use (Default)."
+echo "    nointclean - Do not automaticall determine the number of"
+echo "        deconvolution cycles to use (Default if cleanlim is"
+echo "        specified)."
+echo "    savedata - Preserve finished maps and processed data."
+echo "    savemaps - Preserve finished maps (Default)."
+echo "    junk - Save no end products."
+echo "    autolim - Automatically determine amplitude limits for"
+echo "        automated flagging."
+echo "    autoref - Automatically determine the refant (Default)."
+echo "    mfs - Use the MFS switch for imaging. See MIRIAD for more"
+echo "        details (Default)."
+echo "    nomfs - Do not use the MFS switch for imaging."
+exit 0
 endif
 
 onintr enderr # Error trapping
@@ -53,11 +193,11 @@ set dregion # Display region for map
 set autoflag = 1 # Automatically flag bad data in "auto" mode?
 set autopha = 1 # Automatically selfcal phases in "auto" mode?
 set autoamp = 0 # Automatically selfcal amplitudes in "auto" mode?
-set scint = 10 # Selfcal soln interval
+set scint = 5 # Selfcal soln interval
 set sctol = .05 # Selfcal limiting tolerance iterative cycles
 set scsigma = 10 # Sigma clipping limit for selfcal
 set scmode = "dr" # Selfcal optimiztion (either fidelity or dynamic range)
-set wmode = "natural" # Weighting mode for the invert step
+set weightmode = "natural" # Weighting mode for the invert step
 set imsize # Size of image (in pixels)
 set cellsize # Size of cell (in arcsecs)
 set dispmode = xs # display device for mapping (in progress)
@@ -118,16 +258,16 @@ else if ("$argv[1]" =~ 'amplim='*) then
 else if ("$argv[1]" =~ 'crange='*) then
     set crange = (`echo $argv[1] | sed -e 's/crange=//' -e 's/),/) /' | tr -d ')('`)
     shift argv; if ("$argv" == "") set argv = "finish"
-else if ("$argv[1]" =~ 'scint='*) then
-    set scint = `echo $argv[1] | sed 's/scint=//'`
+else if ("$argv[1]" =~ 'selfcalint='*) then
+    set scint = `echo $argv[1] | sed 's/selfcalint=//'`
     shift argv; if ("$argv" == "") set argv = "finish"
-else if ("$argv[1]" =~ 'sctol='*) then
-    set sctol = `echo $argv[1] | sed 's/sctol=//'`
+else if ("$argv[1]" =~ 'selfcaltol='*) then
+    set sctol = `echo $argv[1] | sed 's/selfcaltol=//'`
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'select='*) then
     set uselect = "`echo $argv[1] | sed 's/select=//'`"
     shift argv; if ("$argv" == "") set argv = "finish"
-else if ("$argv[1]" =~ 'scsigma='*) then
+else if ("$argv[1]" =~ 'selfcalsigma='*) then
     set scsigma = `echo $argv[1] | sed 's/scsigma=//'`
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'sysflux='*) then
@@ -152,16 +292,16 @@ else if ("$argv[1]" =~ 'mode='*) then
     endif
 
     shift argv; if ("$argv" == "") set argv = "finish"
-else if ("$argv[1]" =~ 'wmode='*) then
-    set wmode = `echo $argv[1] | sed 's/mode=//'`
+else if ("$argv[1]" =~ 'weightmode='*) then
+    set wmode = `echo $argv[1] | sed 's/weightmode=//'`
 
-    if !(" natural uniform " =~ *" $wmode "*) then
+    if !("natural uniform" =~ *"$wmode"*) then
 	echo "FATAL ERROR: $argv[1] not recognized!"
 	exit 1
     endif
 
-    if ($mode == "natural") set sup = 0
-    if ($mode == "uniform") set sup = 10000
+    if ("natural" =~ *"$wmode"*) set sup = 0
+    if ("uniform" =~ *"$wmode"*) set sup = 10000
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'cleantype='*) then
     set cleantype = `echo $argv[1] | sed 's/mode=//'`
@@ -226,6 +366,8 @@ else if ("$argv[1]" =~ 'options='*) then
 	    set wrath = 1
 	else if ($option == "autolim") then
 	    set autolim = 1
+	else if ($option == "autoref") then
+	    set refant = 0
 	else
 	    set badopt = ($badopt $option)
 	endif
@@ -300,6 +442,21 @@ while ($source == "")
 	shift sourceline
     endif
 end
+
+set linecmds
+
+foreach line ($crange)
+    if (`echo $line | tr ',' ' ' | wc -w` == 2) then
+	set linecmds = ($linecmds `echo $line | tr ',' ' ' | awk '{if ($1 < $2) print $2-$1+1","$1; else print "1,"$1}'`)
+    else if (`echo $line | tr ',' ' ' | wc -w` == 3) then
+	set linecmds = ($linecmds `echo $line | tr ',' ' ' | awk '{if ($1 < $2 && ($2-$1+1)/$3 > 1) print int(($2-$1+1)/$3)","$1","$3; else print "1,"$1}'`)
+    else
+	set linecmds = ($linecmds "1,"$line)
+    endif
+end
+
+set crange = ($linecmds)
+
 echo "Mapping $source..."
 
 set sidx = 0 # Index marker
