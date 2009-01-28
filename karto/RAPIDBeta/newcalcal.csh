@@ -10,8 +10,8 @@ echo "================================================================="
 echo "CALCAL - All in one calibration program"
 echo "'Building a gains solution for a better tomorrow'"
 echo ""
-echo "CALLS - newautomap.csh, neweprms.csh, MIRIAD(uvlist, uvplt,uvflag"
-echo "    ,uvaflag,mfcal,uvaver)"
+echo "CALLS - newautomap.csh, neweprms.csh, MIRIAD (uvlist, uvplt,"
+echo "    uvflag,uvaflag,mfcal,uvaver)"
 echo "PURPOSE - Build gains and flags solutions based on calibrator"
 echo "    data."
 echo "REPSONSIBLE - Karto (karto@hcro.org)"
@@ -29,6 +29,17 @@ echo "that solution to that data and finding data points that do not"
 echo "agree well with the solution. Those bad datapoints are flagged,"
 echo "and the calibration is repeated until all 'bad' data is removed."
 echo ""
+echo "CALCAL will copy back a gains solution to the calibrator file,"
+echo "gains and flags solutions for source files, and create a group"
+echo "of maps (e.g. dirty and clean maps) for the calibrator file"
+echo "using AUTOMAP; these will normally be located in a directory"
+echo "called cal-'calibrator name'-maps. Maps - by default - will not"
+echo "be overwritten, and the current flags/gains solutions are" 
+echo "'backed-up' (users should note that the back-up copy of these"
+echo "solutions WILL be overwritten). CALCAL will also create an"
+echo "imaging report and calibration report in the directory"
+echo "containing the images of the calibrator"
+echo
 echo "CALCAL does not currently support polarization calibration"
 echo ""
 echo "TECHNICAL NOTE: CALCAL creates a temporary directory to work"
@@ -494,7 +505,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
 #################################################################
 
 	if ($idx != $#regtimes) then
-	    foreach badbase (`neweprms.csh $file $plim`)
+	    foreach badbase (`neweprms.csh vis=$file plim=$plim`)
 		uvflag vis=$file select="$badbase" flagval=f options=none > /dev/null
 		echo -n "."
 	    end
