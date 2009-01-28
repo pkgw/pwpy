@@ -31,7 +31,7 @@ set date1 = `date +%s.%N`
 #Preassigment of variables so that optional inputs will revert to defaults
 set vis #File to be scanned
 set inttime = 5 #Integration time
-set nonormal = "normal" #Switch to normalize spectra
+set nonormal = 0 #Switch to normalize spectra
 set nocal = "nocal" #Switch to apply gains to data
 set nopass = "nopass" #Switch to apply bandpass corrections to data
 set nopol = "nopol" #Switch to apply polarization corrections to data
@@ -59,9 +59,9 @@ else if ("$argv[1]" =~ 'options='*) then
     set badopt
     foreach option (`echo $options`)
 	if ($option == "normal") then
-	    set nonormal = "normal"
+	    set nonormal = 0
 	else if ($option == "nonormal") then
-	    set nonormal = "nonormal"
+	    set nonormal = 1
 	else if ($option == "cal") then
 	    set nocal
 	else if ($option == "nocal") then
@@ -124,31 +124,40 @@ endif
 set options = ($nocal $nopass $nopol)
 echo "Beginning data processing..."
 
-foreach file (`echo $vis`)
-    if ($nonormal != "nonormal") then
+set vislist = (`echo $vis`)
+set filelist
+
+set idx = 0
+foreach file ($vislist)
+    @ idx++
+    set filemark = `echo $idx | awk '{print $1+100000}' | sed 's/1//'`
+    set outfile = "temp$filemark"
+    set filelist = ($filelist $outfile)
+    if !($nonormal) then
 	echo "Beginning normalization of data..."
-	uvcal vis=$file options=fxcal,`echo $options | tr ' ' ','` select='pol(xx)' out=$wd/$file-xpol >& /dev/null
-	uvcal vis=$file options=fxcal,`echo $options | tr ' ' ','` select='pol(yy)' out=$wd/$file-ypol >& /dev/null
+	uvcal vis=$file options=fxcal,`echo $options | tr ' ' ','` select='pol(xx)' out=$wd/$outfile-xpol >& /dev/null
+	uvcal vis=$file options=fxcal,`echo $options | tr ' ' ','` select='pol(yy)' out=$wd/$outfile-ypol >& /dev/null
     else if ($crosspol != "crosspol") then
-	uvaver vis=$file options=relax,`echo $options | tr ' ' ','` select='pol(xx)' out=$wd/$file-xpol > /dev/null
-    	uvaver vis=$file options=relax,`echo $options | tr ' ' ','` select='pol(yy)' out=$wd/$file-ypol > /dev/null
+	uvaver vis=$file options=relax,`echo $options | tr ' ' ','` select='pol(xx)' out=$wd/$outfile-xpol > /dev/null
+    	uvaver vis=$file options=relax,`echo $options | tr ' ' ','` select='pol(yy)' out=$wd/$outfile-ypol > /dev/null
     else
-	uvaver vis=$file options=relax,`echo $options | tr ' ' ','` select='pol(xx,xy)' out=$wd/$file-xpol > /dev/null
-	uvaver vis=$file options=relax,`echo $options | tr ' ' ','` select='pol(yy,yx)' out=$wd/$file-ypol > /dev/null
+	uvaver vis=$file options=relax,`echo $options | tr ' ' ','` select='pol(xx,xy)' out=$wd/$outfile-xpol > /dev/null
+	uvaver vis=$file options=relax,`echo $options | tr ' ' ','` select='pol(yy,yx)' out=$wd/$outfile-ypol > /dev/null
     endif
     echo "Preliminary processing for $file complete..."
 end
 
 #Data is prepared, file scanning begins
 
-foreach file (`echo $vis`)
-
+set fileidx = 0
+foreach file ($filelist)
+    @ fileidx++
     #First step is collecting meta-data, program attempts to speed this up by collecting metadata from a single antenna first
     echo "Performing Az/El/UTC data scan..."
-    set ants = ( `uvlist vis=$file options=list | sed '1,9d' | awk '{print $7,$8}'` )
-    uvlist vis=$file select="ant($ants[1])($ants[2])" options=list recnum=0 | sed '1,9d' | awk '{if ($1*1 > 0 && $3 != last) {printf "%s %3.2f %3.2f\n",$3,(540-$12)%360,$13*1; last=$3}}' | awk '{print $2,$3}' > $wd/$file.obstimes #Get Az/El information
+    set ants = ( `uvlist vis=$vislist[$fileidx] options=list | sed '1,9d' | awk '{print $7,$8}'` )
+    uvlist vis=$vislist[$fileidx] select="ant($ants[1])($ants[2])" options=list recnum=0 | sed '1,9d' | awk '{if ($1*1 > 0 && $3 != last) {printf "%s %3.2f %3.2f\n",$3,(540-$12)%360,$13*1; last=$3}}' | awk '{print $2,$3}' > $wd/$file.obstimes #Get Az/El information
     echo "Scanning source/freq information..."
-    uvlist vis=$file recnum=0 select="ant($ants[1])($ants[2])" options=var,full | sed -e '/Header/b' -e '/source  :/b' -e '/sfreq   :/b' -e '/sdf     :/b' -e '/dec     :/b' -e '/ra      :/b' -e '/freq    :/b' -e d | uniq | tr -d '()' | awk '{if ($1 == "Header") printf "\n%s %s\n",$1,$4; else printf "%s ",$0}' | sed '1d' | awk '{if ($1 == "Header") system("julian options=quiet date="$2); else print $0}' | grep '.' | sed 's/ : /   /g' > $wd/details #Get source/freq information
+    uvlist vis=$vislist[$fileidx] recnum=0 select="ant($ants[1])($ants[2])" options=var,full | sed -e '/Header/b' -e '/source  :/b' -e '/sfreq   :/b' -e '/sdf     :/b' -e '/dec     :/b' -e '/ra      :/b' -e '/freq    :/b' -e d | uniq | tr -d '()' | awk '{if ($1 == "Header") printf "\n%s %s\n",$1,$4; else printf "%s ",$0}' | sed '1d' | awk '{if ($1 == "Header") system("julian options=quiet date="$2); else print $0}' | grep '.' | sed 's/ : /   /g' > $wd/details #Get source/freq information
     #Convert dates to Julian Date, and combine metadata
     set idx = 1
     set lim = `wc -l $wd/details | awk '{print $1}'`
@@ -200,11 +209,11 @@ foreach file (`echo $vis`)
 
     perl -e ' $separator="\t"; ($file1, $file2) = @ARGV; open (F1, $file1) or die; open (F2, $file2) or die; while (<F1>) { if (eof(F2)) { warn "WARNING: File $file2 ended early\n"; last } $line2 = <F2>; s/\r?\n//; print "$_$separator$line2" } if (! eof(F2)) { warn "WARNING: File $file1 ended early\n"; } warn "Metadata scanning complete...\n" ' $wd/emoredetails $wd/$file.obstimes | sort -nk1 > $wd/meta.full
     #Preliminary metadata has been built
-    echo "Processing $file, detecting high channels for each spectrum." 
+    echo "Processing $vislist[$fileidx], detecting high channels for each spectrum." 
 
     set chan
     set ilim = 0
-    set grabchan = (`uvlist vis=$file options=var | grep nchan | tr ':' ' '`)
+    set grabchan = (`uvlist vis=$vislist[$fileidx] options=var | grep nchan | tr ':' ' '`)
 
     while ($ilim == 0 && $#grabchan != 0)
 	if ($grabchan[1] == "nchan") set ilim = $grabchan[2]
@@ -254,8 +263,8 @@ foreach file (`echo $vis`)
     #Check to see if metadata parameters (number of unique tags) match. If not, rerun metadata collection WITHOUT shortcut (process all data)
     if (`awk '{print $1}' $wd/temp.xlist2 | sort -u | wc -l` != `wc -l $wd/$file.obstimes | awk '{print $1}'`) then
 	echo "Initial obstimes detection failed, moving to brute force method..."
-	uvlist vis=$file options=list recnum=0 | sed '1,9d' | awk '{if ($1*1 > 0 && $3 != last) {printf "%s %3.2f %3.2f\n",$3,(540-$12)%360,$13*1; last=$3}}' | awk '{print $2,$3}' > $wd/$file.obstimes #Get Az/El information
-	uvlist vis=$file recnum=0 options=var,full | sed -e '/Header/b' -e '/source  :/b' -e '/sfreq   :/b' -e '/sdf     :/b' -e '/dec     :/b' -e '/ra      :/b' -e '/freq    :/b' -e d | uniq | tr -d '()' | awk '{if ($1 == "Header") printf "\n%s %s\n",$1,$4; else printf "%s ",$0}' | sed '1d' | awk '{if ($1 == "Header") system("julian options=quiet date="$2); else print $0}' | grep '.' | sed 's/ : /   /g' > $wd/details
+	uvlist vis=$vislist[$fileidx] options=list recnum=0 | sed '1,9d' | awk '{if ($1*1 > 0 && $3 != last) {printf "%s %3.2f %3.2f\n",$3,(540-$12)%360,$13*1; last=$3}}' | awk '{print $2,$3}' > $wd/$file.obstimes #Get Az/El information
+	uvlist vis=$vislist[$fileidx] recnum=0 options=var,full | sed -e '/Header/b' -e '/source  :/b' -e '/sfreq   :/b' -e '/sdf     :/b' -e '/dec     :/b' -e '/ra      :/b' -e '/freq    :/b' -e d | uniq | tr -d '()' | awk '{if ($1 == "Header") printf "\n%s %s\n",$1,$4; else printf "%s ",$0}' | sed '1d' | awk '{if ($1 == "Header") system("julian options=quiet date="$2); else print $0}' | grep '.' | sed 's/ : /   /g' > $wd/details
 	set idx = 1
 	set lim = `wc -l $wd/details | awk '{print $1}'`
 	rm -f $wd/moredetails
@@ -356,8 +365,8 @@ foreach file (`echo $vis`)
     end
 ###############################################################
 
-    mv $wd/$file.specdata $file/specdata    
-    echo "$file scanning complete! "`wc -l $file/specdata | awk '{print $1}'`" spectra built." # File processed, move on to the next one
+    mv $wd/$file.specdata $vislist[$fileidx]/specdata    
+    echo "$vislist[$fileidx] scanning complete! "`wc -l $vislist[$fileidx]/specdata | awk '{print $1}'`" spectra built." # File processed, move on to the next one
 end
 
 set times = (`date +%s.%N | awk '{print int(($1-date1)/60),int(($1-date1)%60)}' date1=$date1`)

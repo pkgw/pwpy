@@ -260,7 +260,8 @@ echo "Observation times found, splitting into time intervals"
 foreach itime ($regtimes)
     julian date=$itime options=quiet >> $wd/jultimes # For SELECT commands, datates need to be formatted correctly
 end
-set jultimes = (`awk '{if ($1-lastday-(1/86400) > int/1440){if (NR == 1) printf "%7.6f\n",$1-1; lastday = $1; printf "%7.6f\n",$1-(1/86400)}; fin = $1} END {printf "%7.6f\n",fin+1}' int=$int $wd/jultimes`) # Figure out the start and end time for each interval
+# Figure out the start and end time for each interval
+set jultimes = (`awk '{if ($1-lastday-(1/86400) > interval/1440){if (NR == 1) printf "%7.6f\n",$1-1; lastday = $1; printf "%7.6f\n",$1-(1/86400)}; fin = $1} END {printf "%7.6f\n",fin+1}' interval=$int $wd/jultimes`) 
 echo `echo $#jultimes | awk '{print $1-2}'`" time cycles confirmed."
 set regtimes
 
@@ -406,11 +407,14 @@ while ($idx < $#regtimes)
     end
     if ($outsource && "$tvis[1]" != "") then
         set tviscount = ($tviscount 0)
+	set fileidx = 0
 	foreach tfile ($tvis)
+	    @ fileidx++
+	    set filemark = `echo $fileidx | awk '{print $1+100000}' | sed 's/1//'`
 	    @ tviscount[$idx]++
-	    uvaver vis=$tfile out=$wd/tvis$tfile$cycle options=relax,nocal,nopass,nopol select="time($regtimes[$idx],$regtimes[$postidx])" >& /dev/null
-	    if !(-e $wd/tvis$tfile$cycle/visdata) rm -rf $wd/tvis$tfile$cycle
-	    if !(-e $wd/tvis$tfile$cycle/visdata) @ tviscount[$idx]--
+	    uvaver vis=$tfile out=$wd/tvis$filemark$cycle options=relax,nocal,nopass,nopol select="time($regtimes[$idx],$regtimes[$postidx])" >& /dev/null
+	    if !(-e $wd/tvis$filemark$cycle/visdata) rm -rf $wd/tvis$filemark$cycle
+	    if !(-e $wd/tvis$filemark$cycle/visdata) @ tviscount[$idx]--
         end
     endif
     echo "complete."
@@ -418,12 +422,15 @@ while ($idx < $#regtimes)
 end
 
 # If source data exists before the first calibration, grab that too
+set fileidx = 0
 if ($outsource && "$tvis[1]" != "") then
     foreach tfile ($tvis)
+	@ fileidx++
+	set filemark = `echo $fileidx | awk '{print $1+100000}' | sed 's/1//'`
 	@ tviscount[1]++
-        uvaver vis=$tfile out=$wd/tvis{$tfile}000 options=relax,nocal,nopass,nopol select="time($regtimes[1],$regtimes[2])" >& /dev/null
-        if !(-e $wd/tvis{$tfile}000/visdata) rm -rf $wd/tvis{$tfile}000
-        if !(-e $wd/tvis{$tfile}000/visdata) @ tviscount[1]--
+        uvaver vis=$tfile out=$wd/tvis{$filemark}000 options=relax,nocal,nopass,nopol select="time($regtimes[1],$regtimes[2])" >& /dev/null
+        if !(-e $wd/tvis{$filemark}000/visdata) rm -rf $wd/tvis{$filemark}000
+        if !(-e $wd/tvis{$filemark}000/visdata) @ tviscount[1]--
     end
 endif
 
@@ -463,7 +470,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	    set sfilelist = ($prefiles $postfiles) # "Paste" the two file sets together
 	else
 	    foreach sfile ($tvis) # Check to make sure that datasets have data from that time period relating to the calibration cycle
-		if (`uvplt vis=$sfile select="time($regtimes[$idx],$regtimes[$postidx])" device=/null | grep -c "Baseline"`) set sfilelist = ($sfilelist $sfile
+		if (`uvplt vis=$sfile select="time($regtimes[$idx],$regtimes[$postidx])" device=/null | grep -c "Baseline"`) set sfilelist = ($sfilelist $sfile)
 	    end
 	endif
 	rm -f $wd/xbase $wd/ybase; touch $wd/xbase; touch $wd/ybase # Files for recording basica information about which baselines are present
@@ -524,8 +531,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
 # Horray for MFCAL!    
 	mfcal vis=$file refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& /dev/null
 # UVAVER is used to "apply" the gains solutions to the dataset.
-	uvaver vis=$file out=$wd/tempcal2 options=relax >& /dev/null
-	
+	uvaver vis=$file out=$wd/tempcal2 options=relax >& /dev/null	
 	set sflags = 0
 	if ($display) uvplt vis=$wd/tempcal2 select='-auto' device=/xs options=2pass,nobase,equal,source axis=re,im >& /dev/null # Display results if requested
 #################################################################
@@ -951,10 +957,13 @@ end
 
 # If the outsource switch was used, apply the flags from the source template files
 if ($outsource && "$tvis[1]" != "") then
+    set fileidx = 0
     foreach tfile ($tvis)
+	@ fileidx++
+	set filemark = `echo $fileidx | awk '{print $1+100000}' | sed 's/1//'`
 	echo "Applying flags for $tfile..."
-        uvaver vis="$wd/tvis$tfile*" out=$wd/tvis$tfile options=relax,nocal,nopass,nopol >& /dev/null
-	uvaflag vis=$tvis tvis=$wd/tvis$tfile > /dev/null
+        uvaver vis="$wd/tvis$filemark*" out=$wd/tvis$filemark options=relax,nocal,nopass,nopol >& /dev/null
+	uvaflag vis=$tvis tvis=$wd/tvis$filemark > /dev/null
     end
 endif
 

@@ -9,7 +9,7 @@ if ($#argv == 0) then
     echo "Calling sequence: newfracture.csh vis=vis crange=crange select=select timefocus=timefocus corredge=corredge npoly=npoly nsig=nsig spoly=spoly ssig=ssig options={display, nodisplay, asel, desel, corr, nocorr, scorr, noscorr, pos, neg, mixed}"
     echo "REQUIRED INPUTS:"
     echo "vis - Name of the files that contain spectral count information."
-    echo "vis2 - Name of the files that contain data to be flagged, but should not be used for collecting spectral count information."
+    echo "tvis - Name of the files that contain data to be flagged, but should not be used for collecting spectral count information."
     echo "OPTIONAL INPUTS:"
     echo "interval - newrfisweep attempts to ID RFI and flag in time chunks (to better ID transient RFI)."
     echo "Default is 12 (minutes), although 15 is also good."
@@ -37,7 +37,7 @@ set date1 = `date +%s.%N`
 
 set fsel = ("pol(xx)" "pol(yy)")
 set vis # Files to be scanned for RFI and flagged
-set vis2 # Files to be flagged for RFI, but NOT scanned!
+set tvis # Files to be flagged for RFI, but NOT scanned!
 set inttime = 12.5 # RFI integration time for the subinterval
 set nsig = 3 # Number of sigma for RFI flagging in wide interval
 set tsig = 4 # Number of sigma for RFI flagging in narrow interval
@@ -70,9 +70,9 @@ if ("$argv[1]" =~ 'vis='*) then
     set vis = "`echo '$argv[1]/' | sed 's/vis=//'`"
     set vis = (`echo $vis | sed 's/\/ / /g' | sed 's/\(.*\)\//\1/g' | tr ',' ' '`)
     shift argv; if ("$argv" == "") set argv = "finish"
-else if ("$argv[1]" =~ 'vis2='*) then
-    set vis2 = "`echo '$argv[1]/' | sed 's/vis2=//'`"
-    set vis2 = (`echo $vis2 | sed 's/\/ / /g' | sed 's/\(.*\)\//\1/g' | tr ',' ' '`)
+else if ("$argv[1]" =~ 'tvis='*) then
+    set tvis = "`echo '$argv[1]/' | sed 's/tvis=//'`"
+    set tvis = (`echo $tvis | sed 's/\/ / /g' | sed 's/\(.*\)\//\1/g' | tr ',' ' '`)
     shift argv; if ("$argv" == "") set argv = "finset csel = "$csel,-(1),-("`echo $nchan $autoedgechan | awk '{print $1+1-$2","$1}'`")"ish"
 else if ("$argv[1]" =~ 'options='*) then
     set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
@@ -100,6 +100,8 @@ else if ("$argv[1]" =~ 'options='*) then
 	    set rfitype = "mixed"
 	else if ($option == "display") then
 	    set display = "display"
+	else if ($option == "verbose") then
+	    set display = "display,verbose"
 	else if ($option == "seedcorr") then
 	    set seedcorr = 1
 	else if ($option == "nodisplay") then
@@ -110,7 +112,6 @@ else if ("$argv[1]" =~ 'options='*) then
 	    set outsource = "insource"
 	else if ($option == "debug") then
 	    set debug = 1
-	    set display = "display,verbose"
 	else if ($option == "autoedge") then
 	    set autoedge = 1
 	else if ($option == "noautoedge") then
@@ -164,7 +165,7 @@ if ("$argv[1]" != "finish") goto varassign
 
 # Check to make sure that each "file" has a specdata file - or at least visiblities to be processed. All of the RFI programs can be "tricked" into accepting a folder that has a specdata file but not a visdata file.
 
-set fulllist = (`echo $vis $vis2`)
+set fulllist = (`echo $vis $tvis`)
 set listlim = `echo $fulllist | wc -w`
 set idx = 1
 
@@ -192,17 +193,20 @@ set wd = `mktemp -d rfi3XXXXX`
 # Make spectral directories for all source and cal files - esp important for mosaiced observations... TOTH to Steve and Geoff
 
 mkdir $wd/vis
-mkdir $wd/vis2
+mkdir $wd/tvis
 
 # For each source file, use the specdata file to figure out when observations took place, and use that information to rebuild the actual obsrevation
 
 set fulllist = (`echo $vis`)
 set listlim = `echo $fulllist | wc -w`
+set trlist
 set idx = 1
 
 while ($idx <= $listlim)
+    set filemark = `echo $idx | awk '{print $1+100000}' | sed 's/1//'`
+    set trlist = ($trlist "vis$filemark")
     cat $fulllist[$idx]/specdata >> $wd/vis/specdata
-    cat $fulllist[$idx]/specdata | awk '{print filename,$4,($5-$4)*1440,"vis"}' filename=$fulllist[$idx] >> $wd/vistimes
+    cat $fulllist[$idx]/specdata | awk '{print filename,$4,($5-$4)*1440,"vis",tname}' filename=$fulllist[$idx] tname="vis$filemark" >> $wd/vistimes
     @ idx++
 end
 
@@ -223,13 +227,15 @@ if ($autoedge) then
     set csel = `echo "$csel" | sed 's/=,/=/'`
 endif
 
-set fulllist = (`echo $vis2`)
+set fulllist = (`echo $tvis`)
 set listlim = `echo $fulllist | wc -w`
 set idx = 1
 
 while ($idx <= $listlim)
-    cat $fulllist[$idx]/specdata >> $wd/vis2/specdata
-    cat $fulllist[$idx]/specdata | awk '{print filename,$4,($5-$4)*1440,"vis2"}' filename=$fulllist[$idx] >> $wd/vistimes
+    set filemark = `echo $idx | awk '{print $1+100000}' | sed 's/1//'`
+    set trlist = ($trlist "tvis$filemark")
+    cat $fulllist[$idx]/specdata >> $wd/tvis/specdata
+    cat $fulllist[$idx]/specdata | awk '{print filename,$4,($5-$4)*1440,"tvis",tname}' filename=$fulllist[$idx] tname="tvis$filemark" >> $wd/vistimes
     @ idx++
 end
 
@@ -242,6 +248,9 @@ sort -unk2 $wd/vistimes > $wd/timecheck2
 echo "Reconstructing observational parameters..."
 set slist
 set clist
+set tslist
+set tclist
+
 set lim = `wc -l $wd/timecheck2 | awk '{print $1}'`
 set idx = 2
 
@@ -252,8 +261,13 @@ set mastertime = `echo $vals[2] | awk '{printf "%7.6f\n",$1-(10/1440)+2400000.5}
 set mastertime2 = `echo $vals[2] | awk '{printf "%7.6f\n",$1-(10/1440)}'`
 set starttime = $vals[2]
 set timeint = $vals[3]
-if ($vals[4] == "vis") set slist = ($slist $vals[1])
-if ($vals[4] == "vis2") set clist = ($clist $vals[1])
+if ($vals[4] == "vis") then
+    set slist = ($slist $vals[1])
+    set tslist = ($tslist $vals[5])
+else if ($vals[4] == "tvis") then
+    set clist = ($clist $vals[1])
+    set tclist = ($tclist $vals[5])
+endif
 
 while ($idx <= $lim) 
     set vals = (`sed -n {$idx}p $wd/timecheck2`)
@@ -264,19 +278,28 @@ while ($idx <= $lim)
     endif
     set timeint = `echo $timeint $vals[3] | awk '{print $1+$2}'`
     if  !(" "`echo $clist $slist`" " =~ *" $vals[1] "*) then
-	if ($vals[4] == "vis") set slist = (`echo $slist $vals[1]`)
-	if ($vals[4] == "vis2") set clist = (`echo $slist $vals[1]`)
+	if ($vals[4] == "vis") then
+	    set slist = ($slist $vals[1])
+	    set tslist = ($tslist $vals[5])
+	else if ($vals[4] == "tvis") then
+	    set clist = ($slist $vals[1])
+	    set tclist = ($tclist $vals[5])
+	endif
     endif
     if (`echo $timeint | awk '{if ($1 > inttime) print "go"}' inttime=$inttime` == "go" || `echo $vals[2] $vals[3] $starttime | awk '{if (((1440*($1-$3))+$2) > 2*inttime) print "go"}' inttime=$inttime` == go) then
 	set finstarttime = `echo $starttime | awk '{printf "%7.6f",$1+2400000.5}'`
 	set finstoptime = `echo $vals[2] $vals[3] | awk '{printf "%7.6f",$1+($2/1440)+2400000.5+(.5/86400)}'`
 	set finslist = `echo $slist | tr ' ' ','`","
  	set finclist = `echo $clist | tr ' ' ','`","
-	echo $finstarttime $finstoptime $finslist $finclist >> $wd/obslist
+	set fintslist = `echo $tslist | tr ' ' ','`","
+	set fintclist = `echo $tclist | tr ' ' ','`","
+	echo $finstarttime $finstoptime $finslist $finclist $fintslist $fintclist >> $wd/obslist
 	set starttime = 0
 	set timeint = 0
 	set slist
 	set clist
+	set tslist
+	set tclist
     endif
     @ idx++
 end
@@ -286,7 +309,9 @@ if ($starttime != "0") then
     set finstoptime = `echo $vals[2] $vals[3] | awk '{printf "%7.6f",$1+($2/1440)+2400000.5}'`
     set finslist = `echo $slist | tr ' ' ','`","
     set finclist = `echo $clist | tr ' ' ','`","
-    echo $finstarttime $finstoptime $finslist $finclist >> $wd/obslist
+    set fintslist = `echo $tslist | tr ' ' ','`","
+    set fintclist = `echo $tclist | tr ' ' ','`","
+    echo $finstarttime $finstoptime $finslist $finclist $fintslist $fintclist >> $wd/obslist
 endif
 
 set mastertime = ($mastertime `echo $finstoptime | awk '{printf "%7.6f\n",$1+(10/1440)}'`)
@@ -308,8 +333,11 @@ while ($idx <= $lim)
     echo "Building files for cycle $cycle..."
     set starttime = "`julian options=quiet jday=$mastertime[$idx]`"
     set stoptime = "`julian options=quiet jday=$mastertime[$jidx]`"
+    set tfilelist = (`echo $vals[5] $vals[6] | tr ',' ' '`)
+    set fileidx = 0
     foreach file (`echo $vals[3] $vals[4] | tr ',' ' '`)
-	if (! -e $wd/$file$cycle) uvaver vis=$file out=$wd/$file$cycle select=time"($starttime,$stoptime)" options=relax,nocal,nopass,nopol > /dev/null
+	@ fileidx++
+	if (! -e $wd/$tfilelist[$fileidx]$cycle) uvaver vis=$file out=$wd/$tfilelist[$fileidx]$cycle select=time"($starttime,$stoptime)" options=relax,nocal,nopass,nopol > /dev/null
     end
     @ idx++ jidx++
 end
@@ -377,9 +405,9 @@ while ($idx <= $lim)
 	    echo "time($timelim[1],$timelim[2])" >> $wd/badantshist
 	    cat $wd/badants >> $wd/badantshist
 	else
-	    newrfi32.csh vis=$wd/vis,$wd/vis2 options=nodisplay select="time($timelim[1],$timelim[2])" rawdata=$wd/specdata
+	    newrfi32.csh vis=$wd/vis,$wd/tvis options=nodisplay select="time($timelim[1],$timelim[2])" rawdata=$wd/specdata
 	    newfracture.csh vis=$wd npoly=$cpoly nsig=$csig options=$scorr,$corr,desel,nodisplay,recover,$rfitype,`if ($debug) echo "verbose"` $csel > $wd/badants
-	    echo "No source files, invoking failsafe (vis2) parameter..."
+	    echo "No source files, invoking failsafe (tvis) parameter..."
 	endif
         echo `grep "DESEL" $wd/badants | tr -d '[a-z][A-Z]:().-' | tr ',' ' ' | wc -w`" potentially corrupted antennas found..."
 	grep 'select=pol' $wd/badants > $wd/corrflag
@@ -415,7 +443,7 @@ while ($idx <= $lim)
 	newrfi32.csh vis=$wd/vis options=flagopt,$corr,$display,$rfitype chanlist=$wd/flagslist timefocus="$timefocus" edgerfi=$edgerfi npoly=$npoly nsig=$nsig select="$timesel,$fsel[1] $timesel,$fsel[2]" $csel > /dev/null
     else
 	echo "No source information found, zooming out..."
-	newrfi32.csh vis=$wd/vis,$wd/vis2 options=flagopt,$corr,$display,$rfitype chanlist=$wd/flagslist timefocus="$timefocus" edgerfi=$edgerfi nsig=$nsig select="$timesel,$fsel[1] $timesel,$fsel[2]" $csel > /dev/null
+	newrfi32.csh vis=$wd/vis,$wd/tvis options=flagopt,$corr,$display,$rfitype chanlist=$wd/flagslist timefocus="$timefocus" edgerfi=$edgerfi nsig=$nsig select="$timesel,$fsel[1] $timesel,$fsel[2]" $csel > /dev/null
     endif
     if (! -e $wd/flagslist && -e $wd/flagslist.bu) cp $wd/flagslist.bu $wd/flagslist
     echo "Beginning cycle $idx (of $lim) flagging. "`grep line=chan $wd/flagslist | tr ',' ' ' | awk '{SUM += $2} END {print SUM}'`" channels to flag in "`grep line=chan $wd/flagslist | wc -l`" iterations."
@@ -434,13 +462,13 @@ end
 
 if ($outsource != "outsource") goto finish
 
-set fulllist = (`echo $vis $vis2`)
+set fulllist = (`echo $vis $tvis`)
 set listlim = `echo $fulllist | wc -w`
 set idx = 1
 while ($idx <= $listlim)
     echo "$fulllist[$idx] final flagging..." 
-    uvaver vis=$wd/$fulllist[$idx]'*' options=relax,nocal,nopass,nopol out=$wd/s$fulllist[$idx] 
-    uvaflag vis=$fulllist[$idx] tvis=$wd/s$fulllist[$idx] 
+    uvaver vis=$wd/$trlist[$idx]'*' options=relax,nocal,nopass,nopol out=$wd/s$trlist[$idx] 
+    uvaflag vis=$fulllist[$idx] tvis=$wd/s$trlist[$idx] 
     if ($autoedge) then
     echo "Edge flagging $fulllist[$idx]"
 	if ($autoedgetype == 1) then

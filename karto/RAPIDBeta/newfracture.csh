@@ -219,7 +219,7 @@ else
 endif
 
 if ($display == "display" && $quiet != "verb") then
-    newrfi32.csh vis=$wd options=display,$corr npoly=$npoly select="$xdsel $ydsel" edgerfi=$patedge chanlist=$wd/goodbadchans "$csel"
+    newrfi32.csh vis=$wd options=display,$corr npoly=$npoly select="$xdsel $ydsel" chanlist=$wd/goodbadchans "$csel"
     if ("$xdsel $ydsel" != "pol(xx) pol(yy)") then
 	echo "Displaying good antenna spectra"
 	foreach xant (`echo $xbad`)
