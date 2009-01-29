@@ -362,12 +362,12 @@ while ($idx <= $lim)
 
     echo "Beginning cycle $cycle (of $lim)..."
     set vals = (`sed -n {$idx}p $wd/obslist`)
-    if ($vals[3] == ",") set vals[3]
-    if ($vals[4] == ",") set vals[4]
+    if ($vals[5] == ",") set vals[5]
+    if ($vals[6] == ",") set vals[6]
     if ($outsource == "outsource") then
-	set flaglist = ($wd/`echo "$vals[3]$vals[4]," | sed 's/,,//g' | sed 's/\,/'$cycle' '$wd'\//g'`$cycle)
+	set flaglist = ($wd/`echo "$vals[5]$vals[6]," | sed 's/,,//g' | sed 's/\,/'$cycle' '$wd'\//g'`$cycle)
     else
-	set flaglist = (`echo "$vals[3-4]" | sed 's/\,/ /g'`)
+	set flaglist = (`echo "$vals[5-6]" | sed 's/\,/ /g'`)
     endif
     if ("$vals[3-4]" == " ") set flaglist
     if ($idx == 1) then
@@ -391,15 +391,15 @@ while ($idx <= $lim)
 	while ($blim <= `echo $ulim | awk '{print $1-1}'`)
 	    set altcycle = `echo $blim | awk '{print 1000+$1}' | sed 's/1//'`
 	    set corrvals = (`sed -n {$blim}p $wd/obslist`)
-	    if ($corrvals[3] == ",") set corrvals[3]
-	    if ($corrvals[4] == ",") set corrvals[4]
-	    if ($outsource == "outsource") set corrfilelist = ($corrfilelist $wd/`echo "$corrvals[3]$corrvals[4]," | sed 's/,,//g' | sed 's/\,/'$altcycle' '$wd'\//g'`$altcycle)
-	    if ($outsource != "outsource") set corrfilelist = ($corrfilelist `echo $corrvals[3]$corrvals[4] | tr ',' ' '`)
+	    if ($corrvals[5] == ",") set corrvals[5]
+	    if ($corrvals[6] == ",") set corrvals[6]
+	    if ($outsource == "outsource") set corrfilelist = ($corrfilelist $wd/`echo "$corrvals[5]$corrvals[6]," | sed 's/,,//g' | sed 's/\,/'$altcycle' '$wd'\//g'`$altcycle)
+	    if ($outsource != "outsource") set corrfilelist = ($corrfilelist `echo $corrvals[5]$corrvals[6] | tr ',' ' '`)
 	    @ blim++
 	end
 	set timelim = ($mastertime2[$idx] $mastertime2[$ulim])
 	echo "Beginning corruption detection and recovery..."
-	if (`echo $vals[3] | wc -w`) then
+	if (`echo $vals[5] | wc -w`) then
 	    newrfi32.csh vis=$wd/vis options=nodisplay select="time($timelim[1],$timelim[2])" rawdata=$wd/specdata > /dev/null
 	    newfracture.csh vis=$wd npoly=$cpoly nsig=$csig options=$scorr,$corr,desel,nodisplay,recover,$rfitype,`if ($debug) echo "verbose"` $csel > $wd/badants
 	    echo "time($timelim[1],$timelim[2])" >> $wd/badantshist
