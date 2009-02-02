@@ -905,7 +905,7 @@ else if ($polsplit) then # if polspilt was used, but only one pol was found
 	puthd in=$outfile/$source.1.$pollist[1]/interval value=.5 > /dev/null
 	gpcopy vis=$outfile/$source.1.$pollist[1] out=$wd/tempcal$pollist[1] mode=apply > /dev/null
 	puthd in=$wd/tempcal$pollist[1]/interval value=.5 > /dev/null
-	gpcopy vis=$outfile/$source.1.$pollist[1] out=$vis > /dev/null
+	gpcopy vis=$wd/tempcal$pollist[1] out=$vis > /dev/null
 	# Move pol-specific gains "out of the way" so that information isnb't overwritten by gpcopy
 	if (-e $vis/gains) mv $vis/gains $vis/gains.$pollist[1]
 	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.$pollist[1]
