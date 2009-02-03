@@ -3,26 +3,77 @@
 onintr fail
 
 if ($#argv == 0) then
-    echo "NEWRFI.CSH"
-    echo "newrfi.csh is a tool to build count specta (spectral occupancy spectra). This is the base tool for"
-    echo "performing spectral occupancy based flagging. This style of flagging is effective against persistent"
-    echo "RFI (lasting longer than a few minutes), as well as spectral corruption. newrfi has no program"
-    echo "dependancies, other than MIRIAD. newrfi places a 'specdata' file in the folder containing the MIRIAD"
-    echo "visibilities."
-    echo " "
-    echo "Calling sequence: newrfi.csh vis=vis interval=interval options={cal, pass, pol, normal, nocal, nopass, nonormal, nopol, crosspol, nocrosspol}"
-    echo "REQUIRED INPUTS:"
-    echo "vis - Name of the files that contain visibilities"
-    echo "OPTIONAL INPUTS:"
-    echo "interval - length (in minutes) to integrate count spectra."
-    echo "Options:"
-	echo "nocal,nopass,nopol - don't apply gains corrections to data before processing (default)"
-	echo "cal,pass,pol - do apply gains corrections to data before processing"
-	echo "normal - normalize data before analysis (default)"
-	echo "nonormal - don't normalize data"
-	echo "nocrosspol - don't process  XY and YX data (default)"
-	echo "crosspol - process all polarization data"
-    exit 0
+      #################################################################
+echo "================================================================="
+echo "RFISCAN - RFI scanning utility"
+echo "'The interference is out there.'"
+echo ""
+echo "CALLS - MIRIAD (uvlist, uvaver,uvcal,uvflag)"
+echo "PURPOSE - Build spectral occupancy datasets for RFI processing."
+echo "RESPONSIBLE - Karto (karto@hcro.org)"
+echo "================================================================="
+echo ""
+echo "RFISCAN is designed as a simple scanner for finding RFI in"
+echo "datasets. RFISCAN will derive a spectral occupancy count, which"
+echo "is used by other software to identify and remove RFI. RFISCAN"
+echo "works best on datasets with RFI with strength less than 1000"
+echo "sigma."
+echo ""
+echo "RFISCAN operates by splitting the dataset by polarization,"
+echo "grabbing metadata (e.g. antenna pointing, source name, RA/Dec),"
+echo "and then dumping out a listing of 'high-channels' (channels with" 
+echo "an amplitude of 4 sigma above the average of the bandpass). This"
+echo "information is integrated and written out to a 'specdata' file"
+echo "within the source directory."
+echo ""
+echo "RFISCAN will not modify the primary dataset (i.e. vis, gains and"
+echo "flags files), but will overwrite previous results (i.e. specdata"
+echo "files)."
+echo ""
+echo "Statistical analysis of spectral data works best when bandpass"
+echo "features are removed. Therefore, RFISCAN will normalize data"
+echo "by default. Should passband corrections be available, they"
+echo "should be used and normalization should be turned off (using"
+echo "options=pass,nonormal)."
+echo ""
+echo "TECHNICAL NOTE: RFISCAN creates a temporary directory to work"
+echo "from, named rfiXXXXX (where X is a random character). These"
+echo "directories are supposed to be automatically deleted after"
+echo "RFISCAN completes, but might remain in the event of a program"
+echo "error. Remnant directories can be safely deleted."
+echo ""
+echo "CALLING SEQUENCE: newrfi.csh vis=vis (inttime=inttime"
+echo "    options=[cal,nocal],[pass,nopass],[pol,nopol],[crosspol,"
+echo "    nocrosspol],[normal,nonormal],autoedge"
+echo ""
+echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+echo ""
+echo "REQUIRED INPUTS:"
+echo " vis - Name of the files containing source data. Supports"
+echo "    multiple files and wildcard expansion. No default."
+echo ""
+echo "OPTIONAL INPUTS:"
+echo " interval - length (in minutes) to integrate count spectra."
+echo "    Default is 10."
+echo " options=[cal,nocal],[pass,nopass],[pol,nopol],[crosspol,"
+echo "    nocrosspol],[normal,nonormal]"
+echo "    cal - Apply gains files before analysis."
+echo "    nocal - Don't apply gains files before analysis.(Default)"
+echo "    pass - Apply passband corrections before analysis."
+echo "    nopass - Don't apply passband corrections before analysis."
+echo "        (Default)"
+echo "    pol - Apply polarization corrections before analysis."
+echo "    nopol - Don't apply polarization corrections before"
+echo "    analysis. (Default)"
+echo "    crosspol - Include crosspol data for analysis."
+echo "    nocrosspol - Don't include crosspol data for analysis."
+echo "        (Default)"
+echo "    normal - Normalize data before analysis. (Default)"
+echo "    nonormal - Don't normalize data before analysis."
+echo "    autoedge - Eliminate the bandedges (first and last 100"
+echo "        channels, along with the center 'DC' channel). before"
+echo "        running analysis."
+exit 0
 endif
 
 
@@ -39,6 +90,13 @@ set crosspol = "nocross" #Swtich to exclude XY and YX polarization - should be d
 set autoedge = 0
 set autoedgechan = 100
 set debug = 0
+
+#################################################################
+# Here is the keyword/value pairing code. It basically operates
+# by going through each argument, attempting to figure out which
+# keyword matches (via an if arguement) and sets the value
+# accordingly
+#################################################################
 
 varassign:
 
@@ -114,6 +172,13 @@ if ("$inttime" == 0) then #Does the time interval make sense?
     set inttime = 10
 endif
 
+#################################################################
+# The rfi program creates a temp directory to work in within the
+# data directory being used. This is done to make operations
+# "cleaner", as several MIRIAD results are dumped to temp files
+# to be parsed later.
+#################################################################
+
 set wd = `mktemp -d rfiXXXXX`
 if ($wd == "") then #Can the program create a temp directory?
     echo "FATAL ERROR: Problems creating temp directory. Make sure you have permissions for the current directory. Now exiting..."
@@ -128,6 +193,15 @@ set vislist = (`echo $vis`)
 set filelist
 
 set idx = 0
+#################################################################
+# The first step of pressing is to try and eliminate passband
+# features in the data. This is by default done by normalization
+# since it is assumed that no calibration information has been
+# derived. Because of an issue with MIRIAD, only XX and YY
+# baselines are processed under this mode. If passband
+# corrections are available, they can be applied.
+#################################################################
+
 foreach file ($vislist)
     @ idx++
     set filemark = `echo $idx | awk '{print $1+100000}' | sed 's/1//'`
@@ -148,6 +222,18 @@ foreach file ($vislist)
 end
 
 #Data is prepared, file scanning begins
+
+#################################################################
+# The next step is to gather some meta data for processing. This
+# data includes dates, pointing direction, source name, center
+# freq, number of channels, and channel width. Most of this info
+# is not currently used for RFI processing, although it may be
+# in the near future. To cut down on processing time, the
+# program will only attempt to check the metadata of one antpol,
+# but if the number of time listings isn't consistant with
+# other checks, the program will default to checking all records
+# (from all antennas) for meta data.
+#################################################################
 
 set fileidx = 0
 foreach file ($filelist)
@@ -206,7 +292,7 @@ foreach file ($filelist)
 	@ idx++
     end
     cat $wd/moredetails | uniq > $wd/emoredetails
-
+# The perl script here posts together the two different sets of metadata into a single file
     perl -e ' $separator="\t"; ($file1, $file2) = @ARGV; open (F1, $file1) or die; open (F2, $file2) or die; while (<F1>) { if (eof(F2)) { warn "WARNING: File $file2 ended early\n"; last } $line2 = <F2>; s/\r?\n//; print "$_$separator$line2" } if (! eof(F2)) { warn "WARNING: File $file1 ended early\n"; } warn "Metadata scanning complete...\n" ' $wd/emoredetails $wd/$file.obstimes | sort -nk1 > $wd/meta.full
     #Preliminary metadata has been built
     echo "Processing $vislist[$fileidx], detecting high channels for each spectrum." 
@@ -219,6 +305,12 @@ foreach file ($filelist)
 	if ($grabchan[1] == "nchan") set ilim = $grabchan[2]
 	shift grabchan
     end
+#################################################################
+# The autoedge switch is used to eliminate edge channels that
+# will likely be removed with or without RFI processing. This is
+# done to eliminate any potential problems/statistical anamolies
+# surrounding edge channels.
+#################################################################
 
     if ($autoedge) then
 	if (`echo $sfreq $freq | awk '{if ($1 == $2) print "go"}'` == "go") then
@@ -339,8 +431,14 @@ foreach file ($filelist)
 
     set finaltime = `tail -n 1 $wd/meta.full | awk '{print $1}'`
     set idx = 1
-    #Below is the code that performs the loop operation for each time cycle
-################################################################
+
+#################################################################
+# Below is the workhorse portion of the code. Basically, it
+# sorts through the information provided by UVLIST, integrates
+# the information for each baseline over the time provided by
+# the user, and dumps out 'count spectra'.
+#################################################################
+
     while (`wc -l $wd/meta.full | awk '{print $1}'` != 0)
 	set times = (`head -n 1 $wd/meta.full | awk '{printf "%5.6f %5.6f\n",$1,($1+(inttime/1440))}' inttime=$inttime`)
 	set mlist = (`awk '{if ($1 > time) next; else print $0}' time=$times[1] $wd/meta.full | head -n 1`)
@@ -356,6 +454,7 @@ foreach file ($filelist)
 
 	awk '{if (($1-start) > (inttime/1440)) print $0}' start=$times[1] inttime=$inttime $wd/meta.full > $wd/meta.full2
 	if (`wc -l $wd/meta.full2 | awk '{print $1}'` != 0) then
+	    # Spew out some info regarding how far along the processing is.
 	    echo "Moving on to next time cycle... "
 	    echo $pos[3] $finaltime | awk '{printf "%s%2.0d%s%2.0d%s%2.0d%s%2.0d%s%2.0d%s%2.0d \n","Current cycle end time - ",int($1*24)%24,":",int(($1*1440)%60),":",int(($1*86400)%60),"   Final time - ",int($2*24)%24,":",int(($2*1440)%60),":",int(($2*86400)%60)}' |  sed 's/: /:0/g' | sed 's/ :/0:/g'
 	endif
