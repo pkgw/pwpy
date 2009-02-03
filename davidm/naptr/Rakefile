@@ -4,7 +4,7 @@ require 'rake/gempackagetask'
 spec = Gem::Specification.new do |s|
   # Basics
   s.name = 'naptr'
-  s.version = '0.1.3'
+  s.version = '0.0.1'
   s.summary = 'Adds pointer access to NArray'
   s.description = 'Extends NArray class with a #ptr method to access underlying pointer'
   #s.platform = Gem::Platform::Ruby
