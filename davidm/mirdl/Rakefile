@@ -1,0 +1,48 @@
+require 'rubygems'
+require 'rake/gempackagetask'
+
+spec = Gem::Specification.new do |s|
+  # Basics
+  s.name = 'mirdl'
+  s.version = '0.0.1'
+  s.summary = 'Provides Ruby access to MIRIAD subroutine libraries.'
+  s.description = 'Provides Ruby access to MIRIAD subroutine libraries using dl extension.'
+  #s.platform = Gem::Platform::Ruby
+  s.required_ruby_version = '>= 1.8.1'
+  s.add_dependency('narray', '>= 0.5.9')
+  s.add_dependency('nptr', '>= 0.0.1')
+
+  # About
+  s.authors = 'David MacMahon'
+  s.email = 'davidm@astro.berkeley.edu'
+  #s.homepage = 'http://mirdl.rubyforge.org/'
+  #s.rubyforge_project = 'mirdl' 
+
+  # Files, Libraries, and Extensions
+  s.files = %w[
+    Rakefile
+    lib/**/*
+    test/**/*
+  ]
+  s.require_paths = ['lib']
+  #s.autorequire = nil
+  #s.bindir = 'bin'
+  #s.executables = []
+  #s.default_executable = nil
+
+  # C compilation
+  #s.extensions = %w[ extconf.rb ]
+
+  # Documentation TODO
+  #s.rdoc_options = []
+  #s.has_rdoc = false
+  #s.extra_rdoc_files = []
+
+  # Testing TODO
+  s.test_files = [test/test_mirdl.rb]
+end
+
+Rake::GemPackageTask.new(spec) do |pkg|
+  pkg.need_zip = true
+  pkg.need_tar = true
+end
