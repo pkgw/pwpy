@@ -24,7 +24,8 @@ static VALUE naptr_ptr(int argc, VALUE *argv, VALUE self)
     i = NUM2INT(iv);
   }
   p = NA_PTR(na, i);
-  return OFFT2NUM((off_t)p);
+  //return OFFT2NUM((off_t)p);
+  return ULONG2NUM((unsigned long)p);
 }
 
 void Init_naptr()
