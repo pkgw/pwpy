@@ -1,65 +1,174 @@
 #! /usr/bin/tcsh -f
 # $Id$
-onintr finish
+onintr fail
 
 if ($#argv == 0) then
-    echo "NEWRFI32.CSH"
-    echo "newrfi32.csh is a tool to analyze count specta (spectral occupancy spectra) provided by newrfi."
-    echo "newrfi32 is designed primarily to provide statistics on specta and to identify possible RFI"
-    echo "candidates or spectral corruption."
-    echo " "
-    echo "Calling sequence: newrfi32.csh vis=vis crange=crange select=select timefocus=timefocus edgerfi=edgerfi npoly=npoly nsig=nsig tsig=tsig optlim=optlim logfile=logfile rawdata=rawdata chanlist=chanlist options={display, nodisplay, corr, nocorr, corrdisp, flagopt, pos, neg, mixed}"
-    echo "REQUIRED INPUTS:"
-    echo "vis - Name of the files that contain spectral count information"
-    echo "OPTIONAL INPUTS:"
-    echo "crange - allows for selection or deselection of ranges. Multiple ranges can be specified, seperated"
-    echo "by commas. Useful for ignoring edge/corrupted channels e.g. crange='(100,800),-(512),-(620,640)'."
-    echo "select - MIRIAD style selection. Current support for pol,ant and time selection. Multiple subselect"
-    echo "commands should be seperated by commas, multiple independant select commands can be entered and"
-    echo "seperated by spaces (but enclosed with quotes). e.g. select='time(12,13) time(14,15),ant(12)(35)'."
-    echo "timefocus - additional time subselection command that is processed seperately from main dataset."
-    echo "Useful if attempting to catch more intermittent RFI."
-    echo "edgerfi - how many surrounding channels around each RFI candidate channel should be identified as"
-    echo "RFI. Default is 0."
-    echo "npoly - Order polynomial to use for correcting spectrum. Default is 5."
-    echo "nsig - Number of sigma at which to ID RFI. Default is 3."
-    echo "tsig - Number of sigma for timefocus command. Default is 4."
-    echo "optlim - limit for flagging optimization. Once flagging opt has dropped below this limit, newrfi32"
-    echo "will not try to optimize flagging commands for additional channels."
-    echo "logfile - name of logfile to be created."
-    echo "rawdata - name of file to copy raw data to. Data will have selection commands applied."
-    echo "chanlist - name of file to contain information about RFI candidates and optimized flag commands."
-    echo "Options:"
-	echo "display,nodisplay - display (or not) results of processing. Default is display"
-	echo "corr,nocorr - polynomial correct (or not) final count spectrum. Default is no correction."
-	echo "corrdisp - display correctional polynomial (debugging tool)."
-	echo "flagopt - optimize flagging routines for MIRIAD processing"
-	echo "pos,neg,mixed - identify RFI as having counts that are too high, too low or both. Default is"
-      echo "high (pos)."
-    exit 0
+      #################################################################
+echo "================================================================="
+echo "RFILOCK - RFI spotting utility"
+echo "'That's no moon, it's an interference signal...'"
+echo ""
+echo "CALLS - newrfi.csh, newrfi32.csh (recursive), WIP"
+echo "PURPOSE - Identify channels with RFI pollution."
+echo "RESPONSIBLE - Karto (karto@hcro.org)"
+echo "================================================================="
+echo ""
+echo "RFILOCK is designed as simple scanner for finding RFI in"
+echo "datasets. RFILOCK will use the results of the RFISCAN spectral"
+echo "datasets to find possible RFI candidates. RFILOCK works best"
+echo "with datasets with continuum emission only, and datasets with"
+echo "either passband corrections previously derived or with datasets"
+echo "that have less that roughly 10 Jy of total emission in the"
+echo "primary beam/FOV."
+echo
+echo "RFILOCK operates by taking a selected portion of the spectral"
+echo "occupancy data (count of the number of times each channel rises"
+echo "4 sigma above the average of the band), doing some polynomial"
+echo "fitting (to remove bandpass features), and finding channels with"
+echo "spectral occupancies some sigma away from the median of the"
+echo "distribution. This information is reported back to the user."
+echo ""
+echo "RFILOCK makes no modifications of datasets, and is therefore"
+echo "'safe' to rerun on a dataset without consequence. Users should"
+echo "be aware that RFILOCK will only look at the last 'specdata' file"
+echo "created (by RFISCAN) by default. Users will need to rerun"
+echo "RFISCAN to capture any changes made to the dataset (i.g. new"
+echo "flags or gains solutions)."
+echo ""
+echo "TECHNICAL NOTE: RFILOCK creates a temporary directory to work"
+echo "from, named rfi2XXXXX (where X is a random character). These"
+echo "directories are supposed to be automatically deleted after"
+echo "RFILOCK completes, but might remain in the event of a program"
+echo "error. Remnant directories can be safely deleted."
+echo ""
+echo "CALLING SEQUENCE: newrfi.csh vis=vis (select=select nsig=nsig"
+echo "    npoly=npoly crange=crange timefocus=(timefocus1,timefocus2)"
+echo "    tsig=tsig chanlist=chanlist logfile=logfile optlim=optlim"
+echo "    options=[corr,nocorr],corrdisp,[pos,neg,mixed],flagopt)"
+echo ""
+echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+echo ""
+echo "REQUIRED INPUTS:"
+echo " vis - Name of the files containing source data. Supports"
+echo "    multiple files and wildcard expansion. No default."
+echo ""
+echo "OPTIONAL INPUTS:"
+echo " select - Data to be processed by RFILOCK. Supports MIRIAD style"
+echo "    selection of antennas (e.g. ant(1),-ant(1)(2) will select all"
+echo "    baselines for antenna 1 EXCEPT for baseline 1-2), time"
+echo "    selection (e.g. time(12,13) will select all data between"
+echo "    1200 and 1300), polarization selection (e.g. pol(xy,yx) will"
+echo "    select all cross-pol baselines) and auto/crosscorrelation"
+echo "    (e.g. -auto for all cross correlatrions). Multiple select"
+echo "    commands can be put together using a comma (which acts as an"
+echo "    AND operator) or a space (which operates as an OR operator)."
+echo "    All select commands must be entered as a single string (e.g."
+echo "    select='ant(1),pol(xx) ant(2),pol(yy)' will select all XX"
+echo "    baselines for antenna 1 and all YY baselines for antenna 2)."
+echo "    Default is all data."
+echo ""
+echo " nsig - How far from the 'center' (in sigma) of the band at"
+echo "    which to identify channels as 'bad'. RFILOCK works by trying"
+echo "    to fit a Gaussian distribution to the median channels"
+echo "    (approximately the middle 10 percent), and derives sigma"
+echo "    from this fit. Default is 3."
+echo ""
+echo " npoly - Order of polynomial to apply for passband feature"
+echo "    removal. The polnomial correction is applied after a first"
+echo "    pass through the data to remove any points that appear"
+echo "    to be RFI. Default is 6." 
+echo ""
+echo " crange - Channel range(s) to be analyzed by RFILOCK. Individual"
+echo "    ranges must be enclosed within a pair of parentheses, with"
+echo "    a comma seperating different ranges (e.g. crange=(1),(2,5))."
+echo "    Ranges can be either 'positive' or 'negative' (e.g. crange="
+echo "    (100) will select only channel 100, while crange=-(100) will"
+echo "    select everything but channel 100), and can give either a"
+echo "    single channel or a range of channels (e.g. crange=(2,5)"
+echo "    will select all channels between 2 and 5). This can be very"
+echo "    useful for removing channels that are known to contain"
+echo "    spectral line emission so that they are not mistakenly"
+echo "    identified as RFI. Default is all channels."
+echo ""
+echo " timefocus - Range of times (in either Julian dates or time of"
+echo "    day) to be reanalyzed. Time ranges must be enclosed in"
+echo "    parentheses, and may be used to specify all data that"
+echo "    'overlaps' a particular time (e.g. timefocus='(12:00)' will"
+echo "    select any data taken at noon) or all data within a range of"
+echo "    time (e.g. timefocus='(13,15)' will select all data between"
+echo "    1300 and 1500). Multiple timefocus selections can be issued."
+echo "    The timefocus parameter is useful for finding transient RFI"
+echo "    that may be only located in one particular time range."
+echo "    Channels identified as 'bad' will be added to the 'master'"
+echo "    list of channels created when analyzing the entire dataset."
+echo "    Default in none."
+echo ""
+echo " tsig - How far from the 'center' (in sigma) of the band at"
+echo "    which to identify channels as 'bad' for the timefocus ranges"
+echo "    specified by the user. This parameter is not used unless the"
+echo "    user invokes the 'timefocus' parameter. Default is 4."
+echo ""
+echo " edgerfi - Padding (in channels) around each RFI polluted"
+echo "    channel to also identify as bad (e.g. if channel 3 is IDed"
+echo "    as 'bad' and edgerfi=1, then channels 2,3 and 4 will be"
+echo "    marked as bad. Helpful for protecting against RFI that"
+echo "    shifts frequencies over time, and broadband RFI. Default is"
+echo "    1."
+echo ""
+echo " logfile - Name of log file to write debugging information to."
+echo "    No default."
+echo ""
+echo " chanlist - Name of log file to write out a listing of bad"
+echo "    channels. Useful if planning to pipe the results of RFILOCK"
+echo "    to a flagging program."
+echo ""
+echo " optlim - Debugging parameter for 'flagopt' option, determines"
+echo "    the minimum number of channels to be grouped together as bad"
+echo "    in order to proceed with optimization."
+echo ""
+echo " options=[corr,nocorr],corrdisp,[pos,neg,mixed],flagopt"
+echo "    corr - Correct for bandpass features via a polynomial fit."
+echo "    nocorr - Don't correct for bandpass features. (Default)"
+echo "    corrdisp - Display intermediate results of polynomial fit"
+echo "        (Useful for debugging purposes)."
+echo "    pos - only ID those channels ABOVE the passband as being"
+echo "        RFI candidates (i.e. channels several sigma below the"
+echo "        passband will not be IDed as RFI). (Default)"
+echo "    neg - only ID those channels BELOW the passband as being"
+echo "        RFI candidates (i.e. channels several sigma above the"
+echo "        passband will not be IDed as RFI)."
+echo "    mixed - Channels above and below the passband that exceed"
+echo "        the sigma threshhold are IDed as RFI"
+exit 0
 endif
 
 set file #File(s) to be scanned
-set display = "display" # Whether or not to display results
+set display = 0 # Whether or not to display results
 set corr = "nocorr" # Switch to apply corrections to data
 set csel # Option to select (or deselect) channel ranges
 set msel #Selection parameter
 set nsig = 3  # Number of sigma out to count channel as bad
 set tsig = 4 # Number of sigma out to count channel as bad in timefocus
 set edgerfi = 0 # Number of channels around each RFI spike to count as bad
-set corrdisp = "nocorrdisp" #Display correctional information (debugging tool)
+set corrdisp = 0 #Display correctional information (debugging tool)
 set flagopt = "noopt" # Optimize flagging commands?
 set logfile #Switch for debug file
 set chanlist #Switch for logfile/channel listing
 set rfitype = "pos" # Ident RFI with counts that are too high, too low, or both?
-set tfile # Name for temp file to collect data from multiple input files
 set device = "/xs"
 set timefocus # Allows user to "zoom in" to particular time. Useful if trying to catch more intermittent RFI as well as persistent RFI
 set npoly = 6 #What order polynomial to apply in correction stage
 set rawdata
 set optlim = 0
 
-#Variable assignments
+#################################################################
+# Here is the keyword/value pairing code. It basically operates
+# by going through each argument, attempting to figure out which
+# keyword matches (via an if arguement) and sets the value
+# accordingly
+#################################################################
+
+
 varassign:
 
 if ("$argv[1]" =~ 'vis='*) then
@@ -85,6 +194,10 @@ else if ("$argv[1]" =~ 'tsig='*) then
 else if ("$argv[1]" =~ 'optlim='*) then
     set optlim = (`echo "$argv[1]" | sed 's/optlim=//g' | awk '{print int($1*1)}'`)
     shift argv; if ("$argv" == "") set argv = "finish"
+else if ("$argv[1]" =~ 'device='*) then
+    set display = 1
+    set device = `echo "$argv[1]" | sed 's/display=//g'`
+    shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'npoly='*) then
     set npoly = (`echo "$argv[1]" | sed 's/npoly=//g' | awk '{print 1+int($1*1)}'`)
     shift argv; if ("$argv" == "") set argv = "finish"
@@ -92,16 +205,12 @@ else if ("$argv[1]" =~ 'options='*) then
     set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
     set badopt
     foreach option (`echo $options`)
-	if ($option == "display") then
-	    set display = "display"
-	else if ($option == "nodisplay") then
-	    set display = "nodisplay"
-	else if ($option == "corr") then
+	if ($option == "corr") then
 	    set corr = "corr"
 	else if ($option == "nocorr") then
 	    set corr = "nocorr"
 	else if ($option == "corrdisp") then
-	    set corrdisp = "corrdisp"
+	    set corrdisp = 1
 	else if ($option == "flagopt") then
 	    set flagopt = "flagopt"
 	else if ($option == "pos") then
@@ -151,6 +260,13 @@ if ($logfile != "") then # Can specified log file be created?
 	exit 1
     endif
 endif
+
+#################################################################
+# The program creates a temp directory to work in within the
+# data directory being used. This is done to make operations
+# "cleaner", as several MIRIAD results are dumped to temp files
+# to be parsed later.
+#################################################################
 
 set wd = `mktemp -d rfi2XXXXX`
 
@@ -209,7 +325,20 @@ set midx = 1
 
 filter:
 
-#Below here are the selection commands. The program will run exclusionary selection commands first, and will then move on to inclusionary commands. Multiple selection commands currenty requrie multiple runs through this segment of code
+#################################################################
+# The scan utility needs to have support for selection commands,
+# similar to what would be supported in MIRIAD. Below is my best
+# attempt at such support. The selection parameters run the
+# 'positive' selection commands before running 'negative'
+# selection commands (e.g. if select=ant(1),-ant(2) the program
+# will grab the results for antenna 1 before discarding the
+# results for antenna 2). The biggest reason for this was to
+# increase processing speed. Multiple selection commands (those
+# seperated by a space) will run through this segment of code
+# again. The handling of selection commands causes 'positive'
+# commands to act as AND operators, and 'negative' commands
+# to act like NOR operators.
+#################################################################
 
 set poscmd
 set negcmd
@@ -364,7 +493,15 @@ foreach pos (`echo "$poscmd"`)
 	    goto finish
 	endif
 end
-#Pos commands split into three sections by order of how much data is likely to be culled out. Pos selection works on AND logic, not OR logic. Multiple pos or neg commands can be issued in a single selection command (e.g. time(12,13),time(14,15)) 
+
+#################################################################
+# Positive commands are split into three sections, and run
+# in a order designed to optimize processing speed (i.e. time
+# selections are likely to narrow down the range of data more
+# than pol selections). Negative commands are organized in a
+# similar way.
+#################################################################
+
 if (! -e temp.data) then
     set idx = 1
     while ($idx <= 3)
@@ -388,7 +525,14 @@ if ($#msel > 1) then
 	cat $wd/temp.datat* > $wd/temp.data
     endif
 endif
+
 # Data is now limited to only that which the user is interested in
+
+#################################################################
+# With the data limited to that which we are only interested in,
+# the program will now count the times that each channel is IDed
+# as 'high'.
+#################################################################
 
 set chans = `head -n 1 $file/specdata | wc -w | awk '{print $1-14}'`
 set idx = 1
@@ -478,6 +622,18 @@ if ($corr != "corr") then
 
 awk '{print $2}' $wd/temp.spec | sort -n > $wd/temp.power
 
+#################################################################
+# With the data now built, the program will attempt to derive
+# a gaussian profile for the data. The data is 'bined' (since
+# the PDF of the distribution should be Gaussian) and the
+# program takes the natural log of each of the bins. This is
+# done since ln(e^(a*x^2+B*x+c))=a*x^2+B*x+c, reducing the
+# problem to a simple polynomial fit. After a first pass to
+# determine channels that are significant outliers, the program
+# can use WIP to derive a polynomial fit to the bandpass, and
+# will take one more pass at deriving a Gaussian fit.
+#################################################################
+
 #Find median and try to build a gaussian profile
 set cenchan = `wc -l $wd/temp.power | awk '{print int(.5+($1/2))}'`
 set censpec = `awk '{CHAN += $1; CHANC += 1} END {print int(.5+(CHAN/CHANC))}' $wd/temp.spec `
@@ -512,11 +668,11 @@ set sigma = `echo $sigma $cenpower | awk '{if ($1 > $2^.5) print $1;else print $
 
 awk '{if (($2-finpower)^2 < 4*(nsig^2)*sigma^2) print ($1-censpec)/1000,$2,($2-finpower)/sigma}' finpower=$finpower sigma=$sigma censpec=$censpec nsig=$nsig $wd/temp.spec > $wd/temp.good
 
-if ($corrdisp == "corrdisp") then
+if ($corrdisp) then
     echo "Displaying correctional data..."
-    echo 'device /xs' > $wd/temp.wip
+    echo 'device $device' > $wd/temp.wip
 endif
-# Use wip to determine the best fit polynomial 
+# Use wip to determine the best fit polynomial
 echo "data $wd/temp.good" >> $wd/temp.wip
 echo 'xcol 1' >> $wd/temp.wip
 echo 'ycol 2' >> $wd/temp.wip
@@ -597,7 +753,7 @@ else
 endif
 #if the display parameter has been invoked...
 
-if ($display == "display") then
+if ($display) then
 
     echo "device $device" > $wd/temp.wip
     echo "data $wd/temp.spec2" >> $wd/temp.wip
@@ -683,7 +839,7 @@ echo "MIRIAD optimized line flag commands:" >> $chanlist
 grep -iv "o" $chanlist | awk '{print $1}' | sort -un | grep '.' > $wd/optlist
 
 foreach timerange (`echo "$timefocus"`)
-    newrfi32.csh vis=$wd crange="$csel" select=time"$timerange" nsig=$tsig options=$corr,$rfitype,nodisplay chanlist=$wd/focus.list
+    newrfi32.csh vis=$wd crange="$csel" select=time"$timerange" nsig=$tsig options=$corr,$rfitype npoly=npoly chanlist=$wd/focus.list
     echo "time$timerange focus command issued" >> $chanlist
     if (-e $wd/focus.list) then
         cat $wd/focus.list >> $chanlist

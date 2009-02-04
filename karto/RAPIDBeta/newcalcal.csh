@@ -212,14 +212,13 @@ endif
 
 if ("$argv[1]" != "finish") goto varassign
 
-if ($vis == "") then
+if ("$vis" == "") then
     echo "Vis file needed"
     exit 1
 else if !( -e $vis) then
     echo "Vis file needed!"
     exit 1
 endif
-
 
 #################################################################
 # The cal program creates a temp directory to work in within the

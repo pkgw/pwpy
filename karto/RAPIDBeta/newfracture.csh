@@ -156,7 +156,7 @@ endif
 
 if ("$msel" == "") set msel
 
-newrfi32.csh vis="$vis" options=nodisplay select="$msel" rawdata=$wd/specdata  "$csel" > /dev/null
+newrfi32.csh vis="$vis" select="$msel" rawdata=$wd/specdata  "$csel" > /dev/null
 
 set fants
 set sel
@@ -172,9 +172,9 @@ while ($iidx <= $lim)
     if ($quiet == "verb") echo "Moving on to $vals"
     set sel = "`echo ' $msel' | sed 's/ / pol('$vals[2]$vals[2]'),ant('$vals[1]'),/g'`"
     echo -n "$vals " >> $wd/badlist
-    set pvals = (`newrfi32.csh vis=$wd options=nodisplay,$scorr,$rfitype select="$sel" npoly=$spoly nsig=$nsig "$csel" | grep "bad channels detected" | tr '()' ' ' | awk '{print $5,$7,$11}'`)
+    set pvals = (`newrfi32.csh vis=$wd options=$scorr,$rfitype select="$sel" npoly=$spoly nsig=$nsig "$csel" | grep "bad channels detected" | tr '()' ' ' | awk '{print $5,$7,$11}'`)
     if ($quiet == "verb") echo -n "Antenna $vals "
-    if ($quiet == "verb") newrfi32.csh vis=$wd options=display,$rfitype,$scorr npoly=$spoly nsig=$nsig select="$sel" "$csel" | grep "bad channels detected"
+    if ($quiet == "verb") newrfi32.csh vis=$wd display=/xs options=$rfitype,$scorr npoly=$spoly nsig=$nsig select="$sel" "$csel" | grep "bad channels detected"
     echo $pvals >> $wd/badlist
 
     @ iidx++
@@ -219,24 +219,24 @@ else
 endif
 
 if ($display == "display" && $quiet != "verb") then
-    newrfi32.csh vis=$wd options=display,$corr npoly=$npoly select="$xdsel $ydsel" chanlist=$wd/goodbadchans "$csel"
+    newrfi32.csh vis=$wd display=/xs options=$corr npoly=$npoly select="$xdsel $ydsel" chanlist=$wd/goodbadchans "$csel"
     if ("$xdsel $ydsel" != "pol(xx) pol(yy)") then
 	echo "Displaying good antenna spectra"
 	foreach xant (`echo $xbad`)
 	    echo "Press ENTER to see corrupted count spectra for antenna $xant-X"
 	    set dummy = $<
 	    set sel = "`echo ' $msel' | sed 's/ / pol(xx),ant('$xant'),/g'`"
-	    newrfi32.csh vis=$wd options=display,$scorr npoly=$spoly select="$sel" "$csel"
+	    newrfi32.csh vis=$wd display=/xs options=$scorr npoly=$spoly select="$sel" "$csel"
 	end
 	foreach yant (`echo $ybad`)
 	    echo "Press ENTER to see corrupted count spectra for antenna $yant-Y"
 	    set dummy = $<
 	    set sel = "`echo ' $msel' | sed 's/ / pol(yy),ant('$yant'),/g'`"
-	    newrfi32.csh vis=$wd options=display,$scorr npoly=$spoly select="$sel" "$csel"
+	    newrfi32.csh vis=$wd display=/xs options=$scorr npoly=$spoly select="$sel" "$csel"
 	end
     endif
 else
-    newrfi32.csh vis=$wd options=nodisplay,$corr npoly=$npoly select="$xdsel $ydsel" chanlist=$wd/goodbadchans "$csel" > /dev/null
+    newrfi32.csh vis=$wd options=$corr npoly=$npoly select="$xdsel $ydsel" chanlist=$wd/goodbadchans "$csel" > /dev/null
 endif
 
 if ($desel == "desel") then
@@ -276,7 +276,7 @@ foreach xant (`echo $xbad`)
     set fomarker = 0
     echo "Flagging parameters for $xant-X" 
     set sel = "`echo ' $msel' | sed 's/ / pol(xx),ant('$xant'),/g'`"
-    newrfi32.csh vis=$wd options=nodisplay,$scorr,$rfitype,flagopt select="$sel" edgerfi=$corredge npoly=$spoly nsig=$nsig chanlist=$wd/badchanlist optlim=$chans "$csel" > /dev/null
+    newrfi32.csh vis=$wd options=$scorr,$rfitype,flagopt select="$sel" edgerfi=$corredge npoly=$spoly nsig=$nsig chanlist=$wd/badchanlist optlim=$chans "$csel" > /dev/null
     foreach linecmd (`grep line $wd/badchanlist | grep -v MIRIAD`)
 	set vals = (`echo $linecmd | sed -e 's/line=chan,//g' -e 's/,/ /g'`)
 	if ($vals[1] > $edgelim || `echo $vals[1] $vals[2] | awk '{if ($2 > chanlim2 || $1 == 1) print "0"; else print $1+$2-1}' chanlim2=$chanlim2` == $chans) then
@@ -306,7 +306,7 @@ foreach yant (`echo $ybad`)
     set fomarker = 0
     echo "Flagging parameters for $yant-Y"
     set sel = "`echo ' $msel' | sed 's/ / pol(yy),ant('$yant'),/g'`"
-    newrfi32.csh vis=$wd options=nodisplay,$scorr,$rfitype,flagopt select="$sel" edgerfi=$corredge npoly=$spoly nsig=$nsig chanlist=$wd/badchanlist optlim=$chans "$csel" > /dev/null
+    newrfi32.csh vis=$wd options=$scorr,$rfitype,flagopt select="$sel" edgerfi=$corredge npoly=$spoly nsig=$nsig chanlist=$wd/badchanlist optlim=$chans "$csel" > /dev/null
     foreach linecmd (`grep line $wd/badchanlist | grep -v MIRIAD`)
 	set vals = (`echo $linecmd | sed -e 's/line=chan,//g' -e 's/,/ /g'`)
 	if ($vals[1] > $edgelim || `echo $vals[1] $vals[2] | awk '{if ($2 > chanlim2 || $1 == 1) print "0"; else print $1+$2-1}' chanlim2=$chanlim2` == $chans) then
