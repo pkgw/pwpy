@@ -19,10 +19,10 @@ spec = Gem::Specification.new do |s|
   #s.rubyforge_project = 'mirdl' 
 
   # Files, Libraries, and Extensions
-  s.files = %w[
-    Rakefile
-    lib/**/*
-    test/**/*
+  s.files = FileList[
+    'Rakefile',
+    'lib/**/*',
+    'test/**/*'
   ]
   s.require_paths = ['lib']
   #s.autorequire = nil
@@ -39,7 +39,7 @@ spec = Gem::Specification.new do |s|
   #s.extra_rdoc_files = []
 
   # Testing TODO
-  s.test_files = [test/test_mirdl.rb]
+  #s.test_files = [test/test_mirdl.rb]
 end
 
 Rake::GemPackageTask.new(spec) do |pkg|
