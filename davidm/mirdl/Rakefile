@@ -15,8 +15,8 @@ spec = Gem::Specification.new do |s|
   # About
   s.authors = 'David MacMahon'
   s.email = 'davidm@astro.berkeley.edu'
-  #s.homepage = 'http://mirdl.rubyforge.org/'
-  #s.rubyforge_project = 'mirdl' 
+  s.homepage = 'http://mirdl.rubyforge.org/'
+  s.rubyforge_project = 'mirdl' 
 
   # Files, Libraries, and Extensions
   s.files = FileList[
