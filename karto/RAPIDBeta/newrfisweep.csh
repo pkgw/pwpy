@@ -400,13 +400,13 @@ while ($idx <= $lim)
 	set timelim = ($mastertime2[$idx] $mastertime2[$ulim])
 	echo "Beginning corruption detection and recovery..."
 	if (`echo $vals[5] | wc -w`) then
-	    newrfi32.csh vis=$wd/vis options=nodisplay select="time($timelim[1],$timelim[2])" rawdata=$wd/specdata > /dev/null
-	    newfracture.csh vis=$wd npoly=$cpoly nsig=$csig options=$scorr,$corr,desel,nodisplay,recover,$rfitype,`if ($debug) echo "verbose"` $csel > $wd/badants
+	    newrfi32.csh vis=$wd/vis select="time($timelim[1],$timelim[2])" rawdata=$wd/specdata > /dev/null
+	    newfracture.csh vis=$wd npoly=$cpoly nsig=$csig options=$corr,desel,recover,$rfitype,`if ($debug) echo "verbose"` $csel > $wd/badants
 	    echo "time($timelim[1],$timelim[2])" >> $wd/badantshist
 	    cat $wd/badants >> $wd/badantshist
 	else
-	    newrfi32.csh vis=$wd/vis,$wd/tvis options=nodisplay select="time($timelim[1],$timelim[2])" rawdata=$wd/specdata
-	    newfracture.csh vis=$wd npoly=$cpoly nsig=$csig options=$scorr,$corr,desel,nodisplay,recover,$rfitype,`if ($debug) echo "verbose"` $csel > $wd/badants
+	    newrfi32.csh vis=$wd/vis,$wd/tvis select="time($timelim[1],$timelim[2])" rawdata=$wd/specdata
+	    newfracture.csh vis=$wd npoly=$cpoly nsig=$csig options=$corr,desel,recover,$rfitype,`if ($debug) echo "verbose"` $csel > $wd/badants
 	    echo "No source files, invoking failsafe (tvis) parameter..."
 	endif
         echo `grep "DESEL" $wd/badants | tr -d '[a-z][A-Z]:().-' | tr ',' ' ' | wc -w`" potentially corrupted antennas found..."
@@ -440,10 +440,11 @@ while ($idx <= $lim)
     endif
     if (-e $wd/flagslist) cp $wd/flagslist $wd/flagslist.bu
     if ($flaglist[1] != "") then
-	newrfi32.csh vis=$wd/vis options=flagopt,$corr,$display,$rfitype chanlist=$wd/flagslist timefocus="$timefocus" edgerfi=$edgerfi npoly=$npoly nsig=$nsig select="$timesel,$fsel[1] $timesel,$fsel[2]" $csel > /dev/null
+	newrfi32.csh vis=$wd/vis options=flagopt,$corr,$rfitype chanlist=$wd/flagslist timefocus="$timefocus" edgerfi=$edgerfi npoly=$npoly nsig=$nsig select="$timesel,$fsel[1] $timesel,$fsel[2]" $csel > /dev/null
     else
+#correct code here for display parameters
 	echo "No source information found, zooming out..."
-	newrfi32.csh vis=$wd/vis,$wd/tvis options=flagopt,$corr,$display,$rfitype chanlist=$wd/flagslist timefocus="$timefocus" edgerfi=$edgerfi nsig=$nsig select="$timesel,$fsel[1] $timesel,$fsel[2]" $csel > /dev/null
+	newrfi32.csh vis=$wd/vis,$wd/tvis options=flagopt,$corr,$rfitype chanlist=$wd/flagslist timefocus="$timefocus" edgerfi=$edgerfi nsig=$nsig select="$timesel,$fsel[1] $timesel,$fsel[2]" $csel > /dev/null
     endif
     if (! -e $wd/flagslist && -e $wd/flagslist.bu) cp $wd/flagslist.bu $wd/flagslist
     echo "Beginning cycle $idx (of $lim) flagging. "`grep line=chan $wd/flagslist | tr ',' ' ' | awk '{SUM += $2} END {print SUM}'`" channels to flag in "`grep line=chan $wd/flagslist | wc -l`" iterations."
