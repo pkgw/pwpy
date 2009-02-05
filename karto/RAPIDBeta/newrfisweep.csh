@@ -604,7 +604,7 @@ while ($idx <= $lim)
     set starttime = "`julian options=quiet jday=$mastertime[$idx]`"
     set stoptime = "`julian options=quiet jday=$mastertime[$postidx]`"
     foreach linecmd (`grep "line=chan" $wd/flagslist`)
-	foreach file (`echo $flaglist`)
+	foreach file (`echo################################################################# $flaglist`)
 	    uvflag $linecmd vis=$file options=none flagval=f select=time"($starttime,$stoptime)" > /dev/null
 	end
 	echo -n "."
