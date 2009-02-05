@@ -104,10 +104,12 @@ echo "    is removed from the dataset). Default is 20."
 echo ""
 echo " olay - Overlay file for the autoimaging process. No default."
 echo ""
+echo ""
+echo " device - Device to plot results to (e.g. /xw for x-window)."
+echo '    Default is /null'
+echo ""
 echo " options=debug,display,autoref,polsplit,outsource,insource"
 echo "    debug - Don't delete temporary files created by CALCAL."
-echo "    display - Show results of calibration (via an x-window)"
-echo "        during processing."
 echo "    autoref - Have CALCAL automatically determine the best"
 echo "        reference antenna (default unless refant is specified)."
 echo "    polsplit - Process x and y pol data seperately."
@@ -136,7 +138,7 @@ set mapopt = "options=savedata" # Mapping options
 set display = 0 # Dispaly results while processing?
 set polsplit = 0 # Split pol before processing (first x, then y)
 set debug = 0 # Save temp data after running?
-
+set device
 
 #################################################################
 # Here is the keyword/value pairing code. It basically operates
@@ -167,6 +169,10 @@ else if ("$argv[1]" =~ 'siglim='*) then
 else if ("$argv[1]" =~ 'int='*) then
     set int = `echo $argv[1] | sed 's/int=//'`
     shift argv; if ("$argv" == "") set argv = "finish"
+else if ("$argv[1]" =~ 'device='*) then
+    set device = "$argv[1]"
+    set display = 1
+    shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'options='*) then
     set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
     set badopt
@@ -179,8 +185,6 @@ else if ("$argv[1]" =~ 'options='*) then
 	    set polsplit = 1
 	else if ($option == "nopolsplit") then
 	    set polsplit = 0
-	else if ($option == "display") then
-	    set display = 1
 	else if ($option == "debug") then
 	    set debug = 1
 	else
@@ -543,7 +547,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
 # UVAVER is used to "apply" the gains solutions to the dataset.
 	uvaver vis=$file out=$wd/tempcal2 options=relax >& /dev/null	
 	set sflags = 0
-	if ($display) uvplt vis=$wd/tempcal2 select='-auto' device=/xs options=2pass,nobase,equal,source axis=re,im >& /dev/null # Display results if requested
+	if ($display) uvplt vis=$wd/tempcal2 select='-auto' $device options=2pass,nobase,equal,source axis=re,im >& /dev/null # Display results if requested
 #################################################################
 # After calibration is achieved and applied, UVLIST is used to
 # dump out the ampitude and phase information. Currently, the
