@@ -1,6 +1,7 @@
 #!/bin/bash -ex
 
-arch=$(uname -si | tr ' ' /)
+arch="$(uname -s)/$(uname -i 2>/dev/null || uname -p)"
+
 if [ -e "$arch/naptr.rb" ]
 then
   echo "local build for $arch already exists"
