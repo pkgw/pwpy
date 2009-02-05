@@ -312,17 +312,19 @@ foreach file ($filelist)
 # done to eliminate any potential problems/statistical anamolies
 # surrounding edge channels.
 #################################################################
-
     if ($autoedge) then
 	if (`echo $sfreq $freq | awk '{if ($1 == $2) print "go"}'` == "go") then
 	    if (-e $wd/$file-xpol/visdata) uvflag vis=$wd/$file-xpol edge=1,$autoedgechan,0 options=none flagval=f > /dev/null
 	    if (-e $wd/$file-ypol/visdata) uvflag vis=$wd/$file-ypol edge=1,$autoedgechan,0 options=none flagval=f > /dev/null
-	else if (`echo $ilim $sdf $sfreq $freq | awk '{if ((($1-1)*$2)+$3 < $freq) print "go"}'` == "go") then
+	    echo first
+	else if (`echo $ilim $sdf $sfreq $freq | awk '{if ((($1-1)*$2)+$3 < $4) print "go"}'` == "go") then
 	    if (-e $wd/$file-xpol/visdata) uvflag vis=$wd/$file-xpol edge=$autoedgechan,0,0 options=none flagval=f > /dev/null
 	    if (-e $wd/$file-ypol/visdata) uvflag vis=$wd/$file-ypol edge=$autoedgechan,0,0 options=none flagval=f > /dev/null
+	    echo second
 	else
 	    if (-e $wd/$file-xpol/visdata) uvflag vis=$wd/$file-xpol edge=$autoedgechan,$autoedgechan,3 options=none flagval=f > /dev/null
 	    if (-e $wd/$file-ypol/visdata) uvflag vis=$wd/$file-ypol edge=$autoedgechan,$autoedgechan,3 options=none flagval=f > /dev/null
+	    echo third
 	endif
     endif
 

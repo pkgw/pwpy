@@ -54,7 +54,7 @@ echo "    interval=interval nsig=nsig npoly=npoly tsig=tsig csig=csig"
 echo "    cpoly=cpoly edgerfi=edgerfi device=device" 
 echo "    corrcycle=corrcycle options=[corr,nocorr],[recover,destory,"
 echo "    ignore],[pos,neg,mixed],rescan,debug,[outsource.insource],"
-echo "    [autoedge,noautoedge],[seedcorr,noseedcorr])"
+echo "    [autoedge,noautoedge],[seedcorr,noseedcorr]),noflag"
 echo ""
 echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 echo ""
@@ -121,7 +121,7 @@ echo "    scanning. Default is 4."
 echo ""
 echo " options=[corr,nocorr],[recover,destory,ignorecorr],[pos,neg,"
 echo "    mixed],rescan,debug,[outsource.insource],[autoedge,"
-echo "    noautoedge],[seedcorr,noseedcorr]"
+echo "    noautoedge],[seedcorr,noseedcorr],noflag"
 echo ""
 echo "    corr - Correct for bandpass features via a polynomial fit."
 echo "        (Default)"
@@ -162,6 +162,8 @@ echo "        one cycle (i.e. the first cycle in the set) to flag the"
 echo "        other time cycles. (Default)"
 echo "    noseedcorr - For corruption scanning, use the results of all"
 echo "        cycles for flagging and corruption removal."
+echo "    noflag - Doesn't actually flag datasets, only displays"
+echo "        scanning results."
 exit 0
 endif
 
@@ -192,6 +194,8 @@ set restart # Restart processing?
 set autoedge = 1 # Use autoedge utility?
 set autoedgechan = 100 # Number of channels on edges to flag
 set device # Display device for stuff
+set flag = 1 # Whether or not to flag
+
 #Alright, lets see if I can finally properly comment this code...
 #Below is the variable assignment listing, further documentation on this will be available shortly
 
@@ -253,6 +257,8 @@ else if ("$argv[1]" =~ 'options='*) then
 	    set autoedge = 0
 	else if ($option == "rescan") then
 	    set rescan = 1
+	else if ($option == "noflag") then
+	    set flag = 0
 	else
 	    set badopt = ($badopt $option)
 	endif
@@ -491,7 +497,7 @@ while ($idx <= $lim)
     set fileidx = 0
     foreach file (`echo $vals[3] $vals[4] | tr ',' ' '`)
 	@ fileidx++
-	if (! -e $wd/$tfilelist[$fileidx]$cycle) uvaver vis=$file out=$wd/$tfilelist[$fileidx]$cycle select=time"($starttime,$stoptime)" options=relax,nocal,nopass,nopol > /dev/null
+	if (! -e $wd/$tfilelist[$fileidx]$cycle && $flag) uvaver vis=$file out=$wd/$tfilelist[$fileidx]$cycle select=time"($starttime,$stoptime)" options=relax,nocal,nopass,nopol > /dev/null
     end
     @ idx++ jidx++
 end
@@ -505,7 +511,6 @@ set preidx = 0
 set idx = 1
 set postidx = 2
 set dpostidx = 3
-
 
 ################################################################
 #Here begins flagging
@@ -572,7 +577,7 @@ while ($idx <= $lim)
 	    set flagparam = (`sed -n {$jidx}p $wd/corrflag`)
 	    if ($fracture == "destroy") set $flagparam[2]
 	    foreach file (`echo $corrfilelist`)
-		uvflag vis=$file flagval=f options=none "$flagparam[1]" "$flagparam[2]" > /dev/null
+		if ($flag) uvflag vis=$file flagval=f options=none "$flagparam[1]" "$flagparam[2]" > /dev/null
 	    end
 	    echo "Decorruption subcycle $idx.$jidx (of $jlim) complete..."
 	    @ jidx++
@@ -604,8 +609,8 @@ while ($idx <= $lim)
     set starttime = "`julian options=quiet jday=$mastertime[$idx]`"
     set stoptime = "`julian options=quiet jday=$mastertime[$postidx]`"
     foreach linecmd (`grep "line=chan" $wd/flagslist`)
-	foreach file (`echo################################################################# $flaglist`)
-	    uvflag $linecmd vis=$file options=none flagval=f select=time"($starttime,$stoptime)" > /dev/null
+	foreach file (`echo $flaglist`)
+	    if ($flag) uvflag $linecmd vis=$file options=none flagval=f select=time"($starttime,$stoptime)" > /dev/null
 	end
 	echo -n "."
     end
@@ -614,14 +619,14 @@ while ($idx <= $lim)
     echo "Completed cycle. Processing time was "`date +%s | awk '{print int(($1-cycletime)/60)" minute(s) "int(($1-cycletime)%60)" second(s)."}' cycletime=$cycletime`
 end
 
-if ($outsource != "outsource") goto finish
+if ($outsource != "outsource" || ! $flag) goto finish
 
 set fulllist = (`echo $vis $tvis`)
 set listlim = `echo $fulllist | wc -w`
 set idx = 1
 while ($idx <= $listlim)
     echo "$fulllist[$idx] final flagging..." 
-    uvaver vis=$wd/$trlist[$idx]'*' options=relax,nocal,nopass,nopol out=$wd/s$trlist[$idx] 
+    if ($flag) uvaver vis=$wd/$trlist[$idx]'*' options=relax,nocal,nopass,nopol out=$wd/s$trlist[$idx] 
     uvaflag vis=$fulllist[$idx] tvis=$wd/s$trlist[$idx] 
     if ($autoedge) then
     echo "Edge flagging $fulllist[$idx]"

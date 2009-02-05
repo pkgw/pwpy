@@ -149,6 +149,7 @@ echo "        a focus on minimizing the number of line-selections"
 echo "        needed to 'cover' all polluted channels. This can be"
 echo "        helpful in polluted bands where long strings of"
 echo "        channels may be polluted."
+echo "    debug - Keep intermediate processing files."
 exit 0
 endif
 
@@ -158,7 +159,7 @@ set corr = "nocorr" # Switch to apply corrections to data
 set csel # Option to select (or deselect) channel ranges
 set msel #Selection parameter
 set nsig = 3  # Number of sigma out to count channel as bad
-set tsig = 4 # Number of sigma out to count channel as bad in timefocus
+set tsig = 0 # Number of sigma out to count channel as bad in timefocus
 set edgerfi = 0 # Number of channels around each RFI spike to count as bad
 set corrdisp = 0 #Display correctional information (debugging tool)
 set flagopt = "noopt" # Optimize flagging commands?
@@ -170,6 +171,7 @@ set timefocus # Allows user to "zoom in" to particular time. Useful if trying to
 set npoly = 6 #What order polynomial to apply in correction stage
 set rawdata
 set optlim = 0
+set debug = 0
 
 #################################################################
 # Here is the keyword/value pairing code. It basically operates
@@ -206,7 +208,7 @@ else if ("$argv[1]" =~ 'optlim='*) then
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'device='*) then
     set display = 1
-    set device = `echo "$argv[1]" | sed 's/display=//g'`
+    set device = `echo "$argv[1]" | sed 's/device=//g'`
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'npoly='*) then
     set npoly = (`echo "$argv[1]" | sed 's/npoly=//g' | awk '{print 1+int($1*1)}'`)
@@ -229,7 +231,9 @@ else if ("$argv[1]" =~ 'options='*) then
 	    set rfitype = "neg"
 	else if ($option == "mixed") then
 	    set rfitype = "mixed"
-	else
+	else if ($option == "debug") then
+	    set debug = 1
+	else	
 	    set badopt = ($badopt $option)
 	endif
     end
@@ -297,12 +301,16 @@ endif
 
 
 # Check to see that sigma ranges are reasonable
-if (`echo $nsig | awk '{if ($1*1 < 2) print "nogo"}'` == "nogo") then
+
+if (`echo $nsig | awk '{if ($1*1 < 2) print 1}'`) then
     echo "Sigma multiplier below minimum threshold (2 sigma). Setting nsig to 3..."
     set nsig = 3
 endif
-if (`echo $tsig $nsig | awk '{if ($1*1 < 2 || $1 < $2) print "nogo"}'` == "nogo") then
-    echo "Time focus sigma multiplier below minimum threshold (2 sigma or 1 above nsig). Setting tsig to 4..."
+
+if !("$tsig") set tsig = `echo $nsig | awk '{print $1+1}'`
+
+if (`echo $tsig $nsig | awk '{if ($1*1 < 2 || $1 < $2) print 1}'`) then
+    echo "Time focus sigma multiplier below minimum threshold (2 sigma or nsig). Setting tsig to $nsig..."
     set tsig = $nsig
     @ nsig++
 endif
@@ -758,6 +766,7 @@ else if ($lim != 0) then
     awk '{if ($3 < (-1*nsig)) print $0}' nsig=$nsig $wd/temp.spec3 > $wd/temp.bad1
     awk '{if ($3 > nsig) print $0}' nsig=$nsig $wd/temp.spec3 > $wd/temp.bad2
 else
+    awk '{if ($3^2 <= (nsig^2)) print $0}' nsig=$nsig $wd/temp.spec3 > $wd/temp.good
     touch $wd/temp.bad1
     touch $wd/temp.bad2
 endif
@@ -935,12 +944,12 @@ if ("$logfile" != "") then
     endif
 endif
 
-rm -r $wd
+if !($debug) rm -r $wd
 
 exit 0
 
 fail:
 
-rm -r $wd
+if !($debug) rm -r $wd
 
 exit 1
