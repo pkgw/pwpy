@@ -131,6 +131,7 @@ echo " device - Device to plot results to (e.g. /xw for x-window)."
 echo '    Default is /null'
 echo ""
 echo " options=[corr,nocorr],corrdisp,[pos,neg,mixed],flagopt"
+echo ""
 echo "    corr - Correct for bandpass features via a polynomial fit."
 echo "    nocorr - Don't correct for bandpass features. (Default)"
 echo "    corrdisp - Display intermediate results of polynomial fit"
