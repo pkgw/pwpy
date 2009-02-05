@@ -1,0 +1,14 @@
+#!/bin/bash -ex
+
+arch=$(uname -si | tr ' ' /)
+if [ -e "$arch/naptr.rb" ]
+then
+  echo "local build for $arch already exists"
+else
+  mkdir -p "$arch"
+  ruby extconf.rb
+  make
+  cp -p naptr.rb "$arch"
+  mv naptr.[sd]* "$arch"
+  make distclean
+fi
