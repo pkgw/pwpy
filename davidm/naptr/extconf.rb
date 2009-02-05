@@ -16,15 +16,17 @@ require "mkmf"
 
 # Check NArray
 na_gemspec=Gem.searcher.find('narray')
-na_dir=File.join(na_gemspec.full_gem_path, na_gemspec.require_path)
-$CPPFLAGS = " -I#{na_dir} "+$CPPFLAGS
+if na_gemspec
+  na_dir=File.join(na_gemspec.full_gem_path, na_gemspec.require_path)
+  $CPPFLAGS = " -I#{na_dir} "+$CPPFLAGS
+else
+  $CPPFLAGS = " -I#{CONFIG['sitearchdir']} -I#{CONFIG['archdir']} " + $CPPFLAGS
+end
 exit unless have_header("narray.h")
 if RUBY_PLATFORM =~ /cygwin|mingw/
   $LDFLAGS = " -L#{CONFIG['sitearchdir']} "+$LDFLAGS
   exit unless have_library("narray","na_make_object")
 end
-
-#$objs = %w(rb_pgplot.o kwarg.o)
 
 # Generate Makefile
 create_makefile("naptr")
