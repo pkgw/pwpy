@@ -1,3 +1,5 @@
+# Functions from bug.c
+
 require 'dl'
 
 module Mirdl

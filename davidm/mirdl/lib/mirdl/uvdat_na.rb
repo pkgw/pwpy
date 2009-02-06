@@ -1,9 +1,8 @@
+# Suboutines and functions from uvdat.for
+
+require 'dl'
 require 'narray'
-
-# TODO Detect and adapt to FORTRAN calling conventions of loaded libraries.
-# (Currently developed for gfortran)
-
-# Routines from uvdat.for
+require 'naptr' unless NArray.method_defined? :ptr
 
 module Mirdl
 

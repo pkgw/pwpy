@@ -1,3 +1,6 @@
+# Functions from key.c
+
+require 'dl'
 require 'shellwords'
 
 module Mirdl

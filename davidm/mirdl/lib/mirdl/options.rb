@@ -1,7 +1,6 @@
-# TODO Detect and adapt to FORTRAN calling conventions of loaded libraries.
-# (Currently developed for gfortran)
+# Subroutines and functions from options.for
 
-# Routines from options.for
+require 'dl'
 
 module Mirdl
 

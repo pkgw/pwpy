@@ -1,8 +1,9 @@
-require 'ostruct'
-require 'narray'
-require 'naptr'
+# Functions from uvio.c
 
-# Routines from uvio.c
+require 'ostruct'
+require 'dl'
+require 'narray'
+require 'naptr' unless NArray.method_defined? :ptr
 
 module Mirdl
 
