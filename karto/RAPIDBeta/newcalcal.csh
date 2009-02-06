@@ -679,7 +679,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	    if ($#antlist <= 1) set antlist
 	    foreach ant (`echo $antlist`)
 		# Check to see the number of antennas associated with each baseline
-		set vals = (`awk '{if ($1 == ant || $2 == ant) count += 1} END {print int(100*count/(ocount-1))}' ocount=$#antlist ant=$ant $wd/{$pol}basetemp`)
+		set vals = (`awk '{if ($1 == ant || $2 == ant) count += 1} END {print int(100*count/(ocount-1))}' ocount=$antcount ant=$ant $wd/{$pol}basetemp`)
 		# If the number of baselines falls below the retention limit times it's theoretical threshold (N_ants-1), then flag it as bad.
 		if ($vals[1] < $retlim) then
 		    @ badjump++; @ badjump++
@@ -774,7 +774,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	    if ("$pol" == "y") set antcount = $yantcount
 	    if ($#antlist <= 1) set antlist
 	    foreach ant (`echo $antlist`)
-		set vals = (`awk '{if ($1 == ant || $2 == ant) count += 1} END {print int(100*count/(ocount-1))}' ocount=$#antlist ant=$ant $wd/{$pol}basetemp`)
+		set vals = (`awk '{if ($1 == ant || $2 == ant) count += 1} END {print int(100*count/(ocount-1))}' ocount=$antcount ant=$ant $wd/{$pol}basetemp`)
 		if ($vals[1] < $retlim) then
 		    @ badjump++; @ badjump++
 		    echo -n "."
@@ -836,7 +836,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
     end
     #Final cycle for a pol, use autoref to find the best ref antenna for the whole dataset
     if ($autoref) then
-	uvplt vis=$file options=2pass select='-auto' axis=ti,pha device=/null | grep "Baseline" | awk '{print $2,$3,$5}' | tr -d '-' > $wd/refantstat
+	uvplt vis=$wd/tempcal$ipol options=2pass select='-auto' axis=ti,pha device=/null | grep "Baseline" | awk '{print $2,$3,$5}' | tr -d '-' > $wd/refantstat
 	set antstat = 0
 	set refant = 0
 	foreach ant (`awk '{printf "%s\n%s\n",$1,$2}' $wd/refantstat | sort -nu`)
