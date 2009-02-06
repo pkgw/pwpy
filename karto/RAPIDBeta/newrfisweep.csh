@@ -437,6 +437,23 @@ while ($idx <= $lim)
 	set mastertime2 = ($mastertime2 `echo $vals[2] | awk '{printf "%7.6f\n",$1-(.5/86400)}'`)
     endif
     set timeint = `echo $timeint $vals[3] | awk '{print $1+$2}'`
+    if (`echo $timeint | awk '{if ($1 > inttime) print "go"}' inttime=$inttime` == "go" || `echo $vals[2] $vals[3] $starttime | awk '{if (((1440*($1-$3))+$2) > 2*inttime) print "go"}' inttime=$inttime` == go) then
+	set finstarttime = `echo $starttime | awk '{printf "%7.6f",$1+2400000.5}'`
+	set finstoptime = `echo $vals[2] $vals[3] | awk '{printf "%7.6f",$1+($2/1440)+2400000.5+(.5/86400)}'`
+	set finslist = `echo $slist | tr ' ' ','`","
+ 	set finclist = `echo $clist | tr ' ' ','`","
+	set fintslist = `echo $tslist | tr ' ' ','`","
+	set fintclist = `echo $tclist | tr ' ' ','`","
+	echo $finstarttime $finstoptime $finslist $finclist $fintslist $fintclist >> $wd/obslist
+	set starttime = `echo $vals[2] | awk '{printf "%7.6f\n",$1-(.5/86400)}'`
+	set mastertime = ($mastertime `echo $vals[2] | awk '{printf "%7.6f\n",$1+2400000.5-(.5/86400)}'`)
+	set mastertime2 = ($mastertime2 `echo $vals[2] | awk '{printf "%7.6f\n",$1-(.5/86400)}'`)
+	set timeint = "$vals[3]"
+	set slist
+	set clist
+	set tslist
+	set tclist
+    endif
     if  !(" "`echo $clist $slist`" " =~ *" $vals[1] "*) then
 	if ($vals[4] == "vis") then
 	    set slist = ($slist $vals[1])
@@ -446,21 +463,8 @@ while ($idx <= $lim)
 	    set tclist = ($tclist $vals[5])
 	endif
     endif
-    if (`echo $timeint | awk '{if ($1 > inttime) print "go"}' inttime=$inttime` == "go" || `echo $vals[2] $vals[3] $starttime | awk '{if (((1440*($1-$3))+$2) > 2*inttime) print "go"}' inttime=$inttime` == go) then
-	set finstarttime = `echo $starttime | awk '{printf "%7.6f",$1+2400000.5}'`
-	set finstoptime = `echo $vals[2] $vals[3] | awk '{printf "%7.6f",$1+($2/1440)+2400000.5+(.5/86400)}'`
-	set finslist = `echo $slist | tr ' ' ','`","
- 	set finclist = `echo $clist | tr ' ' ','`","
-	set fintslist = `echo $tslist | tr ' ' ','`","
-	set fintclist = `echo $tclist | tr ' ' ','`","
-	echo $finstarttime $finstoptime $finslist $finclist $fintslist $fintclist >> $wd/obslist
-	set starttime = 0
-	set timeint = 0
-	set slist
-	set clist
-	set tslist
-	set tclist
-    endif
+##########################
+    
     @ idx++
 end
 
@@ -584,6 +588,7 @@ while ($idx <= $lim)
 	end
         echo "Corrupted antennas recovered..."
         set fsel = (`grep "DESEL:" $wd/badants | awk '{print $2,$3}'`)
+	if ("$fsel" == "") set fsel = ("pol(xx)" "pol(yy)")
     endif
     # Improvements made here, no more subcycles, just main cycles
     echo "Beginning cycle $idx (of $lim) scanning..."

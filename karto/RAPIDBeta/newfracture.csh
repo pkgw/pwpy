@@ -4,6 +4,7 @@ set date1 = `date +%s.%N`
 
 onintr fail
       #################################################################
+if ($#argv == 0) then
 echo "================================================================="
 echo "FRACTURE - Spectral corruption spotting utility"
 echo "'Yup, looks like a broken spectra, looks like we're gonna have to"
@@ -126,7 +127,7 @@ endif
 set csel # Channel range selection
 set vis # Name of files to be processed
 set msel # MIRIAD style selection commands
-set display = 1 # Display results?
+set display = 0 # Display results?
 set recover = 0 # Attempt to recover bad ants?
 set quiet = "quiet" # Do debugging display
 set desel = 0 # Provide deselection command?
@@ -137,6 +138,7 @@ set nsig = 5 # number of sigma out to be IDed as bad
 set rfitype = "pos" # channels above, below (or both) band to be IDed as bad?
 set corr = "corr" # use corrective polynomial to remove passband features?
 set badlim = 5 # debugging parameter
+set device
 
 #################################################################
 # Here is the keyword/value pairing code. It basically operates

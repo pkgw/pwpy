@@ -416,7 +416,7 @@ set tviscount = 0
 while ($idx < $#regtimes)
     set cycle = `echo $idx | awk '{print 999+$1}' | sed 's/1//'` # The cycle number is there to files from a particular time range a unique marker
     echo -n "Preparing file "`echo $idx | awk '{print $1-1}'`" of "`echo $#regtimes | awk '{print $1-2}'`"..."
-    foreach pol (`echo $pollist | sed 's/xxyy/xx,yy/'`)
+    foreach pol (`echo $pollist | sed 's/xxyy/xx,yy/g'`)
 	uvaver vis=$wd/tempcal`echo $pol | tr -d ','` out=$wd/tempcali`echo $pol | tr -d ','`$cycle options=relax,nocal,nopass,nopol select="window(1),time($regtimes[$idx],$regtimes[$postidx]),pol($pol)" >& /dev/null
     end
     if ($outsource && "$tvis[1]" != "") then
@@ -814,7 +814,9 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	end
     # End data retention check - if needed, repeat the calibration and retention checks
 	if ($badjump) @ badjump--
-	if ($badjump) then
+	if ("$xants" == ""  && "$yants" == "") then
+	    echo "Calibration for cycle failed! Moving on to next cycle"
+	else if ($badjump) then
 	    rm -f $wd/ampinfo $wd/amplog
 	    echo "Culling complete, continuing cycle $idx of "`echo $#regtimes | awk '{print $1-2}'`"..."
 	    echo " "
