@@ -33,6 +33,6 @@ end
 require 'mirdl/bug'
 require 'mirdl/key'
 require 'mirdl/options'
-require 'mirdl/select'
+require 'mirdl/select_na'
 require 'mirdl/uvio_na'
 require 'mirdl/uvdat_na'

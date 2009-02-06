@@ -37,7 +37,7 @@ keyini('foo=bar')
 p keya('foo', '')
 keyfin
 
-sels = NArray.sfloat(100)
+sels = Sels.new(100)
 keyini
 vis = keyf(:vis,'')
 selInput(sels)
