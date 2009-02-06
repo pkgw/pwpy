@@ -97,3 +97,50 @@ At line 645 of file listobs.f
 Fortran runtime error: End of file
 
 lupus>set REFANT = 13
+
+# take a look visibilities
+
+lupus>itemize in=${VIS}_1
+
+itemize: Version 1.4, 2008/02/19 20:06:29 UTC
+
+  vislen   = 752110784
+  ncorr    = 182476800
+  nwcorr   = 0
+  obstype  = mixed-auto-cross
+  flags      (integer data, 5886349 elements)
+  vartable   (text data, 384 elements)
+  history    (text data, 67748 elements)
+  visdata    (binary data, 752110780 elements)
+
+lupus>prthd in=${VIS}_1
+Prthd: version 11-jul-07
+****************************************************************
+Filename: fx64c-gcmosaictest1-1640_1
+Telescope: ATA
+Object: gcmosaictest1
+First time: 09FEB03:15:15:45.0
+Number of antennae: 43
+Polarisations Present: XX,YY,XX,XX
+Type of correlations present: mixed-auto-cross
+----------------------------------------------------------------
+Spectral Correlations:
+  Spectrum  Channels  Freq(chan=1)  Increment  Restfreq
+      1        512       1.58757     0.000102   1.64000 GHz
+  Total number of correlations: 18247680
+  Correlations are stored in 16-bit form
+----------------------------------------------------------------
+J2000    Source RA: 17:44:24.748  Dec: -28:46:27.53
+Apparent Source RA: 17:44:59.366  Dec: -28:46:39.69
+
+# glue together two halves of correlator.  requires using python2.5 on lupus.  edited ataglue.py to find that specfically and not grab version associated with scipy...
+
+lupus>~/big_scr2/code/mmm/pwilliams/fancy/ataglue.py vis=${VIS}_1,${VIS}_2 out=${VIS}
+lupus>~/big_scr2/code/mmm/pwilliams/fancy/ataglue.py vis=${CALVIS}_1,${CALVIS}_2 out=${CALVIS}
+
+# plot and check raw data
+
+smauvspec vis=${VIS}_1 device=1/xs axis=ch,bo select='pol(xx,yy),ant(1,2,3)(11,12,13,14)' nxy=4,3
+
+# plot shows massive lines which change on time scales of a minute or so.  seems to be near 1612 and 1680 or so, but changes a lot between baselines.  probably rfi.  
+# also, it is in the cal.  definitely rfi.
