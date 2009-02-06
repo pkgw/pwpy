@@ -127,26 +127,21 @@ module Mirdl
     case type
     when H_BYTE
       data = DL.malloc(n)
-      fmt = 'a*'
+      fmt = 'A*'
     when H_INT
-      n = DL.sizeof('I')
-      data = DL.malloc(n)
+      data = DL.malloc(n * DL.sizeof('I'))
       fmt = 'i'
     when H_INT2
-      n = DL.sizeof('S')
-      data = DL.malloc(n)
+      data = DL.malloc(n * DL.sizeof('S'))
       fmt = 's'
     when H_REAL
-      n = DL.sizeof('F')
-      data = DL.malloc(n)
+      data = DL.malloc(n * DL.sizeof('F'))
       fmt = 'F'
     when H_DBLE
-      n = DL.sizeof('D')
-      data = DL.malloc(n)
+      data = DL.malloc(n * DL.sizeof('D'))
       fmt = 'D'
     when H_CMPLX
-      n = 2*DL.sizeof('F')
-      data = DL.malloc(n)
+      data = DL.malloc(n * 2 * DL.sizeof('F'))
       fmt = 'FF'
       defval = [defval.real, defval.imag] unless Array === defval
     else
@@ -155,50 +150,104 @@ module Mirdl
     defval = [defval].pack(fmt)
     r, rs = SYM[:uvrdvr][tno, type, var.to_s, data, defval, n]
     if type == H_CMPLX
-      re, im = rs[3].to_s(n).unpack(fmt)
+      re, im = rs[3].to_s(data.size).unpack(fmt)
       Complex(re, im)
     else
-      rs[3].to_s(n).unpack(fmt)[0]
+      rs[3].to_s(data.size).unpack(fmt)[0]
     end
   end
   module_function :uvrdvr
 
-  def uvrdvra(tno, var, defval, n)
+  def uvrdvra(tno, var, defval='', n=MAXSTRING)
     uvrdvr(tno, H_BYTE, var, defval, n)
   end
   module_function :uvrdvra
 
-  def uvrdvrj(tno, var, defval)
+  def uvrdvrj(tno, var, defval=0)
     uvrdvr(tno, H_INT2, var, defval)
   end
   module_function :uvrdvrj
 
-  def uvrdvri(tno, var, defval)
+  def uvrdvri(tno, var, defval=0)
     uvrdvr(tno, H_INT, var, defval)
   end
   module_function :uvrdvri
 
-  def uvrdvrf(tno, var, defval)
+  def uvrdvrf(tno, var, defval=0.0)
     uvrdvr(tno, H_REAL, var, defval)
   end
   module_function :uvrdvrf
 
-  def uvrdvrd(tno, var, defval)
+  def uvrdvrd(tno, var, defval=0.0)
     uvrdvr(tno, H_DBLE, var, defval)
   end
   module_function :uvrdvrd
 
-  def uvrdvrc(tno, var, defval)
+  def uvrdvrc(tno, var, defval=Complex(0,0))
     uvrdvr(tno, H_CMPLX, var, defval)
   end
   module_function :uvrdvrc
 
-#TODO  # void uvgetvr_c  (int tno, int type, Const char *var, char *data, int n);
-#TODO  SYM[:%] = LIBMIR_UVIO['%_c', '']
-#TODO  def %()
-#TODO    SYM[:%][]
-#TODO  end
-#TODO  module_function :%
+  # void uvgetvr_c  (int tno, int type, Const char *var, char *data, int n);
+  SYM[:uvgetvr] = LIBMIR_UVIO['uvgetvr_c', '0IISsI']
+  # Returns String for type == H_BYTE,
+  # otherwise NArray if n > 1,
+  # otherwise a single value
+  def uvgetvr(tno, type, var, n)
+    case type
+    when H_BYTE
+      p = DL.malloc(n+1)
+    when H_INT
+      data = NArray.int(n)
+      p = DL::PtrData.new(data.ptr, data.bsize)
+    when H_INT2
+      data = NArray.sint(n)
+      p = DL::PtrData.new(data.ptr, data.bsize)
+    when H_REAL
+      data = NArray.sfloat(n)
+      p = DL::PtrData.new(data.ptr, data.bsize)
+    when H_DBLE
+      data = NArray.float(n)
+      p = DL::PtrData.new(data.ptr, data.bsize)
+    when H_CMPLX
+      data = NArray.scomplex(n)
+      p = DL::PtrData.new(data.ptr, data.bsize)
+    else
+      bug(BUGSEV_FATAL, "Type incompatiblity for variable #{var.to_s}, in UVGETVR")
+    end
+    r, rs = SYM[:uvgetvr][tno, type, var.to_s, p, n]
+    if type == H_BYTE
+      data = rs[3].to_s
+    else
+      data = data[0] if n == 1
+    end
+    data
+  end
+  module_function :uvgetvr
+
+  def uvgetvra(tno, var, n=MAXSTRING)
+    uvgetvr(tno, H_BYTE, var, n)
+  end
+
+  def uvgetvrj(tno, var, n=1)
+    uvgetvr(tno, H_INT2, var, n)
+  end
+
+  def uvgetvri(tno, var, n=1)
+    uvgetvr(tno, H_INT, var, n)
+  end
+
+  def uvgetvrr(tno, var, n=1)
+    uvgetvr(tno, H_REAL, var, n)
+  end
+
+  def uvgetvrd(tno, var, n=1)
+    uvgetvr(tno, H_DBLE, var, n)
+  end
+
+  def uvgetvrc(tno, var, n=1)
+    uvgetvr(tno, H_CMPLX, var, n)
+  end
 
   # void uvprobvr_c (int tno, Const char *var, char *type, int *length, int *updated);
   SYM[:uvprobvr] = LIBMIR_UVIO['uvprobvr_c', '0IScii']
@@ -208,12 +257,65 @@ module Mirdl
   end
   module_function :uvprobvr
 
-#TODO  # void uvputvr_c  (int tno, int type, Const char *var, Const char *data, int n);
-#TODO  SYM[:%] = LIBMIR_UVIO['%_c', '']
-#TODO  def %()
-#TODO    SYM[:%][]
-#TODO  end
-#TODO  module_function :%
+  # void uvputvr_c  (int tno, int type, Const char *var, Const char *data, int n);
+  SYM[:uvputvr] = LIBMIR_UVIO['uvputvr_c', '0IISSI']
+  # data can be String for type == H_BYTE, otherwise NArray or Array
+  def uvputvr(tno, type, var, data)
+    n = data.length
+    if NArray === data
+      data = data.to_s
+    else
+      case type
+      when H_BYTE
+        data = data.to_s
+      when H_INT
+        data = data.pack('i*')
+      when H_INT2
+        data = data.pack('s*')
+      when H_REAL
+        data = data.pack('F*')
+      when H_DBLE
+        data = data.pack('D*')
+      when H_CMPLX
+        data = data.map {|z| [z.real, z.imag]}
+        data = data.flatten!.pack('F*')
+      else
+        bug(BUGSEV_FATAL, "Type incompatiblity for variable #{var.to_s}, in UVPUTVR")
+      end
+    end
+    SYM[:uvputvr][tno, type, var.to_s, data, n]
+  end
+  module_function :uvputvr
+
+  def uvputvra(tno, var, value)
+    uvputvr(tno, H_BYTE, var, value)
+  end
+  module_function :uvputvra
+
+  def uvputvrj(tno, var, value)
+    uvputvr(tno, H_INT2, var, value)
+  end
+  module_function :uvputvrj
+
+  def uvputvri(tno, var, value)
+    uvputvr(tno, H_INT, var, value)
+  end
+  module_function :uvputvri
+
+  def uvputvrf(tno, var, value)
+    uvputvr(tno, H_REAL, var, value)
+  end
+  module_function :uvputvrf
+
+  def uvputvrd(tno, var, value)
+    uvputvr(tno, H_DBLE, var, value)
+  end
+  module_function :uvputvrd
+
+  def uvputvrc(tno, var, value)
+    uvputvr(tno, H_CMPLX, var, value)
+  end
+  module_function :uvputvrc
 
   # void uvtrack_c  (int tno, Const char *name, Const char *switches);
   SYM[:uvtrack] = LIBMIR_UVIO['uvtrack_c', '0ISS']
@@ -229,19 +331,21 @@ module Mirdl
   end
   module_function :uvscan
 
-#TODO  # void uvwrite_c  (int tno, Const double *preamble, Const float *data, Const int *flags, int n);
-#TODO  SYM[:%] = LIBMIR_UVIO['%_c', '']
-#TODO  def %()
-#TODO    SYM[:%][]
-#TODO  end
-#TODO  module_function :%
-#TODO
-#TODO  # void uvwwrite_c (int tno, Const float *data, Const int *flags, int n);
-#TODO  SYM[:%] = LIBMIR_UVIO['%_c', '']
-#TODO  def %()
-#TODO    SYM[:%][]
-#TODO  end
-#TODO  module_function :%
+  # void uvwrite_c  (int tno, Const double *preamble, Const float *data, Const int *flags, int n);
+  SYM[:uvwrite] = LIBMIR_UVIO['uvwrite_c', '0IpppI']
+  def uvwrite(tno, vis, n=nil)
+    n ||= vis.nchan
+    SYM[:uvwrite][tno, vis.preamble_p, vis.data_p, vis.flags_p, n]
+  end
+  module_function :uvwrite
+
+  # void uvwwrite_c (int tno, Const float *data, Const int *flags, int n);
+  SYM[:uvwwrite] = LIBMIR_UVIO['uvwwrite_c', '0IppI']
+  def uvwwrite(tno, vis, n=nil)
+    n ||= vis.nchan
+    SYM[:uvwwrite][tno, vis.data_p, vis.flags_p, n]
+  end
+  module_function :uvwwrite
 
   # void uvsela_c   (int tno, Const char *object, Const char *string, int datasel);
   SYM[:uvsela] = LIBMIR_UVIO['uvsela_c', '0ISSI']
@@ -264,41 +368,62 @@ module Mirdl
   end
   module_function :uvset
 
-#TODO  # void uvread_c   (int tno, double *preamble, float *data, int *flags, int n, int *nread);
-#TODO  SYM[:uvread] = LIBMIR_UVIO['uvread_c', '0IpppIi']
-#TODO  def uvread(tno, vis)
-#TODO    r, rs = SYM[:uvread][tno, vis.preamble_p, vis.data_p, vis.flags_p, vis.nchan, 0]
-#TODO    vis.nread = rs[-1]
-#TODO    vis
-#TODO  end
-#TODO  module_function :uvread
-#TODO
-#TODO  # void uvwread_c  (int tno, float *data, int *flags, int n, int *nread);
-#TODO  SYM[:%] = LIBMIR_UVIO['%_c', '']
-#TODO  def %()
-#TODO    SYM[:%][]
-#TODO  end
-#TODO  module_function :%
-#TODO
-#TODO  # void uvflgwr_c  (int tno, Const int *flags);
-#TODO  SYM[:%] = LIBMIR_UVIO['%_c', '']
-#TODO  def %()
-#TODO    SYM[:%][]
-#TODO  end
-#TODO  module_function :%
-#TODO
-#TODO  # void uvwflgwr_c (int tno, Const int *flags);
-#TODO  SYM[:%] = LIBMIR_UVIO['%_c', '']
-#TODO  def %()
-#TODO    SYM[:%][]
-#TODO  end
-#TODO  module_function :%
-#TODO
-#TODO  # void uvinfo_c   (int tno, Const char *object, double *data);
-#TODO  SYM[:%] = LIBMIR_UVIO['%_c', '']
-#TODO  def %()
-#TODO    SYM[:%][]
-#TODO  end
-#TODO  module_function :%
+  # void uvread_c   (int tno, double *preamble, float *data, int *flags, int n, int *nread);
+  SYM[:uvread] = LIBMIR_UVIO['uvread_c', '0IpppIi']
+  def uvread(tno, vis)
+    r, rs = SYM[:uvread][tno, vis.preamble_p, vis.data_p, vis.flags_p, vis.nchan, 0]
+    vis.nread = rs[-1]
+    vis
+  end
+  module_function :uvread
+
+  # void uvwread_c  (int tno, float *data, int *flags, int n, int *nread);
+  SYM[:uvwread] = LIBMIR_UVIO['uvwread_c', '0IppIi']
+  def uvwread()
+    SYM[:uvwread][tno, vis.preamble_p, vis.data_p, vis.flags_p, vis.nchan, 0]
+    vis.nread = rs[-1]
+    vis
+  end
+  module_function :uvwread
+
+  # void uvflgwr_c  (int tno, Const int *flags);
+  SYM[:uvflgwr] = LIBMIR_UVIO['uvflgwr_c', '0Ip']
+  def uvflgwr(tno, vis_flags)
+    case vis_flags
+    when Vis
+      p = vis_flags.flags_p
+    when NArray
+      p = PtrData.new(vis_flags.ptr, vis_flags.bsize)
+    when Array
+      p = vis_flags.pack('i*') # TODO use DL.strdup?
+    end
+    SYM[:uvflgwr][tno, p]
+  end
+  module_function :uvflgwr
+
+  # void uvwflgwr_c (int tno, Const int *flags);
+  SYM[:uvwflgwr] = LIBMIR_UVIO['uvwflgwr_c', '0Ip']
+  def uvwflgwr(tno, vis_flags)
+    case vis_flags
+    when Vis
+      p = vis_flags.flags_p
+    when NArray
+      p = PtrData.new(vis_flags.ptr, vis_flags.bsize)
+    when Array
+      p = vis_flags.pack('i*') # TODO use DL.strdup?
+    end
+    SYM[:uvwflgwr][tno, p]
+  end
+  module_function :uvwflgwr
+
+  # void uvinfo_c   (int tno, Const char *object, double *data);
+  SYM[:uvinfo] = LIBMIR_UVIO['uvinfo_c', '0ISp']
+  def uvinfo(tno, object, ndata)
+    data = NArray.float(ndata)
+    p = DL::PtrData.new(data.ptr, data.bsize)
+    SYM[:uvinfo][tno, object.to_s, p]
+    ndata == 1 ? data[0] : data
+  end
+  module_function :uvinfo
 
 end
