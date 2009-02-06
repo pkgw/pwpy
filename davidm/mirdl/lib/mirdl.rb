@@ -26,6 +26,8 @@ module Mirdl
   undef dlopen
 
   SYM = {}
+
+  MAXSTRING = 4096
 end
 
 require 'mirdl/bug'

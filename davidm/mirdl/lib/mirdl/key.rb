@@ -1,7 +1,6 @@
 require 'shellwords'
 
 module Mirdl
-  MAXSTRING = 4096
 
   # void keyini_c(int, char *[])
   SYM[:keyini] = LIBMIR_UVIO['keyini_c', '0IA']
