@@ -46,6 +46,7 @@ module Mirdl
              else status
              end
     r, rs = SYM[:uvopen][0, name, status]
+    # TODO Raise SystemCallError on error?
     rs[0]
   end
   module_function :uvopen
