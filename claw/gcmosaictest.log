@@ -144,3 +144,216 @@ smauvspec vis=${VIS}_1 device=1/xs axis=ch,bo select='pol(xx,yy),ant(1,2,3)(11,1
 
 # plot shows massive lines which change on time scales of a minute or so.  seems to be near 1612 and 1680 or so, but changes a lot between baselines.  probably rfi.  
 # also, it is in the cal.  definitely rfi.
+
+# several stumbles once starting to use miriad.  local version from mel is different from karto, so RAPIDBeta fails.  set up different version available on lupus, but wip gives problems.  setting paths to get all libraries set up properly.  ultimately success, but wip still complains about lack of initialization file.
+
+# now runs newrfisweep.csh ok
+
+lupus>newrfisweep.csh vis=fx64c-gcmosaictest1-1640_1
+Gathering observation information...
+Reconstructing observational parameters...
+Building files for cycle 001...
+Building files for cycle 002...
+Building files for cycle 003...
+Building files for cycle 004...
+Building files for cycle 005...
+Building files for cycle 006...
+Building files for cycle 007...
+Building files for cycle 008...
+Beginning cycle 001 (of 8)...
+Beginning corruption detection and recovery...
+1 potentially corrupted antennas found...
+Corrupted antennas recovered...
+Beginning cycle 1 (of 8) scanning...
+Beginning cycle 1 (of 8) flagging. 120 channels to flag in 11 iterations.
+............
+Completed cycle. Processing time was 1 minute(s) 10 second(s).
+Beginning cycle 002 (of 8)...
+Beginning cycle 2 (of 8) scanning...
+Beginning cycle 2 (of 8) flagging. 139 channels to flag in 10 iterations.
+...........
+Completed cycle. Processing time was 0 minute(s) 25 second(s).
+Beginning cycle 003 (of 8)...
+Beginning cycle 3 (of 8) scanning...
+Could not open user's WIP initialization file.
+Beginning cycle 3 (of 8) flagging. 145 channels to flag in 11 iterations.
+............
+Completed cycle. Processing time was 0 minute(s) 28 second(s).
+Beginning cycle 004 (of 8)...
+Beginning cycle 4 (of 8) scanning...
+Beginning cycle 4 (of 8) flagging. 147 channels to flag in 10 iterations.
+...........
+Completed cycle. Processing time was 0 minute(s) 25 second(s).
+Beginning cycle 005 (of 8)...
+Beginning corruption detection and recovery...
+1 potentially corrupted antennas found...
+Decorruption subcycle 5.1 (of 1) complete...
+Corrupted antennas recovered...
+Beginning cycle 5 (of 8) scanning...
+Beginning cycle 5 (of 8) flagging. 131 channels to flag in 14 iterations.
+...............
+Completed cycle. Processing time was 1 minute(s) 20 second(s).
+Beginning cycle 006 (of 8)...
+Beginning cycle 6 (of 8) scanning...
+Beginning cycle 6 (of 8) flagging. 124 channels to flag in 7 iterations.
+........
+Completed cycle. Processing time was 0 minute(s) 19 second(s).
+Beginning cycle 007 (of 8)...
+Beginning cycle 7 (of 8) scanning...
+Could not open user's WIP initialization file.
+Beginning cycle 7 (of 8) flagging. 185 channels to flag in 13 iterations.
+..............
+Completed cycle. Processing time was 0 minute(s) 33 second(s).
+Beginning cycle 008 (of 8)...
+Beginning cycle 8 (of 8) scanning...
+Could not open user's WIP initialization file.
+Beginning cycle 8 (of 8) flagging. 191 channels to flag in 14 iterations.
+...............
+Completed cycle. Processing time was 0 minute(s) 31 second(s).
+fx64c-gcmosaictest1-1640_1 final flagging...
+UvAver: version 1.0 17-Nov-08
+Uvaflag: version 1.0 22-Oct-98
+ Correlations: Total   Good      Bad
+ Before:    ********9500166087475140
+ After:     ********9370971088767090
+Edge flagging fx64c-gcmosaictest1-1640_1
+Flagging of fx64c-gcmosaictest1-1640_1 complete!
+Flagging process took 6 minute(s) 19 second(s).
+
+# first spectral half of cal shows whopping high lump in unflagged channels from 100-200.  similarly (but not quite as strong) for second half of cal in channels from 300-400.  ??some kind of renormalization??
+
+# flagged by hand the first 200 channels in cal half 1 and last 200 channels of cal half 2
+
+# flagged first 200 chans of first half of gcmosaictest1.  second half looks ok.
+
+# now gluing halves together for cal and gcmosaictest1.  need to force ataglue.py to use python2.5 or else it gets upset with 64-bit or a library thingy...  glued.
+
+# check that they are stitched together ok:
+smauvspec vis=fx64c-1733-130-1640 device=1/xs axis=ch,bo select='pol(xx,yy),ant(1,2)(11,12)' nxy=2,2
+
+# seems ok, but there is less of a gap between the halves than I expected.  ?? is there significant overlap in the halves somehow (that ataglue knows about)??
+
+# now run uvcal to flatten baselines a bit to help further flagging
+
+lupus>uvcal options=fxcal,unflagged select='pol(yy)' vis=fx64c-gcmosaictest1-1640 out=fx64c-gcmosaictest1-1640-yy
+UVCAL: version 4-dec-2008
+### Informational [uvcal]:  05aug05 seeing correction for coherence
+### Informational [uvcal]:  28jan06 options=avechan. Make new wideband
+### Informational [uvcal]:  25feb06 options=holo: pointing and holography
+### Informational [uvcal]:  05mar06 options=slope: phase slope and baseline
+### Informational [uvcal]:  14mar07 options=noisecal: copy conj LSB into USB
+### Informational [uvcal]:  01oct07 keyword onsource to set uvvariable on
+### Informational [uvcal]:  20nov08 options=atmcal available
+
+# etc. etc.
+
+# use uvspec to check on difference.
+
+uvspec vis=fx64c-1733-130-1640-xx device=1/xs axis=ch,amp select='pol(xx,yy),ant(1,2)(11,12)' nxy=2,2
+
+# check walsh flags => seems to be none according to peter's walsh-flags.py
+
+# now try peter's closure phase analysis script:  closanal.py.  again hacked to use python2.5.
+
+lupus>~/big_scr2/code/mmm/pwilliams/fancy/closanal vis=fx64c-1733-130-1640-xx interval=10
+CLOSANAL: attempt to identify bad baselines based on closure quantities (Python, SVN r218, modified 2008-11-24 04:18:35Z)
+Configuration:
+  Averaging interval: 10 minutes
+  Calculating phase closure triples
+Reading data ... done.
+  Read 2925 phase closure triples.
+
+Triples with worst phase closure values:
+         Triple             RMS
+    12X-26X-37X:         129.01
+    26X-27X-28X:        130.082
+    13X-18X-26X:        130.826
+     8X-11X-26X:        131.071
+     4X-26X-42X:         133.83
+    13X-15X-26X:        135.418
+    14X-26X-36X:        135.704
+     6X-16X-26X:         136.36
+      2X-3X-26X:        137.058
+    26X-32X-36X:        146.336
+
+Basepols with worst phase closure values:
+        Basepol       Mean(RMS) (    StdDev, nTrip)
+        11X-26X:        103.276 (   16.2383,    25)
+        17X-26X:        103.298 (   10.9311,    25)
+         8X-26X:        103.693 (   13.2778,    25)
+         2X-26X:        103.726 (   14.8078,    25)
+        26X-33X:        103.788 (   11.9165,    25)
+         1X-26X:        104.272 (   13.2805,    25)
+        15X-26X:        104.849 (   14.2863,    25)
+        13X-26X:        104.868 (   13.9556,    25)
+        26X-36X:        108.137 (   13.6557,    25)
+         3X-26X:        109.125 (   13.3115,    25)
+
+Antpols with worst phase closure values:
+         Antpol       Mean(RMS) (    StdDev, nTrip)
+            24X:        16.9785 (   26.1446,   325)
+            28X:        17.0461 (    25.825,   325)
+             1X:         17.264 (   26.0932,   325)
+            15X:        17.3353 (   26.6291,   325)
+            16X:        18.3183 (   26.1839,   325)
+            23X:        19.4642 (   25.4533,   325)
+            18X:        19.8971 (   25.5026,   325)
+            14X:        21.5524 (    25.065,   325)
+            42X:        30.4891 (   24.4205,   325)
+            26X:        102.813 (   14.2168,   325)
+
+# and now repeat with opt=best.
+
+lupus>~/big_scr2/code/mmm/pwilliams/fancy/closanal vis=fx64c-1733-130-1640-xx interval=10 options=best
+CLOSANAL: attempt to identify bad baselines based on closure quantities (Python, SVN r218, modified 2008-11-24 04:18:35Z)
+Configuration:
+  Averaging interval: 10 minutes
+  Calculating phase closure triples
+Reading data ... done.
+  Read 2925 phase closure triples.
+
+Triples with best phase closure values:
+         Triple             RMS
+      1X-6X-24X:        1.90055
+     6X-11X-36X:        2.50294
+     1X-11X-33X:        2.64096
+     5X-27X-36X:        2.72183
+     5X-25X-32X:        2.73544
+     5X-16X-41X:        2.81701
+     3X-11X-17X:        2.85417
+    16X-32X-37X:        2.86896
+     3X-17X-33X:        2.95494
+     5X-11X-23X:        3.00953
+
+Basepols with best phase closure values:
+        Basepol       Mean(RMS) (    StdDev, nTrip)
+        11X-28X:        9.66003 (    14.407,    25)
+          6X-8X:        9.66629 (    16.704,    25)
+        11X-15X:        9.73114 (   13.3801,    25)
+         8X-25X:        9.95867 (   13.9149,    25)
+         3X-36X:        9.97081 (   16.0484,    25)
+         4X-25X:        10.0454 (   13.9764,    25)
+         3X-17X:        10.0552 (   21.1767,    25)
+        24X-37X:        10.1013 (   13.1052,    25)
+        25X-37X:        10.1994 (   16.0973,    25)
+        11X-25X:         10.279 (     16.72,    25)
+
+Antpols with best phase closure values:
+         Antpol       Mean(RMS) (    StdDev, nTrip)
+             8X:        15.9714 (   26.1842,   325)
+            25X:        15.9863 (   25.4464,   325)
+            11X:        16.0449 (   26.1629,   325)
+            17X:        16.2986 (   25.9787,   325)
+             6X:        16.3315 (   26.3998,   325)
+             5X:        16.4218 (   25.5455,   325)
+             4X:        16.4595 (   25.6821,   325)
+            13X:        16.5399 (   26.2292,   325)
+             3X:        16.5993 (   27.4022,   325)
+            41X:        16.6754 (   26.1662,   325)
+
+# ant 26 bad for x:
+
+uvflag vis=fx64c-1733-130-1640-xx select='ant(26)' flagval=flag
+
+# again for y.   better afterwards.  still some antpols have mean rms closure that is 1.5 times the std of the rms.  ?? what is considered ok??
+
