@@ -139,6 +139,7 @@ set display = 0 # Dispaly results while processing?
 set polsplit = 0 # Split pol before processing (first x, then y)
 set debug = 0 # Save temp data after running?
 set device
+set wrath
 
 #################################################################
 # Here is the keyword/value pairing code. It basically operates
@@ -187,6 +188,8 @@ else if ("$argv[1]" =~ 'options='*) then
 	    set polsplit = 0
 	else if ($option == "debug") then
 	    set debug = 1
+	else if ($option == "wrath") then
+	    set wrath = 1
 	else
 	    set badopt = ($badopt $option)
 	endif
@@ -822,6 +825,11 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	    echo " "
 	    goto jumper
 	endif
+
+	# Use AUTOMAP's onboard RFI excision to attempt to nuke any more channels that have RFI in it.
+	if ($wrath)
+	endif
+
     	# If on the last cycle, then use uvaver to pull together all of the datasets. Otherwise, repeat with the next time cycle.
 	if ($postidx >= $#regtimes) then
 	    uvaver vis="$wd/tempcali$ipol*" out=$wd/tempcal2 options=relax > /dev/null

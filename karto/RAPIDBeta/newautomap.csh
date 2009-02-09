@@ -200,7 +200,7 @@ set scmode = "dr" # Selfcal optimiztion (either fidelity or dynamic range)
 set weightmode = "natural" # Weighting mode for the invert step
 set imsize # Size of image (in pixels)
 set cellsize # Size of cell (in arcsecs)
-set dispmode = xs # display device for mapping (in progress)
+set device
 set iopt = "options=mfs,double" # Options for invert, usually just double and mfs
 set intclean = 1 # IntelliCLEAN - Automatically determines the number of niters to use
 set refant = 0 # As usual, just the referance antenna for selfcal to use
@@ -278,6 +278,9 @@ else if ("$argv[1]" =~ 'interval='*) then
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'refant='*) then
     set refant = `echo $argv[1] | sed 's/refant=//'`
+    shift argv; if ("$argv" == "") set argv = "finish"
+else if ("$argv[1]" =~ 'device='*) then
+    set device = "$argv[1]"
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'outdir='*) then
     set outdir = (`echo "$argv[1]"/ | sed -e 's/outdir=//' | tr '/' ' '`)
@@ -514,14 +517,14 @@ set idx = 0
 foreach file ($vis)
     echo -n "Splitting $file..."
     @ idx++
-    uvaver vis=$file out=$wd/tempmap$idx.xpol options=relax select="-shadow(7.5),pol(xx),$uselect" interval=$interval > /dev/null 
+    uvaver vis=$file out=$wd/tempmap$idx.xpol select="-shadow(7.5),pol(xx),$uselect" interval=$interval > /dev/null 
     echo -n "."
-    uvaver vis=$file out=$wd/tempmap$idx.ypol options=relax select="-shadow(7.5),pol(yy),$uselect" interval=$interval > /dev/null 
+    uvaver vis=$file out=$wd/tempmap$idx.ypol select="-shadow(7.5),pol(yy),$uselect" interval=$interval > /dev/null 
     if !(-e $wd/tempmap$idx.xpol/visdata || -e $wd/tempmap$idx.ypol/visdata) then
 	echo "FATAL ERROR: UVAVER has failed!" 
 	goto enderr
     endif
-    if !(-e $wd/tempmap$idx.xpol) then
+    if !(-e $wd/tempmap$idx.xpol/visdata) then
 	rm -rf $wd/tempmap$idx.xpol
     else
 	if (-e $file/gains.xx || -e $file/bandpass.xx) then
@@ -538,12 +541,10 @@ foreach file ($vis)
 
 	    uvaver vis=$wd/tempmap$idx.xpol out=$wd/tempmap2 options=relax > /dev/null
 	    rm -rf $wd/tempmap$idx.xpol; mv $wd/tempmap2 $wd/tempmap$idx.xpol
-	    mv $file/gains $file/gains.xx; mv $file/gains.maptemp $file/gains
-
 	endif
 	set vislist = ($vislist $wd/tempmap$idx.xpol)
     endif
-    if !(-e $wd/tempmap$idx.ypol) then
+    if !(-e $wd/tempmap$idx.ypol/visdata) then
 	rm -rf $wd/tempmap$idx.ypol
     else
 	if (-e $file/gains.yy) then
@@ -560,7 +561,6 @@ foreach file ($vis)
 
 	    uvaver vis=$wd/tempmap$idx.ypol out=$wd/tempmap2 options=relax > /dev/null
 	    rm -rf $wd/tempmap$idx.ypol; mv $wd/tempmap2 $wd/tempmap$idx.xpol
-	    mv $file/gains $file/gains.yy; mv $file/gains.maptemp $file/gains
 	endif
 	set vislist = ($vislist $wd/tempmap$idx.ypol)
     endif
@@ -592,6 +592,8 @@ foreach chan (`echo $crange`)
 end
 
 invert:
+
+if !($autoflag || $autopha || $autoflag || $wrath || "$mode" == "inter") set mode = skip
 
 #Clear out the garbage from the last run first
 
@@ -758,13 +760,25 @@ if ($mode == "auto") goto finish
 
 imcomp:
 
-echo "Imaging complete. Would you like to (s)elfcal, (f)lag or e(x)it?"
+echo "Imaging complete. Would you like to (s)elfcal, baseline (f)lag, (g)eneral flag, (w)rath or e(x)it?"
 set yn = $<
 if ($yn == "s") goto selfcal
 if ($yn == "f") goto postflag
 if ($yn == "x") goto finish
+if ($yn == "g") goto postgenflag
+if ($yn == "w") goto wrath
 echo "$yn is not a recognized selection"
 goto imcomp 
+
+postgenflag:
+
+echo "Enter selection parameters for flagging"
+set pfselect = "$<"
+foreach file ($vislist)
+    uvflag vis=$file options=none select="$pfselect" flagval=f > /dev/null
+end
+
+goto invert
 
 selfcal:		# selfcal - in the true selfcal the imaged data
 
@@ -775,9 +789,10 @@ set clip = `echo $scsigma $imstats[3] | awk '{print $1*$2}'`
   if ($cl != "") set scopt = $cl
   echo "Clip level? [default=$clip]: "; set ans=$<
   if ($ans != "") set clip = $ans
-
-  selfcal vis=$vis model=$wd/tempmap.$scaltype interval=$scint select=$sel \
+  foreach file ($vislist)
+    selfcal vis=$file model=$wd/tempmap.clean interval=$scint select=$sel \
 	minants=4 options=noscale,mfs,$scopt clip=$clip refant=$refant
+  end
   goto invert
 
 
@@ -785,18 +800,20 @@ postflag:
 set blopt = "options=nobase" 
 echo "Review baselines one-by-one? (y)es |n|o"
 set $yn = $< ; if ($yn == "y") set blopt
-echo "Plotting all baseline by uv distance and amp."
-blflag vis=$vis device=/xs $blopt select='-auto' axis=uvd,amp
-echo "Plotting all baseline by time and amp."
-blflag vis=$vis device=/xs $blopt select='-auto' axis=time,amp
-echo "Review phases? (y)es |n|o"
-set $yn = $<
-if ($yn == "y") then
-echo "Plotting all baselines by uv distance and phase."
-blflag vis=$vis device=/xs options=nobase select='-auto' axis=uvd,pha
-echo "Plotting all baselines by time and phase."
-blflag vis=$vis device=/xs options=nobase select='-auto' axis=time,pha
-endif
+foreach file ($vislist)
+    echo "Plotting all baseline by uv distance and amp."
+    blflag vis=$file device=/xs $blopt select='-auto' axis=uvd,amp
+    echo "Plotting all baseline by time and amp."
+    blflag vis=$file device=/xs $blopt select='-auto' axis=time,amp
+    echo "Review phases? (y)es |n|o"
+    set $yn = $<
+    if ($yn == "y") then
+	echo "Plotting all baselines by uv distance and phase."
+	blflag vis=$file device=/xs options=nobase select='-auto' axis=uvd,pha
+	echo "Plotting all baselines by time and phase."
+	blflag vis=$file device=/xs options=nobase select='-auto' axis=time,pha
+    endif
+end
 
 goto invert
 
@@ -941,7 +958,7 @@ wrath:
 # that limit by gaussian stats).
 ################################################################# 
 
-if ($wrath) then
+if ($wrath || "$mode" == "inter") then
     echo "Beginning WRATH clean, performing invert..."
     invert vis=`echo $vislist | tr ' ' ','` map=$wd/wrath.map beam=$wd/wrath.beam cell=$cellsize imsize=$imsize sup=$sup select=$sel options=double slop=1 >& /dev/null 
     if !(-e $wd/wrath.map && -e $wd/wrath.beam) then
@@ -959,6 +976,8 @@ if ($wrath) then
     set midrms = `awk '{if ($2 <= midnoise) {idx++; sms += ($2-midnoise)^2}} END {if (idx > 0) {print (sms/idx)^.5}}' midnoise=$midnoise $wd/wrathstats`
     set badchans = (`awk '{if ($2 > midnoise+(log(midplane*2)*midrms)) print $1}' midnoise=$midnoise midplane=$midplane midrms=$midrms $wd/wrathstats`)
     echo "$#badchans RFI afflicted images planes found...blasting RFI!"
+    echo "Eliminating the following bad channels:"
+    echo "WRATHCHAN: $badchans"
     echo -n "Beginning flagging"
 
     foreach chan ($badchans)
@@ -969,7 +988,7 @@ if ($wrath) then
     end
     echo "complete!"
     set wrath = 0
-    if ("$badchans" != "") goto invert
+    if ("$badchans" != "" || "$mode" == "inter") goto invert
 endif
 
 autocal:

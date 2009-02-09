@@ -215,7 +215,7 @@ if ("$argv[1]" =~ 'vis='*) then
 else if ("$argv[1]" =~ 'tvis='*) then
     set tvis = "`echo '$argv[1]/' | sed 's/tvis=//'`"
     set tvis = (`echo $tvis | sed 's/\/ / /g' | sed 's/\(.*\)\//\1/g' | tr ',' ' '`)
-    shift argv; if ("$argv" == "") set argv = "finset csel = "$csel,-(1),-("`echo $nchan $autoedgechan | awk '{print $1+1-$2","$1}'`")"ish"
+    shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'options='*) then
     set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
     set badopt
@@ -376,7 +376,7 @@ if ($autoedge) then
 	set csel = "$csel,-(1,$autoedgechan)"
     else
 	set autoedgetype = 3
-	set csel = "$csel,-(1,$autoedgechan),-("`echo $nchan $autoedgechan | awk '{print $1+1-$2","$1}'`"),-("`echo $nchan | awk '{print int($1/2)-1","int($1/2)+1}'`")"
+	set csel = "$csel,-(1,$autoedgechan),-("`echo $nchan $autoedgechan | awk '{print $1+1-$2","$1}'`"),-("`echo $nchan | awk '{print int($1/2)","int($1/2)+2}'`")"
     endif
     set csel = `echo "$csel" | sed 's/=,/=/'`
 endif
@@ -421,13 +421,13 @@ set mastertime = `echo $vals[2] | awk '{printf "%7.6f\n",$1-(10/1440)+2400000.5}
 set mastertime2 = `echo $vals[2] | awk '{printf "%7.6f\n",$1-(10/1440)}'`
 set starttime = $vals[2]
 set timeint = $vals[3]
-if ($vals[4] == "vis") then
-    set slist = ($slist $vals[1])
-    set tslist = ($tslist $vals[5])
-else if ($vals[4] == "tvis") then
-    set clist = ($clist $vals[1])
-    set tclist = ($tclist $vals[5])
-endif
+#if ($vals[4] == "vis") then
+#    set slist = ($slist $vals[1])
+#    set tslist = ($tslist $vals[5])
+#else if ($vals[4] == "tvis") then
+#    set clist = ($clist $vals[1])
+#    set tclist = ($tclist $vals[5])
+#endif
 
 while ($idx <= $lim) 
     set vals = (`sed -n {$idx}p $wd/timecheck2`)
@@ -607,7 +607,7 @@ while ($idx <= $lim)
 	newrfi32.csh vis=$wd/vis options=flagopt,$corr,$rfitype chanlist=$wd/flagslist timefocus="$timefocus" edgerfi=$edgerfi npoly=$npoly nsig=$nsig select="$timesel,$fsel[1] $timesel,$fsel[2]" $csel $device > /dev/null
     else
 	echo "No source information found, zooming out..."
-	newrfi32.csh vis=$wd/vis,$wd/tvis options=flagopt,$corr,$rfitype chanlist=$wd/flagslist timefocus="$timefocus" edgerfi=$edgerfi nsig=$nsig select="$timesel,$fsel[1] $timesel,$fsel[2]" $csel $device > /dev/null
+	#newrfi32.csh vis=$wd/vis options=flagopt,$corr,$rfitype chanlist=$wd/flagslist timefocus="$timefocus" edgerfi=$edgerfi nsig=$nsig select="$fsel[1] $fsel[2]" $csel $device > /dev/null
     endif
     if (! -e $wd/flagslist && -e $wd/flagslist.bu) cp $wd/flagslist.bu $wd/flagslist
     echo "Beginning cycle $idx (of $lim) flagging. "`grep line=chan $wd/flagslist | tr ',' ' ' | awk '{SUM += $2} END {print SUM}'`" channels to flag in "`grep line=chan $wd/flagslist | wc -l`" iterations."
@@ -655,5 +655,7 @@ echo "Flagging process took $times[1] minute(s) $times[2] second(s)."
 exit 0
 
 fail:
+
+if !($debug) rm -r $wd
 
 exit 1
