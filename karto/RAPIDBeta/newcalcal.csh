@@ -140,6 +140,7 @@ set polsplit = 0 # Split pol before processing (first x, then y)
 set debug = 0 # Save temp data after running?
 set device
 set wrath
+set wrathcycle
 
 #################################################################
 # Here is the keyword/value pairing code. It basically operates
@@ -475,6 +476,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
     set idx = 0; set mididx = 1; set postidx = 2
     foreach file ($wd/tempcali{$ipol}*)
 	@ idx++ midxidx++ postidx++
+	set wrathcycle = 1 # Trigger for WRATH to operate
 	set cycletime = "`date +%s.%N`" # Counter for processing time
 	set cycle =  `echo $idx | awk '{print 1000+$1}' | sed 's/1//'`
 	set precycle =  `echo $idx | awk '{print 999+$1}' | sed 's/1//'`
@@ -826,8 +828,22 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	    goto jumper
 	endif
 
-	# Use AUTOMAP's onboard RFI excision to attempt to nuke any more channels that have RFI in it.
-	if ($wrath)
+	# Use AUTOMAP's onboard RFI excision to attempt to nuke any more channels that have RFI in it. The wrathcycle switch is invoked here to make sure that this processed is performed only once per file
+	if ($wrath && $wrathcycle)
+	    echo "Beginning WRATH flagging"
+	    set rfilist = (`newautomap.csh vis=$file options=noflag,nocal,wrath,junk | grep WRATHCHAN`)
+	    shift rfilist
+	    echo -n "$#rfilist polluted image planes found, beginning removal."
+	    set rfilist = `echo $rfilist | tr ' ' ','`
+	    set rfiflags = (`newoptfchan.csh chanlist=$rfilist`)
+	    foreach rfiline ($rfiflags)
+		echo -n "."
+		uvflag vis=$file flagval=f options=none $rfiline > /dev/null
+	    end
+	    echo "."
+	    echo "WRATH cleaning complete!"
+	    set wrathcycle
+	    if ($#rfiflags) goto jumper
 	endif
 
     	# If on the last cycle, then use uvaver to pull together all of the datasets. Otherwise, repeat with the next time cycle.
