@@ -2,9 +2,6 @@
 
 #include "mirdl.h"
 
-// TODO Default args!
-//
-
 static ID id_ARGV;
 static ID id_basename;
 static ID id_bug;
@@ -69,30 +66,59 @@ VALUE mirdl_keyprsnt(VALUE self, VALUE keyword)
 }
 
 // void keya_c(const char *, char *, const char *)
-VALUE mirdl_keya(VALUE self, VALUE keyword, VALUE keydef)
+VALUE mirdl_keya(int argc, VALUE *argv, VALUE self)
 {
+  VALUE keyword, keydef;
   char value[MAXSTRING+1];
+  char * keydefptr;
 
-  keya_c(SYMSTR_PTR(keyword), value, StringValueCStr(keydef));
+  rb_scan_args(argc, argv, "11", &keyword, &keydef);
 
-  return rb_str_new2(value);
+  if(argc==1) {
+    keydefptr = "\n"; // Key can't start with newline
+  } else {
+    keydefptr = StringValueCStr(keydef);
+  }
+
+  keya_c(SYMSTR_PTR(keyword), value, keydefptr);
+
+  return value[0] == '\n' ? Qnil : rb_str_new2(value);
 }
 
 // void keyf_c(const char *, char *, const char *)
-VALUE mirdl_keyf(VALUE self, VALUE keyword, VALUE keydef)
+VALUE mirdl_keyf(int argc, VALUE *argv, VALUE self)
 {
+  VALUE keyword, keydef;
   char value[MAXSTRING+1];
+  char * keydefptr;
+
+  rb_scan_args(argc, argv, "11", &keyword, &keydef);
+
+  if(argc==1) {
+    keydefptr = "\n"; // Key can't start with newline
+  } else {
+    keydefptr = StringValueCStr(keydef);
+  }
 
   keyf_c(SYMSTR_PTR(keyword), value, StringValueCStr(keydef));
 
-  return rb_str_new2(value);
+  return value[0] == '\n' ? Qnil : rb_str_new2(value);
 }
 
 // void keyd_c(const char *, double *, const double)
-VALUE mirdl_keyd(VALUE self, VALUE keyword, VALUE keydef)
+VALUE mirdl_keyd(int argc, VALUE *argv, VALUE self)
 {
+  VALUE keyword, keydef;
   double value;
-  double def = NUM2DBL(keydef);
+  double def;
+
+  rb_scan_args(argc, argv, "11", &keyword, &keydef);
+
+  if(argc==1) {
+    def = 0.0;
+  } else {
+    def = NUM2DBL(keydef);
+  }
 
   keyd_c(SYMSTR_PTR(keyword), &value, def);
 
@@ -100,10 +126,19 @@ VALUE mirdl_keyd(VALUE self, VALUE keyword, VALUE keydef)
 }
 
 // void keyr_c(const char *, float *, const float)
-VALUE mirdl_keyr(VALUE self, VALUE keyword, VALUE keydef)
+VALUE mirdl_keyr(int argc, VALUE *argv, VALUE self)
 {
+  VALUE keyword, keydef;
   float value;
-  float def = (float)NUM2DBL(keydef);
+  float def;
+
+  rb_scan_args(argc, argv, "11", &keyword, &keydef);
+
+  if(argc==1) {
+    def = 0.0;
+  } else {
+    def = (float)NUM2DBL(keydef);
+  }
 
   keyr_c(SYMSTR_PTR(keyword), &value, def);
 
@@ -111,10 +146,19 @@ VALUE mirdl_keyr(VALUE self, VALUE keyword, VALUE keydef)
 }
 
 // void keyi_c(const char *, int *, const int)
-VALUE mirdl_keyi(VALUE self, VALUE keyword, VALUE keydef)
+VALUE mirdl_keyi(int argc, VALUE *argv, VALUE self)
 {
+  VALUE keyword, keydef;
   int value;
-  int def = NUM2INT(keydef);
+  int def;
+
+  rb_scan_args(argc, argv, "11", &keyword, &keydef);
+
+  if(argc==1) {
+    def = 0;
+  } else {
+    def = NUM2INT(keydef);
+  }
 
   keyi_c(SYMSTR_PTR(keyword), &value, def);
 
@@ -122,26 +166,45 @@ VALUE mirdl_keyi(VALUE self, VALUE keyword, VALUE keydef)
 }
 
 // void keyl_c(const char *, int *, const int)
-VALUE mirdl_keyl(VALUE self, VALUE keyword, VALUE keydef)
+VALUE mirdl_keyl(int argc, VALUE *argv, VALUE self)
 {
+  VALUE keyword, keydef;
   int value;
   int def;
 
-  def = RTEST(keydef) ? 1 : 0;
+  rb_scan_args(argc, argv, "11", &keyword, &keydef);
+
+  if(argc==1) {
+    def = -1;
+  } else {
+    def = RTEST(keydef) ? 1 : 0;
+  }
 
   keyl_c(SYMSTR_PTR(keyword), &value, def);
+
+  if(value == -1) {
+    return Qnil;
+  }
 
   return value != 0 ? Qtrue : Qfalse;
 }
 
 // void mkeyd_c(const char *, double [], const int, int *)
-VALUE mirdl_mkeyd(VALUE self, VALUE keyword, VALUE nmax)
+VALUE mirdl_mkeyd(int argc, VALUE *argv, VALUE self)
 {
+  VALUE keyword, nmax;
   int i, n;
   double * value;
   VALUE retval;
 
-  i = NUM2INT(nmax);
+  rb_scan_args(argc, argv, "11", &keyword, &nmax);
+
+  if(argc==1) {
+    i = 16;
+  } else {
+    i = NUM2INT(nmax);
+  }
+
   value = ALLOCA_N(double, i);
 
   mkeyd_c(SYMSTR_PTR(keyword), value, i, &n);
@@ -155,13 +218,21 @@ VALUE mirdl_mkeyd(VALUE self, VALUE keyword, VALUE nmax)
 }
 
 // void mkeyr_c(const char *, float [], const int, int *)
-VALUE mirdl_mkeyr(VALUE self, VALUE keyword, VALUE nmax)
+VALUE mirdl_mkeyr(int argc, VALUE *argv, VALUE self)
 {
+  VALUE keyword, nmax;
   int i, n;
   float * value;
   VALUE retval;
 
-  i = NUM2INT(nmax);
+  rb_scan_args(argc, argv, "11", &keyword, &nmax);
+
+  if(argc==1) {
+    i = 16;
+  } else {
+    i = NUM2INT(nmax);
+  }
+
   value = ALLOCA_N(float, i);
 
   mkeyr_c(SYMSTR_PTR(keyword), value, i, &n);
@@ -175,13 +246,21 @@ VALUE mirdl_mkeyr(VALUE self, VALUE keyword, VALUE nmax)
 }
 
 // void mkeyi_c(const char *, int [], const int, int *)
-VALUE mirdl_mkeyi(VALUE self, VALUE keyword, VALUE nmax)
+VALUE mirdl_mkeyi(int argc, VALUE *argv, VALUE self)
 {
+  VALUE keyword, nmax;
   int i, n;
   int * value;
   VALUE retval;
 
-  i = NUM2INT(nmax);
+  rb_scan_args(argc, argv, "11", &keyword, &nmax);
+
+  if(argc==1) {
+    i = 16;
+  } else {
+    i = NUM2INT(nmax);
+  }
+
   value = ALLOCA_N(int, i);
 
   mkeyi_c(SYMSTR_PTR(keyword), value, i, &n);
@@ -225,14 +304,14 @@ void init_mirdl_key(VALUE mMirdl)
   rb_define_module_function(mMirdl, "keyini", mirdl_keyini, -1);
   rb_define_module_function(mMirdl, "keyprsnt", mirdl_keyprsnt, 1);
   rb_define_alias(mMirdl, "keyprsnt?", "keyprsnt");
-  rb_define_module_function(mMirdl, "keya", mirdl_keya, 2);
-  rb_define_module_function(mMirdl, "keyf", mirdl_keyf, 2);
-  rb_define_module_function(mMirdl, "keyd", mirdl_keyd, 2);
-  rb_define_module_function(mMirdl, "keyr", mirdl_keyr, 2);
-  rb_define_module_function(mMirdl, "keyi", mirdl_keyi, 2);
-  rb_define_module_function(mMirdl, "keyl", mirdl_keyl, 2);
-  rb_define_module_function(mMirdl, "mkeyd", mirdl_mkeyd, 2);
-  rb_define_module_function(mMirdl, "mkeyr", mirdl_mkeyr, 2);
-  rb_define_module_function(mMirdl, "mkeyi", mirdl_mkeyi, 2);
+  rb_define_module_function(mMirdl, "keya", mirdl_keya, -1);
+  rb_define_module_function(mMirdl, "keyf", mirdl_keyf, -1);
+  rb_define_module_function(mMirdl, "keyd", mirdl_keyd, -1);
+  rb_define_module_function(mMirdl, "keyr", mirdl_keyr, -1);
+  rb_define_module_function(mMirdl, "keyi", mirdl_keyi, -1);
+  rb_define_module_function(mMirdl, "keyl", mirdl_keyl, -1);
+  rb_define_module_function(mMirdl, "mkeyd", mirdl_mkeyd, -1);
+  rb_define_module_function(mMirdl, "mkeyr", mirdl_mkeyr, -1);
+  rb_define_module_function(mMirdl, "mkeyi", mirdl_mkeyi, -1);
   rb_define_module_function(mMirdl, "keyfin", mirdl_keyfin, 0);
 }
