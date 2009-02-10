@@ -6,7 +6,10 @@ spec = Gem::Specification.new do |s|
   s.name = 'mirdl'
   s.version = '0.0.1'
   s.summary = 'Provides Ruby access to MIRIAD subroutine libraries.'
-  s.description = 'Provides Ruby access to MIRIAD subroutine libraries using dl extension.'
+  s.description = <<-EOD
+    Provides Ruby access to MIRIAD subroutine libraries
+    using custom C extension and the Ruby dl extension.
+    EOD
   #s.platform = Gem::Platform::Ruby
   s.required_ruby_version = '>= 1.8.1'
   s.add_dependency('narray', '>= 0.5.9')
@@ -21,17 +24,29 @@ spec = Gem::Specification.new do |s|
   # Files, Libraries, and Extensions
   s.files = FileList[
     'Rakefile',
-    'lib/**/*',
+    'ext/extconf.rb',
+    'ext/mirdl.h',
+    'ext/mirdl_for.h',
+    'ext/bug.c',
+    'ext/hio.c',
+    'ext/key.c',
+    'ext/mirdl.c',
+    'ext/options.c',
+    'ext/options_for.c',
+    'lib/mirdl.rb',
+    'lib/mirdl/select_na.rb',
+    'lib/mirdl/uvdat_na.rb',
+    'lib/mirdl/uvio_na.rb',
     'test/**/*'
   ]
-  s.require_paths = ['lib']
+  s.require_paths = ['ext', 'lib']
   #s.autorequire = nil
   #s.bindir = 'bin'
   #s.executables = []
   #s.default_executable = nil
 
   # C compilation
-  #s.extensions = %w[ extconf.rb ]
+  s.extensions = %w[ ext/extconf.rb ]
 
   # Documentation TODO
   #s.rdoc_options = []

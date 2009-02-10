@@ -1,5 +1,9 @@
 require 'rbconfig'
-require 'dl'
+
+# Require the mirdl shared library
+mirdl_shared_lib = 'mirdl.' + Config::CONFIG['DLEXT']
+require mirdl_shared_lib
+require 'mirdl_gem' if false # Fake out RDoc
 
 module Mirdl
 
