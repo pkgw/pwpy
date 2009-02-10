@@ -9,23 +9,6 @@ static ID id_call;
 static VALUE bug_proc = Qnil;
 static char * bug_label;
 
-// TODO Move constants to mirdl.rb
-//module Mirdl
-//
-//  BUGSEV = {
-//    'i' => 'Informational', 'I' => 'Informational',
-//    'w' => 'Warning',       'W' => 'Warning',
-//    'e' => 'Error',         'E' => 'Error',
-//    'f' => 'Fatal',         'F' => 'Fatal'
-//  }
-//
-//  BUGSEV_INFO  = 'i'
-//  BUGSEV_WARN  = 'w'
-//  BUGSEV_ERROR = 'e'
-//  BUGSEV_FATAL = 'f'
-//
-//  BUGLABEL = '(NOT SET)'
-
 // void bug_c(char s,Const char *m)
 static VALUE mirdl_bug_body(VALUE sym, VALUE args)
 {
