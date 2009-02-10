@@ -49,12 +49,9 @@ static VALUE mirdl_hopen(VALUE self, VALUE vname, VALUE vstatus)
   }
 
   hopen_c(&tno, name, status, &iostat);
-  if(iostat == -1) {
-    errno = EINVAL;
-    rb_sys_fail(status);
-  } else {
-    errno = iostat;
-    rb_sys_fail(name);
+  if(iostat) {
+    errno = (iostat == -1 ? EINVAL : iostat);
+    rb_sys_fail("hopen error");
   }
 
   return INT2NUM(tno);
@@ -126,11 +123,8 @@ static VALUE mirdl_haccess(VALUE self, VALUE tno, VALUE keyword, VALUE vstatus)
   }
 
   haccess_c(tno, &ihandle, kwptr, status, &iostat);
-  if(iostat == -1) {
-    errno = EINVAL;
-    rb_sys_fail(status);
-  } else {
-    errno = iostat;
+  if(iostat) {
+    errno = (iostat == -1 ? EINVAL : iostat);
     rb_sys_fail(kwptr);
   }
 
@@ -166,7 +160,7 @@ static VALUE mirdl_hdaccess(VALUE self, VALUE ihandle)
   hdaccess_c(ihandle, &iostat);
   if(iostat) {
     errno = (iostat == -1 ? EINVAL : iostat);
-    rb_sys_fail("hdelete error");
+    rb_sys_fail("hdaccess error");
   }
 
   return Qnil;
@@ -238,8 +232,7 @@ static VALUE mirdl_hio(int argc, VALUE *argv, VALUE self)
 
   hio_c(ihandle, dowrite, mtype, buf, offset, length, &iostat);
   if(!dowrite && iostat == -1) {
-    // EOF
-    return Qfalse;
+    return Qnil; // EOF
   }
   if(iostat) {
     errno = (iostat == -1 ? EINVAL : iostat);
@@ -455,7 +448,7 @@ static VALUE mirdl_hreada(int argc, VALUE * argv, VALUE self)
 
   hreada_c(ihandle, line, length, &iostat);
   if(iostat == -1) {
-    return Qnil;
+    return Qnil; // EOF
   } else if(iostat) {
     errno = iostat;
     rb_sys_fail("hreada error");
@@ -479,7 +472,7 @@ static VALUE mirdl_hwritea(VALUE self, VALUE vhandle, VALUE vline)
   hwritea_c(ihandle, RSTRING_PTR(vhandle), RSTRING_LEN(vhandle), &iostat);
   if(iostat) {
     errno = (iostat == -1 ? EINVAL : iostat);
-    rb_sys_fail("hdelete error");
+    rb_sys_fail("hwritea error");
   }
 
   return Qnil;
