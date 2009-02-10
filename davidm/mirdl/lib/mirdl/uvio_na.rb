@@ -7,14 +7,6 @@ require 'naptr' unless NArray.method_defined? :ptr
 
 module Mirdl
 
-  H_BYTE  = 1
-  H_INT   = 2
-  H_INT2  = 3
-  H_REAL  = 4
-  H_DBLE  = 5
-  H_TXT   = 6
-  H_CMPLX = 7
-
   class Vis < OpenStruct
     def initialize(nchan)
       super(

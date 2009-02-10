@@ -28,11 +28,31 @@ module Mirdl
   SYM = {}
 
   MAXSTRING = 4096
+
+  # Map bug severity to string
+  BUGSEV = {
+    'i' => 'Informational', 'I' => 'Informational',
+    'w' => 'Warning',       'W' => 'Warning',
+    'e' => 'Error',         'E' => 'Error',
+    'f' => 'Fatal',         'F' => 'Fatal'
+  }
+
+  # Bug severity codes
+  BUGSEV_INFO  = 'i'
+  BUGSEV_WARN  = 'w'
+  BUGSEV_ERROR = 'e'
+  BUGSEV_FATAL = 'f'
+
+  # hio typecodes
+  H_BYTE  = 1
+  H_INT   = 2
+  H_INT2  = 3
+  H_REAL  = 4
+  H_DBLE  = 5
+  H_TXT   = 6
+  H_CMPLX = 7
 end
 
-require 'mirdl/bug'
-require 'mirdl/key'
-require 'mirdl/options'
 require 'mirdl/select_na'
 require 'mirdl/uvio_na'
 require 'mirdl/uvdat_na'
