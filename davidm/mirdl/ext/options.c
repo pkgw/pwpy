@@ -4,18 +4,20 @@
 #include "mirdl_for.h"
 
 // void Options(const char *key, const char *opts[nopt], int present[nopts], int *nopt)
-VALUE mirdl_options(VALUE self, VALUE opts_ary, VALUE vkey)
+VALUE mirdl_options(int argc, VALUE *argv, VALUE self)
 {
   int i;
   int nopt;
   int *present;
   char *key;
   char **opts;
-  VALUE opthash;
+  VALUE opts_ary, vkey, opthash;
+
+  rb_scan_args(argc, argv, "11", &opts_ary, &vkey);
 
   Check_Type(opts_ary, T_ARRAY);
   nopt = RARRAY_LEN(opts_ary);
-  key = SYMSTR_PTR(vkey);
+  key = (argc < 2 ? "options" : SYMSTR_PTR(vkey));
   present = ALLOCA_N(int, nopt);
   opts = ALLOCA_N(char *, nopt);
 
@@ -44,5 +46,5 @@ VALUE mirdl_options(VALUE self, VALUE opts_ary, VALUE vkey)
 
 void init_mirdl_options(VALUE mMirdl)
 {
-  rb_define_module_function(mMirdl, "options", mirdl_options, 2);
+  rb_define_module_function(mMirdl, "options", mirdl_options, -1);
 }

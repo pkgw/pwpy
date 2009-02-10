@@ -3,6 +3,37 @@
 #include <errno.h>
 #include "mirdl.h"
 
+#define NARRAY_C
+#include "narray.h"
+#undef NARRAY_C
+
+static ID id_rstrip_bang;
+static VALUE cNArray;
+
+// Map H_type constants to NArray typecodes
+static enum NArray_Types hio2na[] = {
+  /* dummy   -> */ NA_NONE,
+  /* H_BYTE  -> */ NA_BYTE,
+  /* H_INT   -> */ NA_LINT,
+  /* H_INT2  -> */ NA_SINT,
+  /* H_REAL  -> */ NA_SFLOAT,
+  /* H_DBLE  -> */ NA_DFLOAT,
+  /* H_TXT   -> */ NA_NONE,
+  /* H_CMPLX -> */ NA_SCOMPLEX
+};
+
+// Map H_type constants to sizes
+static int hio_sizeof[] = {
+  /* dummy   -> */ 0,
+  /* H_BYTE  -> */ 1,
+  /* H_INT   -> */ 2,
+  /* H_INT2  -> */ 4,
+  /* H_REAL  -> */ 4,
+  /* H_DBLE  -> */ 8,
+  /* H_TXT   -> */ 0,
+  /* H_CMPLX -> */ 8
+};
+
 // void hopen_c(int *tno, Const char *name, Const char *status, int *iostat);
 static VALUE mirdl_hopen(VALUE self, VALUE vname, VALUE vstatus)
 {
@@ -149,16 +180,240 @@ static VALUE mirdl_hsize(VALUE self, VALUE ihandle)
   return OFFT2NUM(size);
 }
 
-// TODO
-#if 0
 // void hio_c(int ihandle, int dowrite, int type, char *buf, off_t offset, size_t length, int *iostat);
-static VALUE mirdl_hio(VALUE self, VALUE )
+static VALUE mirdl_hio(int argc, VALUE *argv, VALUE self)
 {
-    SYM[:%][]
-  end
-  module_function :%
+  VALUE vhandle, vdowrite, vtype, vbuf, voff, vlen;
+  int ihandle;
+  int dowrite;
+  int mtype;
+  off_t offset;
+  size_t length;
+  int iostat;
+  void * buf;
+  struct NARRAY * na;
+  int natype;
+
+  rb_scan_args(argc, argv, "51",
+      &vhandle, &vdowrite, &vtype, &vbuf, &voff, &vlen);
+
+  if(argc == 5) {
+    vlen = Qnil;
+  } else {
+    length = NUM2ULONG(vlen);
+  }
+
+  ihandle = NUM2INT(vhandle);
+  dowrite = RTEST(vdowrite) ? 1 : 0;
+  mtype = NUM2INT(vtype);
+  offset = NUM2OFFT(voff);
+
+  switch(mtype) {
+    case H_BYTE:
+    case H_INT:
+    case H_INT2:
+    case H_REAL:
+    case H_DBLE:
+    case H_CMPLX:
+      if(!IsNArray(vbuf)) {
+        rb_raise(rb_eArgError, "must use NArray for buffer, not %s", rb_obj_classname(vbuf));
+      }
+      GetNArray(vbuf, na);
+      natype = hio2na[mtype];
+      if(na->type != natype) {
+        rb_raise(rb_eTypeError, "expected NArray typecode %d, got %d", natype, na->type);
+      }
+      buf = na->ptr;
+      if(NIL_P(vlen) || length > na->total*hio_sizeof[mtype]) {
+        length = na->total*hio_sizeof[mtype];
+      }
+      break;
+    //case H_INT8:
+    case H_TXT:
+      rb_notimplement(); // TODO
+      break;
+    default:
+      bugv_c('f', "hio: Unrecognized write type %d", mtype);
+  }
+
+  hio_c(ihandle, dowrite, mtype, buf, offset, length, &iostat);
+  if(!dowrite && iostat == -1) {
+    // EOF
+    return Qfalse;
+  }
+  if(iostat) {
+    errno = (iostat == -1 ? EINVAL : iostat);
+    rb_sys_fail(dowrite ? "hio write error" : "hio read error");
+  }
+
+  return Qtrue;
 }
-#endif
+
+// #define hreadb_c(item,buf,offset,length,iostat)
+static VALUE mirdl_hreadb(int argc, VALUE *argv, VALUE self)
+{
+  int hioargc = argc+2;
+  VALUE * hioargv = ALLOCA_N(VALUE, hioargc);
+  hioargv[0] = argv[0];          // ihandle
+  hioargv[1] = Qfalse;           // dowrite
+  hioargv[2] = INT2FIX(H_BYTE);  // type
+  memcpy(hioargv+3, argv+1, (argc-1)*sizeof(VALUE));
+  return mirdl_hio(hioargc, hioargv, self);
+}
+
+// #define hwriteb_c(item,buf,offset,length,iostat)
+static VALUE mirdl_hwriteb(int argc, VALUE *argv, VALUE self)
+{
+  int hioargc = argc+2;
+  VALUE * hioargv = ALLOCA_N(VALUE, hioargc);
+  hioargv[0] = argv[0];          // ihandle
+  hioargv[1] = Qtrue;            // dowrite
+  hioargv[2] = INT2FIX(H_BYTE);  // type
+  memcpy(hioargv+3, argv+1, (argc-1)*sizeof(VALUE));
+  return mirdl_hio(hioargc, hioargv, self);
+}
+
+// #define hreadi_c(item,buf,offset,length,iostat)
+static VALUE mirdl_hreadi(int argc, VALUE *argv, VALUE self)
+{
+  int hioargc = argc+2;
+  VALUE * hioargv = ALLOCA_N(VALUE, hioargc);
+  hioargv[0] = argv[0];          // ihandle
+  hioargv[1] = Qfalse;           // dowrite
+  hioargv[2] = INT2FIX(H_INT);   // type
+  memcpy(hioargv+3, argv+1, (argc-1)*sizeof(VALUE));
+  return mirdl_hio(hioargc, hioargv, self);
+}
+
+// #define hwritei_c(item,buf,offset,length,iostat)
+static VALUE mirdl_hwritei(int argc, VALUE *argv, VALUE self)
+{
+  int hioargc = argc+2;
+  VALUE * hioargv = ALLOCA_N(VALUE, hioargc);
+  hioargv[0] = argv[0];          // ihandle
+  hioargv[1] = Qtrue;            // dowrite
+  hioargv[2] = INT2FIX(H_INT);   // type
+  memcpy(hioargv+3, argv+1, (argc-1)*sizeof(VALUE));
+  return mirdl_hio(hioargc, hioargv, self);
+}
+
+// #define hreadj_c(item,buf,offset,length,iostat)
+static VALUE mirdl_hreadj(int argc, VALUE *argv, VALUE self)
+{
+  int hioargc = argc+2;
+  VALUE * hioargv = ALLOCA_N(VALUE, hioargc);
+  hioargv[0] = argv[0];          // ihandle
+  hioargv[1] = Qfalse;           // dowrite
+  hioargv[2] = INT2FIX(H_INT2);  // type
+  memcpy(hioargv+3, argv+1, (argc-1)*sizeof(VALUE));
+  return mirdl_hio(hioargc, hioargv, self);
+}
+
+// #define hwritej_c(item,buf,offset,length,iostat)
+static VALUE mirdl_hwritej(int argc, VALUE *argv, VALUE self)
+{
+  int hioargc = argc+2;
+  VALUE * hioargv = ALLOCA_N(VALUE, hioargc);
+  hioargv[0] = argv[0];          // ihandle
+  hioargv[1] = Qtrue;            // dowrite
+  hioargv[2] = INT2FIX(H_INT2);  // type
+  memcpy(hioargv+3, argv+1, (argc-1)*sizeof(VALUE));
+  return mirdl_hio(hioargc, hioargv, self);
+}
+
+// #define hreadr_c(item,buf,offset,length,iostat)
+static VALUE mirdl_hreadr(int argc, VALUE *argv, VALUE self)
+{
+  int hioargc = argc+2;
+  VALUE * hioargv = ALLOCA_N(VALUE, hioargc);
+  hioargv[0] = argv[0];          // ihandle
+  hioargv[1] = Qfalse;           // dowrite
+  hioargv[2] = INT2FIX(H_REAL);  // type
+  memcpy(hioargv+3, argv+1, (argc-1)*sizeof(VALUE));
+  return mirdl_hio(hioargc, hioargv, self);
+}
+
+// #define hwriter_c(item,buf,offset,length,iostat)
+static VALUE mirdl_hwriter(int argc, VALUE *argv, VALUE self)
+{
+  int hioargc = argc+2;
+  VALUE * hioargv = ALLOCA_N(VALUE, hioargc);
+  hioargv[0] = argv[0];          // ihandle
+  hioargv[1] = Qtrue;            // dowrite
+  hioargv[2] = INT2FIX(H_REAL);  // type
+  memcpy(hioargv+3, argv+1, (argc-1)*sizeof(VALUE));
+  return mirdl_hio(hioargc, hioargv, self);
+}
+
+// #define hreadd_c(item,buf,offset,length,iostat)
+static VALUE mirdl_hreadd(int argc, VALUE *argv, VALUE self)
+{
+  int hioargc = argc+2;
+  VALUE * hioargv = ALLOCA_N(VALUE, hioargc);
+  hioargv[0] = argv[0];          // ihandle
+  hioargv[1] = Qfalse;           // dowrite
+  hioargv[2] = INT2FIX(H_DBLE);  // type
+  memcpy(hioargv+3, argv+1, (argc-1)*sizeof(VALUE));
+  return mirdl_hio(hioargc, hioargv, self);
+}
+
+// #define hwrited_c(item,buf,offset,length,iostat)
+static VALUE mirdl_hwrited(int argc, VALUE *argv, VALUE self)
+{
+  int hioargc = argc+2;
+  VALUE * hioargv = ALLOCA_N(VALUE, hioargc);
+  hioargv[0] = argv[0];          // ihandle
+  hioargv[1] = Qtrue;            // dowrite
+  hioargv[2] = INT2FIX(H_DBLE);  // type
+  memcpy(hioargv+3, argv+1, (argc-1)*sizeof(VALUE));
+  return mirdl_hio(hioargc, hioargv, self);
+}
+
+// #define hreadc_c(item,buf,offset,length,iostat)
+static VALUE mirdl_hreadc(int argc, VALUE *argv, VALUE self)
+{
+  int hioargc = argc+2;
+  VALUE * hioargv = ALLOCA_N(VALUE, hioargc);
+  hioargv[0] = argv[0];          // ihandle
+  hioargv[1] = Qfalse;           // dowrite
+  hioargv[2] = INT2FIX(H_CMPLX); // type
+  memcpy(hioargv+3, argv+1, (argc-1)*sizeof(VALUE));
+  return mirdl_hio(hioargc, hioargv, self);
+}
+
+// #define hwritec_c(item,buf,offset,length,iostat)
+static VALUE mirdl_hwritec(int argc, VALUE *argv, VALUE self)
+{
+  int hioargc = argc+2;
+  VALUE * hioargv = ALLOCA_N(VALUE, hioargc);
+  hioargv[0] = argv[0];          // ihandle
+  hioargv[1] = Qtrue;            // dowrite
+  hioargv[2] = INT2FIX(H_CMPLX); // type
+  memcpy(hioargv+3, argv+1, (argc-1)*sizeof(VALUE));
+  return mirdl_hio(hioargc, hioargv, self);
+}
+
+// #define hread_c(item,type,buf,offset,length,iostat)
+static VALUE mirdl_hread(int argc, VALUE *argv, VALUE self)
+{
+  int hioargc = argc+1;
+  VALUE * hioargv = ALLOCA_N(VALUE, hioargc);
+  hioargv[0] = argv[0];          // ihandle
+  hioargv[1] = Qfalse;           // dowrite
+  memcpy(hioargv+2, argv+1, (argc-1)*sizeof(VALUE));
+  return mirdl_hio(hioargc, hioargv, self);
+}
+
+// #define hwrite_c(item,type,buf,offset,length,iostat)
+static VALUE mirdl_hwrite(int argc, VALUE *argv, VALUE self)
+{
+  int hioargc = argc+1;
+  VALUE * hioargv = ALLOCA_N(VALUE, hioargc);
+  hioargv[0] = argv[0];          // ihandle
+  hioargv[1] = Qtrue;            // dowrite
+  memcpy(hioargv+2, argv+1, (argc-1)*sizeof(VALUE));
+  return mirdl_hio(hioargc, hioargv, self);
+}
 
 // void hseek_c(int ihandle, off_t offset);
 static VALUE mirdl_hseek(VALUE self, VALUE ihandle, VALUE voffset)
@@ -178,27 +433,64 @@ static VALUE mirdl_htell(VALUE self, VALUE ihandle)
   return OFFT2NUM(offset);
 }
 
-// TODO
-#if 0
 // void hreada_c(int ihandle, char *line, size_t length, int *iostat);
-static VALUE mirdl_hreada(VALUE self, VALUE )
+static VALUE mirdl_hreada(int argc, VALUE * argv, VALUE self)
 {
-    SYM[:%][]
-  end
-  module_function :%
+  VALUE vhandle, vlen;
+  int ihandle, length, iostat;
+  char *line;
+  VALUE str;
+
+  rb_scan_args(argc, argv, "11", &vhandle, &vlen);
+
+  ihandle = NUM2INT(vhandle);
+
+  if(argc == 1) {
+    length = MAXSTRING;
+  } else {
+    length = NUM2INT(vlen);
+  }
+
+  line = ALLOCA_N(char, length);
+
+  hreada_c(ihandle, line, length, &iostat);
+  if(iostat == -1) {
+    return Qnil;
+  } else if(iostat) {
+    errno = iostat;
+    rb_sys_fail("hreada error");
+  }
+
+  str = rb_str_new(line, length);
+  if(argc == 1) {
+    rb_funcall(str, id_rstrip_bang, 0);
+  }
+
+  return str;
 }
 
 // void hwritea_c(int ihandle, Const char *line, size_t length, int *iostat);
-static VALUE mirdl_hwritea(VALUE self, VALUE )
+static VALUE mirdl_hwritea(VALUE self, VALUE vhandle, VALUE vline)
 {
-    SYM[:%][]
-  end
-  module_function :%
+  int iostat;
+  int ihandle = NUM2INT(vhandle);
+
+  StringValue(vhandle);
+  hwritea_c(ihandle, RSTRING_PTR(vhandle), RSTRING_LEN(vhandle), &iostat);
+  if(iostat) {
+    errno = (iostat == -1 ? EINVAL : iostat);
+    rb_sys_fail("hdelete error");
+  }
+
+  return Qnil;
 }
-#endif
 
 void init_mirdl_hio(VALUE mMirdl)
 {
+  id_rstrip_bang = rb_intern("rstrip!");
+  rb_require("narray");
+  cNArray = rb_const_get(rb_cObject, rb_intern("NArray"));
+
   rb_define_module_function(mMirdl, "hopen", mirdl_hopen, 2);
   rb_define_module_function(mMirdl, "hflush",  mirdl_hflush, 1);
   rb_define_module_function(mMirdl, "habort",  mirdl_habort, 0);
@@ -210,9 +502,26 @@ void init_mirdl_hio(VALUE mMirdl)
   rb_define_module_function(mMirdl, "hexists",  mirdl_hexists, 2);
   rb_define_module_function(mMirdl, "hdaccess",  mirdl_hdaccess, 1);
   rb_define_module_function(mMirdl, "hsize",  mirdl_hsize, 1);
-  //TODO rb_define_module_function(mMirdl, "hio",  mirdl_hio, _);
+
+  rb_define_module_function(mMirdl, "hio",  mirdl_hio, -1);
+  rb_define_module_function(mMirdl, "hreadb", mirdl_hreadb, -1);
+  rb_define_module_function(mMirdl, "hwriteb", mirdl_hwriteb, -1);
+  rb_define_module_function(mMirdl, "hreadi", mirdl_hreadi, -1);
+  rb_define_module_function(mMirdl, "hwritei", mirdl_hwritei, -1);
+  rb_define_module_function(mMirdl, "hreadj", mirdl_hreadj, -1);
+  rb_define_module_function(mMirdl, "hwritej", mirdl_hwritej, -1);
+  rb_define_module_function(mMirdl, "hreadr", mirdl_hreadr, -1);
+  rb_define_module_function(mMirdl, "hwriter", mirdl_hwriter, -1);
+  rb_define_module_function(mMirdl, "hreadd", mirdl_hreadd, -1);
+  rb_define_module_function(mMirdl, "hwrited", mirdl_hwrited, -1);
+  rb_define_module_function(mMirdl, "hreadc", mirdl_hreadc, -1);
+  rb_define_module_function(mMirdl, "hwritec", mirdl_hwritec, -1);
+  rb_define_module_function(mMirdl, "hread", mirdl_hread, -1);
+  rb_define_module_function(mMirdl, "hwrite", mirdl_hwrite, -1);
+
   rb_define_module_function(mMirdl, "hseek",  mirdl_hseek, 1);
   rb_define_module_function(mMirdl, "htell",  mirdl_htell, 1);
-  //TODO rb_define_module_function(mMirdl, "hreada",  mirdl_hreada, _);
-  //TODO rb_define_module_function(mMirdl, "hwritea",  mirdl_hwritea, _);
+
+  rb_define_module_function(mMirdl, "hreada",  mirdl_hreada, -1);
+  rb_define_module_function(mMirdl, "hwritea",  mirdl_hwritea, 2);
 }

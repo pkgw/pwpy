@@ -5,24 +5,35 @@
 // TODO Default args!
 //
 
+static ID id_ARGV;
+static ID id_basename;
 static ID id_bug;
 static ID id_buglabel;
 static ID id_shellwords;
+static VALUE cFile;
 static VALUE mShellwords;
 
 static int key_argc = 0;
 static char ** key_argv = NULL;
 
 // void keyini_c(int, char *[])
-VALUE mirdl_keyini(VALUE self, VALUE vargv, VALUE vprogname)
+VALUE mirdl_keyini(int argc, VALUE *argv, VALUE self)
 {
   int i = 0;
-  VALUE arg;
+  VALUE vargv, vprogname, arg, arg0;
 
   if(key_argv) {
     rb_funcall(self, id_bug, 2,
         INT2NUM('f'), rb_str_new2("keyini already called"));
     return Qnil;
+  }
+
+  rb_scan_args(argc, argv, "02", &vargv, &vprogname);
+
+  switch(argc) {
+    case 0: vargv = rb_const_get(rb_cObject, id_ARGV);
+    case 1: arg0 = rb_gv_get("$0");
+            vprogname = rb_funcall(rb_cFile, id_basename, 1, arg0);
   }
 
   // If vargv is a String, convert to Array using Shellwords.shellwords
@@ -204,12 +215,14 @@ void init_mirdl_key(VALUE mMirdl)
 {
   rb_require("shellwords");
 
+  id_ARGV = rb_intern("ARGV");
+  id_basename = rb_intern("basename");
   id_bug = rb_intern("bug");
   id_buglabel = rb_intern("buglabel");
   id_shellwords = rb_intern("shellwords");
   mShellwords = rb_define_module("Shellwords");
 
-  rb_define_module_function(mMirdl, "keyini", mirdl_keyini, 2);
+  rb_define_module_function(mMirdl, "keyini", mirdl_keyini, -1);
   rb_define_module_function(mMirdl, "keyprsnt", mirdl_keyprsnt, 1);
   rb_define_alias(mMirdl, "keyprsnt?", "keyprsnt");
   rb_define_module_function(mMirdl, "keya", mirdl_keya, 2);

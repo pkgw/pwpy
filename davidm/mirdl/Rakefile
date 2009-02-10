@@ -39,7 +39,7 @@ spec = Gem::Specification.new do |s|
     'lib/mirdl/uvio_na.rb',
     'test/**/*'
   ]
-  s.require_paths = ['ext', 'lib']
+  s.require_paths = ['lib', 'ext']
   #s.autorequire = nil
   #s.bindir = 'bin'
   #s.executables = []

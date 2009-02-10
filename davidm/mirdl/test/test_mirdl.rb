@@ -45,6 +45,6 @@ keyfin
 p selProbe(sels,:antennae?)
 p selProbe(sels,:window?)
 p selProbe(sels,:window,2)
-tno = uvopen(vis,'old')
+tno = uvopen(vis,:old)
 selApply(tno, sels)
 uvclose(tno)

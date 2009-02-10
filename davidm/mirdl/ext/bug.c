@@ -38,7 +38,6 @@ static VALUE mirdl_bug_body(VALUE sym, VALUE args)
     sev = (char)FIX2INT(vs);
   } else {
     sev = *SYMSTR_PTR(vs);
-    rb_warn("sev=%c", sev);
   }
   msg = StringValueCStr(vm);
 
