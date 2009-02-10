@@ -1,0 +1,48 @@
+// Subroutines and functions from options.for
+
+#include "mirdl.h"
+#include "mirdl_for.h"
+
+// void Options(const char *key, const char *opts[nopt], int present[nopts], int *nopt)
+VALUE mirdl_options(VALUE self, VALUE opts_ary, VALUE vkey)
+{
+  int i;
+  int nopt;
+  int *present;
+  char *key;
+  char **opts;
+  VALUE opthash;
+
+  Check_Type(opts_ary, T_ARRAY);
+  nopt = RARRAY_LEN(opts_ary);
+  key = SYMSTR_PTR(vkey);
+  present = ALLOCA_N(int, nopt);
+  opts = ALLOCA_N(char *, nopt);
+
+  if(!present || !opts) {
+    rb_raise(rb_eNoMemError, "not enough memory for %d options", nopt);
+  }
+
+  for(i=0; i<nopt; i++) {
+    present[i] = 0;
+    opts[i] = SYMSTR_PTR(rb_ary_entry(opts_ary, i));
+  }
+
+  if(options_c(key, opts, present, nopt)) {
+    rb_raise(rb_eNoMemError, "not enough memory to pack keywords");
+  }
+
+  // Build options Hash
+  opthash = rb_hash_new();
+  for(i=0; i<nopt; i++) {
+    rb_hash_aset(opthash,
+        SYMSTR_SYM(rb_ary_entry(opts_ary, i)), present[i] ? Qtrue : Qfalse);
+  }
+
+  return opthash;
+}
+
+void init_mirdl_options(VALUE mMirdl)
+{
+  rb_define_module_function(mMirdl, "options", mirdl_options, 2);
+}
