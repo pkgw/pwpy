@@ -941,6 +941,9 @@ end
 
 newautomap.csh vis=$wd/tempcalfin mode=auto outdir=$outfile $mapopt $olay $device
 
+if (-e $wd/sefd.xx) cp $wd/sefd.xx $outfile/sefd.xx
+if (-e $wd/sefd.xx) cp $wd/sefd.yy $outfile/sefd.yy
+
 echo "Copying gains back to original file ($vis)"
 
 if ($polsplit && $#pollist > 1) then # If pols were split and more than one pol exists
