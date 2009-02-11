@@ -28,6 +28,7 @@ spec = Gem::Specification.new do |s|
     'ext/mirdl.h',
     'ext/mirdl_for.h',
     'ext/bug.c',
+    'ext/headio.c',
     'ext/hio.c',
     'ext/key.c',
     'ext/mirdl.c',
