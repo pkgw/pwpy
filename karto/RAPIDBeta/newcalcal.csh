@@ -141,6 +141,7 @@ set polsplit = 0 # Split pol before processing (first x, then y)
 set debug = 0 # Save temp data after running?
 set device
 set wrath = 0
+set wrathcycle = 0
 set sefd = 0
 #################################################################
 # Here is the keyword/value pairing code. It basically operates
@@ -476,6 +477,7 @@ echo "Starting flagging and calibration."
 
 foreach ipol ($pollist) # Work with only one pol at a time
     set idx = 0; set mididx = 1; set postidx = 2
+    set wrathcycle = 1
     foreach file ($wd/tempcali{$ipol}*)
 	@ idx++ midxidx++ postidx++
 	set cycletime = "`date +%s.%N`" # Counter for processing time
@@ -574,6 +576,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	set intcheck = `tail -n 1 $wd/ampinfo | awk '{print $3}'`
 	# Enforce a limit on the minmum number of flags needed to pass to the next stage
 	if ($linelim < 10) set linelim = 10
+	if ($linemax < 10) set linemax = 10
 	echo "Minimum flagging line is $linelim, maximum is $linemax."
 	# Enforce the 5% limit for flagging.
 	if (`sed -n {$linecheck}p $wd/ampinfo | awk '{if ($3*1 < (addflux+sysflux)) print "go"; else if ($3*1 < intcheck/10 && (addflux+sysflux) < intcheck/10) print "go"}' addflux=$addflux sysflux=$sysflux intcheck=$intcheck` == "go") then
@@ -625,14 +628,13 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	echo " "
 	# UVAFLAG is used here since we created a temp dataset to apply the gains to.
 	uvaflag vis=$file tvis=$wd/tempcal2 >& /dev/null
-	rm -rf $wd/tempcal2 $wd/amplog $wd/ampinfo $wd/phaseinfo
+	rm -rf $wd/tempcal2 $wd/amplog $wd/ampinfo
 	
 	set pols = (x y)
 	if ("$retlim" == 0) set pols
 	# If we haven't dropped below the repeat threshold, then repeat.
 	if (`echo $sflags $linelim $lim | awk '{if ($1 > $2*(nchan^.5)) print "go"; else if ($2 < $3) print "go"}' nchan=$nchan` == "go" || `echo $intcheck $addflux $sysflux | awk '{if ($1/10 > ($2+$3)) print "go"}'` == "go") then
 	    echo " "
-	    rm -f $wd/ampinfo $wd/amplog $wd/phaseinfo $wd/phaselog
 	    echo "Flagging complete, continuing cycle $idx of "`echo $#regtimes | awk '{print $1-2}'`"..."
 	    goto jumper
 	endif
@@ -849,8 +851,8 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	if ($postidx >= $#regtimes) then
 	    uvaver vis="$wd/tempcali$ipol*" out=$wd/tempcal2 options=relax > /dev/null
 	    uvaflag vis=$wd/tempcal$ipol tvis=$wd/tempcal2 > /dev/null
-	    echo "Moving to final cycle!"
 	    rm -rf $wd/tempcal2
+	    echo "Moving to final cycle!"
 	else
 	    set cycletimes = (`date +%s.%N | awk '{print int(($1-date1)/60),int(($1-date1)%60)}' date1=$cycletime` 0 0)
 	    echo "Cycle complete! Calibration cycle took $cycletimes[1] minute(s) and $cycletimes[2] second(s). Moving on..."    
@@ -858,6 +860,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	echo " "
     end
     #Final cycle for a pol, use autoref to find the best ref antenna for the whole dataset
+    poljumper:
     if ($autoref) then
 	uvplt vis=$wd/tempcal$ipol options=2pass select='-auto' axis=ti,pha device=/null | grep "Baseline" | awk '{print $2,$3,$5}' | tr -d '-' > $wd/refantstat
 	set antstat = 0
@@ -870,10 +873,62 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	end
 	echo -n "Refant $refant choosen! "
     endif
-#Do one more mfcal before using the automapper
+    # The final solution check, start with a dash of MFCAL
+    set checkamp = 1000
     mfcal vis=$wd/tempcal$ipol refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& /dev/null
-# Use AUTOMAP's onboard RFI excision to attempt to nuke any more channels that have RFI in it.
-    if ($wrath) then
+    # Add a pinch of UVAVER to apply the gains
+    uvaver vis=$wd/tempcal$ipol out=$wd/tempcal2 options=relax >& /dev/null
+    #Display if neccessary
+    if ($display) uvplt vis=$wd/tempcal2 select='-auto' $device options=2pass,nobase,equal,source axis=re,im >& /dev/null
+    # Error capture if no records to be flagged
+    touch $wd/amplog
+    # Get listing of all amps from datasset
+    uvlist vis=$wd/tempcal2 select='-auto' recnum=0 line=chan,1,1,$nchan | sed 1,9d | awk '{if ($1*1 ==0); else if ($8*1 != 0 || $9*1 != 0) print $1,$9,(($8*cos(pi*$9/180)-flux)^2+($8*sin(pi*$9/180))^2)^.5}' flux=$calflux pi=3.141592 | sort -nk3 > $wd/ampinfo
+    # Gather some basic information about the data limits
+    set linecheck = `wc -l $wd/ampinfo | awk '{print int($1*.95)}'`
+    set linelim = `wc -l $wd/ampinfo | awk '{print int($1*exp(-1*siglim))}' siglim=$siglim`
+    set linemax = `wc -l $wd/ampinfo | awk '{print 1+int($1*.05)}'`
+    set intcheck = `tail -n 1 $wd/ampinfo | awk '{print $3}'`
+    # Enforce a limit on the minmum number of flags needed to pass to the next stage
+    if ($linelim < 10) set linelim = 10
+    if ($linemax < 10) set linemax = 10
+    echo "Minimum flagging line is $linelim, maximum is $linemax."
+    if (`sed -n {$linecheck}p $wd/ampinfo | awk '{if ($3*1 < (addflux+sysflux)) print "go"; else if ($3*1 < intcheck/10 && (addflux+sysflux) < intcheck/10) print "go"}' addflux=$addflux sysflux=$sysflux intcheck=$intcheck` == "go") then
+	if (`echo $intcheck $addflux $sysflux | awk '{if ($1/10 > ($2+$3)) print "go"}'` == "go") then
+	    awk '{if ($3 > (intcheck/10)) print $1}' intcheck=$intcheck $wd/ampinfo | sort -nk1 > $wd/amplog
+	    set checkamp = `echo $intcheck | awk '{print $1/10}'`
+	else
+	    awk '{if ($3 > (addflux+sysflux)) print $1}' addflux=$addflux sysflux=$sysflux $wd/ampinfo | sort -nk1 > $wd/amplog
+	    set checkamp = `echo $addflux $sysflux | awk '{print $1+$2}'`
+	endif
+    else
+	sed 1,{$linecheck}d $wd/ampinfo | awk '{print $1}' | sort -nk1 > $wd/amplog
+        set checkamp =  `sed -n {$linecheck}p $wd/ampinfo | awk '{print $3}'`
+    endif
+    echo "Flagging commencing, outer-limit for flux noise is $checkamp Jy for integrated spectra."
+    set llim=1
+    set ulim=50
+    set lim = `wc -w $wd/amplog | awk '{print $1}'`
+    
+    echo -n "$lim integrated records to flag..."
+    while ($llim <= $lim)
+        set flags = `sed -n {$llim},{$ulim}p $wd/amplog | awk '{printf "%s","vis("$1"),"}' ulim=$ulim`
+        uvflag vis=$wd/tempcal2 flagval=f options=none select=$flags >& /dev/null
+        set llim = `echo $llim | awk '{print $1+50}'`
+        set ulim = `echo $ulim | awk '{print $1+50}'`
+        echo -n "."
+    end
+    echo " "
+    # UVAFLAG is used here since we created a temp dataset to apply the gains
+    uvaflag vis=$wd/tempcal$ipol tvis=$wd/tempcal2 >& /dev/null
+    rm -rf $wd/tempcal2 $wd/amplog $wd/ampinfo
+    if (`echo $linelim $lim | awk '{if ($1 < $2) print "go"}'` == "go" || `echo $intcheck $addflux $sysflux | awk '{if ($1/10 > ($2+$3)) print "go"}'` == "go") then
+	echo " "
+        echo "Flagging complete, continuing final cycle for $ipol data..."
+	goto poljumper
+    endif
+    # Use AUTOMAP's onboard RFI excision to attempt to nuke any more channels that have RFI in it.
+    if ($wrath && $wrathcycle) then
         echo "Beginning WRATH flagging"
         newautomap.csh vis=$wd/tempcal$ipol options=noflag,nocal,wrath,junk >& $wd/wrathlog
         set rfilist = (`grep WRATHCHAN $wd/wrathlog`)
@@ -887,8 +942,9 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	end
         echo "."
         echo "WRATH cleaning complete!"
+	set wrathcycle = 0
     endif
-
+    
     # Horray again for MFCAL
     mfcal vis=$wd/tempcal$ipol refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& /dev/null
 
@@ -906,10 +962,12 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	rm -rf $wd/sefdcal
 	echo "done!"
     endif
+    echo "Final cycle complete!"
+    echo ""
 end
 
 # Pull together all polarizations
-uvaver vis=`echo " $pollist" | sed -e 's/ /,'$wd'\/tempcal/g' -e 's/,//'` options=relax out=$wd/tempcalfin
+uvaver vis=`echo " $pollist" | sed -e 's/ /,'$wd'\/tempcal/g' -e 's/,//'` options=relax out=$wd/tempcalfin >& /dev/null
 
 # Put the results of the mapping process into a specified directory
 set outfile = "cal-$source-maps"
@@ -1068,7 +1126,6 @@ foreach base (`cat $wd/ibaselist | awk '{print $1}'`)
 	echo " $base --- $fpts out of $ipts spectra preserved (0%)" >> $wd/rpttemp
     endif
 end
-
 
 report: # Beyond here is pretty boring code, so we'll just "ignore" it for the time being
 

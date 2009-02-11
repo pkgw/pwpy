@@ -528,9 +528,9 @@ set idx = 0
 foreach file ($vis)
     echo -n "Splitting $file..."
     @ idx++
-    uvaver vis=$file out=$wd/tempmap$idx.xpol select="-shadow(7.5),pol(xx),$uselect" interval=$interval > /dev/null 
+    uvaver vis=$file out=$wd/tempmap$idx.xpol select="-shadow(7.5),pol(xx),$uselect" interval=$interval >& /dev/null 
     echo -n "."
-    uvaver vis=$file out=$wd/tempmap$idx.ypol select="-shadow(7.5),pol(yy),$uselect" interval=$interval > /dev/null 
+    uvaver vis=$file out=$wd/tempmap$idx.ypol select="-shadow(7.5),pol(yy),$uselect" interval=$interval >& /dev/null 
     if !(-e $wd/tempmap$idx.xpol/visdata || -e $wd/tempmap$idx.ypol/visdata) then
 	echo "FATAL ERROR: UVAVER has failed!" 
 	goto enderr
@@ -743,10 +743,12 @@ if ($autolim) then
 endif
 
 if ($verb) then
+    set levs = (`echo $imstats[3] $imstats2[4] | awk '{lim = 4*$1; while (lim < $2) {print lim; lim=2*lim}}'`)
+    set levs = `echo $levs | tr ' ' ','`
     if ("$plotscale" == "") then
 	set plotscale = `echo $range | awk '{if ($1 > 500) print "log"; else print "lin"}'`
     endif
-    cgdisp slev=p,1 in=$wd/tempmap.cm,$wd/tempmap.cm region=relcenter,arcsec,box"(-$arc,-$arc,$arc,$arc)" labtyp=arcmin options=beambl,wedge,3value,mirr,full csize=0.6,1 olay=$wd/mixolay type=contour,pix slev=p,1 range=0,0,$plotscale,2 $device >& /dev/null
+    cgdisp in=$wd/tempmap.cm,$wd/tempmap.cm region=relcenter,arcsec,box"(-$arc,-$arc,$arc,$arc)" labtyp=arcmin options=beambl,wedge,3value,mirr,full csize=0.6,1 olay=$wd/mixolay type=contour,pix levs1=$levs range=0,0,$plotscale,2 $device >& /dev/null
 endif
 
 if ($mode == "auto") goto auto # Skip display during the auto cycle
@@ -757,15 +759,19 @@ plot:
 if ("$plotscale" == "") then
     set plotscale = `echo $range | awk '{if ($1 > 500) print "log"; else print "lin"}'`
 endif
+echo $imstats
+echo $imstats2
+set levs = (`echo $imstats[3] $imstats2[4] | awk '{lim = 4*$1; while (lim < $2) {print lim; lim=2*lim}}'`)
+set levs = `echo $levs | tr ' ' ','`
 
 grep -v "#" $wd/sfind.log | tr ":" " " | awk '{if ($10*$11 < 3000) print "star hms dms","sfind"NR,"no",$1,$2,$3,$4,$5,$6,$10*$11,$10*$11; else print "star hms dms","sfind"NR,"no",$1,$2,$3,$4,$5,$6,3000,3000}' > $wd/sfindolay # Build an overlay of detected sources
 cat $wd/olay $wd/sfindolay > $wd/mixolay
 
 echo "Writing PS document"
-cgdisp slev=p,1 in=$wd/tempmap.cm,$wd/tempmap.cm region=relcenter,arcsec,box"(-$arc,-$arc,$arc,$arc)" device=$wd/tempmap.ps/cps labtyp=arcmin options=beambl,wedge,3value,mirr,full csize=0.6,1 olay=$wd/mixolay type=contour,pix slev=p,1 range=0,0,$plotscale,3 >& /dev/null
+cgdisp in=$wd/tempmap.cm,$wd/tempmap.cm region=relcenter,arcsec,box"(-$arc,-$arc,$arc,$arc)" device=$wd/tempmap.ps/cps labtyp=arcmin options=beambl,wedge,3value,mirr,full csize=0.6,1 olay=$wd/mixolay type=contour,pix levs1=$levs range=0,0,$plotscale,3 >& /dev/null
 
 if ($display) echo "Displaying Results"
-if ($display) cgdisp slev=p,1 in=$wd/tempmap.cm,$wd/tempmap.cm region=relcenter,arcsec,box"(-$arc,-$arc,$arc,$arc)" labtyp=arcmin options=beambl,wedge,3value,mirr,full csize=0.6,1 olay=$wd/mixolay type=contour,pix slev=p,1 range=0,0,$plotscale,2 $device >& /dev/null
+if ($display) cgdisp in=$wd/tempmap.cm,$wd/tempmap.cm region=relcenter,arcsec,box"(-$arc,-$arc,$arc,$arc)" labtyp=arcmin options=beambl,wedge,3value,mirr,full csize=0.6,1 olay=$wd/mixolay type=contour,pix levs1=$levs range=0,0,$plotscale,2 $device >& /dev/null
 
 set orc = `echo 500 $freq | awk '{print int($1*1430/$2)}'`
 
@@ -1137,6 +1143,7 @@ if ($savedata != 2) then
     mv $wd/tempmap.rs $outfile/$source.rs
     mv $wd/tempmap.cm $outfile/$source.cm
     mv $wd/tempmap.ps $outfile/$source.ps
+    mv $wd/mixolay $outfile/$source.olay
     if ($savedata) then
 	set idx = 1
 	while ($idx <= $#vis)
