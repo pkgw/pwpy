@@ -122,7 +122,7 @@ static VALUE mirdl_haccess(VALUE self, VALUE tno, VALUE keyword, VALUE vstatus)
     case 'w': status = (status[1] == '+' ? "append" : "write"); break;
   }
 
-  haccess_c(tno, &ihandle, kwptr, status, &iostat);
+  haccess_c(NUM2INT(tno), &ihandle, kwptr, status, &iostat);
   if(iostat) {
     errno = (iostat == -1 ? EINVAL : iostat);
     rb_sys_fail(kwptr);
@@ -157,7 +157,7 @@ static VALUE mirdl_hdaccess(VALUE self, VALUE ihandle)
 {
   int iostat = 0;
 
-  hdaccess_c(ihandle, &iostat);
+  hdaccess_c(NUM2INT(ihandle), &iostat);
   if(iostat) {
     errno = (iostat == -1 ? EINVAL : iostat);
     rb_sys_fail("hdaccess error");
@@ -454,12 +454,7 @@ static VALUE mirdl_hreada(int argc, VALUE * argv, VALUE self)
     rb_sys_fail("hreada error");
   }
 
-  str = rb_str_new(line, length);
-  if(argc == 1) {
-    rb_funcall(str, id_rstrip_bang, 0);
-  }
-
-  return str;
+  return rb_str_new2(line);
 }
 
 // void hwritea_c(int ihandle, Const char *line, size_t length, int *iostat);
