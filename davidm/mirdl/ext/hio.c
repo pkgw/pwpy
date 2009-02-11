@@ -444,7 +444,8 @@ static VALUE mirdl_hreada(int argc, VALUE * argv, VALUE self)
     length = NUM2INT(vlen);
   }
 
-  line = ALLOCA_N(char, length);
+  line = ALLOCA_N(char, length+1);
+  line[length] = '\0'; // Backstop
 
   hreada_c(ihandle, line, length, &iostat);
   if(iostat == -1) {
