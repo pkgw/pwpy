@@ -405,8 +405,6 @@ set clist
 set tslist
 set tclist
 
-set lim = `wc -l $wd/timecheck2 | awk '{print $1}'`
-set idx = 2
 
 #################################################################
 # The first goal of the program is to figure out how 'large' to
@@ -416,19 +414,12 @@ set idx = 2
 # so the processor can catch RFI that is changing over time.
 #################################################################
 
-set vals = (`head -n 1 $wd/timecheck2`)
-set mastertime = `echo $vals[2] | awk '{printf "%7.6f\n",$1-(10/1440)+2400000.5}'`
-set mastertime2 = `echo $vals[2] | awk '{printf "%7.6f\n",$1-(10/1440)}'`
-set starttime = $vals[2]
-set timeint = $vals[3]
-#if ($vals[4] == "vis") then
-#    set slist = ($slist $vals[1])
-#    set tslist = ($tslist $vals[5])
-#else if ($vals[4] == "tvis") then
-#    set clist = ($clist $vals[1])
-#    set tclist = ($tclist $vals[5])
-#endif
-
+set lim = `wc -l $wd/timecheck2 | awk '{print $1}'`
+set idx = 1
+set mastertime
+set mastertime2
+set starttime = 0
+set timeint
 while ($idx <= $lim) 
     set vals = (`sed -n {$idx}p $wd/timecheck2`)
     if ($starttime == "0") then
@@ -437,7 +428,7 @@ while ($idx <= $lim)
 	set mastertime2 = ($mastertime2 `echo $vals[2] | awk '{printf "%7.6f\n",$1-(.5/86400)}'`)
     endif
     set timeint = `echo $timeint $vals[3] | awk '{print $1+$2}'`
-    if (`echo $timeint | awk '{if ($1 > inttime) print "go"}' inttime=$inttime` == "go" || `echo $vals[2] $vals[3] $starttime | awk '{if (((1440*($1-$3))+$2) > 2*inttime) print "go"}' inttime=$inttime` == go) then
+    if (`echo $vals[2] $vals[3] $starttime | awk '{if (((1440*($1-$3))+$2) > inttime) print 1}' inttime=$inttime`) then
 	set finstarttime = `echo $starttime | awk '{printf "%7.6f",$1+2400000.5}'`
 	set finstoptime = `echo $vals[2] $vals[3] | awk '{printf "%7.6f",$1+($2/1440)+2400000.5+(.5/86400)}'`
 	set finslist = `echo $slist | tr ' ' ','`","
@@ -568,9 +559,9 @@ while ($idx <= $lim)
 	    echo "time($timelim[1],$timelim[2])" >> $wd/badantshist
 	    cat $wd/badants >> $wd/badantshist
 	else
-	    newrfi32.csh vis=$wd/vis,$wd/tvis select="time($timelim[1],$timelim[2])" rawdata=$wd/specdata
-	    newfracture.csh vis=$wd npoly=$cpoly nsig=$csig options=$corr,desel,recover,$rfitype,`if ($debug) echo "verbose"` $csel > $wd/badants
-	    echo "No source files, invoking failsafe (tvis) parameter..."
+	    echo "No source files, using results from last decorruption cycle..."
+	 #   newrfi32.csh vis=$wd/vis,$wd/tvis select="time($timelim[1],$timelim[2])" rawdata=$wd/specdata
+	 #   newfracture.csh vis=$wd npoly=$cpoly nsig=$csig options=$corr,desel,recover,$rfitype,`if ($debug) echo "verbose"` $csel > $wd/badants
 	endif
         echo `grep "DESEL" $wd/badants | tr -d '[a-z][A-Z]:().-' | tr ',' ' ' | wc -w`" potentially corrupted antennas found..."
 	grep 'select=pol' $wd/badants > $wd/corrflag

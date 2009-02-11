@@ -58,7 +58,7 @@ echo ""
 echo "CALLING SEQUENCE: newcalcal.csh vis=vis (tvis=tvis flux=flux1,"
 echo "    flux2,flux3 plim=plim int=int siglim=siglim refant=refant"
 echo "    olay=olay options=debug,display,autoref,polsplit,[outsource,"
-echo "    insource])"
+echo "    insource],sefd)"
 echo ""
 echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 echo ""
@@ -106,9 +106,9 @@ echo " olay - Overlay file for the autoimaging process. No default."
 echo ""
 echo ""
 echo " device - Device to plot results to (e.g. /xw for x-window)."
-echo '    Default is /null'
+echo '    Default is /null.'
 echo ""
-echo " options=debug,display,autoref,polsplit,outsource,insource"
+echo " options=debug,display,autoref,polsplit,outsource,insource,sefd"
 echo "    debug - Don't delete temporary files created by CALCAL."
 echo "    autoref - Have CALCAL automatically determine the best"
 echo "        reference antenna (default unless refant is specified)."
@@ -116,6 +116,7 @@ echo "    polsplit - Process x and y pol data seperately."
 echo "    outsource - Split tvis files into smaller chunks for faster"
 echo "        processing (default, uses extra hard drive space)."
 echo "    insource - Don't split tvis files into smaller chunks."
+echo "    sefd - Calculate the SEFD for each antenna."
     exit 0
 endif
 
@@ -139,9 +140,8 @@ set display = 0 # Dispaly results while processing?
 set polsplit = 0 # Split pol before processing (first x, then y)
 set debug = 0 # Save temp data after running?
 set device
-set wrath
-set wrathcycle
-
+set wrath = 0
+set sefd = 0
 #################################################################
 # Here is the keyword/value pairing code. It basically operates
 # by going through each argument, attempting to figure out which
@@ -191,6 +191,8 @@ else if ("$argv[1]" =~ 'options='*) then
 	    set debug = 1
 	else if ($option == "wrath") then
 	    set wrath = 1
+	else if ($option == "sefd") then
+	    set sefd = 1
 	else
 	    set badopt = ($badopt $option)
 	endif
@@ -376,10 +378,10 @@ set pollist = ("xxyy")
 
 if ($polsplit) then
     set pollist = ("xx" "yy")
-    uvaver vis=$vis select='window(1),pol(xx),-auto' out=$wd/tempcalxx options=relax,nocal,nopass,nopol >& /dev/null
-    uvaver vis=$vis select='window(1),pol(yy),-auto' out=$wd/tempcalyy options=relax,nocal,nopass,nopol >& /dev/null
+    uvaver vis=$vis select='window(1),pol(xx)' out=$wd/tempcalxx options=relax,nocal,nopass,nopol >& /dev/null
+    uvaver vis=$vis select='window(1),pol(yy)' out=$wd/tempcalyy options=relax,nocal,nopass,nopol >& /dev/null
 else
-    uvaver vis=$vis select='window(1),pol(xx,yy),-auto' out=$wd/tempcalxxyy options=relax,nocal,nopass,nopol >& /dev/null
+    uvaver vis=$vis select='window(1),pol(xx,yy)' out=$wd/tempcalxxyy options=relax,nocal,nopass,nopol >& /dev/null
 endif
 
 # Perform some error checking to make sure that "blank" datasets are created
@@ -476,7 +478,6 @@ foreach ipol ($pollist) # Work with only one pol at a time
     set idx = 0; set mididx = 1; set postidx = 2
     foreach file ($wd/tempcali{$ipol}*)
 	@ idx++ midxidx++ postidx++
-	set wrathcycle = 1 # Trigger for WRATH to operate
 	set cycletime = "`date +%s.%N`" # Counter for processing time
 	set cycle =  `echo $idx | awk '{print 1000+$1}' | sed 's/1//'`
 	set precycle =  `echo $idx | awk '{print 999+$1}' | sed 's/1//'`
@@ -828,23 +829,21 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	    goto jumper
 	endif
 
-	# Use AUTOMAP's onboard RFI excision to attempt to nuke any more channels that have RFI in it. The wrathcycle switch is invoked here to make sure that this processed is performed only once per file
-	if ($wrath && $wrathcycle)
-	    echo "Beginning WRATH flagging"
-	    set rfilist = (`newautomap.csh vis=$file options=noflag,nocal,wrath,junk | grep WRATHCHAN`)
-	    shift rfilist
-	    echo -n "$#rfilist polluted image planes found, beginning removal."
-	    set rfilist = `echo $rfilist | tr ' ' ','`
-	    set rfiflags = (`newoptfchan.csh chanlist=$rfilist`)
-	    foreach rfiline ($rfiflags)
-		echo -n "."
-		uvflag vis=$file flagval=f options=none $rfiline > /dev/null
-	    end
-	    echo "."
-	    echo "WRATH cleaning complete!"
-	    set wrathcycle
-	    if ($#rfiflags) goto jumper
-	endif
+    if ($polsplit && $sefd) then
+        echo -n "Beginning SEFD calculation"
+	uvflag vis=$file options=none flagval=u select=auto >& /dev/null
+	uvcal vis=$file options=nocal,nopass,nopol,fxcal out=$wd/sefdcal >& /dev/null
+	uvflag vis=$wd/sefdcal flagval=f select='amp(0,0.0000000000000001)' options=none >& /dev/null #This is here since uvcal is stupid, and this corresponds to a noise level of 80 dBS (SNR of 1:10^8)
+	echo -n ", calculating gains tables..."
+	mfcal vis=$wd/sefdcal refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& /dev/null
+	echo " Ant Pol  R-Gain Avg  R-Gain RMS  I-Gain Avg  I-Gain RMS   SEFD (Jy)" >> $wd/sefd.$ipol$cycle
+	echo "====================================================================" >> $wd/sefd.$ipol$cycle
+
+	gplist vis=$wd/sefdcal options=all | sed 's/^.\{10\}//g' | grep "Ant" | sort -nk2 | awk '{if (NR == 1 || ant == $2) {ant=$2;n++; re += $5; rs += $5*$5;im += $6;is += $6*$6}; if (ant != $2) {printf "%4s   %1s % .4e % .4e % .4e % .4e % .4e\n",ant,pol,re/n,sqrt((rs-n*(re/n)*(re/n))/n),im/n,sqrt((is-(n*(im/n)*(im/n)))/n),((re*re)+(im*im))/(n^2);ant=$2;n=1;re=$5;rs=$5*$5;im=$6;is=$6*$6}}' pol=`echo $ipol | sed -e 's/xx/x/g' -e 's/yy/y/g'`| awk '{if ($7*1 != 0) print $0}' >> $wd/sefd.$ipol$cycle
+	rm -rf $wd/sefdcal
+	echo "done!"
+    endif
+
 
     	# If on the last cycle, then use uvaver to pull together all of the datasets. Otherwise, repeat with the next time cycle.
 	if ($postidx >= $#regtimes) then
@@ -871,8 +870,42 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	end
 	echo -n "Refant $refant choosen! "
     endif
+#Do one more mfcal before using the automapper
+    mfcal vis=$wd/tempcal$ipol refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& /dev/null
+# Use AUTOMAP's onboard RFI excision to attempt to nuke any more channels that have RFI in it.
+    if ($wrath) then
+        echo "Beginning WRATH flagging"
+        newautomap.csh vis=$wd/tempcal$ipol options=noflag,nocal,wrath,junk >& $wd/wrathlog
+        set rfilist = (`grep WRATHCHAN $wd/wrathlog`)
+        shift rfilist
+        echo -n "$#rfilist polluted image planes found, beginning removal."
+        set rfilist = `echo $rfilist | tr ' ' ','`
+        set rfiflags = (`newoptfchan.csh chanlist=$rfilist`)
+        foreach rfiline ($rfiflags)
+	    echo -n "."
+	    uvflag vis=$file flagval=f options=none $rfiline > /dev/null
+	end
+        echo "."
+        echo "WRATH cleaning complete!"
+    endif
+
     # Horray again for MFCAL
     mfcal vis=$wd/tempcal$ipol refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& /dev/null
+
+    if ($polsplit && $sefd) then
+        echo -n "Beginning SEFD calculation"
+	uvflag vis=$wd/tempcal$ipol options=none flagval=u select=auto >& /dev/null
+	uvcal vis=$wd/tempcal$ipol options=nocal,nopass,nopol,fxcal out=$wd/sefdcal >& /dev/null
+	uvflag vis=$wd/sefdcal flagval=f select='amp(0,0.0000000000000001)' options=none >& /dev/null #This is here since uvcal is stupid, and this corresponds to a noise level of 80 dBS (SNR of 1:10^8)
+	echo -n ", calculating gains tables..."
+	mfcal vis=$wd/sefdcal refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& /dev/null
+	echo " Ant Pol  R-Gain Avg  R-Gain RMS  I-Gain Avg  I-Gain RMS   SEFD (Jy)" > $wd/sefd.$ipol
+	echo "====================================================================" >> $wd/sefd.$ipol
+
+	gplist vis=$wd/sefdcal options=all | sed 's/^.\{10\}//g' | grep "Ant" | sort -nk2 | awk '{if (NR == 1 || ant == $2) {ant=$2;n++; re += $5; rs += $5*$5;im += $6;is += $6*$6}; if (ant != $2) {printf "%4s   %1s % .4e % .4e % .4e % .4e % .4e\n",ant,pol,re/n,sqrt((rs-n*(re/n)*(re/n))/n),im/n,sqrt((is-(n*(im/n)*(im/n)))/n),((re*re)+(im*im))/(n^2);ant=$2;n=1;re=$5;rs=$5*$5;im=$6;is=$6*$6}}' pol=`echo $ipol | sed -e 's/xx/x/g' -e 's/yy/y/g'` | awk '{if ($7*1 != 0) print $0}' >> $wd/sefd.$ipol
+	rm -rf $wd/sefdcal
+	echo "done!"
+    endif
 end
 
 # Pull together all polarizations
@@ -906,7 +939,7 @@ end
 # done manually by users not using that software.
 #################################################################
 
-newautomap.csh vis=$wd/tempcalfin mode=auto outdir=$outfile $mapopt $olay
+newautomap.csh vis=$wd/tempcalfin mode=auto outdir=$outfile $mapopt $olay $device
 
 echo "Copying gains back to original file ($vis)"
 

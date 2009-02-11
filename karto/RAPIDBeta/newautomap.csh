@@ -4,7 +4,7 @@
 #
 # A simple mapping routine that has a bunch of cool features to it...
 
-onintr fail
+onintr enderr
 
 if ($#argv == 0) then
       #################################################################
@@ -57,11 +57,11 @@ echo "    crange=crange interval=interval weightmode=[natural,uniform]"
 echo "    imsize=imsize1,imsize2 cellsize=cellsize cleantpye=[clean,"
 echo "    mem] cregion=cregion cleanlim=cleanlim amplim=amplim1,amplim2"
 echo "    ,amplim3 sysflux=sysflux refant=refant selfcalint=selfcalint"
-echo "    selfcaltol=selfcaltol selfcalsigma=selfcalsigma"
+echo "    selfcaltol=selfcaltol selfcalsigma=selfcalsigma device=device"
 echo "    dregion=dregion outdir=outdir olay=olay options=[autoflag,"
 echo "    noflag],[autoamp,noamp],[autopha,nopha],[autocal,nocal],"
 echo "    [drmax,fidmax],[intclean,nointclean],[savedata,savemaps,junk]"
-echo "    ,autolim,autoref,[mfs,nomfs])"
+echo "    ,autolim,autoref,[mfs,nomfs],verbose)"
 echo ""
 echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 echo ""
@@ -144,9 +144,12 @@ echo ""
 echo " olay - Overlay file to be used when making final images. No"
 echo "    default."
 echo ""
+echo " device - Device to plot results to (e.g. /xw for x-window)."
+echo '    Default is /null.'
+echo ""
 echo " options=[autoflag,noflag],[autoamp,noamp],[autopha,nopha],"
 echo "    [autocal,nocal],[drmax,fidmax],[intclean,nointclean],"
-echo "    [savedata,savemaps,junk],autolim,autoref,[mfs,nomfs]"
+echo "    [savedata,savemaps,junk],autolim,autoref,[mfs,nomfs],verbose"
 echo "    autoflag - Automatically flag bad based on amplitude ranges"
 echo "        specified (Default)."
 echo "    noflag - No automated flagging."
@@ -174,10 +177,9 @@ echo "    autoref - Automatically determine the refant (Default)."
 echo "    mfs - Use the MFS switch for imaging. See MIRIAD for more"
 echo "        details (Default)."
 echo "    nomfs - Do not use the MFS switch for imaging."
+echo "    verbose - Display results at each iteration."
 exit 0
 endif
-
-onintr enderr # Error trapping
 
 # Begin variable preset, determine what variables to populate. These are variables that the user has control over when calling the program
 
@@ -187,6 +189,7 @@ set amplim = (0 5000 10000) # Amplitude limits for flagging of data
 set preamplim
 set uselect # User selection parameters for mapping, i.e. xx or yy. Users should note that shadowed ants are automatically deselected.
 set niters = 2500 # Limit to provide clean, assuming that it's nice and happy
+set wniters = 100 # Limit for wrath cleaning
 set cleantype = clean # Clean operating mode
 set cregion # Cleaning region for thingy
 set dregion # Display region for map
@@ -201,6 +204,7 @@ set weightmode = "natural" # Weighting mode for the invert step
 set imsize # Size of image (in pixels)
 set cellsize # Size of cell (in arcsecs)
 set device
+set display
 set iopt = "options=mfs,double" # Options for invert, usually just double and mfs
 set intclean = 1 # IntelliCLEAN - Automatically determines the number of niters to use
 set refant = 0 # As usual, just the referance antenna for selfcal to use
@@ -214,10 +218,11 @@ set addflux = 5 # Non-init parameter, awaiting further testnig
 set intamplim = 0 # Initial amp limit for data, non-init
 set plotscale # Plotting scale for map
 set sopt # slop parameter for invert, should be used if MFS is not
-set wrath # Muah ha ha ha, let no RFI escape...
+set wrath = 0# Muah ha ha ha, let no RFI escape...
 set autolim
 set sysflux = 2
-
+set verb
+set debug
 if ($#argv == 0) then
     echo "AUTOMAP: No input files detected!"
     exit 0
@@ -280,6 +285,7 @@ else if ("$argv[1]" =~ 'refant='*) then
     set refant = `echo $argv[1] | sed 's/refant=//'`
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'device='*) then
+    set display = 1
     set device = "$argv[1]"
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'outdir='*) then
@@ -371,6 +377,11 @@ else if ("$argv[1]" =~ 'options='*) then
 	    set autolim = 1
 	else if ($option == "autoref") then
 	    set refant = 0
+	else if ($option == "verbose") then
+	    set verb = 1
+	    if !($display) set device = 'device=/xs'
+	else if ($option == "debug") then
+	    set debug = 1
 	else
 	    set badopt = ($badopt $option)
 	endif
@@ -598,7 +609,7 @@ if !($autoflag || $autopha || $autoflag || $wrath || "$mode" == "inter") set mod
 #Clear out the garbage from the last run first
 
 foreach type (map beam clean cm rs)
-   if (-e $wd/tempmap.$type)  rm -r $wd/tempmap.$type
+   if (-e $wd/tempmap.$type) rm -r $wd/tempmap.$type
 end
 
 #Grid an invert visabilities.
@@ -641,13 +652,13 @@ if ($intclean) then
 
     cd $wd
     rm -f sfind.log
-    sfind in=tempmap.cm options=oldsfind,auto rmsbox=256 xrms=3 labtyp=arcsec >& /dev/null 
+    sfind in=tempmap.cm options=oldsfind,auto,nofit rmsbox=100 xrms=3 labtyp=arcsec >& /dev/null 
     cd ..
-
-    set niters = `grep -v "#" $wd/sfind.log | awk '{if ($7 > 0) cycles+=log((3000*noise)/$7)/log(.9)} END {print int(cycles)}' noise=$imstats[3]`
-    if ($niters < 250) then
-	echo "Derived value for niters was $niters... invoking safegaurd and putting niters at 250."
-	set niters = 250
+    # Had to patch here since sfind was having problems... stupid bugger
+    set niters = `grep -v "#" $wd/sfind.log | awk '{if ($6*$7 > 3000*noise) cycles+=log((3000*noise)/($6*$7))/log(.9)} END {print int(cycles)}' noise=$imstats[3]`
+    if ($niters < 100) then
+	echo "Derived value for niters was $niters... invoking safegaurd and putting niters at 100."
+	set niters = 100
     else if ($niters > 25000) then
 	echo "Derived value for $niters was $niters... invoking safeguard and putting nitters at 25000"
  	set niters = 25000
@@ -666,17 +677,17 @@ set imstats = (`imstat in=$wd/tempmap.rs | awk '{if (check == 1) print $0; else 
 
 cd $wd
 rm -f sfind.log
-sfind in=tempmap.rs options=oldsfind,auto,nofit rmsbox=256 xrms=3 labtyp=arcsec >& /dev/null 
+sfind in=tempmap.rs options=oldsfind,auto,nofit rmsbox=100 xrms=4 labtyp=arcsec >& /dev/null 
 cd ..
 
 #Verify that the residual maps look clean. If not, reclean or advise the user that recleaning needs to be performed
 echo "Currently at $niters cycles..."
-if (`grep -v "#" $wd/sfind.log | awk '{if ($3 > 3000*noise) cycles+=log((3000*noise)/$3)/log(.9)} END {print int(cycles)*1}' noise=$imstats[3]` > `echo $niters | awk '{print int(.05*$1)}'` && $niters != 25000) then
+if (`grep -v "#" $wd/sfind.log | awk '{if ($7*1 > 3000*noise) cycles+=log((3000*noise)/($6*$7))/log(.9)} END {print int(cycles)*1}' noise=$imstats[3]` > `echo $niters | awk '{print int(.05*$1)}'` && $niters != 25000) then
     if ($intclean) then
 	set niters = `grep -v "#" $wd/sfind.log | awk '{ cycles+=log((3000*noise)/$3)/log(.9)} END {print int(cycles)+niters}' noise=$imstats[3] niters=$niters`
-	if ($niters < 250) then
-	    echo "Derived value for $niters was $niters... invoking safegaurd and putting niters at 250."
-	    set niters = 250
+	if ($niters < 100) then
+	    echo "Derived value for $niters was $niters... invoking safegaurd and putting niters at 100."
+	    set niters = 100
 	else if ($niters > 25000) then
 	    echo "Derived value for $niters was $niters... invoking safeguard and putting nitters at 25000"
 	    set niters = 25000
@@ -698,7 +709,7 @@ else
 endif
 
 cd $wd; rm -f sfind.log
-sfind in=tempmap.cm options=oldsfind,auto rmsbox=256 xrms=5 labtyp=arcsec >& /dev/null
+sfind in=tempmap.cm options=oldsfind,auto,nofit rmsbox=256 xrms=4 labtyp=arcsec >& /dev/null
 cd ..
 
 # Find some stats about the map...
@@ -731,6 +742,13 @@ if ($autolim) then
     echo "Amp limits automatically derived - $amplim[1] low, $amplim[2] high, $amplim[3] spectral."
 endif
 
+if ($verb) then
+    if ("$plotscale" == "") then
+	set plotscale = `echo $range | awk '{if ($1 > 500) print "log"; else print "lin"}'`
+    endif
+    cgdisp slev=p,1 in=$wd/tempmap.cm,$wd/tempmap.cm region=relcenter,arcsec,box"(-$arc,-$arc,$arc,$arc)" labtyp=arcmin options=beambl,wedge,3value,mirr,full csize=0.6,1 olay=$wd/mixolay type=contour,pix slev=p,1 range=0,0,$plotscale,2 $device >& /dev/null
+endif
+
 if ($mode == "auto") goto auto # Skip display during the auto cycle
 
 plot:
@@ -740,14 +758,14 @@ if ("$plotscale" == "") then
     set plotscale = `echo $range | awk '{if ($1 > 500) print "log"; else print "lin"}'`
 endif
 
-grep -v "#" $wd/sfind.log | tr ":" " " | awk '{if ($11 < 3000) print "star hms dms","sfind"NR,"no",$1,$2,$3,$4,$5,$6,$11,$11; else print "star hms dms","sfind"NR,"no",$1,$2,$3,$4,$5,$6,3000,3000}' > $wd/sfindolay # Build an overlay of detected sources
+grep -v "#" $wd/sfind.log | tr ":" " " | awk '{if ($10*$11 < 3000) print "star hms dms","sfind"NR,"no",$1,$2,$3,$4,$5,$6,$10*$11,$10*$11; else print "star hms dms","sfind"NR,"no",$1,$2,$3,$4,$5,$6,3000,3000}' > $wd/sfindolay # Build an overlay of detected sources
 cat $wd/olay $wd/sfindolay > $wd/mixolay
 
 echo "Writing PS document"
 cgdisp slev=p,1 in=$wd/tempmap.cm,$wd/tempmap.cm region=relcenter,arcsec,box"(-$arc,-$arc,$arc,$arc)" device=$wd/tempmap.ps/cps labtyp=arcmin options=beambl,wedge,3value,mirr,full csize=0.6,1 olay=$wd/mixolay type=contour,pix slev=p,1 range=0,0,$plotscale,3 >& /dev/null
 
-echo "Displaying Results"
-cgdisp slev=p,1 in=$wd/tempmap.cm,$wd/tempmap.cm device=/xs region=relcenter,arcsec,box"(-$arc,-$arc,$arc,$arc)" labtyp=arcmin options=beambl,wedge,3value,mirr,full csize=0.6,1 olay=$wd/mixolay type=contour,pix slev=p,1 range=0,0,$plotscale,2 >& /dev/null
+if ($display) echo "Displaying Results"
+if ($display) cgdisp slev=p,1 in=$wd/tempmap.cm,$wd/tempmap.cm region=relcenter,arcsec,box"(-$arc,-$arc,$arc,$arc)" labtyp=arcmin options=beambl,wedge,3value,mirr,full csize=0.6,1 olay=$wd/mixolay type=contour,pix slev=p,1 range=0,0,$plotscale,2 $device >& /dev/null
 
 set orc = `echo 500 $freq | awk '{print int($1*1430/$2)}'`
 
@@ -959,16 +977,22 @@ wrath:
 ################################################################# 
 
 if ($wrath || "$mode" == "inter") then
+    set cniters = `grep -v "#" $wd/sfind.log | awk '{if ($6*$7 > .25*3000*noise*(nchan^.5)) cycles+=log((.25*3000*noise)/($6*$7))/log(.9)} END {print int(cycles)}' noise=$imstats[3] nchan=$nchan`
+    if ($cniters < 10) then
+	set cniters = 10
+    else if ($cniters > 10000) then
+    set cniters = 10000
+    endif
     echo "Beginning WRATH clean, performing invert..."
-    invert vis=`echo $vislist | tr ' ' ','` map=$wd/wrath.map beam=$wd/wrath.beam cell=$cellsize imsize=$imsize sup=$sup select=$sel options=double slop=1 >& /dev/null 
+    invert vis=`echo $vislist | tr ' ' ','` map=$wd/wrath.map beam=$wd/wrath.beam cell=$cellsize imsize=$imsize sup=$sup select=$sel options=double slop=1 >& $wd/progress
     if !(-e $wd/wrath.map && -e $wd/wrath.beam) then
 	echo "FATAL ERROR: INVERT has failed to complete (most likely a buffer space issue)"
 	goto enderr
     endif
-    echo -n "Cleaning channel maps..."
-    clean map=$wd/wrath.map beam=$wd/wrath.beam out=$wd/wrath.clean niters=$niters "$cregion" >& /dev/null 
+    echo -n "Cleaning channel maps with $cniters iterations..."
+    clean map=$wd/wrath.map beam=$wd/wrath.beam out=$wd/wrath.clean niters=$cniters "$cregion" >& $wd/progress 
     echo "restoring..."
-    restor map=$wd/wrath.map beam=$wd/wrath.beam model=$wd/wrath.clean out=$wd/wrath.rs mode=residual >& /dev/null
+    restor map=$wd/wrath.map beam=$wd/wrath.beam model=$wd/wrath.clean out=$wd/wrath.rs mode=residual >& $wd/progress
 
     imstat in=$wd/wrath.rs options=noheader | sed -e 1d -e 's/\([0-9][0-9]\)-/\1 -/g' | awk '{if ($5 !=0) printf "%s %.24f\n",$1,$5}' | sort -nk2 > $wd/wrathstats
     set midplane = `wc -l $wd/wrathstats | awk '{print int(.5+$1/2)}' | awk '{if ($1 < 1) print 1; else print $1}'`
@@ -978,7 +1002,7 @@ if ($wrath || "$mode" == "inter") then
     echo "$#badchans RFI afflicted images planes found...blasting RFI!"
     echo "Eliminating the following bad channels:"
     echo "WRATHCHAN: $badchans"
-    echo -n "Beginning flagging"
+    echo -n "Beginning flagging..."
 
     foreach chan ($badchans)
 	echo -n "."
@@ -1139,5 +1163,5 @@ if ($savedata != 2) then
     mv $wd/imgrpt $outfile/imgrpt
 endif
 
-rm -rf $wd
+if !($debug) rm -rf $wd
 exit 0
