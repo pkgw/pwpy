@@ -15,7 +15,7 @@ include Mirdl
 # as possible; it is not intended to show off Ruby coding idioms.
 
 # No need to declare Ruby variables.    # character var*12,name*(?)
-# The spring to life when assigned.     # integer iostat,tno,item
+# They spring to life when assigned.    # integer iostat,tno,item
                                         #
 keyini                                  #
 vis = keya('vis')                       #
