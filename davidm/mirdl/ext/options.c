@@ -11,7 +11,7 @@ VALUE mirdl_options(int argc, VALUE *argv, VALUE self)
   int *present;
   char *key;
   char **opts;
-  VALUE opts_ary, vkey, opthash;
+  VALUE opts_ary, vkey, flag_ary;
 
   rb_scan_args(argc, argv, "11", &opts_ary, &vkey);
 
@@ -34,14 +34,13 @@ VALUE mirdl_options(int argc, VALUE *argv, VALUE self)
     rb_raise(rb_eNoMemError, "not enough memory to pack keywords");
   }
 
-  // Build options Hash
-  opthash = rb_hash_new();
+  // Build flag array
+  flag_ary = rb_ary_new2(nopt);
   for(i=0; i<nopt; i++) {
-    rb_hash_aset(opthash,
-        SYMSTR_SYM(rb_ary_entry(opts_ary, i)), present[i] ? Qtrue : Qfalse);
+    rb_ary_store(flag_ary, i, present[i] ? Qtrue : Qfalse);
   }
 
-  return opthash;
+  return flag_ary;
 }
 
 void init_mirdl_options(VALUE mMirdl)
