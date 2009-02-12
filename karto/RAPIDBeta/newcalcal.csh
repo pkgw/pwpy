@@ -459,7 +459,6 @@ if ($outsource && "$tvis[1]" != "") then
         if !(-e $wd/tvis{$filemark}000/visdata) @ tviscount[1]--
     end
 endif
-
 echo " "
 echo " "
 echo "Starting flagging and calibration."
@@ -484,7 +483,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
     set idx = 0; set mididx = 1; set postidx = 2
     set wrathcycle = 1
     foreach file ($wd/tempcali{$ipol}*)
-	@ idx++ midxidx++ postidx++
+	@ idx++ mididx++ postidx++
 	set cycletime = "`date +%s.%N`" # Counter for processing time
 	set cycle =  `echo $idx | awk '{print 1000+$1}' | sed 's/1//'`
 	set precycle =  `echo $idx | awk '{print 999+$1}' | sed 's/1//'`
@@ -492,6 +491,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	set prefiles # Source files from observing immediately prior to cal cycle
 	set postfiles # Source files from observing immediately following the cal cycle
 	if ($outsource && "$tvis[1]" != "") then
+	
 	    if ($tviscount[$idx]) set prefiles = "$wd/tvis*$precycle"
 	    if ($tviscount[$mididx]) set postfiles = "$wd/tvis*$cycle"
 	    set sfilelist = ($prefiles $postfiles) # "Paste" the two file sets together
@@ -1070,7 +1070,7 @@ foreach tfile ($tvis)
 	if (-e $vis/bandpass.xx) mv $vis/bandpass.xx $vis/bandpass
 	if (-e $tfile/gains) mv $tfile/gains $tfile/tempgains
 	if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/tempbandpass
-	gpcopy vis=$vis out=$tfile
+	gpcopy vis=$vis out=$tfile > /dev/null
 	if (-e $tfile/gains) mv $tfile/gains $tfile/gains.xx
 	if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/bandpass.xx
 	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.xx
@@ -1085,7 +1085,7 @@ foreach tfile ($tvis)
 	if (-e $vis/bandpass.yy) mv $vis/bandpass.yy $vis/bandpass
 	if (-e $tfile/gains) mv $tfile/gains $tfile/tempgains
 	if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/tempbandpass
-	gpcopy vis=$vis out=$tfile
+	gpcopy vis=$vis out=$tfile > /dev/null
 	if (-e $tfile/gains) mv $tfile/gains $tfile/gains.yy
 	if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/bandpass.yy
 	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.yy
