@@ -9,8 +9,8 @@ SELS = Sels.new(256)
 
 #  Get the user parameters.
 keyini
-vis = keya(:vis);
-logfile = keya(:log);
+vis = keya(:vis)
+logfile = keya(:log)
 selInput(SELS)
 keyfin
 
@@ -99,7 +99,7 @@ if(selProbe(SELS,'antennae?',0.0))
     for j in 0...nants
       for i in 0...nfeeds
         if !ant[j]
-          gains[k][j*nfeeds+i] = 0;
+          gains[k][j*nfeeds+i] = 0
         end
       end
     end
