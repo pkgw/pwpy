@@ -51,7 +51,7 @@ static VALUE mirdl_hopen(VALUE self, VALUE vname, VALUE vstatus)
   hopen_c(&tno, name, status, &iostat);
   if(iostat) {
     errno = (iostat == -1 ? EINVAL : iostat);
-    rb_sys_fail("hopen error");
+    rb_sys_fail(name);
   }
 
   return INT2NUM(tno);
