@@ -24,8 +24,7 @@ module Mirdl
   SYM[:uvDatOpn] = LIBMIR['uvdatopn_', 'Ii']
   def uvDatOpn
     r, rs = SYM[:uvDatOpn][0]
-    raise RuntimeError.new unless r!=0
-    rs[0]
+    r != 0 ? rs[0] : nil
   end
   module_function :uvDatOpn
 
