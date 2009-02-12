@@ -24,7 +24,11 @@ module Mirdl
   SYM[:uvDatOpn] = LIBMIR['uvdatopn_', 'Ii']
   def uvDatOpn
     r, rs = SYM[:uvDatOpn][0]
-    r != 0 ? rs[0] : nil
+    return nil if r == 0
+    tno = rs[0]
+    uvnext(tno)
+    uvrewind(tno)
+    tno
   end
   module_function :uvDatOpn
 
@@ -56,6 +60,7 @@ module Mirdl
   # void uvDatGti(const char *object, int *ival)
   SYM[:uvDatGti] = LIBMIR['uvdatgti_', '0Sp'+'I']
   def uvDatGti(object)
+    object = object.to_s
     p = DL.malloc(4*DL.sizeof('I'))
     r, rs = SYM[:uvDatGti][object, p, object.length]
     if object == 'pols'
@@ -70,6 +75,7 @@ module Mirdl
   # void uvDatGtr(const char *object, float *rval)
   SYM[:uvDatGtr] = LIBMIR['uvdatgtr_', '0Sf'+'I']
   def uvDatGtr(object)
+    object = object.to_s
     r, rs = SYM[:uvDatGtr][object, 0.0, object.length]
     rs[1]
   end
@@ -78,6 +84,7 @@ module Mirdl
   # void uvDatGta(const char *object, char *aval)
   SYM[:uvDatGta] = LIBMIR['uvdatgta_', '0Ss'+'II']
   def uvDatGta(object, size=128)
+    object = object.to_s
     aval=DL.malloc(size)
     r, rs = SYM[:uvDatGta][object, aval, object.length, size]
     rs[1].to_s.rstrip!
@@ -87,6 +94,7 @@ module Mirdl
   # void uvDatSet(const char *object, int ival)
   SYM[:uvDatSet] = LIBMIR['uvdatset_', '0Si'+'I']
   def uvDatSet(object, value)
+    object = object.to_s
     r, rs = SYM[:uvDatSet][object, value, object.length]
     rs[1]
   end
@@ -95,8 +103,9 @@ module Mirdl
   # int uvDatPrb(const char *object, double dval)
   SYM[:uvDatPrb] = LIBMIR['uvdatprb_', '0SD'+'I']
   def uvDatPrb(object, value)
+    object = object.to_s
     r, rs = SYM[:uvDatPrb][object, value, object.length]
-    rs[1]
+    r != 0
   end
   module_function :uvDatPrb
 
