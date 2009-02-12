@@ -1003,7 +1003,7 @@ end
 # done manually by users not using that software.
 #################################################################
 
-newautomap.csh vis=$wd/tempcalfin mode=auto outdir=$outfile $mapopt $olay $device
+newautomap.csh vis=$wd/tempcalfin mode=auto outdir=$outfile $mapopt $olay $device `if ($debug) echo "options=debug"`
 
 if (-e $wd/sefd.xx) cp $wd/sefd.xx $outfile/sefd.xx
 if (-e $wd/sefd.xx) cp $wd/sefd.yy $outfile/sefd.yy
@@ -1012,48 +1012,54 @@ echo "Copying gains back to original file ($vis)"
 
 if ($polsplit && $#pollist > 1) then # If pols were split and more than one pol exists
     if (-e $outfile/$source.1.xx/gains) then # If the automapping software had "tweaks" for the x-pol gains solution, apply those tweaks
-	puthd in=$outfile/$source.1.xx/interval value=.5 > /dev/null
-	gpcopy vis=$outfile/$source.1.xx out=$wd/tempcalxx mode=apply > /dev/null
-	puthd in=$wd/tempcalxx/interval value=.5 > /dev/null 
-	gpcopy vis=$wd/tempcalxx out=$vis > /dev/null
-	# Move pol-specific gains "out of the way" so that information isnb't overwritten by gpcopy
-	if (-e $vis/gains) mv $vis/gains $vis/gains.xx 
-	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.xx
+	puthd in=$outfile/$source.1.xx/interval value=.1 > /dev/null
+	gpcopy vis=$outfile/$source.1.xx out=$vis > /dev/null
+	if (-e $vis/gains) mv $vis/gains $vis/gains.xxp
+	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.xxp
     endif
-    if (-e $outfile/$source.1.yy/gains) then # If the automapping software had "tweaks" for the y-pol gains solution, apply those tweaks
-	puthd in=$outfile/$source.1.yy/interval value=.5 > /dev/null
-	gpcopy vis=$outfile/$source.1.yy out=$wd/tempcalyy mode=apply > /dev/null
-	puthd in=$wd/tempcalyy/interval value=.5 > /dev/null
+    puthd in=$wd/tempcalxx/interval value=.1 > /dev/null 
+    gpcopy vis=$wd/tempcalxx out=$vis > /dev/null
+    # Move pol-specific gains "out of the way" so that information isnb't overwritten by gpcopy
+    if (-e $vis/gains) mv $vis/gains $vis/gains.xx 
+    if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.xx
+#   if (-e $outfile/$source.1.yy/gains) then # If the automapping software had "tweaks" for the y-pol gains solution, apply those tweaks
+	puthd in=$outfile/$source.1.yy/interval value=.1 > /dev/null
 	gpcopy vis=$outfile/$source.1.yy out=$vis > /dev/null
-	# Move pol-specific gains "out of the way" so that information isnb't overwritten by gpcopy
-	if (-e $vis/gains) mv $vis/gains $vis/gains.yy
-	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.yy
+	if (-e $vis/gains) mv $vis/gains $vis/gains.yyp
+	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.yyp
     endif
+    puthd in=$wd/tempcalyy/interval value=.1 > /dev/null
+    gpcopy vis=$wd/tempcalyy out=$vis > /dev/null
+    # Move pol-specific gains "out of the way" so that information isn't overwritten by gpcopy
+    if (-e $vis/gains) mv $vis/gains $vis/gains.yy
+    if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.yy
 else if ($polsplit) then # if polspilt was used, but only one pol was found
     if (-e $outfile/$source.1.$pollist[1]/gains) then # If the automapping software had "tweaks" for a single pol gains solution, apply those tweaks
-	puthd in=$outfile/$source.1.$pollist[1]/interval value=.5 > /dev/null
-	gpcopy vis=$outfile/$source.1.$pollist[1] out=$wd/tempcal$pollist[1] mode=apply > /dev/null
-	puthd in=$wd/tempcal$pollist[1]/interval value=.5 > /dev/null
-	gpcopy vis=$wd/tempcal$pollist[1] out=$vis > /dev/null
-	# Move pol-specific gains "out of the way" so that information isnb't overwritten by gpcopy
-	if (-e $vis/gains) mv $vis/gains $vis/gains.$pollist[1]
+	puthd in=$outfile/$source.1.$pollist[1]/interval value=.1 > /dev/null
+	gpcopy vis=$outfile/$source.1.$pollist[1] out=$vis > /dev/null
+	if (-e $vis/gains) mv $vis/gains $vis/gains.$pollist[1] 
 	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.$pollist[1]
     endif
+    puthd in=$wd/tempcal$pollist[1]/interval value=.1 > /dev/null
+    gpcopy vis=$wd/tempcal$pollist[1] out=$vis > /dev/null
+    # Move pol-specific gains "out of the way" so that information isn't overwritten by gpcopy
+    if (-e $vis/gains) mv $vis/gains $vis/gains.$pollist[1]
+    if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.$pollist[1]
 else
     if (-e $outfile/$source.1.xx/gains) then # If the automapping software had "tweaks" for the x-pol gains solution, apply those tweaks
-	puthd in=$outfile/$source.1.xx/interval value=.5 > /dev/null
+	puthd in=$outfile/$source.1.xx/interval value=.1 > /dev/null
 	gpcopy vis=$outfile/$source.1.xx out=$vis > /dev/null
-	# Move pol-specific gains "out of the way" so that information isnb't overwritten by gpcopy
+	# Move pol-specific gains "out of the way" so that information isn't overwritten by gpcopy
 	mv $vis/gains $vis/gains.xx
     endif
     if (-e $outfile/$source.1.yy/gains) then # If the automapping software had "tweaks" for the y-pol gains solution, apply those tweaks
-	puthd in=$outfile/$source.1.yy/interval value=.5 > /dev/null
+	puthd in=$outfile/$source.1.yy/interval value=.1 > /dev/null
 	# Move pol-specific gains "out of the way" so that information isnb't overwritten by gpcopy
 	gpcopy vis=$outfile/$source.1.yy out=$vis > /dev/null
 	mv $vis/gains $vis/gains.yy
     endif
     # Copy over any "general" gains solutions (relating to multiple pols)
-    puthd in=$wd/tempcal$pollist[1]/interval value=.5 > /dev/null
+    puthd in=$wd/tempcal$pollist[1]/interval value=.1 > /dev/null
     gpcopy vis=$wd/tempcal$pollist[1] out=$vis > /dev/null
 endif
 
@@ -1078,6 +1084,21 @@ foreach tfile ($tvis)
 	if (-e $vis/tempbandpass) mv $vis/tempbandpass $vis/bandpass
 	if (-e $vis/tempgains) mv $vis/tempgains $vis/gains
     endif
+    if (-e $vis/gains.xxp || -e $vis/bandpass.xxp) then
+	if (-e $vis/gains) mv $vis/gains $vis/tempgains
+	if (-e $vis/bandpass) mv $vis/bandpass $vis/tempbandpass
+	if (-e $vis/gains.xxp) mv $vis/gains.xxp $vis/gains
+	if (-e $vis/bandpass.xxp) mv $vis/bandpass.xxp $vis/bandpass
+	if (-e $tfile/gains) mv $tfile/gains $tfile/tempgains
+	if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/tempbandpass
+	gpcopy vis=$vis out=$tfile > /dev/null
+	if (-e $tfile/gains) mv $tfile/gains $tfile/gains.xxp
+	if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/bandpass.xxp
+	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.xxp
+	if (-e $vis/gains) mv $vis/gains $vis/gains.xxp
+	if (-e $vis/tempbandpass) mv $vis/tempbandpass $vis/bandpass
+	if (-e $vis/tempgains) mv $vis/tempgains $vis/gains
+    endif
     if (-e $vis/gains.yy || -e $vis/bandpass.yy) then
 	if (-e $vis/gains) mv $vis/gains $vis/tempgains
 	if (-e $vis/bandpass) mv $vis/bandpass $vis/tempbandpass
@@ -1090,6 +1111,21 @@ foreach tfile ($tvis)
 	if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/bandpass.yy
 	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.yy
 	if (-e $vis/gains) mv $vis/gains $vis/gains.yy
+	if (-e $vis/tempbandpass) mv $vis/tempbandpass $vis/bandpass
+	if (-e $vis/tempgains) mv $vis/tempgains $vis/gains
+    endif
+    if (-e $vis/gains.yyp || -e $vis/bandpass.yyp) then
+	if (-e $vis/gains) mv $vis/gains $vis/tempgains
+	if (-e $vis/bandpass) mv $vis/bandpass $vis/tempbandpass
+	if (-e $vis/gains.yyp) mv $vis/gains.yyp $vis/gains
+	if (-e $vis/bandpass.yyp) mv $vis/bandpass.yyp $vis/bandpass
+	if (-e $tfile/gains) mv $tfile/gains $tfile/tempgains
+	if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/tempbandpass
+	gpcopy vis=$vis out=$tfile > /dev/null
+	if (-e $tfile/gains) mv $tfile/gains $tfile/gains.yyp
+	if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/bandpass.yyp
+	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.yyp
+	if (-e $vis/gains) mv $vis/gains $vis/gains.yyp
 	if (-e $vis/tempbandpass) mv $vis/tempbandpass $vis/bandpass
 	if (-e $vis/tempgains) mv $vis/tempgains $vis/gains
     endif

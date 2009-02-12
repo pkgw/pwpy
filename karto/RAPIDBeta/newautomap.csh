@@ -1047,7 +1047,7 @@ echo " "
 goto invert
 
 enderr:
-rm -r $wd
+if ($debug) rm -r $wd
 exit 1
 
 failsafe:
