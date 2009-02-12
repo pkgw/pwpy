@@ -213,7 +213,7 @@ else if ("$argv[1]" =~ 'retlim='*) then
     set retlim = `echo $argv[1] | sed 's/retlim=//' | awk '{print int($1)}'`
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'refant='*) then
-    set refant = `echo $argv[1] | sed 's/clim=//'`
+    set refant = `echo $argv[1] | sed 's/refant=//'`
     set autoref = 0
     shift argv; if ("$argv" == "") set argv = "finish"
 else
@@ -375,16 +375,21 @@ set fccount
 
 set pollist = ("xxyy")
 
+echo -n "Preprocessing data..."
+
 # If the polsplit option is used, split the individual pols into seperate files for processing.
 
 if ($polsplit) then
     set pollist = ("xx" "yy")
     uvaver vis=$vis select='window(1),pol(xx)' out=$wd/tempcalxx options=relax,nocal,nopass,nopol >& /dev/null
+    echo -n "."
     uvaver vis=$vis select='window(1),pol(yy)' out=$wd/tempcalyy options=relax,nocal,nopass,nopol >& /dev/null
+    echo -n "."
 else
     uvaver vis=$vis select='window(1),pol(xx,yy)' out=$wd/tempcalxxyy options=relax,nocal,nopass,nopol >& /dev/null
+    echo -n "."
 endif
-
+echo ""
 # Perform some error checking to make sure that "blank" datasets are created
 
 if !(-e $wd/tempcalxxyy || -e $wd/tempcalxx || -e $wd/tempcalyy) then
@@ -618,6 +623,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	set lim = `wc -w $wd/amplog | awk '{print $1}'`
     
 	echo -n "$lim integrated records to flag and $sflags spectral records to flag..."
+	uvflag vis=$wd/tempcal2 flagval=f select='amp(0,0.0000000000000001)' options=none >& /dev/null #This is here since uvcal is stupid, and this corresponds to a noise level of 80 dBS (SNR of 1:10^8)
 	while ($llim <= $lim)
 	    set flags = `sed -n {$llim},{$ulim}p $wd/amplog | awk '{printf "%s","vis("$1"),"}' ulim=$ulim`
 	    uvflag vis=$wd/tempcal2 flagval=f options=none select=$flags >& /dev/null
@@ -633,7 +639,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	set pols = (x y)
 	if ("$retlim" == 0) set pols
 	# If we haven't dropped below the repeat threshold, then repeat.
-	if (`echo $sflags $linelim $lim | awk '{if ($1 > $2*(nchan^.5)) print "go"; else if ($2 < $3) print "go"}' nchan=$nchan` == "go" || `echo $intcheck $addflux $sysflux | awk '{if ($1/10 > ($2+$3)) print "go"}'` == "go") then
+	if ((`echo $sflags $linelim $lim | awk '{if ($1 > $2*(nchan^.5)) print "go"; else if ($2 < $3) print "go"}' nchan=$nchan` == "go" || `echo $intcheck $addflux $sysflux | awk '{if ($1/10 > ($2+$3)) print "go"}'` == "go") && $linelim != $linemax) then
 	    echo " "
 	    echo "Flagging complete, continuing cycle $idx of "`echo $#regtimes | awk '{print $1-2}'`"..."
 	    goto jumper
@@ -909,7 +915,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
     set llim=1
     set ulim=50
     set lim = `wc -w $wd/amplog | awk '{print $1}'`
-    
+    uvflag vis=$wd/tempcal2 flagval=f select='amp(0,0.0000000000000001)' options=none >& /dev/null #This is here since uvcal is stupid, and this corresponds to a noise level of 80 dBS (SNR of 1:10^8)    
     echo -n "$lim integrated records to flag..."
     while ($llim <= $lim)
         set flags = `sed -n {$llim},{$ulim}p $wd/amplog | awk '{printf "%s","vis("$1"),"}' ulim=$ulim`
@@ -922,7 +928,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
     # UVAFLAG is used here since we created a temp dataset to apply the gains
     uvaflag vis=$wd/tempcal$ipol tvis=$wd/tempcal2 >& /dev/null
     rm -rf $wd/tempcal2 $wd/amplog $wd/ampinfo
-    if (`echo $linelim $lim | awk '{if ($1 < $2) print "go"}'` == "go" || `echo $intcheck $addflux $sysflux | awk '{if ($1/10 > ($2+$3)) print "go"}'` == "go") then
+    if ((`echo $linelim $lim | awk '{if ($1 < $2) print "go"}'` == "go" || `echo $intcheck $addflux $sysflux | awk '{if ($1/10 > ($2+$3)) print "go"}'` == "go") && $linelim != $linemax) then
 	echo " "
         echo "Flagging complete, continuing final cycle for $ipol data..."
 	goto poljumper
