@@ -187,3 +187,7 @@ UVCAT: Command line inputs follow:
 UVCAT:   vis=scan-3c274-1430/
 UVCAT:   out=test.mir
 UVCAT:   select=ant(3,4)(3,4),pol(xx)
+MFCAL: MfCal: version 1.0 15-Feb-2008
+MFCAL: Executed on: 2009-02-11T12:18:13.0
+MFCAL: Command line inputs follow:
+MFCAL:   vis=test.mir
