@@ -821,14 +821,14 @@ set clip = `echo $scsigma $imstats[3] | awk '{print $1*$2}'`
 postflag:
 set blopt = "options=nobase" 
 echo "Review baselines one-by-one? (y)es |n|o"
-set $yn = $< ; if ($yn == "y") set blopt
+set yn = $< ; if ($yn == "y") set blopt
+echo "Review phases? (y)es |n|o"
+set yn = $<
 foreach file ($vislist)
     echo "Plotting all baseline by uv distance and amp."
     blflag vis=$file device=/xs $blopt select='-auto' axis=uvd,amp
     echo "Plotting all baseline by time and amp."
     blflag vis=$file device=/xs $blopt select='-auto' axis=time,amp
-    echo "Review phases? (y)es |n|o"
-    set $yn = $<
     if ($yn == "y") then
 	echo "Plotting all baselines by uv distance and phase."
 	blflag vis=$file device=/xs options=nobase select='-auto' axis=uvd,pha
