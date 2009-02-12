@@ -25,7 +25,7 @@ tno = uvopen(vis, 'old')                # call uvopen(tno,name,'old')
 item = haccess(tno, 'vartable', 'read') # call haccess(tno,item,'vartable','read',iostat)
 var = hreada(item)                      # call hreada(item,var,iostat)
 while var                               # dowhile(iostat.eq.0)
-  puts var[2..9]                       #   call output(var(3:10))
+  puts var[2..9]                        #   call output(var(3:10))
   var = hreada(item)                    #   call hreada(item,var,iostat)
 end                                     # enddo
 hdaccess(item)                          # call hdaccess(item,iostat)
