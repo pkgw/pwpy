@@ -44,7 +44,7 @@ module Mirdl
   def uvDatRd(vis)
     r, rs = SYM[:uvDatRd][vis.preamble_p, vis.data_p, vis.flags_p, vis.nchan, 0]
     vis.nread = rs[-1]
-    vis
+    vis.nread == 0 ? nil : vis
   end
   module_function :uvDatRd
 
@@ -53,7 +53,7 @@ module Mirdl
   def uvDatWRd(vis)
     r, rs = SYM[:uvDatWRd][vis.preamble_p, vis.data_p, vis.flags_p, vis.nchan, 0]
     vis.nread = rs[-1]
-    vis
+    vis.nread == 0 ? nil : vis
   end
   module_function :uvDatWRd
 

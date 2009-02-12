@@ -367,7 +367,7 @@ module Mirdl
   def uvread(tno, vis)
     r, rs = SYM[:uvread][tno, vis.preamble_p, vis.data_p, vis.flags_p, vis.nchan, 0]
     vis.nread = rs[-1]
-    vis
+    vis.nread == 0 ? nil : vis
   end
   module_function :uvread
 
@@ -376,7 +376,7 @@ module Mirdl
   def uvwread()
     SYM[:uvwread][tno, vis.preamble_p, vis.data_p, vis.flags_p, vis.nchan, 0]
     vis.nread = rs[-1]
-    vis
+    vis.nread == 0 ? nil : vis
   end
   module_function :uvwread
 
