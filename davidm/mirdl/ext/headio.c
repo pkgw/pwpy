@@ -105,7 +105,7 @@ VALUE mirdl_wrhdc(VALUE self, VALUE vtno, VALUE vkeyword, VALUE vvalue)
   VALUE vreal;
   VALUE vimag;
 
-  if(!(rb_respond_to(vvalue, id_real) && respond_to(vvalue, id_imag))) {
+  if(!(rb_respond_to(vvalue, id_real) && rb_respond_to(vvalue, id_imag))) {
     rb_raise(rb_eTypeError, "value does not respond to #real and #imag");
   }
 
@@ -208,7 +208,7 @@ VALUE mirdl_rdhdc(int argc, VALUE *argv, VALUE self)
     def[0] = 0.0;
     def[1] = 0.0;
   } else {
-    if(!(rb_respond_to(vdef, id_real) && respond_to(vdef, id_imag))) {
+    if(!(rb_respond_to(vdef, id_real) && rb_respond_to(vdef, id_imag))) {
       rb_raise(rb_eTypeError, "default value does not respond to #real and #imag");
     }
 
