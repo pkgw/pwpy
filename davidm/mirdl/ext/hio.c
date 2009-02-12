@@ -239,7 +239,7 @@ static VALUE mirdl_hio(int argc, VALUE *argv, VALUE self)
     rb_sys_fail(dowrite ? "hio write error" : "hio read error");
   }
 
-  return Qtrue;
+  return vbuf;
 }
 
 // #define hreadb_c(item,buf,offset,length,iostat)
