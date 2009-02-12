@@ -759,8 +759,6 @@ plot:
 if ("$plotscale" == "") then
     set plotscale = `echo $range | awk '{if ($1 > 500) print "log"; else print "lin"}'`
 endif
-echo $imstats
-echo $imstats2
 set levs = (`echo $imstats[3] $imstats2[4] | awk '{lim = 4*$1; while (lim < $2) {print lim; lim=2*lim}}'`)
 set levs = `echo $levs | tr ' ' ','`
 
