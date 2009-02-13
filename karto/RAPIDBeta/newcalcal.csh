@@ -944,7 +944,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
         set rfiflags = (`newoptfchan.csh chanlist=$rfilist`)
         foreach rfiline ($rfiflags)
 	    echo -n "."
-	    uvflag vis=$file flagval=f options=none $rfiline > /dev/null
+	    uvflag vis=$wd/tempcal$ipol flagval=f options=none $rfiline > /dev/null
 	end
         echo "."
         echo "WRATH cleaning complete!"
