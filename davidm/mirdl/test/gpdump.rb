@@ -1,6 +1,8 @@
 #!/usr/bin/env ruby
 $-w = true if $0 == __FILE__
 
+# gpdump.rb - Dump antenna gains in a very rudimentary way.
+
 require 'mirdl'
 include Mirdl
 
@@ -85,7 +87,6 @@ if(k == 0)
 end
 nsols = k
 hdaccess(item)
-
 
 # Blank out the antenna gains that were not selected.
 
