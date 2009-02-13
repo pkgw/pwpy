@@ -222,7 +222,7 @@ set wrath = 0# Muah ha ha ha, let no RFI escape...
 set autolim
 set sysflux = 2
 set verb
-set debug
+set debug = 0
 if ($#argv == 0) then
     echo "AUTOMAP: No input files detected!"
     exit 0
@@ -515,7 +515,9 @@ endif
 # If "special" gains files are found in the original folder
 # (currently only created by calcal.csh) - normally named
 # gains.xx and gains.yy - then automap will apply those gains
-# soln's after the file is split.
+# soln's after the file is split. Due to additional problems
+# with gpcopy options=apply, there is now also a new file type
+# with the suffix xxp or yyp (p stands for prime).
 #
 # Gains information now "force" applied via UVAVER, i.e. they
 # cannot be removed once applied. This is done for the sake of
@@ -525,57 +527,54 @@ endif
 
 set vislist
 set idx = 0
+
 foreach file ($vis)
     echo -n "Splitting $file..."
     @ idx++
-    uvaver vis=$file out=$wd/tempmap$idx.xpol select="-shadow(7.5),pol(xx),$uselect" interval=$interval >& /dev/null 
+    uvaver vis=$file out=$wd/tempmap$idx.xpol options=relax select="-shadow(7.5),pol(xx),$uselect" interval=$interval >& /dev/null 
     echo -n "."
-    uvaver vis=$file out=$wd/tempmap$idx.ypol select="-shadow(7.5),pol(yy),$uselect" interval=$interval >& /dev/null 
+    uvaver vis=$file out=$wd/tempmap$idx.ypol options=relax select="-shadow(7.5),pol(yy),$uselect" interval=$interval >& /dev/null 
     if !(-e $wd/tempmap$idx.xpol/visdata || -e $wd/tempmap$idx.ypol/visdata) then
-	echo "FATAL ERROR: UVAVER has failed!" 
+	echo "FATAL ERROR: UVAVER has failed! $file shows no viable data!" 
 	goto enderr
     endif
-    if !(-e $wd/tempmap$idx.xpol/visdata) then
-	rm -rf $wd/tempmap$idx.xpol
-    else
-	if (-e $file/gains.xx || -e $file/bandpass.xx) then
-	    echo ""; echo -n "Applying diff xx gains..."
-	    if (-e $file/gains) mv $file/gains $file/tempgains
-	    if (-e $file/bandpass) mv $file/bandpass $file/tempbandpass
-	    if (-e $file/gains.xx) mv $file/gains.xx $file/gains
-	    if (-e $file/bandpass.xx) mv $file/bandpass.xx $file/bandpass
-	    gpcopy vis=$file out=$wd/tempmap$idx.xpol > /dev/null
-	    if (-e $file/bandpass) mv $file/bandpass $file/bandpass.xx
-	    if (-e $file/gains) mv $file/gains $file/gains.xx
-	    if (-e $file/tempbandpass) mv $file/tempbandpass $file/bandpass
-	    if (-e $file/tempgains) mv $file/tempgains $file/gains
-
-	    uvaver vis=$wd/tempmap$idx.xpol out=$wd/tempmap2 options=relax > /dev/null
-	    rm -rf $wd/tempmap$idx.xpol; mv $wd/tempmap2 $wd/tempmap$idx.xpol
+    foreach dp (x y)
+	if ((-e $file/gains.$dp$dp || -e $file/bandpass.$dp$dp) && -e $wd/tempmap$idx.{$dp}pol/visdata) then
+	    echo ""; echo -n "Applying diff $dp$dp gains..."
+	    if (-e $file/gains)  mv $file/gains $file/gains.mp
+	    if (-e $file/gains.$dp$dp) mv $file/gains.$dp$dp $file/gains
+	    if (-e $file/bandpass) mv $file/bandpass $file/bandpass.mp
+	    if (-e $file/bandpass.$dp$dp) mv $file/bandpass.$dp$dp $file/bandpass
+	    gpcopy vis=$file out=$wd/tempmap$idx.{$dp}pol > /dev/null
+	    if (-e $file/gains)  mv $file/gains $file/gains.$dp$dp
+	    if (-e $file/gains.mp) mv $file/gains.mp $file/gains
+	    if (-e $file/bandpass) mv $file/bandpass $file/bandpass.$dp$dp
+	    if (-e $file/bandpass.mp) mv $file/bandpass.mp $file/bandpass
+	    uvaver vis=$wd/tempmap$idx.{$dp}pol out=$wd/tempgmap options=relax >& /dev/null
+	    rm -rf $wd/tempmap$idx.{$dp}pol; mv $wd/tempgmap $wd/tempmap$idx.{$dp}pol
+	    echo 1
 	endif
-	set vislist = ($vislist $wd/tempmap$idx.xpol)
-    endif
-    if !(-e $wd/tempmap$idx.ypol/visdata) then
-	rm -rf $wd/tempmap$idx.ypol
-    else
-	if (-e $file/gains.yy) then
-	    echo ""; echo -n "Applying diff yy gains..."
-	    if (-e $file/gains) mv $file/gains $file/tempgains
-	    if (-e $file/bandpass) mv $file/bandpass $file/tempbandpass
-	    if (-e $file/gains.yy) mv $file/gains.yy $file/gains
-	    if (-e $file/bandpass.yy) mv $file/bandpass.yy $file/bandpass
-	    gpcopy vis=$file out=$wd/tempmap$idx.ypol > /dev/null
-	    if (-e $file/bandpass) mv $file/bandpass $file/bandpass.yy
-	    if (-e $file/gains) mv $file/gains $file/gains.yy
-	    if (-e $file/tempbandpass) mv $file/tempbandpass $file/bandpass
-	    if (-e $file/tempgains) mv $file/tempgains $file/gains
-
-	    uvaver vis=$wd/tempmap$idx.ypol out=$wd/tempmap2 options=relax > /dev/null
-	    rm -rf $wd/tempmap$idx.ypol; mv $wd/tempmap2 $wd/tempmap$idx.xpol
+	if ((-e $file/gains.{$dp$dp}p || -e $file/bandpass.{$dp$dp}p) && -e $wd/tempmap$idx.{$dp}pol/visdata) then
+	    echo -n "."
+	    if (-e $file/gains)  mv $file/gains $file/gains.mp
+	    if (-e $file/gains.{$dp$dp}p) mv $file/gains.{$dp$dp}p $file/gains
+	    if (-e $file/bandpass) mv $file/bandpass $file/bandpass.mp
+	    if (-e $file/bandpass.{$dp$dp}p) mv $file/bandpass.{$dp$dp}p $file/bandpass
+	    gpcopy vis=$file out=$wd/tempmap$idx.{$dp}pol > /dev/null
+	    if (-e $file/gains)  mv $file/gains $file/gains.{$dp$dp}p
+	    if (-e $file/gains.mp) mv $file/gains.mp $file/gains
+	    if (-e $file/bandpass) mv $file/bandpass $file/bandpass.{$dp$dp}p
+	    if (-e $file/bandpass.mp) mv $file/bandpass.mp $file/bandpass
+	    uvaver vis=$wd/tempmap$idx.{$dp}pol out=$wd/tempgmap options=relax >& /dev/null
+	    rm -rf $wd/tempmap$idx.{$dp}pol; mv $wd/tempgmap $wd/tempmap$idx.{$dp}pol
+	    echo 2
+	endif	
+	if (-e $wd/tempmap$idx.{$dp}pol/visdata) then
+	    set vislist = ($vislist $wd/tempmap$idx.{$dp}pol)
+	else
+	    rm -rf $wd/tempmap$idx.{$dp}pol
 	endif
-	set vislist = ($vislist $wd/tempmap$idx.ypol)
-    endif
-    echo "done!"
+    end
 end
 
 #################################################################
@@ -1047,7 +1046,7 @@ echo " "
 goto invert
 
 enderr:
-if ($debug) rm -r $wd
+if !($debug) rm -r $wd
 exit 1
 
 failsafe:

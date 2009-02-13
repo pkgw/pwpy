@@ -1011,28 +1011,19 @@ if (-e $wd/sefd.xx) cp $wd/sefd.yy $outfile/sefd.yy
 echo "Copying gains back to original file ($vis)"
 
 if ($polsplit && $#pollist > 1) then # If pols were split and more than one pol exists
-    if (-e $outfile/$source.1.xx/gains) then # If the automapping software had "tweaks" for the x-pol gains solution, apply those tweaks
-	puthd in=$outfile/$source.1.xx/interval value=.1 > /dev/null
-	gpcopy vis=$outfile/$source.1.xx out=$vis > /dev/null
-	if (-e $vis/gains) mv $vis/gains $vis/gains.xxp
-	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.xxp
-    endif
-    puthd in=$wd/tempcalxx/interval value=.1 > /dev/null 
-    gpcopy vis=$wd/tempcalxx out=$vis > /dev/null
+    foreach dp (xx yy)
+	if (-e $outfile/$source.1.$dp/gains) then # If the automapping software had "tweaks" for the gains solution, apply those tweaks
+	    puthd in=$outfile/$source.1.$dp/interval value=.1 > /dev/null
+	    gpcopy vis=$outfile/$source.1.$dp out=$vis > /dev/null
+	    if (-e $vis/gains) mv $vis/gains $vis/gains.{$dp}p
+	    if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.{$dp}p
+	endif
+	puthd in=$wd/tempcal$dp/interval value=.1 > /dev/null 
+	gpcopy vis=$wd/tempcal$dp out=$vis > /dev/null
     # Move pol-specific gains "out of the way" so that information isnb't overwritten by gpcopy
-    if (-e $vis/gains) mv $vis/gains $vis/gains.xx 
-    if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.xx
-#   if (-e $outfile/$source.1.yy/gains) then # If the automapping software had "tweaks" for the y-pol gains solution, apply those tweaks
-	puthd in=$outfile/$source.1.yy/interval value=.1 > /dev/null
-	gpcopy vis=$outfile/$source.1.yy out=$vis > /dev/null
-	if (-e $vis/gains) mv $vis/gains $vis/gains.yyp
-	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.yyp
-    endif
-    puthd in=$wd/tempcalyy/interval value=.1 > /dev/null
-    gpcopy vis=$wd/tempcalyy out=$vis > /dev/null
-    # Move pol-specific gains "out of the way" so that information isn't overwritten by gpcopy
-    if (-e $vis/gains) mv $vis/gains $vis/gains.yy
-    if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.yy
+	if (-e $vis/gains) mv $vis/gains $vis/gains.$dp 
+	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.$dp
+    end
 else if ($polsplit) then # if polspilt was used, but only one pol was found
     if (-e $outfile/$source.1.$pollist[1]/gains) then # If the automapping software had "tweaks" for a single pol gains solution, apply those tweaks
 	puthd in=$outfile/$source.1.$pollist[1]/interval value=.1 > /dev/null
@@ -1046,18 +1037,14 @@ else if ($polsplit) then # if polspilt was used, but only one pol was found
     if (-e $vis/gains) mv $vis/gains $vis/gains.$pollist[1]
     if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.$pollist[1]
 else
-    if (-e $outfile/$source.1.xx/gains) then # If the automapping software had "tweaks" for the x-pol gains solution, apply those tweaks
-	puthd in=$outfile/$source.1.xx/interval value=.1 > /dev/null
-	gpcopy vis=$outfile/$source.1.xx out=$vis > /dev/null
-	# Move pol-specific gains "out of the way" so that information isn't overwritten by gpcopy
-	mv $vis/gains $vis/gains.xx
-    endif
-    if (-e $outfile/$source.1.yy/gains) then # If the automapping software had "tweaks" for the y-pol gains solution, apply those tweaks
-	puthd in=$outfile/$source.1.yy/interval value=.1 > /dev/null
-	# Move pol-specific gains "out of the way" so that information isnb't overwritten by gpcopy
-	gpcopy vis=$outfile/$source.1.yy out=$vis > /dev/null
-	mv $vis/gains $vis/gains.yy
-    endif
+    foreach dp (xx yy)
+	if (-e $outfile/$source.1.$dp/gains) then # If the automapping software had "tweaks" for the gains solution, apply those tweaks
+	    puthd in=$outfile/$source.1.$dp/interval value=.1 > /dev/null
+	    gpcopy vis=$outfile/$source.1.$dp out=$vis > /dev/null
+	    # Move pol-specific gains "out of the way" so that information isn't overwritten by gpcopy
+	    mv $vis/gains $vis/gains.$dp
+	endif
+    end
     # Copy over any "general" gains solutions (relating to multiple pols)
     puthd in=$wd/tempcal$pollist[1]/interval value=.1 > /dev/null
     gpcopy vis=$wd/tempcal$pollist[1] out=$vis > /dev/null
@@ -1066,68 +1053,28 @@ endif
 # Repeat the gains copying process for each source file, first copying any pol-specific solutions first, then copying "general" (multi-pol) solutions
 foreach tfile ($tvis)
     echo "Copying gains to $tfile"
+    foreach dp (xx yy)
+	if (-e $vis/gains.$dp || -e $vis/bandpass.$dp) then
+	    if (-e $vis/gains) mv $vis/gains $vis/tempgains
+	    if (-e $vis/bandpass) mv $vis/bandpass $vis/tempbandpass
+	    if (-e $vis/gains.$dp) mv $vis/gains.$dp $vis/gains
+	    if (-e $vis/bandpass.$dp) mv $vis/bandpass.$dp $vis/bandpass
+	    gpcopy vis=$vis out=$tfile > /dev/null
+	    if (-e $tfile/gains) mv $tfile/gains $tfile/gains.$dp
+	    if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/bandpass.$dp
+	    if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.$dp
+	    if (-e $vis/gains) mv $vis/gains $vis/gains.$dp
+	    if (-e $vis/tempbandpass) mv $vis/tempbandpass $vis/bandpass
+	    if (-e $vis/tempgains) mv $vis/tempgains $vis/gains
+	endif
+	if (-e $vis/gains.{$dp}p || -e $vis/bandpass.{$dp}p) then
+	    gpcopy vis=$outfile/$source.1.$dp out=$tfile > /dev/null
+	    if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/bandpass.{$dp}p
+	    if (-e $tfile/gains) mv $tfile/gains $tfile/gains.{$dp}p
+	endif
+    end
     if (-e $vis/gains) then
-	gpcopy vis=$vis out=$tfile
-    endif
-    if (-e $vis/gains.xx || -e $vis/bandpass.xx) then
-	if (-e $vis/gains) mv $vis/gains $vis/tempgains
-	if (-e $vis/bandpass) mv $vis/bandpass $vis/tempbandpass
-	if (-e $vis/gains.xx) mv $vis/gains.xx $vis/gains
-	if (-e $vis/bandpass.xx) mv $vis/bandpass.xx $vis/bandpass
-	if (-e $tfile/gains) mv $tfile/gains $tfile/tempgains
-	if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/tempbandpass
 	gpcopy vis=$vis out=$tfile > /dev/null
-	if (-e $tfile/gains) mv $tfile/gains $tfile/gains.xx
-	if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/bandpass.xx
-	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.xx
-	if (-e $vis/gains) mv $vis/gains $vis/gains.xx
-	if (-e $vis/tempbandpass) mv $vis/tempbandpass $vis/bandpass
-	if (-e $vis/tempgains) mv $vis/tempgains $vis/gains
-    endif
-    if (-e $vis/gains.xxp || -e $vis/bandpass.xxp) then
-	if (-e $vis/gains) mv $vis/gains $vis/tempgains
-	if (-e $vis/bandpass) mv $vis/bandpass $vis/tempbandpass
-	if (-e $vis/gains.xxp) mv $vis/gains.xxp $vis/gains
-	if (-e $vis/bandpass.xxp) mv $vis/bandpass.xxp $vis/bandpass
-	if (-e $tfile/gains) mv $tfile/gains $tfile/tempgains
-	if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/tempbandpass
-	gpcopy vis=$vis out=$tfile > /dev/null
-	if (-e $tfile/gains) mv $tfile/gains $tfile/gains.xxp
-	if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/bandpass.xxp
-	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.xxp
-	if (-e $vis/gains) mv $vis/gains $vis/gains.xxp
-	if (-e $vis/tempbandpass) mv $vis/tempbandpass $vis/bandpass
-	if (-e $vis/tempgains) mv $vis/tempgains $vis/gains
-    endif
-    if (-e $vis/gains.yy || -e $vis/bandpass.yy) then
-	if (-e $vis/gains) mv $vis/gains $vis/tempgains
-	if (-e $vis/bandpass) mv $vis/bandpass $vis/tempbandpass
-	if (-e $vis/gains.yy) mv $vis/gains.yy $vis/gains
-	if (-e $vis/bandpass.yy) mv $vis/bandpass.yy $vis/bandpass
-	if (-e $tfile/gains) mv $tfile/gains $tfile/tempgains
-	if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/tempbandpass
-	gpcopy vis=$vis out=$tfile > /dev/null
-	if (-e $tfile/gains) mv $tfile/gains $tfile/gains.yy
-	if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/bandpass.yy
-	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.yy
-	if (-e $vis/gains) mv $vis/gains $vis/gains.yy
-	if (-e $vis/tempbandpass) mv $vis/tempbandpass $vis/bandpass
-	if (-e $vis/tempgains) mv $vis/tempgains $vis/gains
-    endif
-    if (-e $vis/gains.yyp || -e $vis/bandpass.yyp) then
-	if (-e $vis/gains) mv $vis/gains $vis/tempgains
-	if (-e $vis/bandpass) mv $vis/bandpass $vis/tempbandpass
-	if (-e $vis/gains.yyp) mv $vis/gains.yyp $vis/gains
-	if (-e $vis/bandpass.yyp) mv $vis/bandpass.yyp $vis/bandpass
-	if (-e $tfile/gains) mv $tfile/gains $tfile/tempgains
-	if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/tempbandpass
-	gpcopy vis=$vis out=$tfile > /dev/null
-	if (-e $tfile/gains) mv $tfile/gains $tfile/gains.yyp
-	if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/bandpass.yyp
-	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.yyp
-	if (-e $vis/gains) mv $vis/gains $vis/gains.yyp
-	if (-e $vis/tempbandpass) mv $vis/tempbandpass $vis/bandpass
-	if (-e $vis/tempgains) mv $vis/tempgains $vis/gains
     endif
 end
 
