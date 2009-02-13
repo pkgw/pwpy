@@ -139,7 +139,7 @@ module Mirdl
       fmt = 'FF'
       defval = [defval.real, defval.imag] unless Array === defval
     else
-      bug(BUGSEV_FATAL, "Type incompatiblity for variable #{var.to_s}, in UVRDVR")
+      bug(BUGSEV_ERROR, "Type incompatiblity for variable #{var.to_s}, in UVRDVR")
     end
     defval = [defval].pack(fmt)
     r, rs = SYM[:uvrdvr][tno, type, var.to_s, data, defval, n]
@@ -207,7 +207,7 @@ module Mirdl
       data = NArray.scomplex(n)
       p = DL::PtrData.new(data.ptr, data.bsize)
     else
-      bug(BUGSEV_FATAL, "Type incompatiblity for variable #{var.to_s}, in UVGETVR")
+      bug(BUGSEV_ERROR, "Type incompatiblity for variable #{var.to_s}, in UVGETVR")
     end
     r, rs = SYM[:uvgetvr][tno, type, var.to_s, p, n]
     if type == H_BYTE
@@ -274,7 +274,7 @@ module Mirdl
         data = data.map {|z| [z.real, z.imag]}
         data = data.flatten!.pack('F*')
       else
-        bug(BUGSEV_FATAL, "Type incompatiblity for variable #{var.to_s}, in UVPUTVR")
+        bug(BUGSEV_ERROR, "Type incompatiblity for variable #{var.to_s}, in UVPUTVR")
       end
     end
     SYM[:uvputvr][tno, type, var.to_s, data, n]

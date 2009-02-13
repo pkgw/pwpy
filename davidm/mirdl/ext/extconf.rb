@@ -42,6 +42,9 @@ d = ENV['MIRLIB']
 $LDFLAGS << " -L#{d} " if test ?d, d
 exit unless have_library('mir_uvio', 'bug_c')
 
+# Check for new MIRIAD bug handler function
+have_func('bughandler_c', 'miriad.h')
+
 # Check mir library (also require pgplot library)
 exit unless have_library('mir_linpack', 'sdot_')
 exit unless have_library('pgplot', 'pgpt_')
