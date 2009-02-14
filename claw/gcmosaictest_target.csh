@@ -1,0 +1,74 @@
+#!/usr/bin/csh
+# script to automate flagging and cal of targets in gcmosaictest
+
+# set up variables
+set CAL = 'mosfxc_1733-130-1640'
+set VIS1 = 'mosfxc_gcmosaictest2-1640'
+set VIS2 = 'mosfxc_gcmosaictest3-1640'
+set VIS3 = 'mosfxc_gcmosaictest4-1640'
+set VISLIST = (VIS1)
+
+# perhaps add some logical structure to control flow?
+#goto flag
+
+
+check:
+  echo 'Make sure everything is executable, etc.'
+  uvflag
+  newrfisweep.csh
+  ~/big_scr2/code/mmm/pwilliams/fancy/calctsys
+
+fixup:
+
+foreach VIS (`echo $VISLIST`)
+  echo 'Fix header problem for '${VIS}
+  puthd in=${VIS}/freq value=1.640
+  puthd in=${VIS}/restfreq value=1.640
+  puthd in=${VIS}/sfreq value=1.5876
+end
+
+flag:
+
+foreach VIS (`echo $VISLIST`)
+  echo 'Starting flagging for '${VIS}
+  echo 'First flag data for known bad stuff'
+  uvflag vis=${VIS} select='pol(xx),ant(14,42,26)' flagval=flag
+  uvflag vis=${VIS} select='pol(yy),ant(42,39,24,28)' flagval=flag
+  uvflag vis=${VIS} line='chan,210,1,1,1' flagval=flag
+  uvflag vis=${VIS} line='chan,200,840,1,1' flagval=flag
+  uvflag vis=${VIS} line='chan,10,320,1,1' flagval=flag
+
+  echo 'Now flag automatically'
+  newrfisweep.csh vis=${VIS}
+
+  echo 'Inspect for bad RFI...'
+#  smauvspec vis=${VIS} device=1/xs axis=ch,bo select='pol(xx,yy),ant(1,2,3)(11,12,13,14)' nxy=4,3
+
+  echo 'Inspect for solar interference...'
+#  smauvspec device=1/xs axis=ch,bo select='pol(xx),-auto,uvrange(0.001,0.1)' nxy='4,3' vis=${VIS}
+
+end
+
+cal:
+
+foreach VIS (`echo $VISLIST`)
+  echo 'Starting calibration for '${VIS}
+  echo 'Flatten out spectra a bit for later Tsys estimate'
+  uvcal options=fxcal,unflagged select='pol(xx)' vis=${VIS} out=${VIS}-xx
+  uvcal options=fxcal,unflagged select='pol(yy)' vis=${VIS} out=${VIS}-yy
+
+  echo 'Copy over calibration solutions'
+  gpcopy vis=${CALVIS}-xx out=${VIS}-xx
+  uvcat vis=${VIS}-xx out=${VIS}-xx.mf
+  gpcopy vis=${CALVIS}-xx.ts out=${VIS}-xx.mf
+
+  gpcopy vis=${CALVIS}-yy out=${VIS}-yy
+  uvcat vis=${VIS}-yy out=${VIS}-yy.mf
+  gpcopy vis=${CALVIS}-yy.ts out=${VIS}-yy.mf
+
+  ~/big_scr2/code/mmm/pwilliams/fancy/calctsys quant=16,1 vis=${VIS}-xx.mf out=${VIS}-xx.ts maxtsys=1000
+end
+
+image:
+  echo 'Image roughly'
+  micr.sh ${VIS1} ${VIS2} ${VIS3}
