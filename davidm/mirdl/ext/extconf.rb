@@ -1,4 +1,4 @@
-# extconf.rb : Configure script for naptr
+# extconf.rb : Configure script for mirdl
 #
 #   Copyright (c) 2009 David MacMahon <davidm@astro.berkeley.edu>
 #
@@ -45,7 +45,7 @@ exit unless have_library('mir_uvio', 'bug_c')
 # Check for new MIRIAD bug handler function
 have_func('bughandler_c', 'miriad.h')
 
-# Check mir library (also require pgplot library)
+# Check mir library (also requires mir_linpack and pgplot libraries)
 exit unless have_library('mir_linpack', 'sdot_')
 exit unless have_library('pgplot', 'pgpt_')
 exit unless have_library('mir', 'options_')

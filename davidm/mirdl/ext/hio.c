@@ -2,13 +2,9 @@
 
 #include <errno.h>
 #include "mirdl.h"
-
-#define NARRAY_C
 #include "narray.h"
-#undef NARRAY_C
 
 static ID id_rstrip_bang;
-static VALUE cNArray;
 
 // Map H_type constants to NArray typecodes
 static enum NArray_Types hio2na[] = {
@@ -477,8 +473,6 @@ static VALUE mirdl_hwritea(VALUE self, VALUE vhandle, VALUE vline)
 void init_mirdl_hio(VALUE mMirdl)
 {
   id_rstrip_bang = rb_intern("rstrip!");
-  rb_require("narray");
-  cNArray = rb_const_get(rb_cObject, rb_intern("NArray"));
 
   rb_define_module_function(mMirdl, "hopen", mirdl_hopen, 2);
   rb_define_module_function(mMirdl, "hflush",  mirdl_hflush, 1);

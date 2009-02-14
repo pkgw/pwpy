@@ -1,5 +1,6 @@
 require 'rbconfig'
 require 'dl'
+require 'narray'
 
 # Require the mirdl shared library
 mirdl_shared_lib = 'mirdl.' + Config::CONFIG['DLEXT']

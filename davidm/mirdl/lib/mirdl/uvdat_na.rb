@@ -2,7 +2,6 @@
 
 require 'dl'
 require 'narray'
-require 'naptr' unless NArray.method_defined? :ptr
 
 module Mirdl
 
