@@ -415,18 +415,23 @@ set tclist
 #################################################################
 
 set lim = `wc -l $wd/timecheck2 | awk '{print $1}'`
+
 set idx = 1
-set mastertime
-set mastertime2
-set starttime = 0
-set timeint
+set vals = (`sed -n 1p $wd/timecheck2`)
+set mastertime = `echo $vals[2] | awk '{printf "%7.6f\n",$1+2400000.5-(.5/86400)}'`
+set mastertime2 = `echo $vals[2] | awk '{printf "%7.6f\n",$1-(.5/86400)}'`
+set starttime = `echo $vals[2] | awk '{printf "%7.6f\n",$1-(.5/86400)}'`
+set timeint = "$vals[3]"
+if ($vals[4] == "vis") then
+    set slist = $vals[1]; set tslist = $vals[5]
+else if ($vals[4] == "tvis") then
+    set clist = $vals[1]; set tclist = $vals[5]
+endif
+
+set idx = 2
+
 while ($idx <= $lim) 
     set vals = (`sed -n {$idx}p $wd/timecheck2`)
-    if ($starttime == "0") then
-	set starttime = `echo $vals[2] | awk '{printf "%7.6f\n",$1-(.5/86400)}'`
-	set mastertime = ($mastertime `echo $vals[2] | awk '{printf "%7.6f\n",$1+2400000.5-(.5/86400)}'`)
-	set mastertime2 = ($mastertime2 `echo $vals[2] | awk '{printf "%7.6f\n",$1-(.5/86400)}'`)
-    endif
     set timeint = `echo $timeint $vals[3] | awk '{print $1+$2}'`
     if (`echo $vals[2] $vals[3] $starttime | awk '{if (((1440*($1-$3))+$2) > inttime) print 1}' inttime=$inttime`) then
 	set finstarttime = `echo $starttime | awk '{printf "%7.6f",$1+2400000.5}'`
@@ -445,17 +450,15 @@ while ($idx <= $lim)
 	set tslist
 	set tclist
     endif
-    if  !(" "`echo $clist $slist`" " =~ *" $vals[1] "*) then
+    if  !(" $clist $slist " =~ *" $vals[1] "*) then
 	if ($vals[4] == "vis") then
 	    set slist = ($slist $vals[1])
 	    set tslist = ($tslist $vals[5])
 	else if ($vals[4] == "tvis") then
-	    set clist = ($slist $vals[1])
+	    set clist = ($clist $vals[1])
 	    set tclist = ($tclist $vals[5])
 	endif
-    endif
-##########################
-    
+    endif    
     @ idx++
 end
 
