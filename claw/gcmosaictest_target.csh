@@ -15,20 +15,20 @@ set VISLIST = ($VIS2 $VIS3)
 check:
 echo 'Make sure everything is executable, etc.'
 itemize
-if [$? .ne 0] then exit 1
+if ($? != 0) exit(1)
 newrfisweep.csh
-if [$? .ne 0] then exit 1
+if ($? != 0) exit(1)
 ~/big_scr2/code/mmm/pwilliams/fancy/calctsys
-if [$? .eq 1] then exit 1
+if ($? == 1) exit(1)
 
 echo 'Can find files?'
-if (! -e ${CAL}) then exit 1
-if (! -e ${VIS1}) then exit 1
-if (! -e ${VIS2}) then exit 1
-if (! -e ${VIS3}) then exit 1
+if (! -e ${CAL}) exit(1)
+if (! -e ${VIS1}) exit(1)
+if (! -e ${VIS2}) exit(1)
+if (! -e ${VIS3}) exit(1)
 
 foreach VIS (`echo $VISLIST`)
-  if (! -e ${VIS}) then exit 1
+  if (! -e ${VIS}) exit(1)
 end
 
 
