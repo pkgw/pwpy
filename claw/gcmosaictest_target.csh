@@ -6,7 +6,7 @@ set CAL = 'mosfxc_1733-130-1640'
 set VIS1 = 'mosfxc_gcmosaictest2-1640'
 set VIS2 = 'mosfxc_gcmosaictest3-1640'
 set VIS3 = 'mosfxc_gcmosaictest4-1640'
-set VISLIST = (VIS1)
+set VISLIST = ($VIS1)
 
 # perhaps add some logical structure to control flow?
 #goto flag
@@ -58,13 +58,13 @@ foreach VIS (`echo $VISLIST`)
   uvcal options=fxcal,unflagged select='pol(yy)' vis=${VIS} out=${VIS}-yy
 
   echo 'Copy over calibration solutions'
-  gpcopy vis=${CALVIS}-xx out=${VIS}-xx
+  gpcopy vis=${CAL}-xx out=${VIS}-xx
   uvcat vis=${VIS}-xx out=${VIS}-xx.mf
-  gpcopy vis=${CALVIS}-xx.ts out=${VIS}-xx.mf
+  gpcopy vis=${CAL}-xx.ts out=${VIS}-xx.mf
 
-  gpcopy vis=${CALVIS}-yy out=${VIS}-yy
+  gpcopy vis=${CAL}-yy out=${VIS}-yy
   uvcat vis=${VIS}-yy out=${VIS}-yy.mf
-  gpcopy vis=${CALVIS}-yy.ts out=${VIS}-yy.mf
+  gpcopy vis=${CAL}-yy.ts out=${VIS}-yy.mf
 
   ~/big_scr2/code/mmm/pwilliams/fancy/calctsys quant=16,1 vis=${VIS}-xx.mf out=${VIS}-xx.ts maxtsys=1000
 end
