@@ -2,10 +2,10 @@
 # script to automate flagging and cal of targets in gcmosaictest
 
 # set up variables
-set CAL = 'mosfxc_1733-130-1640'
-set VIS1 = 'mosfxc_gcmosaictest2-1640'
-set VIS2 = 'mosfxc_gcmosaictest3-1640'
-set VIS3 = 'mosfxc_gcmosaictest4-1640'
+set CAL = 'mosfxc-1733-130-1640'
+set VIS1 = 'mosfxc-gcmosaictest2-1640'
+set VIS2 = 'mosfxc-gcmosaictest3-1640'
+set VIS3 = 'mosfxc-gcmosaictest4-1640'
 set VISLIST = ($VIS1)
 
 # perhaps add some logical structure to control flow?
