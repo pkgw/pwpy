@@ -89,3 +89,4 @@ echo 'Image roughly'
 foreach VIS (`echo $VISLIST`)
   micr.sh ${VIS}-xx.ts
   micr.sh ${VIS}-yy.ts
+end
