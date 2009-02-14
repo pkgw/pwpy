@@ -6,17 +6,31 @@ set CAL = 'mosfxc-1733-130-1640'
 set VIS1 = 'mosfxc-gcmosaictest2-1640'
 set VIS2 = 'mosfxc-gcmosaictest3-1640'
 set VIS3 = 'mosfxc-gcmosaictest4-1640'
-set VISLIST = ($VIS1)
+set VISLIST = ($VIS2 $VIS3)
 
 # perhaps add some logical structure to control flow?
 #goto flag
 
 
 check:
-  echo 'Make sure everything is executable, etc.'
-  uvflag
-  newrfisweep.csh
-  ~/big_scr2/code/mmm/pwilliams/fancy/calctsys
+echo 'Make sure everything is executable, etc.'
+itemize
+if [$? .ne 0] then exit 1
+newrfisweep.csh
+if [$? .ne 0] then exit 1
+~/big_scr2/code/mmm/pwilliams/fancy/calctsys
+if [$? .eq 1] then exit 1
+
+echo 'Can find files?'
+if (! -e ${CAL}) then exit 1
+if (! -e ${VIS1}) then exit 1
+if (! -e ${VIS2}) then exit 1
+if (! -e ${VIS3}) then exit 1
+
+foreach VIS (`echo $VISLIST`)
+  if (! -e ${VIS}) then exit 1
+end
+
 
 fixup:
 
@@ -67,8 +81,11 @@ foreach VIS (`echo $VISLIST`)
   gpcopy vis=${CAL}-yy.ts out=${VIS}-yy.mf
 
   ~/big_scr2/code/mmm/pwilliams/fancy/calctsys quant=16,1 vis=${VIS}-xx.mf out=${VIS}-xx.ts maxtsys=1000
+  ~/big_scr2/code/mmm/pwilliams/fancy/calctsys quant=16,1 vis=${VIS}-yy.mf out=${VIS}-yy.ts maxtsys=1000
 end
 
 image:
-  echo 'Image roughly'
-  micr.sh ${VIS1} ${VIS2} ${VIS3}
+echo 'Image roughly'
+foreach VIS (`echo $VISLIST`)
+  micr.sh ${VIS}-xx.ts
+  micr.sh ${VIS}-yy.ts
