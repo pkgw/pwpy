@@ -100,7 +100,7 @@ VALUE mirdl_keyf(int argc, VALUE *argv, VALUE self)
     keydefptr = StringValueCStr(keydef);
   }
 
-  keyf_c(SYMSTR_PTR(keyword), value, StringValueCStr(keydef));
+  keyf_c(SYMSTR_PTR(keyword), value, keydefptr);
 
   return value[0] == '\n' ? Qnil : rb_str_new2(value);
 }
