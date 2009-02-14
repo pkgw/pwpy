@@ -19,7 +19,7 @@ if ($? != 0) exit(1)
 newrfisweep.csh
 if ($? != 0) exit(1)
 ~/big_scr2/code/mmm/pwilliams/fancy/calctsys
-if ($? == 1) exit(1)
+if ($? != 1) exit(1)
 
 echo 'Can find files?'
 if (! -e ${CAL}) exit(1)
