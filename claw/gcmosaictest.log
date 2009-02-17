@@ -5,9 +5,9 @@
 
 lupus>set SRC = 'gcmosaictest1'
 lupus>set CAL = '1733-130'
-lupus>set FREQ = '1640'
-lupus>set VIS = fx64c-${SRC}-${FREQ}
-lupus>set CALVIS = fx64c-${CAL}-${FREQ}
+Lupus>set FREQ = '1640'
+Lupus>set VIS = fx64c-${SRC}-${FREQ}
+Lupus>set CALVIS = fx64c-${CAL}-${FREQ}
 lupus>set VIS2 = ${SRC}-${FREQ}
 lupus>set CALVIS2 = ${CAL}-${FREQ}
 
@@ -576,3 +576,172 @@ lupus>../../../code/mmm/pwilliams/fancy/calctsys quant=16,1 vis=fx64c-gcmosaicte
 # xx looks ok, yy a bit worse...  make hardcopy of xx.
 
 cgdisp slev=p,1 levs1=10,1,0.1,0.01 device='gcmosaictest1-xx.ps/ps' options=wedge beamtyp=b,l labtyp=arcsec,arcsec in=fx64c-gcmosaictest1-1640-xx.ts.rm,fx64c-gcmosaictest1-1640-xx.ts.rm type=pixel range=0,0,log,0
+
+####################################################################################################
+####################################################################################################
+# new thread for atafx product "mosfxc"
+####################################################################################################
+####################################################################################################
+
+# set variables and inspect summary info
+
+lupus>set SRC = 'gcmosaictest1'
+lupus>set CAL = '1733-130'
+lupus>set FREQ = '1640'
+lupus>set VIS = mosfxc-${SRC}-${FREQ}
+lupus>set CALVIS = mosfxc-${CAL}-${FREQ}
+
+lupus>listobs vis=${VIS}
+lupus>itemize in=${VIS}
+lupus>prthd in=${VIS}
+
+# check raw spectra.  see rfi!
+
+lupus>smauvspec vis=${CALVIS} device=1/xs axis=ch,bo select='pol(xx,yy),ant(1,2,3)(11,12,13,14)' nxy=4,3 interval=100
+
+# run karto's flagger
+
+lupus>newrfisweep.csh vis=${CALVIS}
+
+mosfxc-1733-130-1640 final flagging...
+UvAver: version 1.0 17-Nov-08
+Uvaflag: version 1.0 22-Oct-98
+ Correlations: Total   Good      Bad
+ Before:    ****************  209385
+ After:     ****************30145500
+Edge flagging mosfxc-1733-130-1640
+Flagging of mosfxc-1733-130-1640 complete!
+Flagging process took 8 minute(s) 6 second(s).
+
+# doesn't catch all the rfi that is persistent from 1600-1610 MHz and up around 1685-1690 MHz
+# flag all of that completely
+
+lupus>uvflag vis=${CALVIS} line='chan,100,100,1,1' flagval='flag'
+lupus>uvflag vis=${CALVIS} line='chan,100,840,1,1' flagval='flag'
+lupus>uvflag vis=${VIS} line='chan,100,100,1,1' flagval='flag'
+lupus>uvflag vis=${VIS} line='chan,100,840,1,1' flagval='flag'
+
+# try rerunning newrfisweep.csh, since it may choke on superbad rfi
+# still doesn't change much.  a bit of trouble at channels 320-330.  flagging manually.
+
+lupus>uvflag vis=${VIS} line='chan,10,320,1,1' flagval='flag'
+lupus>uvflag vis=${CALVIS} line='chan,10,320,1,1' flagval='flag'
+
+# reasonably happy with flagging now.  what are stats?
+# ?? does this mean that 6.9e6 visibilities are flagged out of 8.7e8??
+
+lupus>itemize in=${CALVIS}
+
+itemize: Version 1.4, 2008/02/19 20:06:29 UTC
+
+  sfreq    = 1.5876
+  freq     = 1.64000001
+  vislen   = 872640448
+  ncorr    = 214410240
+  nwcorr   = 0
+  obstype  = mixed-auto-cross
+  npol     = 4
+  restfreq = 1.64
+  flags      (integer data, 6916460 elements)
+  specdata   (text data, 36415864 elements)
+  vartable   (text data, 425 elements)
+  history    (text data, 270952 elements)
+  visdata    (binary data, 872640444 elements)
+
+# not sure...  moving on...
+# uvcal to flatten baselines by dividing by autocorrs
+
+lupus>uvcal options=fxcal,unflagged select='pol(xx)' vis=${CALVIS} out=${CALVIS}-xx
+lupus>uvcal options=fxcal,unflagged select='pol(yy)' vis=${CALVIS} out=${CALVIS}-yy
+
+# uvspec shows that it looks a bit better.  also checked that autocorrs weren't wonky.
+
+# check for solar interference effects on short baselines
+
+lupus>smauvspec device=1/xs axis=ch,bo select='pol(xx),-auto,uvrange(0.001,0.1)' nxy=4,3 vis=${CALVIS}-xx interval=1
+
+# some bad low channels (probably not solar, but anyway worth flagging).  baseline 4,5 shows wavy amp and phase often.  ??why??
+
+# flagging chans 200-210.  clearly limited in time. ?? how to find/select smartly??  need 2d flag inspection...
+
+lupus>uvflag vis=${CALVIS}-xx line='chan,10,200,1,1' flagval=f
+# etc...
+
+# now use closanal to find bad ants/bl
+
+lupus>~/big_scr2/code/mmm/pwilliams/fancy/closanal vis=${CALVIS}-xx interval=10
+
+# 42x, 26x, 14x clearly bad.
+# 24y, 28y, 42y, 39y clearly bad.
+
+lupus>uvflag vis=${VIS}-xx select='ant(26)' flagval=f
+lupus>uvflag vis=${CALVIS}-xx select='ant(26)' flagval=f
+# etc.
+
+# after this, the best and worst mean rms of antpols ranges from 5.6 to 7.6 for xx and 6.6 to 10.4 for yy.
+
+# flagging ok! moving on to cal
+
+lupus>smamfcal options=interp,opolyfit select=-auto polyfit=7 refant=${REFANT} line=chan,824,101 vis=${CALVIS}-xx
+lupus>smamfcal options=interp,opolyfit select=-auto polyfit=7 refant=${REFANT} line=chan,824,101 vis=${CALVIS}-yy
+
+# calibration looks ok, but flux scale off, since cal not known.  need selfcal.
+
+lupus>selfcal select=-auto options=amp,noscale flux=5.2 vis=${CALVIS}-xx
+lupus>selfcal select=-auto options=amp,noscale flux=5.2 vis=${CALVIS}-yy
+
+# fix header
+
+lupus>puthd type=double value=0.02 in=${CALVIS}-xx/interval
+lupus>puthd type=double value=0.02 in=${CALVIS}-yy/interval
+
+# check quality of cal.  phase shows all ants have rms of about 5-10 deg.  looks ok.  worst is 2x, which has jump of 30 deg.  
+
+lupus>gpplt vis=${VIS}-xx device=1/xs yaxis=phase
+
+# cal meaningful tsys
+
+lupus>../../../code/mmm/pwilliams/fancy/calctsys quant=16,1 flux=5.2 vis=${CALVIS}-xx out=${CALVIS}-xx.ts
+lupus>../../../code/mmm/pwilliams/fancy/calctsys quant=16,1 flux=5.2 vis=${CALVIS}-yy out=${CALVIS}-yy.ts
+
+# image calibrator
+
+lupus>~/big_scr2/code/mmm/pwilliams/micr.sh ${CALVIS}-xx.ts
+
+lupus>cgdisp slev=p,1 levs1=10,5,1,0.5,0.1 device=1/xs options=wedge beamtyp=b,l labtyp=arcsec,arcsec in=${CALVIS}-xx.ts.rm,${CALVIS}-xx.ts.rm type=contour,pixel
+
+# calibrator image shows compact, 1% sidelobes in xx and yy about about 0.5 deg out.  also yy shows very low freq vertical stripes.  ?? ok??
+
+# now clean up target field.
+
+lupus>newrfisweep.csh vis=${VIS}
+
+# looks pretty good.  note that worst parts were flagged out during cal flagging.
+
+lupus>uvcal options=fxcal,unflagged select='pol(xx)' vis=${VIS} out=${VIS}-xx
+lupus>uvcal options=fxcal,unflagged select='pol(yy)' vis=${VIS} out=${VIS}-yy
+
+# plot shows that baselines are a bit flatter...
+
+lupus>smauvspec device=1/xs axis=ch,bo select='pol(yy),ant(1,2,3)(12,13,14,15)' nxy=4,3 vis=${VIS} interval=1
+
+# copy over first gains and bandpass here
+
+lupus>gpcopy vis=${CALVIS}-xx out=${VIS}-xx
+lupus>gpcopy vis=${CALVIS}-yy out=${VIS}-yy
+
+# solidify
+
+lupus>uvcat vis=${VIS}-xx out=${VIS}-xx.mf
+lupus>uvcat vis=${VIS}-yy out=${VIS}-yy.mf
+
+# copy selfcal gain values over...
+
+lupus>gpcopy vis=${CALVIS}-yy.ts out=${VIS}-yy.mf
+lupus>gpcopy vis=${CALVIS}-xx.ts out=${VIS}-xx.mf
+
+# now calculate proper tsys values.  note that default maxtsys will flag everything.  gc is bright!  note yy looked a bit worse in closure phase earlier, so i'm increaseing maxtsys for them here.
+
+lupus>~/big_scr2/code/mmm/pwilliams/fancy/calctsys quant=16,1 vis=${VIS}-xx.mf out=${VIS}-xx.ts maxtsys=800
+lupus>~/big_scr2/code/mmm/pwilliams/fancy/calctsys quant=16,1 vis=${VIS}-yy.mf out=${VIS}-yy.ts maxtsys=900
+
