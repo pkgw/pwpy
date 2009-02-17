@@ -45,12 +45,13 @@ flag:
 
 foreach VIS (`echo $VISLIST`)
   echo 'Starting flagging for '${VIS}
-  echo 'First flag data for known bad stuff'
+  echo 'First flag data for known bad stuff, including short baselinse (100 lambda).'
   uvflag vis=${VIS} select='pol(xx),ant(14,42,26)' flagval=flag
   uvflag vis=${VIS} select='pol(yy),ant(42,39,24,28)' flagval=flag
   uvflag vis=${VIS} line='chan,210,1,1,1' flagval=flag
   uvflag vis=${VIS} line='chan,200,840,1,1' flagval=flag
   uvflag vis=${VIS} line='chan,10,320,1,1' flagval=flag
+  uvflag vis=${VIS} select='uvrange(0.001,0.1)' flagval=flag
 
   echo 'Now flag automatically'
   newrfisweep.csh vis=${VIS}
