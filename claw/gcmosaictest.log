@@ -745,3 +745,9 @@ lupus>gpcopy vis=${CALVIS}-xx.ts out=${VIS}-xx.mf
 lupus>~/big_scr2/code/mmm/pwilliams/fancy/calctsys quant=16,1 vis=${VIS}-xx.mf out=${VIS}-xx.ts maxtsys=800
 lupus>~/big_scr2/code/mmm/pwilliams/fancy/calctsys quant=16,1 vis=${VIS}-yy.mf out=${VIS}-yy.ts maxtsys=900
 
+# images show a bit of large-scale emission.  uvspec of cal shows phase wobbles (like small wrap) on short baselinse => solar interference!
+# flag baselines under 100 lambda.
+
+lupus>uvflag vis=${VIS}-xx select='uvrange(0.001,0.1)' flagval=flag
+#etc.
+
