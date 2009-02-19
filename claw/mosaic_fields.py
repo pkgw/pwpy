@@ -53,4 +53,4 @@ def print_centers(centerl,centerb):
     for i in range(len(centerl)):
         gal = ephem.Galactic(str(centerl[i]),str(centerb[i]),epoch='2000')
         cel = ephem.Equatorial(gal)
-        print 'ata  mosaic     gc-seti%d-20     %.10f           %.10f           cjl' % (i+1,cel.ra*12/ephem.pi, cel.dec*180/ephem.pi)
+        print 'ata  mosaic     gc-seti2-%d     %.10f           %.10f           cjl' % (i+1,cel.ra*12/ephem.pi, cel.dec*180/ephem.pi)
