@@ -135,7 +135,7 @@ set sysflux = 5 # Additional flux from tsys (at three sigma point, say)
 set addflux = 1 # Additional flux in the field, definitely good to keep track o
 set retlim = 20 # Data retention percentage limit for processing.
 set outsource = 1 # Whether or not to split the datasets into smaller chunks
-set mapopt = "options=savedata" # Mapping options
+set mapopt = "options=savedata,autocal" # Mapping options
 set display = 0 # Dispaly results while processing?
 set polsplit = 0 # Split pol before processing (first x, then y)
 set debug = 0 # Save temp data after running?
@@ -1054,18 +1054,10 @@ endif
 foreach tfile ($tvis)
     echo "Copying gains to $tfile"
     foreach dp (xx yy)
-	if (-e $vis/gains.$dp || -e $vis/bandpass.$dp) then
-	    if (-e $vis/gains) mv $vis/gains $vis/tempgains
-	    if (-e $vis/bandpass) mv $vis/bandpass $vis/tempbandpass
-	    if (-e $vis/gains.$dp) mv $vis/gains.$dp $vis/gains
-	    if (-e $vis/bandpass.$dp) mv $vis/bandpass.$dp $vis/bandpass
-	    gpcopy vis=$vis out=$tfile > /dev/null
+	if (-e $wd/tempcal$dp/gains || -e $wd/tempcal$dp/bandpass) then
+	    gpcopy vis=$wd/tempcal$dp out=$tfile > /dev/null
 	    if (-e $tfile/gains) mv $tfile/gains $tfile/gains.$dp
 	    if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/bandpass.$dp
-	    if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.$dp
-	    if (-e $vis/gains) mv $vis/gains $vis/gains.$dp
-	    if (-e $vis/tempbandpass) mv $vis/tempbandpass $vis/bandpass
-	    if (-e $vis/tempgains) mv $vis/tempgains $vis/gains
 	endif
 	if (-e $vis/gains.{$dp}p || -e $vis/bandpass.{$dp}p) then
 	    gpcopy vis=$outfile/$source.1.$dp out=$tfile > /dev/null

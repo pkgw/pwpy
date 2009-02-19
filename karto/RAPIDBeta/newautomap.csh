@@ -654,7 +654,7 @@ if ($intclean) then
     sfind in=tempmap.cm options=oldsfind,auto,nofit rmsbox=100 xrms=3 labtyp=arcsec >& /dev/null 
     cd ..
     # Had to patch here since sfind was having problems... stupid bugger
-    set niters = `grep -v "#" $wd/sfind.log | awk '{if ($6*$7 > 3000*noise) cycles+=log((3000*noise)/($6*$7))/log(.9)} END {print int(cycles)}' noise=$imstats[3]`
+    set niters = `grep -v "#" $wd/sfind.log | awk '{if ($6*$7 > 3000*noise) cycles+=2*log((3000*noise)/($6*$7))/log(.9)} END {print int(cycles)}' noise=$imstats[3]`
     if ($niters < 100) then
 	echo "Derived value for niters was $niters... invoking safegaurd and putting niters at 100."
 	set niters = 100
@@ -681,9 +681,9 @@ cd ..
 
 #Verify that the residual maps look clean. If not, reclean or advise the user that recleaning needs to be performed
 echo "Currently at $niters cycles..."
-if (`grep -v "#" $wd/sfind.log | awk '{if ($7*1 > 3000*noise) cycles+=log((3000*noise)/($6*$7))/log(.9)} END {print int(cycles)*1}' noise=$imstats[3]` > `echo $niters | awk '{print int(.05*$1)}'` && $niters != 25000) then
+if (`grep -v "#" $wd/sfind.log | awk '{if ($7*$6 > 3000*noise) cycles+=2*log((3000*noise)/($6*$7))/log(.9)} END {print int(cycles)*1}' noise=$imstats[3]` > `echo $niters | awk '{print int(.01*$1)}'` && $niters != 25000) then
     if ($intclean) then
-	set niters = `grep -v "#" $wd/sfind.log | awk '{ cycles+=log((3000*noise)/$3)/log(.9)} END {print int(cycles)+niters}' noise=$imstats[3] niters=$niters`
+	set niters = `grep -v "#" $wd/sfind.log | awk '{ cycles+=2*log((3000*noise)/$3)/log(.9)} END {print int(cycles)+niters}' noise=$imstats[3] niters=$niters`
 	if ($niters < 100) then
 	    echo "Derived value for $niters was $niters... invoking safegaurd and putting niters at 100."
 	    set niters = 100
