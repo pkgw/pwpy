@@ -342,6 +342,15 @@ end
 
 echo "Gathering observation information..."
 set wd = `mktemp -d rfi3XXXXX`
+set dmark = `date +%s`
+
+foreach file ($vis $tvis)
+    if !(-e $file/phoenix) mkdir -p $file/phoenix
+    if (! -e $file/phoenix/flags.o && -e $file/flags) cp $file/flags $file/phoenix/flags.o
+    echo "RFISWEEP $dmark" >> $file/phoenix/history
+end
+
+
 # Make spectral directories for all source and cal files - esp important for mosaiced observations... TOTH to Steve and Geoff
 
 mkdir $wd/vis
@@ -639,6 +648,10 @@ while ($idx <= $listlim)
     endif
     echo "Flagging of $fulllist[$idx] complete!" 
     @ idx++
+end
+
+foreach file ($vis $tvis)
+    if (-e $file/flags) cp $file/flags $file/phoenix/flags.RFI$dmark
 end
 
 finish:

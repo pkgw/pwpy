@@ -253,14 +253,14 @@ endif
 #################################################################
 
 set date1 = `date +%s.%N`
+set dmark = `date +%s`
 
-if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.bu
-if (-e $vis/gains) mv $vis/gains $vis/gains.bu
-
-foreach tfile ($tvis)
-    if (-e $tfile/flags) cp $tfile/flags $tfile/flags.bu
-    if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/bandpass.bu
-    if (-e $tfile/gains) mv $tfile/gains $tfile/gains.bu
+foreach file ($vis $tvis)
+    if !(-e $file/phoenix) mkdir -p $file/phoenix
+    if (! -e $file/phoenix/flags.o && -e $file/flags) cp $file/flags $file/phoenix/flags.o
+    if (! -e $file/phoenix/gains.o && -e $file/flags) cp $file/flags $file/phoenix/gains.o
+    if (! -e $file/phoenix/bandpass.o && -e $file/bandpass) cp $file/bandpass $file/phoenix/bandpass.o
+    echo "CALCAL $dmark" >> $file/phoenix/history
 end
 
 #################################################################
@@ -1083,6 +1083,23 @@ if ($outsource && "$tvis[1]" != "") then
 endif
 
 #
+
+foreach file ($vis $tvis)
+    if (-e $file/gains) cp $file/gains $file/phoenix/gains.CAL$dmark
+    if (-e $file/bandpass) cp $file/bandpass $file/phoenix/bandpass.CAL$dmark
+    if (-e $file/gains.xx) cp $file/gains.xx $file/phoenix/gains.xx.CAL$dmark
+    if (-e $file/bandpass.xx) cp $file/bandpass.xx $file/phoenix/bandpass.xx.CAL$dmark
+    if (-e $file/gains.xxp) cp $file/gains.xxp $file/phoenix/gains.xxp.CAL$dmark
+    if (-e $file/bandpass.xxp) cp $file/bandpass.xxp $file/phoenix/bandpass.xxp.CAL$dmark
+    if (-e $file/gains.yy) cp $file/gains.yy $file/phoenix/gains.yy.CAL$dmark
+    if (-e $file/bandpass.yy) cp $file/bandpass.yy $file/phoenix/bandpass.yy.CAL$dmark
+    if (-e $file/gains.yyp) cp $file/gains.yyp $file/phoenix/gains.yyp.CAL$dmark
+    if (-e $file/bandpass.yyp) cp $file/bandpass.yyp $file/phoenix/bandpass.yyp.CAL$dmark
+end
+
+foreach file ($tvis)
+    if (-e $file/flags) cp $file/flags $file/phoenix/flags.CAL$dmark
+end
 
 goto finish
 # Below here is reporting information that needs to be upgraded... badly.
