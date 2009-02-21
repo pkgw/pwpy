@@ -37,6 +37,8 @@ spec = Gem::Specification.new do |s|
     'lib/mirdl/select_na.rb',
     'lib/mirdl/uvdat_na.rb',
     'lib/mirdl/uvio_na.rb',
+    'lib/mirdl/gains.rb',
+    'lib/mirdl/astroutil.rb',
     'test/**/*'
   ]
   s.require_paths = ['lib', 'ext']

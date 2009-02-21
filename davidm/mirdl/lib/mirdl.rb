@@ -62,3 +62,5 @@ end
 require 'mirdl/select_na'
 require 'mirdl/uvio_na'
 require 'mirdl/uvdat_na'
+require 'mirdl/gains'
+require 'mirdl/astroutil'
