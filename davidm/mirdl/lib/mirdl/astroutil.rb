@@ -65,13 +65,15 @@ class Numeric
   def to_dmsstr(prec=3)
     width = prec == 0 ? 2 : prec+3
     scale = (3600 * 10 ** prec).to_f
-    "%02dd%02dm%0#{width}.#{prec}fs" % ((self*scale).round/scale).to_dms
+    d,m,s = to_dms
+    "%02dd%02dm%0#{width}.#{prec}fs" % [d,m,s+5*10**(-prec-1)]
   end
-  # Convert +self+ to "##:##:##.###" format truncated to +prec+ fractional places.
+  # Convert +self+ to "##:##:##.###" format rounded to +prec+ fractional places.
+  # TODO truncate instead of round if prec < 0?
   def to_hmsstr(prec=3)
     width = prec == 0 ? 2 : prec+3
-    scale = (3600 * 10 ** prec).to_f
-    "%02d:%02d:%0#{width}.#{prec}f" % ((self*scale).to_i/scale).to_dms
+    h,m,s = to_hms
+    "%02d:%02d:%0#{width}.#{prec}f" % [h,m,s+5*10**(-prec-1)]
   end
   # Convert +self+ from degrees to radians (i.e. <tt>Math.d2r(self)</tt>).
   def d2r() Math.d2r(self); end
