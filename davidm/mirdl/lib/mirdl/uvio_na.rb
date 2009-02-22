@@ -37,8 +37,13 @@ module Mirdl
              else status
              end
     r, rs = SYM[:uvopen][0, name, status]
-    # TODO Raise SystemCallError on error?
-    rs[0]
+    tno = rs[0]
+    if status == 'old'
+      # Read in first "frame" of uv variables
+      uvnext(tno)
+      uvrewind(tno)
+    end
+    tno
   end
   module_function :uvopen
 
@@ -80,7 +85,8 @@ module Mirdl
   # int  uvupdate_c (int tno);
   SYM[:uvupdate] = LIBMIR_UVIO['uvupdate_c', 'II']
   def uvupdate(tno)
-    SYM[:uvupdate][tno]
+    r, rs = SYM[:uvupdate][tno]
+    r != 0
   end
   module_function :uvupdate
 
@@ -312,15 +318,20 @@ module Mirdl
 
   # void uvtrack_c  (int tno, Const char *name, Const char *switches);
   SYM[:uvtrack] = LIBMIR_UVIO['uvtrack_c', '0ISS']
-  def uvtrack(tno, name, switches)
+  def uvtrack(tno, name, switches='u')
     SYM[:uvtrack][tno, name.to_s, switches.to_s]
   end
   module_function :uvtrack
 
   # int  uvscan_c   (int tno, Const char *var);
-  SYM[:uvscan] = LIBMIR_UVIO['uvscan_c', '0IS']
+  SYM[:uvscan] = LIBMIR_UVIO['uvscan_c', 'IIS']
   def uvscan(tno, var)
-    SYM[:uvscan][tno, var.to_s]
+    r, rs = SYM[:uvscan][tno, var.to_s]
+    case r
+    when -1: nil # eof
+    when  0: true # found
+    else false # not found
+    end
   end
   module_function :uvscan
 

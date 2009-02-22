@@ -25,6 +25,7 @@ module Mirdl
     r, rs = SYM[:uvDatOpn][0]
     return nil if r == 0
     tno = rs[0]
+    # Read in first "frame" of uv variables
     uvnext(tno)
     uvrewind(tno)
     tno
