@@ -27,7 +27,7 @@ module Gauss2d
   # x: Vector, list of the parameters to determine
   # t, y: observational data
   # f: Vector, function to minimize
-  PROCF = lambda do |x, t, y, f|
+  def procf(x, t, y, f)
     # Get current "guess" at parameters
     a, x0, y0, sx, sy = *x
     # For each observation
@@ -38,9 +38,10 @@ module Gauss2d
       f[i] = yi - y[i]
     end
   end
+  module_function :procf
 
   # jac: Matrix, Jacobian
-  PROCDF = lambda do |x, t, y, jac|
+  def procdf(x, t, y, jac)
     # Get current "guess" at parameters
     a, x0, y0, sx, sy = *x
     # For each observation
@@ -60,6 +61,7 @@ module Gauss2d
       jac.set(i, 4, yi * 2 * (ty-y0)**2 / sy**3)
     end
   end
+  module_function :procdf
 
   # call-seq:
   #   Gauss2d.fit(t, y, solver=nil, init_guess=nil) -> [iter, solver, status]
@@ -106,7 +108,7 @@ module Gauss2d
     raise "inconsistent number of observations (#{t.length} != #{y.length})" if n != y.length
 
     # Create function object for fitting 5 parameters based on procf and procdf
-    f = MultiFit::Function_fdf.alloc(PROCF, PROCDF, NP)
+    f = MultiFit::Function_fdf.alloc(method(:procf), method(:procdf), NP)
 
     # Create solver
     solver ||= MultiFit::FdfSolver.alloc(MultiFit::FdfSolver::LMSDER, n, NP)
