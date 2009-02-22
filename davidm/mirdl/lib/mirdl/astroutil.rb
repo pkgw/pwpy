@@ -60,11 +60,12 @@ class Numeric
   # Convert +self+ to [hours, minutes, seconds] where hours and minutes are
   # integers.
   alias :to_hms :to_dms
-  # Convert +self+ to "##d##m##.###s" format truncated to +prec+ fractional places.
+  # Convert +self+ to "##d##m##.###s" format rounded to +prec+ fractional places.
+  # TODO truncate instead of round if prec < 0?
   def to_dmsstr(prec=3)
     width = prec == 0 ? 2 : prec+3
     scale = (3600 * 10 ** prec).to_f
-    "%02dd%02dm%0#{width}.#{prec}fs" % ((self*scale).to_i/scale).to_dms
+    "%02dd%02dm%0#{width}.#{prec}fs" % ((self*scale).round/scale).to_dms
   end
   # Convert +self+ to "##:##:##.###" format truncated to +prec+ fractional places.
   def to_hmsstr(prec=3)
