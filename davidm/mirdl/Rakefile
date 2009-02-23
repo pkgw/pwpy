@@ -35,6 +35,7 @@ spec = Gem::Specification.new do |s|
     'ext/options_for.c',
     'lib/mirdl.rb',
     'lib/mirdl/ephem.rb',
+    'lib/mirdl/key.rb',
     'lib/mirdl/select_na.rb',
     'lib/mirdl/uvdat_na.rb',
     'lib/mirdl/uvio_na.rb',

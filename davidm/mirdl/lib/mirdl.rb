@@ -60,6 +60,7 @@ module Mirdl
 end
 
 require 'mirdl/ephem'
+require 'mirdl/key'
 require 'mirdl/select_na'
 require 'mirdl/uvio_na'
 require 'mirdl/uvdat_na'
