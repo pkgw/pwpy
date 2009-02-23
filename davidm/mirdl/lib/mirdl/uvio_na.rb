@@ -28,7 +28,7 @@ module Mirdl
 
   # void uvopen_c (int *tno, Const char *name, Const char *status);
   SYM[:uvopen] = LIBMIR_UVIO['uvopen_c', '0iSS']
-  def uvopen(name, status)
+  def uvopen(name, status='old')
     status = status.to_s
     status = case status
              when 'a', 'w+': 'append'
