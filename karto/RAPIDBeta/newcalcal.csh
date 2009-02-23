@@ -57,7 +57,7 @@ echo "gains when a 'gains' file is already present)."
 echo ""
 echo "CALLING SEQUENCE: newcalcal.csh vis=vis (tvis=tvis flux=flux1,"
 echo "    flux2,flux3 plim=plim int=int siglim=siglim refant=refant"
-echo "    olay=olay options=debug,display,autoref,polsplit,[outsource,"
+echo "    olay=olay options=debug,autoref,polsplit,[outsource,"
 echo "    insource],sefd)"
 echo ""
 echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
@@ -108,7 +108,7 @@ echo ""
 echo " device - Device to plot results to (e.g. /xw for x-window)."
 echo '    Default is /null.'
 echo ""
-echo " options=debug,display,autoref,polsplit,outsource,insource,sefd"
+echo " options=debug,autoref,polsplit,outsource,insource,sefd"
 echo "    debug - Don't delete temporary files created by CALCAL."
 echo "    autoref - Have CALCAL automatically determine the best"
 echo "        reference antenna (default unless refant is specified)."
@@ -260,6 +260,7 @@ foreach file ($vis $tvis)
     if (! -e $file/phoenix/flags.o && -e $file/flags) cp $file/flags $file/phoenix/flags.o
     if (! -e $file/phoenix/gains.o && -e $file/flags) cp $file/flags $file/phoenix/gains.o
     if (! -e $file/phoenix/bandpass.o && -e $file/bandpass) cp $file/bandpass $file/phoenix/bandpass.o
+    if !(-e $file/phoenix/header.o) cp $file/header $file/phoenix/header.o
     echo "CALCAL $dmark" >> $file/phoenix/history
 end
 
@@ -1058,11 +1059,13 @@ foreach tfile ($tvis)
 	    gpcopy vis=$wd/tempcal$dp out=$tfile > /dev/null
 	    if (-e $tfile/gains) mv $tfile/gains $tfile/gains.$dp
 	    if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/bandpass.$dp
+	    cp $tfile/header $tfile/header.$dp
 	endif
 	if (-e $vis/gains.{$dp}p || -e $vis/bandpass.{$dp}p) then
 	    gpcopy vis=$outfile/$source.1.$dp out=$tfile > /dev/null
 	    if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/bandpass.{$dp}p
 	    if (-e $tfile/gains) mv $tfile/gains $tfile/gains.{$dp}p
+	    cp $tfile/header $tfile/header.{$dp}p
 	endif
     end
     if (-e $vis/gains) then
@@ -1095,6 +1098,11 @@ foreach file ($vis $tvis)
     if (-e $file/bandpass.yy) cp $file/bandpass.yy $file/phoenix/bandpass.yy.CAL$dmark
     if (-e $file/gains.yyp) cp $file/gains.yyp $file/phoenix/gains.yyp.CAL$dmark
     if (-e $file/bandpass.yyp) cp $file/bandpass.yyp $file/phoenix/bandpass.yyp.CAL$dmark
+    if (-e $file/header) cp $file/header $file/header/pheonix/header.CAL$dmark
+    if (-e $file/header.xx) cp $file/header.xx $file/header/pheonix/header.xx.CAL$dmark
+    if (-e $file/header.xxp) cp $file/header.xxp $file/header/pheonix/header.xxp.CAL$dmark
+    if (-e $file/header.yy) cp $file/header.yy $file/header/pheonix/header.yy.CAL$dmark
+    if (-e $file/header.yyp) cp $file/header.yyp $file/header/pheonix/header.yyp.CAL$dmark
 end
 
 foreach file ($tvis)

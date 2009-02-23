@@ -538,37 +538,42 @@ foreach file ($vis)
 	echo "FATAL ERROR: UVAVER has failed! $file shows no viable data!" 
 	goto enderr
     endif
+    echo ""
     foreach dp (x y)
 	if ((-e $file/gains.$dp$dp || -e $file/bandpass.$dp$dp) && -e $wd/tempmap$idx.{$dp}pol/visdata) then
-	    echo ""; echo -n "Applying diff $dp$dp gains..."
+	    echo -n "Applying diff $dp$dp gains..."
 	    if (-e $file/gains)  mv $file/gains $file/gains.mp
 	    if (-e $file/gains.$dp$dp) mv $file/gains.$dp$dp $file/gains
 	    if (-e $file/bandpass) mv $file/bandpass $file/bandpass.mp
 	    if (-e $file/bandpass.$dp$dp) mv $file/bandpass.$dp$dp $file/bandpass
+	    if (-e $file/header) cp $file/header $file/header.mp
+	    if (-e $file/header.$dp$dp) cp $file/header.$dp$dp $file/header
 	    gpcopy vis=$file out=$wd/tempmap$idx.{$dp}pol > /dev/null
+	    if (-e $file/header.mp) mv $file/header.mp $file/header
 	    if (-e $file/gains)  mv $file/gains $file/gains.$dp$dp
 	    if (-e $file/gains.mp) mv $file/gains.mp $file/gains
 	    if (-e $file/bandpass) mv $file/bandpass $file/bandpass.$dp$dp
 	    if (-e $file/bandpass.mp) mv $file/bandpass.mp $file/bandpass
 	    uvaver vis=$wd/tempmap$idx.{$dp}pol out=$wd/tempgmap options=relax >& /dev/null
 	    rm -rf $wd/tempmap$idx.{$dp}pol; mv $wd/tempgmap $wd/tempmap$idx.{$dp}pol
-	    echo 1
+	    echo ""
 	endif
 	if ((-e $file/gains.{$dp$dp}p || -e $file/bandpass.{$dp$dp}p) && -e $wd/tempmap$idx.{$dp}pol/visdata) then
-	    echo -n "."
 	    if (-e $file/gains)  mv $file/gains $file/gains.mp
 	    if (-e $file/gains.{$dp$dp}p) mv $file/gains.{$dp$dp}p $file/gains
 	    if (-e $file/bandpass) mv $file/bandpass $file/bandpass.mp
 	    if (-e $file/bandpass.{$dp$dp}p) mv $file/bandpass.{$dp$dp}p $file/bandpass
+	    if (-e $file/header) cp $file/header $file/header.mp
+	    if (-e $file/header.{$dp$dp}p) cp $file/header.{$dp$dp}p $file/header
 	    gpcopy vis=$file out=$wd/tempmap$idx.{$dp}pol > /dev/null
+	    if (-e $file/header.mp) mv $file/header.mp $file/header
 	    if (-e $file/gains)  mv $file/gains $file/gains.{$dp$dp}p
 	    if (-e $file/gains.mp) mv $file/gains.mp $file/gains
 	    if (-e $file/bandpass) mv $file/bandpass $file/bandpass.{$dp$dp}p
 	    if (-e $file/bandpass.mp) mv $file/bandpass.mp $file/bandpass
 	    uvaver vis=$wd/tempmap$idx.{$dp}pol out=$wd/tempgmap options=relax >& /dev/null
 	    rm -rf $wd/tempmap$idx.{$dp}pol; mv $wd/tempgmap $wd/tempmap$idx.{$dp}pol
-	    echo 2
-	endif	
+	endif
 	if (-e $wd/tempmap$idx.{$dp}pol/visdata) then
 	    set vislist = ($vislist $wd/tempmap$idx.{$dp}pol)
 	else
@@ -681,7 +686,7 @@ cd ..
 
 #Verify that the residual maps look clean. If not, reclean or advise the user that recleaning needs to be performed
 echo "Currently at $niters cycles..."
-if (`grep -v "#" $wd/sfind.log | awk '{if ($7*$6 > 3000*noise) cycles+=2*log((3000*noise)/($6*$7))/log(.9)} END {print int(cycles)*1}' noise=$imstats[3]` > `echo $niters | awk '{print int(.01*$1)}'` && $niters != 25000) then
+if (`grep -v "#" $wd/sfind.log | awk '{if ($7*$6 > 3000*noise) cycles+=2*log((3000*noise)/($6*$7))/log(.9)} END {print int(cycles)*1}' noise=$imstats[3]` > `echo $niters | awk '{print int(.025*$1)}'` && $niters != 25000) then
     if ($intclean) then
 	set niters = `grep -v "#" $wd/sfind.log | awk '{ cycles+=2*log((3000*noise)/$3)/log(.9)} END {print int(cycles)+niters}' noise=$imstats[3] niters=$niters`
 	if ($niters < 100) then
