@@ -59,6 +59,7 @@ module Mirdl
   H_CMPLX = 7
 end
 
+require 'mirdl/ephem'
 require 'mirdl/select_na'
 require 'mirdl/uvio_na'
 require 'mirdl/uvdat_na'
