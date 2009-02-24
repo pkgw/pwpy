@@ -674,6 +674,8 @@ lupus>~/big_scr2/code/mmm/pwilliams/fancy/closanal vis=${CALVIS}-xx interval=10
 # 42x, 26x, 14x clearly bad.
 # 24y, 28y, 42y, 39y clearly bad.
 
+# alternatively could use garretts "newcalcal"
+
 lupus>uvflag vis=${VIS}-xx select='ant(26)' flagval=f
 lupus>uvflag vis=${CALVIS}-xx select='ant(26)' flagval=f
 # etc.
