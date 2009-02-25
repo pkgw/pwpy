@@ -101,13 +101,14 @@ cal:
   exit(0)
 
 apply:
-  echo 'If cal is calibrated well, now flag and apply calibration to targets.\n'
-  newrfisweep.csh vis=${VISLIST}
+  echo 'If cal is calibrated well, now flag and apply calibration to targets.'
+  echo 'This ignores lines at 1612 and 1665/1667.'
+  newrfisweep.csh vis=${VISLIST} crange='-(240,260),-(750,800)'
   newcalcal.csh vis=${CAL} flux=${CALFLUX} tvis=${VISLIST} options=insource,sefd
 
-  echo 'Unflag known line emission/absorption.\n'
-  uvflag vis=${VISLIST} flagval=unflag line='chan,20,240,0,0'
-  uvflag vis=${VISLIST} flagval=unflag line='chan,50,750,0,0'
+# in case forgotten the first time
+#  uvflag vis=${VISLIST} flagval=unflag line='chan,20,240,0,0'
+#  uvflag vis=${VISLIST} flagval=unflag line='chan,50,750,0,0'
 
 # this not needed?
 #  echo 'If target fields flagged well (probably not true yet!), calculate Tsys.\n'
