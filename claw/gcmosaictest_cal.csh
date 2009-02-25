@@ -107,8 +107,8 @@ apply:
   newcalcal.csh vis=${CAL} flux=${CALFLUX} tvis=${VISLIST} options=insource,sefd
 
 # in case forgotten the first time
-#  uvflag vis=${VISLIST} flagval=unflag line='chan,20,240,0,0'
-#  uvflag vis=${VISLIST} flagval=unflag line='chan,50,750,0,0'
+#  uvflag vis=${VISLIST} flagval=unflag line='chan,20,240,1,1'
+#  uvflag vis=${VISLIST} flagval=unflag line='chan,50,750,1,1'
 
 # this not needed?
 #  echo 'If target fields flagged well (probably not true yet!), calculate Tsys.\n'
