@@ -1098,11 +1098,11 @@ foreach file ($vis $tvis)
     if (-e $file/bandpass.yy) cp $file/bandpass.yy $file/phoenix/bandpass.yy.CAL$dmark
     if (-e $file/gains.yyp) cp $file/gains.yyp $file/phoenix/gains.yyp.CAL$dmark
     if (-e $file/bandpass.yyp) cp $file/bandpass.yyp $file/phoenix/bandpass.yyp.CAL$dmark
-    if (-e $file/header) cp $file/header $file/header/pheonix/header.CAL$dmark
-    if (-e $file/header.xx) cp $file/header.xx $file/header/pheonix/header.xx.CAL$dmark
-    if (-e $file/header.xxp) cp $file/header.xxp $file/header/pheonix/header.xxp.CAL$dmark
-    if (-e $file/header.yy) cp $file/header.yy $file/header/pheonix/header.yy.CAL$dmark
-    if (-e $file/header.yyp) cp $file/header.yyp $file/header/pheonix/header.yyp.CAL$dmark
+    if (-e $file/header) cp $file/header $file/phoenix/header.CAL$dmark
+    if (-e $file/header.xx) cp $file/header.xx $file/phoenix/header.xx.CAL$dmark
+    if (-e $file/header.xxp) cp $file/header.xxp $file/phoenix/header.xxp.CAL$dmark
+    if (-e $file/header.yy) cp $file/header.yy $file/phoenix/header.yy.CAL$dmark
+    if (-e $file/header.yyp) cp $file/header.yyp $file/phoenix/header.yyp.CAL$dmark
 end
 
 foreach file ($tvis)
