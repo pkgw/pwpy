@@ -4,27 +4,27 @@
 # set up variables
 set CAL = 'mosfxc-1733-130-1640'
 set CALFLUX = 5.2
-set VIS1 = 'mosfxc-gc-seti1-1-1640'
-set VIS2 = 'mosfxc-gc-seti1-2-1640'
-set VIS3 = 'mosfxc-gc-seti1-3-1640'
-set VIS4 = 'mosfxc-gc-seti1-4-1640'
-set VIS5 = 'mosfxc-gc-seti1-5-1640'
-set VIS6 = 'mosfxc-gc-seti1-6-1640'
-set VIS7 = 'mosfxc-gc-seti1-7-1640'
-set VIS8 = 'mosfxc-gc-seti1-8-1640'
-set VIS9 = 'mosfxc-gc-seti1-9-1640'
-set VIS10 = 'mosfxc-gc-seti1-10-1640'
-set VIS11 = 'mosfxc-gc-seti1-11-1640'
-set VIS12 = 'mosfxc-gc-seti1-12-1640'
-set VIS13 = 'mosfxc-gc-seti1-13-1640'
-set VIS14 = 'mosfxc-gc-seti1-14-1640'
-set VIS15 = 'mosfxc-gc-seti1-15-1640'
-set VIS16 = 'mosfxc-gc-seti1-16-1640'
-set VIS17 = 'mosfxc-gc-seti1-17-1640'
-set VIS18 = 'mosfxc-gc-seti1-18-1640'
-set VIS19 = 'mosfxc-gc-seti1-19-1640'
-set VIS20 = 'mosfxc-gc-seti1-20-1640'
-set VISLIST = ($VIS3,$VIS4,$VIS5,$VIS6,$VIS7,$VIS8,$VIS9,$VIS10,$VIS11,$VIS12,$VIS13,$VIS14,$VIS15,$VIS16,$VIS17,$VIS18,$VIS19,$VIS20)
+set VIS1 = 'mosfxc-gc-seti2-1-1640'
+set VIS2 = 'mosfxc-gc-seti2-2-1640'
+set VIS3 = 'mosfxc-gc-seti2-3-1640'
+set VIS4 = 'mosfxc-gc-seti2-4-1640'
+set VIS5 = 'mosfxc-gc-seti2-5-1640'
+set VIS6 = 'mosfxc-gc-seti2-6-1640'
+set VIS7 = 'mosfxc-gc-seti2-7-1640'
+set VIS8 = 'mosfxc-gc-seti2-8-1640'
+set VIS9 = 'mosfxc-gc-seti2-9-1640'
+set VIS10 = 'mosfxc-gc-seti2-10-1640'
+set VIS11 = 'mosfxc-gc-seti2-11-1640'
+set VIS12 = 'mosfxc-gc-seti2-12-1640'
+set VIS13 = 'mosfxc-gc-seti2-13-1640'
+set VIS14 = 'mosfxc-gc-seti2-14-1640'
+set VIS15 = 'mosfxc-gc-seti2-15-1640'
+set VIS16 = 'mosfxc-gc-seti2-16-1640'
+set VIS17 = 'mosfxc-gc-seti2-17-1640'
+set VIS18 = 'mosfxc-gc-seti2-18-1640'
+set VIS19 = 'mosfxc-gc-seti2-19-1640'
+set VIS20 = 'mosfxc-gc-seti2-20-1640'
+set VISLIST = ($VIS2,$VIS3,$VIS4,$VIS5,$VIS6,$VIS7,$VIS8,$VIS9,$VIS10,$VIS11,$VIS12,$VIS13,$VIS14,$VIS15,$VIS16,$VIS17,$VIS18,$VIS19,$VIS20)
 
 echo ''
 echo 'Make sure everything is executable, etc.\n'
@@ -36,7 +36,7 @@ if ($? != 0) exit(1)
 if ($? != 1) exit(1)
 echo 'Checking on files...\n'
 if (! -e ${CAL}) exit(1)
-if (! -e ${VIS1}) exit(1)
+if (! -e ${VIS2}) exit(1)
 
 if ($#argv > 0) then
   switch ($argv[1])
@@ -96,7 +96,7 @@ cal:
 #  ~/big_scr2/code/mmm/pwilliams/fancy/calctsys quant=16,1 flux=${CALFLUX} vis=${CAL} out=${CAL}.ts
 
   echo 'Plots to inspect phase solution...\n'
-  gpplt device=${CAL}_cal.ps/cps vis=${CAL}.ts yaxis=phase yrange='-180,180'
+  gpplt device=${CAL}_cal.ps/cps vis=${CAL} yaxis=phase yrange='-180,180'
 
   exit(0)
 
