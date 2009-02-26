@@ -1,0 +1,22 @@
+# define stuff
+import ephem
+ata = ephem.Observer()
+ata.lat = '40.817'
+ata.long = '-121.47'
+ata.elevation = 3000  # guess
+ata.date = ephem.now()
+
+# current 
+print ata.sidereal_time()
+
+# set up source
+src = ephem.FixedBody()
+src._ra = '17:45:00'
+src._dec = '-29:00:00'
+src.compute(ata)
+
+# get transit properties -- note times are normally in UT!
+print ephem.localtime(src.rise_time)
+print ephem.localtime(src.set_time)
+print ephem.localtime(src.transit_time)
+print ephem.localtime(src.transit_alt)
