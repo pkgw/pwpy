@@ -17,15 +17,21 @@ class Numeric
   end
 end
 
+# gauss2d.fit returns sqrt(2)*sigma for sigma_x and sigma_y.
+# This is why this conversion factor has a "/2" in the sqrt.
+SIGMA2FWHM = 2*sqrt(-log(0.5)/2)
+
 # Process command line
 keyini
 vis = mkeyf(:vis)
 
-valid_coords = %w[radec azel]
+valid_coords = %w[azel radec]
 coord = keya(:coord,valid_coords[0])
 
 valid_offsets = %w[rect polar]
 offset = keya(:offset,valid_offsets[0])
+
+dosquint, junk = options %w[squint]
 keyfin
 
 bug('f',"coord must be one of #{valid_coords.inspect}") unless valid_coords.include? coord
@@ -174,24 +180,56 @@ all_times.each_slice(7) do |hex_times|
   #break # DEBUG: just do first one
 end
 
-# dump results for each hex pattern
-# TODO Print column header
-hexes.transpose.each_with_index do |fits, ap|
-  ant = (ap >> 1) + 1
-  pol = (?X + (ap&1)).chr
-  fits.each_with_index do |(iters, gauss, chi, covar), i|
-    if iters.nil?
-      #printf "%2d %s hex %d iters 0\n", ant, pol, i+1
+if dosquint
+  ant = 0
+  hexes.transpose.each_slice(2) do |xfits, yfits|
+    ant += 1
+    if xfits[0].nil? && yfits[0].nil?
+      printf "%02d absent\n", ant
+      next
+    elsif xfits[0].nil?
+      printf "%02d missingX\n", ant
+      next
+    elsif yfits[0].nil?
+      printf "%02d missingY\n", ant
       next
     end
-    printf "%02d %s hex %d iters %-2d : %5.3f", ant, pol, i+1, iters, gauss[0]
-    if offset == 'polar'
-      r, th = Complex(*gauss[1,2]).polar
-      gauss[1] = r
-      gauss[2] = th.r2d
+    xgauss = xfits.transpose[1]
+    ygauss = yfits.transpose[1]
+    xoff = [1,2].map {|i| xgauss.inject(0) {|s,g| s += g[i]} / xgauss.length}
+    yoff = [1,2].map {|i| ygauss.inject(0) {|s,g| s += g[i]} / ygauss.length}
+    #p [ant, xoff, yoff]
+    sq0 = yoff[0] - xoff[0]
+    sq1 = yoff[1] - xoff[1]
+    sqr, sqt = Complex(sq0, sq1).polar
+    sqt = sqt.r2d
+    # TODO Print header
+    # TODO Print quality indicated (X^2, ave_iters, etc)
+    printf "%02d squint %7.3f x %7.3f arcmin  --> %7.3f arcmin @ %8.3f degrees\n",
+      ant, sq0, sq1, sqr, sqt
+  end
+else
+  # dump results for each hex pattern
+  # TODO Print column header
+  hexes.transpose.each_with_index do |fits, ap|
+    ant = (ap >> 1) + 1
+    pol = (?X + (ap&1)).chr
+    fits.each_with_index do |(iters, gauss, chi, covar), i|
+      if iters.nil?
+        #printf "%2d %s hex %d iters 0\n", ant, pol, i+1
+        next
+      end
+      printf "%02d %s hex %d iters %-2d : %5.3f", ant, pol, i+1, iters, gauss[0]
+      if offset == 'polar'
+        r, th = Complex(*gauss[1,2]).polar
+        gauss[1] = r
+        gauss[2] = th.r2d
+      end
+      gauss[3] *= SIGMA2FWHM
+      gauss[4] *= SIGMA2FWHM
+      gauss[1..-1].each {|x| printf "  %8.3f", x}
+      printf "  |X|= %.4f\n", chi.dnrm2
     end
-    gauss[1..-1].each {|x| printf "  %8.3f", x}
-    printf "  |X|= %.4f\n", chi.dnrm2
   end
 end
 
