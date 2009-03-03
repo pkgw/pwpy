@@ -1,10 +1,9 @@
 #!/usr/bin/env ruby
 $-w = true if $0 == __FILE__
 
-module Gauss2d
+require 'gsl'
 
-  require 'gsl'
-  include GSL
+module Gauss2d
 
   NP = 5 # Number of parameters to fit
   MAXITER = 50 # Max number of iterations
@@ -19,14 +18,15 @@ module Gauss2d
   end
   module_function :print_state
 
+  # Function to fit
   def gauss2d(x, y, a=1.0, x0=0.0, y0=x0, sx=1.0, sy=sx)
     a * Math.exp(-((x-x0)/sx)**2 - ((y-y0)/sy)**2)
   end
   module_function :gauss2d
 
-  # x: Vector, list of the parameters to determine
+  # x: GSL::Vector, list of the parameters to determine
   # t, y: observational data
-  # f: Vector, function to minimize
+  # f: GSL::Vector, residuals of function to minimize
   def procf(x, t, y, f)
     # Get current "guess" at parameters
     a, x0, y0, sx, sy = *x
@@ -108,20 +108,20 @@ module Gauss2d
     raise "inconsistent number of observations (#{t.length} != #{y.length})" if n != y.length
 
     # Create function object for fitting 5 parameters based on procf and procdf
-    f = MultiFit::Function_fdf.alloc(method(:procf), method(:procdf), NP)
+    f = GSL::MultiFit::Function_fdf.alloc(method(:procf), method(:procdf), NP)
 
     # Create solver
-    solver ||= MultiFit::FdfSolver.alloc(MultiFit::FdfSolver::LMSDER, n, NP)
+    solver ||= GSL::MultiFit::FdfSolver.alloc(GSL::MultiFit::FdfSolver::LMSDER, n, NP)
 
     # Create initial guess vector
     if init_guess
       x = init_guess
       # Convert to Vector unless it already is one
-      x = x.to_gv unless Vector === x
+      x = x.to_gv unless GSL::Vector === x
     else
       s = t[1..-1].map{|a| a.to_gv.dnrm2}.to_gv.mean
       #            a,  x0,  y0, sx, sy
-      x = Vector[y[0], 0.0, 0.0, s, s]
+      x = GSL::Vector[y[0], 0.0, 0.0, s, s]
     end
 
     # Tell function object about observed data
