@@ -9,7 +9,7 @@ require 'mirdl_gem' if false # Fake out RDoc
 
 module Mirdl
 
-  # Use miriad libraries from MIRLIB if it is set int he environment.
+  # Use miriad libraries from MIRLIB if it is set in the environment.
   # If it is not set, libraries from LD_LIBRARY_PATH (etc) will be used.
   MIRLIB = ENV['MIRLIB'].dup
   MIRLIB << "/" if !MIRLIB.empty? && MIRLIB !~ %r{/$}
@@ -66,3 +66,4 @@ require 'mirdl/uvio_na'
 require 'mirdl/uvdat_na'
 require 'mirdl/gains'
 require 'mirdl/astroutil'
+require 'mirdl/task'
