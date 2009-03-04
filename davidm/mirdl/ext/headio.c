@@ -1,3 +1,7 @@
+//
+// $Id$
+//
+
 // Functions from headio.c
 
 #include "mirdl.h"

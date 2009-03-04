@@ -1,6 +1,9 @@
-$-w = true if $0 == __FILE__
-
+#
 # $Id$
+#
+
+# Mirdl::Task contains methods to facilitate the running of native miriad tasks
+# (aka programs).
 
 require 'tempfile'
 

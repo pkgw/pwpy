@@ -1,3 +1,7 @@
+//
+// $Id$
+//
+
 // Functions from hio.c
 
 #include <errno.h>

@@ -1,3 +1,7 @@
+#
+# $Id$
+#
+
 # gains.rb - Method(s) to get antenna gains
 
 require 'narray'

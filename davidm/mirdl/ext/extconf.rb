@@ -1,3 +1,7 @@
+#
+# $Id$
+#
+
 # extconf.rb : Configure script for mirdl
 #
 #   Copyright (c) 2009 David MacMahon <davidm@astro.berkeley.edu>

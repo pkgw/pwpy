@@ -1,3 +1,7 @@
+//
+// $Id$
+//
+
 #include "ruby.h"
 #include "narray.h"
 

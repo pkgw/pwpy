@@ -1,3 +1,7 @@
+//
+// $Id$
+//
+
 // Functions from bug.c
 
 #include "mirdl.h"

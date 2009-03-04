@@ -1,3 +1,7 @@
+#
+# $Id$
+#
+
 # Functions missing from key.c
 
 module Mirdl

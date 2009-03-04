@@ -1,9 +1,12 @@
+#
+# $Id$
+#
+
 # Astronomy friendly extensions to Ruby.
 # Does not really need to be part of Mirdl.
 # Could live on its own.
 
 require 'date'
-
 
 # Add angle conversion methods to the Math module
 module Math

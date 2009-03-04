@@ -1,3 +1,7 @@
+//
+// $Id$
+//
+
 // Functions from key.c
 
 #include "mirdl.h"

@@ -1,6 +1,10 @@
 #!/usr/bin/env ruby
 $-w = true if $0 == __FILE__
 
+#
+# $Id$
+#
+
 # gpdump.rb - Dump antenna gains in a very rudimentary way.
 
 require 'mirdl'

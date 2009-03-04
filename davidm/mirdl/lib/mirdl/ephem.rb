@@ -1,3 +1,7 @@
+#
+# $Id$
+#
+
 # Subroutines and functions from ephem.for
 
 require 'dl'

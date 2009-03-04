@@ -1,6 +1,10 @@
 #!/usr/bin/env ruby
 $-w = true if $0 == __FILE__
 
+#
+# $Id$
+#
+
 require 'mirdl'
 include Mirdl
 

@@ -1,3 +1,7 @@
+//
+// $Id$
+//
+
 #ifndef _MIRDL_FOR_H_
 #define _MIRDL_FOR_H_
 

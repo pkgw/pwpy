@@ -1,3 +1,7 @@
+#
+# $Id$
+#
+
 require 'rbconfig'
 require 'dl'
 require 'narray'
