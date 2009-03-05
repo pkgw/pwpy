@@ -142,7 +142,7 @@ while (($mode == debug || `$obsbin/stopnow.csh $begin $stopHour` != stop) && $pa
 	    echo " - would execute custom $cfg $stop" |tee -ia mbbsf.log
 	else
 	    echo " - custom $cfg $stop" |tee -ia mbbsf.log
-	    (cd $partDir && tcsh ./script.csh $stop |& custom.log)
+	    (cd $partDir && tcsh ./script.csh $stop |& tee -ia custom.log)
 	    # If the script exited early, pause.
 	    $obsbin/waittillstart.csh $stop
 	endif
