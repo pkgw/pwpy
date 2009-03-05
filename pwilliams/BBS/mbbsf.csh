@@ -38,6 +38,11 @@ if ($mode != debug && $mode != real) then
     exit 1
 endif
 
+if ($mode == debug && -d part1) then
+    echo "Error: Existing 'part1' directory -- blow away files before rerunning in debug."
+    exit 1
+endif
+
 # Note our start
 
 echo "Running $0 at `date`" |tee -ia mbbsf.log
@@ -142,24 +147,3 @@ while (($mode == debug || `$obsbin/stopnow.csh $begin $stopHour` != stop) && $pa
 	endif
     endif
 end
-
-# If in debug mode, clean up the directories we created.
-# This, well, cleans things up, and also allows us to rerun in debug
-# mode since the loop above tests for the existence of the partN directories
-# to know when to move to the next step.
-#
-# Avoid using rm -rf as a paranoia measure.
-
-if ($mode == debug) then
-    foreach n (`seq 1 $nparts`)
-	set d = part$n
-
-	if (! -f $planDir/custom$n.csh) then
-	    rm $d/*.ephem $d/*.msephem $d/bbs.uuid $d/config.py $d/config.pyc
-	endif
-	   
-	rmdir $d
-    end
-
-    rm mbbsf.log
-endif
