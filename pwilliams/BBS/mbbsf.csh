@@ -134,6 +134,7 @@ while (($mode == debug || `$obsbin/stopnow.csh $begin $stopHour` != stop) && $pa
     if (($skip == y && $mode == real) || ($mode == debug && -d $partDir)) then
 	echo "Advancing to next part: now = $now, stop for part $part = $stop." |tee -ia mbbsf.log
 	@ part++
+	set lastNow = nopause
 	continue
     endif
 
