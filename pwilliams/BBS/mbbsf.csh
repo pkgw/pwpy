@@ -50,9 +50,17 @@ set stopHours = ()
 
 while (1)
     set cfg = $planDir/config$part.py
+    set style = bbs
 
-    if (! -f $cfg) break
-    
+    if (! -f $cfg) then
+	set cfg = $planDir/custom$part.csh
+	set style = custom
+
+	if (! -f $cfg) then
+	    break
+	endif
+    endif
+
     # Stop hour?
 
     set line = `egrep '^# stopHour [0-9.]+' $cfg`
@@ -65,12 +73,14 @@ while (1)
 
     # UUID?
 
-    set line = `egrep '^# uuid [-0-9a-fA-F]+' $cfg`
-    if ($%line == 0) then
-	echo "Error: config file $cfg has no uuid line!"
-	exit 1
+    if ($style == bbs) then
+	set line = `egrep '^# uuid [-0-9a-fA-F]+' $cfg`
+	if ($%line == 0) then
+	    echo "Error: config file $cfg has no uuid line!"
+	    exit 1
+	endif
     endif
-
+    
     @ part++
 end
 
@@ -89,6 +99,13 @@ echo "Stop hours: $stopHours" |tee -ia mbbsf.log
 
 while (($mode == debug || `$obsbin/stopnow.csh $begin $stopHour` != stop) && $part <= $nparts)
     set cfg = $planDir/config$part.py
+    set style = bbs
+
+    if (! -f $cfg) then
+	set cfg = $planDir/custom$part.csh
+	set style = custom
+    endif
+
     set partDir = part$part
     set stop = $stopHours[$part] # 1-based indices ...
 
@@ -105,11 +122,25 @@ while (($mode == debug || `$obsbin/stopnow.csh $begin $stopHour` != stop) && $pa
 
     # We should observe this guy
 
-    mkdir -p $partDir
-    cp -f $cfg $partDir/config.py
-    egrep '^# uuid [-0-9a-fA-F]+' $cfg |cut -d' ' -f3 >$partDir/bbs.uuid
-    echo " - $script $mode $instr $stop in $partDir" |tee -ia mbbsf.log
-    (cd $partDir && $script $mode $instr $stop)
+    if ($style == bbs) then
+	mkdir -p $partDir
+	cp -f $cfg $partDir/config.py
+	egrep '^# uuid [-0-9a-fA-F]+' $cfg |cut -d' ' -f3 >$partDir/bbs.uuid
+	echo " - $script $mode $instr $stop in $partDir" |tee -ia mbbsf.log
+	(cd $partDir && $script $mode $instr $stop)
+    else if ($style == custom) then
+	mkdir -p $partDir
+	if ($mode == debug) then
+	    echo " - would execute custom $cfg $stop" |tee -ia mbbsf.log
+	else
+	    cp -f $cfg $partDir/script.csh
+	    chmod -w $partDir/script.csh
+	    echo " - custom $cfg $stop" |tee -ia mbbsf.log
+	    (cd $partDir && tcsh ./script.csh $stop |& custom.log)
+	    # If the script exited early, pause.
+	    $obsbin/waittillstart.csh $stop
+	endif
+    endif
 end
 
 # If in debug mode, clean up the directories we created.
@@ -122,7 +153,11 @@ end
 if ($mode == debug) then
     foreach n (`seq 1 $nparts`)
 	set d = part$n
-	rm $d/*.ephem $d/*.msephem $d/bbs.uuid $d/config.py $d/config.pyc
+
+	if (! -f $planDir/custom$n.csh) then
+	    rm $d/*.ephem $d/*.msephem $d/bbs.uuid $d/config.py $d/config.pyc
+	endif
+	   
 	rmdir $d
     end
 
