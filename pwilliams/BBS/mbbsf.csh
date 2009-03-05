@@ -101,6 +101,7 @@ echo "Stop hours: $stopHours" |tee -ia mbbsf.log
 # OK, now run, skipping up to what seems to be the best part
 
 @ part = 1
+set lastNow = nothing
 
 while (($mode == debug || `$obsbin/stopnow.csh $begin $stopHour` != stop) && $part <= $nparts)
     set cfg = $planDir/config$part.py
@@ -114,7 +115,18 @@ while (($mode == debug || `$obsbin/stopnow.csh $begin $stopHour` != stop) && $pa
     set partDir = part$part
     set stop = $stopHours[$part] # 1-based indices ...
 
-    set now = `date +'%H %M' |awk '{print $1 + ($2/60)}'`
+    set now = `date +'%H %M' |awk '{print $1 + $2/60}'`
+
+    # Have we looped around in less than a minute? Nothing should
+    # finish that quickly ... if this is the case, sleep and try again.
+
+    if ($now == $lastNow) then
+	echo "Iterated in less than 60s; pausing ..." |tee -ia mbbsf.log
+	sleep 60
+	continue
+    endif
+
+    set lastNow = "$now"
 
     # print y if $now is later than $stop with a 12 hour margin
     set skip = `echo $stop $now |awk '{if (($2 - $1 + 12) % 24 > 12) print "y"}'`
