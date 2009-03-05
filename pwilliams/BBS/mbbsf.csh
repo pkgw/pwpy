@@ -129,7 +129,7 @@ while (($mode == debug || `$obsbin/stopnow.csh $begin $stopHour` != stop) && $pa
     set lastNow = "$now"
 
     # print y if $now is later than $stop with a 12 hour margin
-    set skip = `echo $stop $now |awk '{if (($2 - $1 + 12) % 24 > 12) print "y"}'`
+    set skip = `echo $stop $now |awk '{if (($2 - $1 + 12) % 24 >= 12) print "y"}'`
 
     if (($skip == y && $mode == real) || ($mode == debug && -d $partDir)) then
 	echo "Advancing to next part: now = $now, stop for part $part = $stop." |tee -ia mbbsf.log
