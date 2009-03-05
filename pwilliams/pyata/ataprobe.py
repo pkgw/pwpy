@@ -199,7 +199,7 @@ def logFocusSettings (ants, destname):
 
 # Array hookup data
 
-_defaultInstrument = 'fx64a:fxa'
+_defaultInstrument = 'fx64c:fxa'
 
 class Hookup (object):
     def __init__ (self, instr=None):
