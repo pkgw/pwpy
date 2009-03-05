@@ -130,16 +130,17 @@ while (($mode == debug || `$obsbin/stopnow.csh $begin $stopHour` != stop) && $pa
     if ($style == bbs) then
 	mkdir -p $partDir
 	cp -f $cfg $partDir/config.py
+	chmod -w $partDir/config.py
 	egrep '^# uuid [-0-9a-fA-F]+' $cfg |cut -d' ' -f3 >$partDir/bbs.uuid
 	echo " - $script $mode $instr $stop in $partDir" |tee -ia mbbsf.log
 	(cd $partDir && $script $mode $instr $stop)
     else if ($style == custom) then
 	mkdir -p $partDir
+	cp -f $cfg $partDir/script.csh
+	chmod -w $partDir/script.csh
 	if ($mode == debug) then
 	    echo " - would execute custom $cfg $stop" |tee -ia mbbsf.log
 	else
-	    cp -f $cfg $partDir/script.csh
-	    chmod -w $partDir/script.csh
 	    echo " - custom $cfg $stop" |tee -ia mbbsf.log
 	    (cd $partDir && tcsh ./script.csh $stop |& custom.log)
 	    # If the script exited early, pause.
