@@ -25,17 +25,24 @@ SIGMA2FWHM = 2*sqrt(-log(0.5)/2)
 keyini
 vis = mkeyf(:vis)
 
-valid_coords = %w[azel radec]
-coord = keya(:coord,valid_coords[0])
-
-valid_offsets = %w[rect polar]
-offset = keya(:offset,valid_offsets[0])
-
-dosquint, junk = options %w[squint]
+optkeys = [:squint, :absolute, :azel, :radec, :rect, :polar]
+optvals = options(optkeys, :hexopts)
+# Convert optkeys and optvals into a Hash
+opts = Hash[*optkeys.zip(optvals).flatten!]
 keyfin
 
-bug('f',"coord must be one of #{valid_coords.inspect}") unless valid_coords.include? coord
-bug('f',"offset must be one of #{valid_offsets.inspect}") unless valid_offsets.include? offset
+if opts[:azel] && opts[:azel]
+  bug('f',"cannot specify both azel and radec")
+elsif !opts[:radec]
+  opts[:azel] = true
+end
+
+if opts[:rect] && opts[:polar]
+  bug('f',"cannot specify both rect and polar")
+elsif !opts[:polar]
+  opts[:rect] = true
+end
+
 bug('f','no datasets given (try "vis=...")') if vis.empty?
 bug('f',"need exactly 7 datasets (got #{vis.length})") unless vis.length == 7
 
@@ -43,8 +50,11 @@ all_gains = {}
 all_radec = {}
 all_azellst = {}
 lat = nil
+radec0 = []
+azellst0 = []
 
 # For each dataset name given
+first_vis = true
 for dsname in vis
   STDERR.puts "reading dataset #{dsname}"
 
@@ -83,7 +93,13 @@ for dsname in vis
 
     # Store lst along with az,el.  No need to convert lst to cos/sin comonents
     all_azellst[gt] << lst
+
+    if first_vis
+      radec0 << all_radec[gt]
+      azellst0 << all_azellst[gt]
+    end
   end
+  first_vis = false
 end
 
 all_times = all_gains.keys.sort!
@@ -119,7 +135,7 @@ all_times.each_slice(7) do |hex_times|
   # Calc delta pos in arcmin
   # TODO Do not assume first pointing is center
   ra0, dec0 = radec7[0]
-  if coord == 'radec'
+  if opts[:radec]
     ra0, dec0 = ra0.conj, dec0.conj
     dpos7 = radec7.map do |ra, dec|
       # This is a small angle approximation.  If needed, ra/dec and ra0/dec0
@@ -180,7 +196,7 @@ all_times.each_slice(7) do |hex_times|
   #break # DEBUG: just do first one
 end
 
-if dosquint
+if opts[:squint]
   ant = 0
   hexes.transpose.each_slice(2) do |xfits, yfits|
     ant += 1
@@ -220,10 +236,16 @@ else
         next
       end
       printf "%02d %s hex %d iters %-2d : %5.3f", ant, pol, i+1, iters, gauss[0]
-      if offset == 'polar'
+      if opts[:polar]
         r, th = Complex(*gauss[1,2]).polar
         gauss[1] = r
         gauss[2] = th.r2d
+      elsif opts[:absolute] && opts[:azel]
+        # Divide by cos(el) of central pointing for this hex
+        gauss[1] /= azellst0[i][1].real
+      elsif opts[:absolute] && opts[:radec]
+        # Divide by cos(dec) of central pointing for this hex
+        gauss[1] /= radec0[i][1].real
       end
       gauss[3] *= SIGMA2FWHM
       gauss[4] *= SIGMA2FWHM
