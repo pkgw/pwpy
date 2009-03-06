@@ -71,13 +71,13 @@ flag:
 #  uvflag vis=${CAL} select='pol(yy),ant(42,39,24,28)' flagval=flag   # high tsys
 
   echo 'Summarize intermediate flagged data.\n'
-  uvflag vis=${CAL} flagval=f options=noapply
+  uvfstats vis=${CAL}
 
   echo 'Now flag automatically.\n'
   newrfisweep.csh vis=${CAL} tvis=${VISLIST}
 
   echo 'Summarize final flagged data.\n'
-  uvflag vis=${CAL} flagval=f options=noapply
+  uvfstats vis=${CAL}
 
   echo 'Plots to inspect for remnant RFI...\n'
   smauvspec vis=${CAL} device=${CAL}_rfi.ps/cps axis=ch,bo select='pol(xx,yy),ant(1,2,3)(11,12,13,14)' nxy=4,3
