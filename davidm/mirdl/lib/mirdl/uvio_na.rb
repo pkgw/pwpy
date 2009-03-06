@@ -128,22 +128,28 @@ module Mirdl
   SYM[:uvrdvr] = LIBMIR_UVIO['uvrdvr_c', '0IISppI']
   def uvrdvr(tno, type, var, defval, n=1)
     case type
-    when H_BYTE
+    when H_BYTE, :char, 'a'
+      type = H_BYTE
       data = DL.malloc(n)
       fmt = 'A*'
-    when H_INT
+    when H_INT, :int, 'i'
+      type = H_INT
       data = DL.malloc(n * DL.sizeof('I'))
       fmt = 'i'
-    when H_INT2
+    when H_INT2, :short, 'j'
+      type = H_INT2
       data = DL.malloc(n * DL.sizeof('S'))
       fmt = 's'
-    when H_REAL
+    when H_REAL, :float, 'r'
+      type = H_REAL
       data = DL.malloc(n * DL.sizeof('F'))
       fmt = 'F'
-    when H_DBLE
+    when H_DBLE, :double, 'd'
+      type = H_DBLE
       data = DL.malloc(n * DL.sizeof('D'))
       fmt = 'D'
-    when H_CMPLX
+    when H_CMPLX, :complex, 'c'
+      type = H_CMPLX
       data = DL.malloc(n * 2 * DL.sizeof('F'))
       fmt = 'FF'
       defval = [defval.real, defval.imag] unless Array === defval
@@ -192,33 +198,52 @@ module Mirdl
   module_function :uvrdvrc
 
   # void uvgetvr_c  (int tno, int type, Const char *var, char *data, int n);
-  SYM[:uvgetvr] = LIBMIR_UVIO['uvgetvr_c', '0IISsI']
+  SYM[:uvgetvr] = LIBMIR_UVIO['uvgetvr_c', '0IISpI']
   # Returns String for type == H_BYTE,
   # otherwise NArray if n > 1,
   # otherwise a single value
-  def uvgetvr(tno, type, var, n)
+  #def uvgetvr(tno, type, var, n)
+  #def uvgetvr(tno, type, var, n)
+  def uvgetvr(*args)
+    case args.length
+    when 2
+      tno, var = *args
+      type, n, updated = uvprobvr(tno, var)
+      return nil if type.nil?
+    when 4
+      tno, type, var, n = *args
+    else
+      raise ArgumentError.new("wrong number of arguments (#{args.length} for 2 or 4)")
+    end
+
     case type
-    when H_BYTE
-      p = DL.malloc(n+1)
-    when H_INT
+    when H_BYTE, :char, 'a'
+      type = H_BYTE
+      ptr = DL.malloc(n+1)
+    when H_INT, :int, 'i'
+      type = H_INT
       data = NArray.int(n)
-      p = DL::PtrData.new(data.ptr, data.bsize)
-    when H_INT2
+      ptr = DL::PtrData.new(data.ptr, data.bsize)
+    when H_INT2, :short, 'j'
+      type = H_INT2
       data = NArray.sint(n)
-      p = DL::PtrData.new(data.ptr, data.bsize)
-    when H_REAL
+      ptr = DL::PtrData.new(data.ptr, data.bsize)
+    when H_REAL, :float, 'r'
+      type = H_REAL
       data = NArray.sfloat(n)
-      p = DL::PtrData.new(data.ptr, data.bsize)
-    when H_DBLE
+      ptr = DL::PtrData.new(data.ptr, data.bsize)
+    when H_DBLE, :double, 'd'
+      type = H_DBLE
       data = NArray.float(n)
-      p = DL::PtrData.new(data.ptr, data.bsize)
-    when H_CMPLX
+      ptr = DL::PtrData.new(data.ptr, data.bsize)
+    when H_CMPLX, :complex, 'c'
+      type = H_CMPLX
       data = NArray.scomplex(n)
-      p = DL::PtrData.new(data.ptr, data.bsize)
+      ptr = DL::PtrData.new(data.ptr, data.bsize)
     else
       bug(BUGSEV_ERROR, "Type incompatiblity for variable #{var.to_s}, in UVGETVR")
     end
-    r, rs = SYM[:uvgetvr][tno, type, var.to_s, p, n]
+    r, rs = SYM[:uvgetvr][tno, type, var.to_s, ptr, n]
     if type == H_BYTE
       data = rs[3].to_s
     else
@@ -231,55 +256,103 @@ module Mirdl
   def uvgetvra(tno, var, n=MAXSTRING)
     uvgetvr(tno, H_BYTE, var, n)
   end
+  module_function :uvgetvra
 
   def uvgetvrj(tno, var, n=1)
     uvgetvr(tno, H_INT2, var, n)
   end
+  module_function :uvgetvrj
 
   def uvgetvri(tno, var, n=1)
     uvgetvr(tno, H_INT, var, n)
   end
+  module_function :uvgetvri
 
   def uvgetvrr(tno, var, n=1)
     uvgetvr(tno, H_REAL, var, n)
   end
+  module_function :uvgetvrr
 
   def uvgetvrd(tno, var, n=1)
     uvgetvr(tno, H_DBLE, var, n)
   end
+  module_function :uvgetvrd
 
   def uvgetvrc(tno, var, n=1)
     uvgetvr(tno, H_CMPLX, var, n)
   end
+  module_function :uvgetvrc
 
   # void uvprobvr_c (int tno, Const char *var, char *type, int *length, int *updated);
   SYM[:uvprobvr] = LIBMIR_UVIO['uvprobvr_c', '0IScii']
   def uvprobvr(tno, var)
     r, rs = SYM[:uvprobvr][tno, var.to_s, 0, 0, 0]
-    (rs[2] == ' '[0]) ? nil : [rs[2].chr, rs[3], rs[4]!=0]
+    case rs[2].chr
+    when ' ' then nil
+    when 'a' then 
+      # increment length to allow for terminating nul
+      [rs[2].chr, rs[3]+1, rs[4]!=0]
+    else
+      [rs[2].chr, rs[3], rs[4]!=0]
+    end
   end
   module_function :uvprobvr
 
   # void uvputvr_c  (int tno, int type, Const char *var, Const char *data, int n);
   SYM[:uvputvr] = LIBMIR_UVIO['uvputvr_c', '0IISSI']
   # data can be String for type == H_BYTE, otherwise NArray or Array
-  def uvputvr(tno, type, var, data)
+  def uvputvr(tno, var, data, type=nil)
     n = data.length
     if NArray === data
+      # Force type
+      type = case data.typecode
+             when NArray::BYTE then H_BYTE
+             when NArray::INT then H_INT
+             when NArray::SINT then H_INT2
+             when NArray::SFLOAT then H_REAL
+             when NArray::FLOAT then H_DBLE
+             when NArray::SCOMPLEX then H_CMPLX
+             else
+               bug(BUGSEV_ERROR, "Unsupported typecode (#{data.typecode}), in UVPUTVR")
+             end
       data = data.to_s
     else
+      # Autodetect type?
+      if type.nil?
+        if String == data
+          type = H_BYTE
+        else
+          case data[0]
+          when Integer
+            type = H_INT
+          when Float
+            type = H_DBLE
+          when Complex
+            type = H_CMPLX
+          else
+            bug(BUGSEV_ERROR, "Unsupported type (#{data.class}), in UVPUTVR")
+          end
+        end
+      end
+      # Pack data
       case type
-      when H_BYTE
+      when H_BYTE, :char, 'a'
+        type = H_BYTE
         data = data.to_s
-      when H_INT
+      when H_INT, :int, 'i'
+        type = H_INT
         data = data.pack('i*')
-      when H_INT2
+      when H_INT2, :short, 'j'
+        type = H_INT2
         data = data.pack('s*')
-      when H_REAL
+      when H_REAL, :float, 'r'
+        type = H_REAL
         data = data.pack('F*')
-      when H_DBLE
+      when H_DBLE, :double, 'd'
+        type = H_DBLE
         data = data.pack('D*')
-      when H_CMPLX
+      when H_CMPLX, :complex, 'c'
+        type = H_CMPLX
         data = data.map {|z| [z.real, z.imag]}
         data = data.flatten!.pack('F*')
       else
