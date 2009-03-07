@@ -13,5 +13,5 @@ duration="$9"
 # When only using atafx, 'radec' and 'ndumps' are not needed.
 # They are used by fxmir.
 
-echo atafx $outbase-$src-$freq $antpols $lo $nsephem -duration $duration -noabort -fringeon
-exec atafx $outbase-$src-$freq $antpols $lo $nsephem -duration $duration -noabort -fringeon
+echo atafx $outbase-$src-$freq $antpols fx64c:fxa $nsephem -duration $duration -noabort -fringeon
+exec atafx $outbase-$src-$freq $antpols fx64c:fxa $nsephem -duration $duration -noabort -fringeon
