@@ -40,6 +40,8 @@ endif
 cd /ataarchive/scratch/obs/compass/
 
 set calline = (`uvlist vis=caldata options=var | grep "source" | tr ':' ' '`)
+
+set fr
 set cal
 #Get the name of the calibrator
 while ("$cal" == "")
@@ -53,7 +55,6 @@ while ("$cal" == "")
 end
 
 set freqline = (`uvlist vis=caldata options=var | grep "freq    :" | tr ':' ' '`)
-set freq
 #Get the obs freq of the calibratior (in MHZ)
 while ("$freq" == "")
     if ($freqline[1] == "freq") then
@@ -65,7 +66,16 @@ while ("$freq" == "")
     endif
 end
 
-if ("echo $cal | tr '[A-Z] [a-z]" == 
+set calvals = (`calinfo target=$cal freq=$freq options=auto`)
+if ("$calvals[1]" == "FATAL") then
+    rm -rf caldata $histview
+    echo "WARNING: Calibrator data not found!"
+    goto restart
+endif
+
+set flux = "$calvals[1],$calvals[2],$calvals[3]"
+set addflux = "$calvals[8]"
+set sysflux = "echo $freq | awk '{print 4+($1/5)^2}'"
 
 fxhealth > fxstatus
 
