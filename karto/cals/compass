@@ -39,15 +39,15 @@ endif
 
 cd /ataarchive/scratch/obs/compass/
 
-set calline = (`uvlist vis=caldata options=var | grep "source" | tr ':' ' '`)
+set sourceline = (`uvlist vis=caldata options=var | grep "source" | tr ':' ' '`)
 
 set fr
 set cal
 #Get the name of the calibrator
 while ("$cal" == "")
-    if ($calline[1] == "source") then
-	set cal = "echo $sourceline[2]"
-    else if ($#calline == 1) then
+    if ($sourceline[1] == "source") then
+	set cal = `echo $sourceline[2]`
+    else if ($#sourceline == 1) then
 	set cal == "UNK" # Default to name UNK if cannot be found
     else
 	shift sourceline
@@ -75,7 +75,8 @@ endif
 
 set flux = "$calvals[1],$calvals[2],$calvals[3]"
 set addflux = "$calvals[8]"
-set sysflux = "echo $freq | awk '{print 4+($1/5)^2}'"
+set sysflux = `echo $freq | awk '{print 4+($1/5)^2}'`
+set plim = `calc "asin($sysflux/$calvals[1])*180/pi"`
 
 fxhealth > fxstatus
 
@@ -140,7 +141,8 @@ echo "label Bad Antennas: `echo $badants | sed 's/,//'`" >> wip.jypkstat
 echo "mtext t 2 1 .75 "`date` >> wip.jypkstat
 echo end >> wip.jypkstat
 wip wip.jypkstat -d jypkstat.png/png >& /dev/null
-set arc = `echo 4500 | awk '{print $1*1430/freq}' freq=$freq`
+set arc = `echo 4500 | awk '{print int($1*1.430/freq)}' freq=$freq`
+echo "arc = $arc"
 set imstats = (`imstat in=cal-$cal-maps/$cal.rs | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
 set imstats2 = (`imstat in=cal-$cal-maps/$cal.cm region=relcen,arcsec,"box(-$arc,-$arc,$arc,$arc)" | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
 set range = `echo $imstats[3] $imstats2[4] | awk '{print $2/$1}'`
@@ -154,11 +156,13 @@ cgdisp in=cal-$cal-maps/$cal.cm,cal-$cal-maps/$cal.cm region=relcenter,arcsec,bo
 echo `date +%s` 100 100 $range $imstats[3] $alevel >> obsstats
 
 awk '{if ($1-curdate < 100000) print ($1-curdate)/3600,$2,$3,$4,1/($5+.000000000001),$6}' curdate=`date +%s` obsstats > temp.prsv
-cp $datapath/karto/RAPIDBeta/wip.prsv .
+cp $datapath/wip.prsv .
+echo "mtext t 1.5 0 .25 "`date` >> wip.prsv
+echo "end" >> wip.prsv
 wip wip.prsv -d prsv.png/png >& /dev/null
-cat $datapath/karto/RAPIDBeta/wip.hs > wip.hardstat
-cat $datapath/karto/RAPIDBeta/wip.builds >> wip.hardstat
-cat $datapath/karto/RAPIDBeta/wip.ants > temp.ants
+cat $datapath/wip.hs > wip.hardstat
+cat $datapath/wip.builds >> wip.hardstat
+cat $datapath/wip.ants > temp.ants
 ataasciistatus -l | tr ',' ' ' | awk '{if ($1 != "") print $1,$2,($6^2+$7^2)^.5}' > temp.antstatus
 set antlist = (`fxconf.rb sals | awk '{if ($1 == inst) print $0}' inst=$inst[2] | tr '[a-z]' '[A-Z]'`)
 shift antlist
@@ -179,7 +183,7 @@ while ($idx <= `wc -l temp.ants | awk '{print $1}'`)
     @ idx++
 end
 
-cat ~/mmm/karto/RAPIDBeta/wip.fx > temp.fxstat
+cat $datapath/wip.fx > temp.fxstat
 
 set idx = 1
 while ($idx <= `wc -l temp.fxstat | awk '{print $1}'`)
@@ -195,7 +199,7 @@ while ($idx <= `wc -l temp.fxstat | awk '{print $1}'`)
     endif
     @ idx++
 end
-
+echo "mtext t 2 1 .75 "`date` >> wip.hardstat
 echo "end" >> wip.hardstat
 
 wip wip.hardstat -d hardstat.png/png >& /dev/null
