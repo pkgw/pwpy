@@ -57,8 +57,8 @@ echo "gains when a 'gains' file is already present)."
 echo ""
 echo "CALLING SEQUENCE: newcalcal.csh vis=vis (tvis=tvis flux=flux1,"
 echo "    flux2,flux3 plim=plim int=int siglim=siglim refant=refant"
-echo "    olay=olay options=debug,autoref,polsplit,[outsource,"
-echo "    insource],sefd)"
+echo "    smooth=smooth olay=olay options=debug,autoref,polsplit,"
+echo "    [outsource,insource],sefd)"
 echo ""
 echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 echo ""
@@ -102,6 +102,15 @@ echo "    'good'. Elements below this limit are flagged (i.e. for"
 echo "    retlim=10, a baseline that has 19 of 20 datapoints flagged"
 echo "    is removed from the dataset). Default is 20."
 echo ""
+echo " smooth - This gives three parameters of moving smooth"
+echo "    calculation of the bandpass/gain curves"
+echo "    smooth(1) = K  parameter k giving the length 2k+1 of the"
+echo "        averaging interval; default is 3."
+echo "    smooth(2) = L  order of the averaging polynomial l; default"
+echo "        is 1."
+echo "    smooth(3) = P  probability P for computing the confidence"
+echo "        limits; default is 0.9."
+echo ""
 echo " olay - Overlay file for the autoimaging process. No default."
 echo ""
 echo ""
@@ -143,6 +152,8 @@ set device
 set wrath = 0
 set wrathcycle = 0
 set sefd = 0
+set smooth
+
 #################################################################
 # Here is the keyword/value pairing code. It basically operates
 # by going through each argument, attempting to figure out which
@@ -215,6 +226,9 @@ else if ("$argv[1]" =~ 'retlim='*) then
 else if ("$argv[1]" =~ 'refant='*) then
     set refant = `echo $argv[1] | sed 's/refant=//'`
     set autoref = 0
+    shift argv; if ("$argv" == "") set argv = "finish"
+else if ("$argv[1]" =~ 'smooth='*) then
+    set smooth = `echo $argv[1]`
     shift argv; if ("$argv" == "") set argv = "finish"
 else
     echo "FATAL ERROR: $argv[1] not recognized..."
@@ -491,8 +505,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	set sfilelist # Source files to be flagged
 	set prefiles # Source files from observing immediately prior to cal cycle
 	set postfiles # Source files from observing immediately following the cal cycle
-	if ($outsource && "$tvis[1]" != "") then
-	
+	if ($outsource && "$tvis[1]" != "") then	
 	    if ($tviscount[$idx]) set prefiles = "$wd/tvis*$precycle"
 	    if ($tviscount[$mididx]) set postfiles = "$wd/tvis*$cycle"
 	    set sfilelist = ($prefiles $postfiles) # "Paste" the two file sets together
@@ -953,8 +966,8 @@ foreach ipol ($pollist) # Work with only one pol at a time
     endif
     
     # Horray again for MFCAL
-    mfcal vis=$wd/tempcal$ipol refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& /dev/null
-
+    if ("$smooth" == "") mfcal vis=$wd/tempcal$ipol refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& /dev/null
+    if ("$smooth" != "") smamfcal =$wd/tempcal$ipol refant=$refant options=interpolate minants=4 flux=$flux interval=$int smooth=$smooth weight=-1 >& /dev/null
     if ($polsplit && $sefd) then
         echo -n "Beginning SEFD calculation"
 	uvflag vis=$wd/tempcal$ipol options=none flagval=u select=auto >& /dev/null
