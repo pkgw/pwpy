@@ -1,0 +1,53 @@
+data temp.prsv
+lwidth 5
+xcol 1
+ycol 2
+lim -24 0 -1 101
+box cbnst bnst
+poi
+color 3
+conn
+color 1
+ycol 3
+poi
+color 4
+conn
+color 1
+lim -24 0 -.03 5.03
+box 0 cmstl
+ycol 4
+log y
+poi
+color 6
+conn
+color 1
+ycol 5
+log y
+poi
+color 8
+conn
+color 1
+ycol 6
+log y
+poi
+color 7
+conn
+color 1
+lwidth 3
+mtext t 2.5 .5 .5 Correlator Performance
+mtext l 1.6 .5 .5 Data Retention (Percentage)
+mtext b 2.5 .5 .5 Time (Hours Prior)
+mtext r 1.85 .5 .5 Imaging Performance
+color 3
+mtext l 2.75 .1 .2 Green: Baseline Retention
+color 4
+mtext l 2.75 .9 .8 Blue: Overall Data Retention
+color 6
+mtext r 2.75 -.11 0 Magenta: Dynamic Range (Cal)
+color 8
+mtext r 2.75 1.11 1 Orange: 1/RMS-Noise (1/Jy)
+color 7
+mtext r 3.6 .5 .5 Yellow: Artifact Level
+color 1
+
+end

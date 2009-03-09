@@ -1,0 +1,3219 @@
+onintr enderr
+set datapath = /home/obs/mmm/karto/cals
+set target
+set debug = 0
+set freq
+set flux = ( 0 0 )
+set mode = info
+set dwflux = 1
+set dwdist = 1
+set dwtime = 1
+set ra = 0
+set dec = 0
+set pi = 3.14159265
+set distlim = 3.14159265
+set auto = 0
+set calgrade = U
+set addflux
+set altname
+if ( 5 == 0 ) then
+varassign:
+if ( options=find =~ target=* ) then
+if ( options=find =~ freq=* ) then
+if ( options=find =~ radec=* ) then
+if ( options=find =~ distlim=* ) then
+if ( options=find =~ flux=* ) then
+if ( options=find =~ altname=* ) then
+if ( options=find =~ addflux=* ) then
+if ( options=find =~ target=* ) then
+if ( options=find =~ options=* ) then
+set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
+echo options=find
+sed s/options=//g
+tr [A-Z] [a-z]
+tr ,  
+set badopt
+foreach option ( `echo $options` )
+echo find
+if ( find == debug ) then
+if ( find == info ) then
+if ( find == find ) then
+set mode = find
+else if ( find == best ) then
+end
+if (  !=  ) echo options=`echo $badopt | tr ' ' ','` not recognized!
+shift argv
+if ( freq=1.4 flux=10 radec=1.23,5.46 distlim=60 ==  ) set argv = finish
+else
+if ( freq=1.4 != finish ) goto varassign
+goto varassign
+if ( freq=1.4 =~ target=* ) then
+if ( freq=1.4 =~ freq=* ) then
+set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print $1*1000}'`
+echo freq=1.4
+awk {print $1*1000}
+sed s/freq=//
+shift argv
+if ( flux=10 radec=1.23,5.46 distlim=60 ==  ) set argv = finish
+else if ( flux=10 =~ radec=* ) then
+if ( flux=10 != finish ) goto varassign
+goto varassign
+if ( flux=10 =~ target=* ) then
+if ( flux=10 =~ freq=* ) then
+if ( flux=10 =~ radec=* ) then
+if ( flux=10 =~ distlim=* ) then
+if ( flux=10 =~ flux=* ) then
+set flux = ( `echo $argv[1] | sed 's/flux=//' | awk '{if ($1*1 < 0 || $2*1 < 0) print 1,1; else print $1*1,$2*1}'` )
+echo flux=10
+awk {if ($1*1 < 0 || $2*1 < 0) print 1,1; else print $1*1,$2*1}
+sed s/flux=//
+if ( 10 == 0 && 10 != 0 ) then
+shift argv
+if ( radec=1.23,5.46 distlim=60 ==  ) set argv = finish
+else if ( radec=1.23,5.46 =~ altname=* ) then
+if ( radec=1.23,5.46 != finish ) goto varassign
+goto varassign
+if ( radec=1.23,5.46 =~ target=* ) then
+if ( radec=1.23,5.46 =~ freq=* ) then
+if ( radec=1.23,5.46 =~ radec=* ) then
+set ra = `echo $argv[1] | sed 's/radec=//' | tr ',' ' ' | awk '{print $1}' | tr ':' ' ' | awk '{print (1*$1+($2/60)+($3/3600))*pi/12}' pi=$pi`
+echo radec=1.23,5.46
+sed s/radec=//
+tr ,  
+tr :  
+awk {print $1}
+awk {print (1*$1+($2/60)+($3/3600))*pi/12} pi=3.14159265
+set dec = `echo $argv[1] | sed 's/radec=//' tr ',' ' ' | awk '{print $2}' | tr ':' ' ' | awk '{print (1*$1+($2/60)+($3/3600))*pi/180}' pi=$pi`
+echo radec=1.23,5.46
+sed s/radec=// tr ,  
+awk {print (1*$1+($2/60)+($3/3600))*pi/180} pi=3.14159265
+tr :  
+awk {print $2}
+Can't open tr
+Can't open ,
+Can't open  
+shift argv
+if ( distlim=60 ==  ) set argv = finish
+else if ( distlim=60 =~ distlim=* ) then
+if ( distlim=60 != finish ) goto varassign
+goto varassign
+if ( distlim=60 =~ target=* ) then
+if ( distlim=60 =~ freq=* ) then
+if ( distlim=60 =~ radec=* ) then
+if ( distlim=60 =~ distlim=* ) then
+set distlim = `echo $argv[1] | sed 's/distlim=//' | awk '{print ($1*1)*pi/180}' pi=$pi`
+echo distlim=60
+awk {print ($1*1)*pi/180} pi=3.14159265
+sed s/distlim=//
+shift argv
+if (  ==  ) set argv = finish
+set argv = finish
+else if ( finish =~ flux=* ) then
+if ( finish != finish ) goto varassign
+set wd = ( `mktemp -d cal3XXXXX` )
+mktemp -d cal3XXXXX
+if ! ( -e cal3uxiF4 ) then
+if ( find == info ) goto infocal
+if ( find == find ) goto findcal
+goto findcal
+if ( 1400 ==  ) then
+if ( 0 == 0 ) then
+set cals = ( `awk '{print $1,$2,$3,$4,$5,$7}' $datapath/calsdata | awk '{if (cos(distlim) <= (sin($4*pi/180)*sin(dec)+cos($4*pi/180)*cos(dec)*cos(ra-($3*pi/12))) && $5 >= f1) print $1}' ra=$ra dec=$dec pi=$pi distlim=$distlim f1=$flux[1] | sort -u` )
+awk {print $1,$2,$3,$4,$5,$7} /home/obs/mmm/karto/cals/calsdata
+sort -u
+awk {if (cos(distlim) <= (sin($4*pi/180)*sin(dec)+cos($4*pi/180)*cos(dec)*cos(ra-($3*pi/12))) && $5 >= f1) print $1} ra=0.322013 dec= pi=3.14159265 distlim=1.0472 f1=10
+else
+if ( 0006-000 ==  ) then
+set idx
+set freq = `echo $freq | awk '{print $1/1000}'`
+awk {print $1/1000}
+echo 1400
+foreach pcal ( 0006-000 0020+156 0025-260 0040+331 0042-442 0116-208 0120-153 0137+331 0220-019 0223+400 0224+278 0242-000 0319+415 0336+057 0337+507 0437+296 0455-205 2137-207 2206-185 2225-049 2253+161 2316+040 2321-163 )
+set calvals = ( `calinfo target=$pcal freq=$freq options=auto` )
+calinfo target=0006-000 freq=1.4 options=auto
+onintr enderr
+set datapath = /home/obs/mmm/karto/cals
+set target
+set debug = 0
+set freq
+set flux = ( 0 0 )
+set mode = info
+set dwflux = 1
+set dwdist = 1
+set dwtime = 1
+set ra = 0
+set dec = 0
+set pi = 3.14159265
+set distlim = 3.14159265
+set auto = 0
+set calgrade = U
+set addflux
+set altname
+if ( 3 == 0 ) then
+varassign:
+if ( target=0006-000 =~ target=* ) then
+set target = `echo $argv[1] | sed 's/target=//' | tr '[a-z]' '[A-Z]'`
+echo target=0006-000
+tr [a-z] [A-Z]
+sed s/target=//
+shift argv
+if ( freq=1.4 options=auto ==  ) set argv = finish
+else if ( freq=1.4 =~ freq=* ) then
+if ( freq=1.4 != finish ) goto varassign
+goto varassign
+if ( freq=1.4 =~ target=* ) then
+if ( freq=1.4 =~ freq=* ) then
+set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print $1*1000}'`
+echo freq=1.4
+awk {print $1*1000}
+sed s/freq=//
+shift argv
+if ( options=auto ==  ) set argv = finish
+else if ( options=auto =~ radec=* ) then
+if ( options=auto != finish ) goto varassign
+goto varassign
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ freq=* ) then
+if ( options=auto =~ radec=* ) then
+if ( options=auto =~ distlim=* ) then
+if ( options=auto =~ flux=* ) then
+if ( options=auto =~ altname=* ) then
+if ( options=auto =~ addflux=* ) then
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ options=* ) then
+set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
+echo options=auto
+sed s/options=//g
+tr [A-Z] [a-z]
+tr ,  
+set badopt
+foreach option ( `echo $options` )
+echo auto
+if ( auto == debug ) then
+if ( auto == info ) then
+if ( auto == find ) then
+if ( auto == best ) then
+if ( auto == modify ) then
+if ( auto == dwflux ) then
+if ( auto == dwdist ) then
+if ( auto == dwtime ) then
+if ( auto == auto ) then
+set auto = 1
+else
+end
+if (  !=  ) echo options=`echo $badopt | tr ' ' ','` not recognized!
+shift argv
+if (  ==  ) set argv = finish
+set argv = finish
+else
+if ( finish != finish ) goto varassign
+set wd = ( `mktemp -d cal3XXXXX` )
+mktemp -d cal3XXXXX
+if ! ( -e cal3HyGI4 ) then
+if ( info == info ) goto infocal
+goto infocal
+if ( 0006-000 ==  &&  ==  ) then
+if ( 0006-000 ==  ) then
+awk {if ($1 == target || $2 == target) print $0} target=0006-000 /home/obs/mmm/karto/cals/calsdata
+sort -nk7
+if ! ( `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3HyGI4/calinfo
+if ( 1400 ==  ) then
+set linemark = `awk '{print NR,(($7-freq)^2)^.5}' freq=$freq $wd/calinfo | sort -nk2 | head -n 1 | awk '{print $1}'`
+awk {print NR,(($7-freq)^2)^.5} freq=1400 cal3HyGI4/calinfo
+sort -nk2
+awk {print $1}
+head -n 1
+set preline = `echo $linemark | awk '{print $1-1}'`
+awk {print $1-1}
+echo 2
+set postline = `echo $linemark | awk '{print $1+1}'`
+awk {print $1+1}
+echo 2
+set altcaldata = ( `sed -n {$linemark}p $wd/calinfo | awk '{print $1,$2,$3,$4}'` )
+awk {print $1,$2,$3,$4}
+sed -n 2p cal3HyGI4/calinfo
+if ( 2 == 1 ) then
+if ( 2 == `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3HyGI4/calinfo
+set fluxinfo = ( `sed -n {$preline},{$linemark}p $wd/calinfo | awk '{if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}} END {sfr = exp((log(fr1)+log(fr2))/2); if (freq <= sfr) {reffreq = fr1; refflux = fl1; aflux = af1}; if (freq > sfr) {reffreq = fr2; refflux = fl2; aflux = af2}; print refflux,reffreq/1000,log(fl1/fl2)/log(fr1/fr2),aflux}' freq=$freq` )
+awk {if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}} END {sfr = exp((log(fr1)+log(fr2))/2); if (freq <= sfr) {reffreq = fr1; refflux = fl1; aflux = af1}; if (freq > sfr) {reffreq = fr2; refflux = fl2; aflux = af2}; print refflux,reffreq/1000,log(fl1/fl2)/log(fr1/fr2),aflux} freq=1400
+sed -n 1,2p cal3HyGI4/calinfo
+else
+if ( 1 ) then
+echo 3.8 1.425 -0.782827 0006-000 NA 0.106287167 0.073357222 2
+else
+goto finish
+if ! ( 0 ) rm -rf cal3HyGI4
+rm -rf cal3HyGI4
+exit 0
+if ! ( -0.782827 == NA && `echo $calvals[2] | awk '{if ((($1-freq)^2)^.5 > 0.21*freq) print "1"}' freq=$freq` ) then
+awk {if ((($1-freq)^2)^.5 > 0.21*freq) print "1"} freq=1.4
+echo 1.425
+if ( 0 == 0 ) then
+if ( -0.782827 == NA && `echo $calvals[1] | awk '{if ($1 >= flux) print 1; else print 0}' flux=$flux[1]` ) then
+awk {if ($1 >= flux) print 1; else print 0} flux=10
+echo 3.8
+if ( -0.782827 != NA && `echo $calvals[1-3] | awk '{if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0}' freq=$freq flux=$flux[1]` ) then
+awk {if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0} freq=1.4 flux=10
+echo 3.8 1.425 -0.782827
+else
+endif
+end
+set calvals = ( `calinfo target=$pcal freq=$freq options=auto` )
+calinfo target=0020+156 freq=1.4 options=auto
+onintr enderr
+set datapath = /home/obs/mmm/karto/cals
+set target
+set debug = 0
+set freq
+set flux = ( 0 0 )
+set mode = info
+set dwflux = 1
+set dwdist = 1
+set dwtime = 1
+set ra = 0
+set dec = 0
+set pi = 3.14159265
+set distlim = 3.14159265
+set auto = 0
+set calgrade = U
+set addflux
+set altname
+if ( 3 == 0 ) then
+varassign:
+if ( target=0020+156 =~ target=* ) then
+set target = `echo $argv[1] | sed 's/target=//' | tr '[a-z]' '[A-Z]'`
+echo target=0020+156
+tr [a-z] [A-Z]
+sed s/target=//
+shift argv
+if ( freq=1.4 options=auto ==  ) set argv = finish
+else if ( freq=1.4 =~ freq=* ) then
+if ( freq=1.4 != finish ) goto varassign
+goto varassign
+if ( freq=1.4 =~ target=* ) then
+if ( freq=1.4 =~ freq=* ) then
+set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print $1*1000}'`
+echo freq=1.4
+awk {print $1*1000}
+sed s/freq=//
+shift argv
+if ( options=auto ==  ) set argv = finish
+else if ( options=auto =~ radec=* ) then
+if ( options=auto != finish ) goto varassign
+goto varassign
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ freq=* ) then
+if ( options=auto =~ radec=* ) then
+if ( options=auto =~ distlim=* ) then
+if ( options=auto =~ flux=* ) then
+if ( options=auto =~ altname=* ) then
+if ( options=auto =~ addflux=* ) then
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ options=* ) then
+set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
+echo options=auto
+sed s/options=//g
+tr [A-Z] [a-z]
+tr ,  
+set badopt
+foreach option ( `echo $options` )
+echo auto
+if ( auto == debug ) then
+if ( auto == info ) then
+if ( auto == find ) then
+if ( auto == best ) then
+if ( auto == modify ) then
+if ( auto == dwflux ) then
+if ( auto == dwdist ) then
+if ( auto == dwtime ) then
+if ( auto == auto ) then
+set auto = 1
+else
+end
+if (  !=  ) echo options=`echo $badopt | tr ' ' ','` not recognized!
+shift argv
+if (  ==  ) set argv = finish
+set argv = finish
+else
+if ( finish != finish ) goto varassign
+set wd = ( `mktemp -d cal3XXXXX` )
+mktemp -d cal3XXXXX
+if ! ( -e cal30AWN4 ) then
+if ( info == info ) goto infocal
+goto infocal
+if ( 0020+156 ==  &&  ==  ) then
+if ( 0020+156 ==  ) then
+awk {if ($1 == target || $2 == target) print $0} target=0020+156 /home/obs/mmm/karto/cals/calsdata
+sort -nk7
+if ! ( `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal30AWN4/calinfo
+if ( 1400 ==  ) then
+set linemark = `awk '{print NR,(($7-freq)^2)^.5}' freq=$freq $wd/calinfo | sort -nk2 | head -n 1 | awk '{print $1}'`
+awk {print NR,(($7-freq)^2)^.5} freq=1400 cal30AWN4/calinfo
+sort -nk2
+head -n 1
+awk {print $1}
+set preline = `echo $linemark | awk '{print $1-1}'`
+awk {print $1-1}
+echo 2
+set postline = `echo $linemark | awk '{print $1+1}'`
+awk {print $1+1}
+echo 2
+set altcaldata = ( `sed -n {$linemark}p $wd/calinfo | awk '{print $1,$2,$3,$4}'` )
+awk {print $1,$2,$3,$4}
+sed -n 2p cal30AWN4/calinfo
+if ( 2 == 1 ) then
+if ( 2 == `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal30AWN4/calinfo
+set fluxinfo = ( `sed -n {$preline},{$linemark}p $wd/calinfo | awk '{if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}} END {sfr = exp((log(fr1)+log(fr2))/2); if (freq <= sfr) {reffreq = fr1; refflux = fl1; aflux = af1}; if (freq > sfr) {reffreq = fr2; refflux = fl2; aflux = af2}; print refflux,reffreq/1000,log(fl1/fl2)/log(fr1/fr2),aflux}' freq=$freq` )
+awk {if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}} END {sfr = exp((log(fr1)+log(fr2))/2); if (freq <= sfr) {reffreq = fr1; refflux = fl1; aflux = af1}; if (freq > sfr) {reffreq = fr2; refflux = fl2; aflux = af2}; print refflux,reffreq/1000,log(fl1/fl2)/log(fr1/fr2),aflux} freq=1400
+sed -n 1,2p cal30AWN4/calinfo
+else
+if ( 1 ) then
+echo 2.1 1.425 -1.06245 0020+156 3C9 0.340366111 15.68130556 2
+else
+goto finish
+if ! ( 0 ) rm -rf cal30AWN4
+rm -rf cal30AWN4
+exit 0
+if ! ( -1.06245 == NA && `echo $calvals[2] | awk '{if ((($1-freq)^2)^.5 > 0.21*freq) print "1"}' freq=$freq` ) then
+awk {if ((($1-freq)^2)^.5 > 0.21*freq) print "1"} freq=1.4
+echo 1.425
+if ( 0 == 0 ) then
+if ( -1.06245 == NA && `echo $calvals[1] | awk '{if ($1 >= flux) print 1; else print 0}' flux=$flux[1]` ) then
+awk {if ($1 >= flux) print 1; else print 0} flux=10
+echo 2.1
+if ( -1.06245 != NA && `echo $calvals[1-3] | awk '{if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0}' freq=$freq flux=$flux[1]` ) then
+awk {if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0} freq=1.4 flux=10
+echo 2.1 1.425 -1.06245
+else
+endif
+end
+set calvals = ( `calinfo target=$pcal freq=$freq options=auto` )
+calinfo target=0025-260 freq=1.4 options=auto
+onintr enderr
+set datapath = /home/obs/mmm/karto/cals
+set target
+set debug = 0
+set freq
+set flux = ( 0 0 )
+set mode = info
+set dwflux = 1
+set dwdist = 1
+set dwtime = 1
+set ra = 0
+set dec = 0
+set pi = 3.14159265
+set distlim = 3.14159265
+set auto = 0
+set calgrade = U
+set addflux
+set altname
+if ( 3 == 0 ) then
+varassign:
+if ( target=0025-260 =~ target=* ) then
+set target = `echo $argv[1] | sed 's/target=//' | tr '[a-z]' '[A-Z]'`
+echo target=0025-260
+tr [a-z] [A-Z]
+sed s/target=//
+shift argv
+if ( freq=1.4 options=auto ==  ) set argv = finish
+else if ( freq=1.4 =~ freq=* ) then
+if ( freq=1.4 != finish ) goto varassign
+goto varassign
+if ( freq=1.4 =~ target=* ) then
+if ( freq=1.4 =~ freq=* ) then
+set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print $1*1000}'`
+echo freq=1.4
+awk {print $1*1000}
+sed s/freq=//
+shift argv
+if ( options=auto ==  ) set argv = finish
+else if ( options=auto =~ radec=* ) then
+if ( options=auto != finish ) goto varassign
+goto varassign
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ freq=* ) then
+if ( options=auto =~ radec=* ) then
+if ( options=auto =~ distlim=* ) then
+if ( options=auto =~ flux=* ) then
+if ( options=auto =~ altname=* ) then
+if ( options=auto =~ addflux=* ) then
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ options=* ) then
+set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
+echo options=auto
+sed s/options=//g
+tr [A-Z] [a-z]
+tr ,  
+set badopt
+foreach option ( `echo $options` )
+echo auto
+if ( auto == debug ) then
+if ( auto == info ) then
+if ( auto == find ) then
+if ( auto == best ) then
+if ( auto == modify ) then
+if ( auto == dwflux ) then
+if ( auto == dwdist ) then
+if ( auto == dwtime ) then
+if ( auto == auto ) then
+set auto = 1
+else
+end
+if (  !=  ) echo options=`echo $badopt | tr ' ' ','` not recognized!
+shift argv
+if (  ==  ) set argv = finish
+set argv = finish
+else
+if ( finish != finish ) goto varassign
+set wd = ( `mktemp -d cal3XXXXX` )
+mktemp -d cal3XXXXX
+if ! ( -e cal3nDOT4 ) then
+if ( info == info ) goto infocal
+goto infocal
+if ( 0025-260 ==  &&  ==  ) then
+if ( 0025-260 ==  ) then
+awk {if ($1 == target || $2 == target) print $0} target=0025-260 /home/obs/mmm/karto/cals/calsdata
+sort -nk7
+if ! ( `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3nDOT4/calinfo
+if ( 1400 ==  ) then
+set linemark = `awk '{print NR,(($7-freq)^2)^.5}' freq=$freq $wd/calinfo | sort -nk2 | head -n 1 | awk '{print $1}'`
+awk {print NR,(($7-freq)^2)^.5} freq=1400 cal3nDOT4/calinfo
+sort -nk2
+awk {print $1}
+head -n 1
+set preline = `echo $linemark | awk '{print $1-1}'`
+awk {print $1-1}
+echo 2
+set postline = `echo $linemark | awk '{print $1+1}'`
+awk {print $1+1}
+echo 2
+set altcaldata = ( `sed -n {$linemark}p $wd/calinfo | awk '{print $1,$2,$3,$4}'` )
+awk {print $1,$2,$3,$4}
+sed -n 2p cal3nDOT4/calinfo
+if ( 2 == 1 ) then
+if ( 2 == `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3nDOT4/calinfo
+set fluxinfo = ( `sed -n {$preline},{$postline}p $wd/calinfo | awk '{if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}; if (NR == 3) {fl3=$5; fr3 = $7; af3 = $8}} END {sidx1 = log(fl1/fl2)/log(fr1/fr2); sidx2 = log(fl2/fl3)/log(fr2/fr3); sfr1 = exp((log(fr1)+log(fr2))/2); sfr2 = exp((log(fr2)+log(fr3))/2); if (freq <= sfr1) {sidx = sidx1; reffreq = fr1; refflux = fl1; aflux = af1}; if (freq >= sfr2) {sidx = sidx2; reffreq = fr3; refflux = fl3; aflux = af2} ; if (freq > sfr1 && freq < sfr2) {sidx = ((sidx1*log(freq/sfr1))+(sidx2*log(sfr2/freq)))/(log(sfr2/sfr1)); reffreq = fr2; refflux = fl2; aflux = af3}; print refflux,reffreq/1000,sidx,aflux}' freq=$freq` )
+awk {if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}; if (NR == 3) {fl3=$5; fr3 = $7; af3 = $8}} END {sidx1 = log(fl1/fl2)/log(fr1/fr2); sidx2 = log(fl2/fl3)/log(fr2/fr3); sfr1 = exp((log(fr1)+log(fr2))/2); sfr2 = exp((log(fr2)+log(fr3))/2); if (freq <= sfr1) {sidx = sidx1; reffreq = fr1; refflux = fl1; aflux = af1}; if (freq >= sfr2) {sidx = sidx2; reffreq = fr3; refflux = fl3; aflux = af2} ; if (freq > sfr1 && freq < sfr2) {sidx = ((sidx1*log(freq/sfr1))+(sidx2*log(sfr2/freq)))/(log(sfr2/sfr1)); reffreq = fr2; refflux = fl2; aflux = af3}; print refflux,reffreq/1000,sidx,aflux} freq=1400
+sed -n 1,3p cal3nDOT4/calinfo
+endif
+if ( 1 ) then
+echo 8.3 1.425 -0.647935 0025-260 NA 0.430324528 -25.96314028 2
+else
+goto finish
+if ! ( 0 ) rm -rf cal3nDOT4
+rm -rf cal3nDOT4
+exit 0
+if ! ( -0.647935 == NA && `echo $calvals[2] | awk '{if ((($1-freq)^2)^.5 > 0.21*freq) print "1"}' freq=$freq` ) then
+awk {if ((($1-freq)^2)^.5 > 0.21*freq) print "1"} freq=1.4
+echo 1.425
+if ( 0 == 0 ) then
+if ( -0.647935 == NA && `echo $calvals[1] | awk '{if ($1 >= flux) print 1; else print 0}' flux=$flux[1]` ) then
+awk {if ($1 >= flux) print 1; else print 0} flux=10
+echo 8.3
+if ( -0.647935 != NA && `echo $calvals[1-3] | awk '{if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0}' freq=$freq flux=$flux[1]` ) then
+awk {if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0} freq=1.4 flux=10
+echo 8.3 1.425 -0.647935
+else
+endif
+end
+set calvals = ( `calinfo target=$pcal freq=$freq options=auto` )
+calinfo target=0040+331 freq=1.4 options=auto
+onintr enderr
+set datapath = /home/obs/mmm/karto/cals
+set target
+set debug = 0
+set freq
+set flux = ( 0 0 )
+set mode = info
+set dwflux = 1
+set dwdist = 1
+set dwtime = 1
+set ra = 0
+set dec = 0
+set pi = 3.14159265
+set distlim = 3.14159265
+set auto = 0
+set calgrade = U
+set addflux
+set altname
+if ( 3 == 0 ) then
+varassign:
+if ( target=0040+331 =~ target=* ) then
+set target = `echo $argv[1] | sed 's/target=//' | tr '[a-z]' '[A-Z]'`
+tr [a-z] [A-Z]
+echo target=0040+331
+sed s/target=//
+shift argv
+if ( freq=1.4 options=auto ==  ) set argv = finish
+else if ( freq=1.4 =~ freq=* ) then
+if ( freq=1.4 != finish ) goto varassign
+goto varassign
+if ( freq=1.4 =~ target=* ) then
+if ( freq=1.4 =~ freq=* ) then
+set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print $1*1000}'`
+echo freq=1.4
+awk {print $1*1000}
+sed s/freq=//
+shift argv
+if ( options=auto ==  ) set argv = finish
+else if ( options=auto =~ radec=* ) then
+if ( options=auto != finish ) goto varassign
+goto varassign
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ freq=* ) then
+if ( options=auto =~ radec=* ) then
+if ( options=auto =~ distlim=* ) then
+if ( options=auto =~ flux=* ) then
+if ( options=auto =~ altname=* ) then
+if ( options=auto =~ addflux=* ) then
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ options=* ) then
+set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
+echo options=auto
+tr [A-Z] [a-z]
+sed s/options=//g
+tr ,  
+set badopt
+foreach option ( `echo $options` )
+echo auto
+if ( auto == debug ) then
+if ( auto == info ) then
+if ( auto == find ) then
+if ( auto == best ) then
+if ( auto == modify ) then
+if ( auto == dwflux ) then
+if ( auto == dwdist ) then
+if ( auto == dwtime ) then
+if ( auto == auto ) then
+set auto = 1
+else
+end
+if (  !=  ) echo options=`echo $badopt | tr ' ' ','` not recognized!
+shift argv
+if (  ==  ) set argv = finish
+set argv = finish
+else
+if ( finish != finish ) goto varassign
+set wd = ( `mktemp -d cal3XXXXX` )
+mktemp -d cal3XXXXX
+if ! ( -e cal32FyY4 ) then
+if ( info == info ) goto infocal
+goto infocal
+if ( 0040+331 ==  &&  ==  ) then
+if ( 0040+331 ==  ) then
+awk {if ($1 == target || $2 == target) print $0} target=0040+331 /home/obs/mmm/karto/cals/calsdata
+sort -nk7
+if ! ( `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal32FyY4/calinfo
+if ( 1400 ==  ) then
+set linemark = `awk '{print NR,(($7-freq)^2)^.5}' freq=$freq $wd/calinfo | sort -nk2 | head -n 1 | awk '{print $1}'`
+awk {print NR,(($7-freq)^2)^.5} freq=1400 cal32FyY4/calinfo
+sort -nk2
+head -n 1
+awk {print $1}
+set preline = `echo $linemark | awk '{print $1-1}'`
+echo 2
+awk {print $1-1}
+set postline = `echo $linemark | awk '{print $1+1}'`
+echo 2
+awk {print $1+1}
+set altcaldata = ( `sed -n {$linemark}p $wd/calinfo | awk '{print $1,$2,$3,$4}'` )
+awk {print $1,$2,$3,$4}
+sed -n 2p cal32FyY4/calinfo
+if ( 2 == 1 ) then
+if ( 2 == `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal32FyY4/calinfo
+set fluxinfo = ( `sed -n {$preline},{$linemark}p $wd/calinfo | awk '{if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}} END {sfr = exp((log(fr1)+log(fr2))/2); if (freq <= sfr) {reffreq = fr1; refflux = fl1; aflux = af1}; if (freq > sfr) {reffreq = fr2; refflux = fl2; aflux = af2}; print refflux,reffreq/1000,log(fl1/fl2)/log(fr1/fr2),aflux}' freq=$freq` )
+sed -n 1,2p cal32FyY4/calinfo
+awk {if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}} END {sfr = exp((log(fr1)+log(fr2))/2); if (freq <= sfr) {reffreq = fr1; refflux = fl1; aflux = af1}; if (freq > sfr) {reffreq = fr2; refflux = fl2; aflux = af2}; print refflux,reffreq/1000,log(fl1/fl2)/log(fr1/fr2),aflux} freq=1400
+else
+if ( 1 ) then
+echo 3.2 1.425 -0.775699 0040+331 NA 0.681961 33.16896306 2
+else
+goto finish
+if ! ( 0 ) rm -rf cal32FyY4
+rm -rf cal32FyY4
+exit 0
+if ! ( -0.775699 == NA && `echo $calvals[2] | awk '{if ((($1-freq)^2)^.5 > 0.21*freq) print "1"}' freq=$freq` ) then
+awk {if ((($1-freq)^2)^.5 > 0.21*freq) print "1"} freq=1.4
+echo 1.425
+if ( 0 == 0 ) then
+if ( -0.775699 == NA && `echo $calvals[1] | awk '{if ($1 >= flux) print 1; else print 0}' flux=$flux[1]` ) then
+echo 3.2
+awk {if ($1 >= flux) print 1; else print 0} flux=10
+if ( -0.775699 != NA && `echo $calvals[1-3] | awk '{if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0}' freq=$freq flux=$flux[1]` ) then
+awk {if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0} freq=1.4 flux=10
+echo 3.2 1.425 -0.775699
+else
+endif
+end
+set calvals = ( `calinfo target=$pcal freq=$freq options=auto` )
+calinfo target=0042-442 freq=1.4 options=auto
+onintr enderr
+set datapath = /home/obs/mmm/karto/cals
+set target
+set debug = 0
+set freq
+set flux = ( 0 0 )
+set mode = info
+set dwflux = 1
+set dwdist = 1
+set dwtime = 1
+set ra = 0
+set dec = 0
+set pi = 3.14159265
+set distlim = 3.14159265
+set auto = 0
+set calgrade = U
+set addflux
+set altname
+if ( 3 == 0 ) then
+varassign:
+if ( target=0042-442 =~ target=* ) then
+set target = `echo $argv[1] | sed 's/target=//' | tr '[a-z]' '[A-Z]'`
+tr [a-z] [A-Z]
+echo target=0042-442
+sed s/target=//
+shift argv
+if ( freq=1.4 options=auto ==  ) set argv = finish
+else if ( freq=1.4 =~ freq=* ) then
+if ( freq=1.4 != finish ) goto varassign
+goto varassign
+if ( freq=1.4 =~ target=* ) then
+if ( freq=1.4 =~ freq=* ) then
+set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print $1*1000}'`
+sed s/freq=//
+awk {print $1*1000}
+echo freq=1.4
+shift argv
+if ( options=auto ==  ) set argv = finish
+else if ( options=auto =~ radec=* ) then
+if ( options=auto != finish ) goto varassign
+goto varassign
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ freq=* ) then
+if ( options=auto =~ radec=* ) then
+if ( options=auto =~ distlim=* ) then
+if ( options=auto =~ flux=* ) then
+if ( options=auto =~ altname=* ) then
+if ( options=auto =~ addflux=* ) then
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ options=* ) then
+set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
+echo options=auto
+tr ,  
+sed s/options=//g
+tr [A-Z] [a-z]
+set badopt
+foreach option ( `echo $options` )
+echo auto
+if ( auto == debug ) then
+if ( auto == info ) then
+if ( auto == find ) then
+if ( auto == best ) then
+if ( auto == modify ) then
+if ( auto == dwflux ) then
+if ( auto == dwdist ) then
+if ( auto == dwtime ) then
+if ( auto == auto ) then
+set auto = 1
+else
+end
+if (  !=  ) echo options=`echo $badopt | tr ' ' ','` not recognized!
+shift argv
+if (  ==  ) set argv = finish
+set argv = finish
+else
+if ( finish != finish ) goto varassign
+set wd = ( `mktemp -d cal3XXXXX` )
+mktemp -d cal3XXXXX
+if ! ( -e cal3yLi34 ) then
+if ( info == info ) goto infocal
+goto infocal
+if ( 0042-442 ==  &&  ==  ) then
+if ( 0042-442 ==  ) then
+awk {if ($1 == target || $2 == target) print $0} target=0042-442 /home/obs/mmm/karto/cals/calsdata
+sort -nk7
+if ! ( `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3yLi34/calinfo
+if ( 1400 ==  ) then
+set linemark = `awk '{print NR,(($7-freq)^2)^.5}' freq=$freq $wd/calinfo | sort -nk2 | head -n 1 | awk '{print $1}'`
+awk {print NR,(($7-freq)^2)^.5} freq=1400 cal3yLi34/calinfo
+sort -nk2
+awk {print $1}
+head -n 1
+set preline = `echo $linemark | awk '{print $1-1}'`
+awk {print $1-1}
+echo 2
+set postline = `echo $linemark | awk '{print $1+1}'`
+awk {print $1+1}
+echo 2
+set altcaldata = ( `sed -n {$linemark}p $wd/calinfo | awk '{print $1,$2,$3,$4}'` )
+awk {print $1,$2,$3,$4}
+sed -n 2p cal3yLi34/calinfo
+if ( 2 == 1 ) then
+if ( 2 == `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3yLi34/calinfo
+set fluxinfo = ( `sed -n {$preline},{$linemark}p $wd/calinfo | awk '{if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}} END {sfr = exp((log(fr1)+log(fr2))/2); if (freq <= sfr) {reffreq = fr1; refflux = fl1; aflux = af1}; if (freq > sfr) {reffreq = fr2; refflux = fl2; aflux = af2}; print refflux,reffreq/1000,log(fl1/fl2)/log(fr1/fr2),aflux}' freq=$freq` )
+awk {if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}} END {sfr = exp((log(fr1)+log(fr2))/2); if (freq <= sfr) {reffreq = fr1; refflux = fl1; aflux = af1}; if (freq > sfr) {reffreq = fr2; refflux = fl2; aflux = af2}; print refflux,reffreq/1000,log(fl1/fl2)/log(fr1/fr2),aflux} freq=1400
+sed -n 1,2p cal3yLi34/calinfo
+else
+if ( 1 ) then
+echo 3.5 1.425 -0.893304 0042-442 NA 0.702617278 -43.76233861 2
+else
+goto finish
+if ! ( 0 ) rm -rf cal3yLi34
+rm -rf cal3yLi34
+exit 0
+if ! ( -0.893304 == NA && `echo $calvals[2] | awk '{if ((($1-freq)^2)^.5 > 0.21*freq) print "1"}' freq=$freq` ) then
+awk {if ((($1-freq)^2)^.5 > 0.21*freq) print "1"} freq=1.4
+echo 1.425
+if ( 0 == 0 ) then
+if ( -0.893304 == NA && `echo $calvals[1] | awk '{if ($1 >= flux) print 1; else print 0}' flux=$flux[1]` ) then
+awk {if ($1 >= flux) print 1; else print 0} flux=10
+echo 3.5
+if ( -0.893304 != NA && `echo $calvals[1-3] | awk '{if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0}' freq=$freq flux=$flux[1]` ) then
+awk {if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0} freq=1.4 flux=10
+echo 3.5 1.425 -0.893304
+else
+endif
+end
+set calvals = ( `calinfo target=$pcal freq=$freq options=auto` )
+calinfo target=0116-208 freq=1.4 options=auto
+onintr enderr
+set datapath = /home/obs/mmm/karto/cals
+set target
+set debug = 0
+set freq
+set flux = ( 0 0 )
+set mode = info
+set dwflux = 1
+set dwdist = 1
+set dwtime = 1
+set ra = 0
+set dec = 0
+set pi = 3.14159265
+set distlim = 3.14159265
+set auto = 0
+set calgrade = U
+set addflux
+set altname
+if ( 3 == 0 ) then
+varassign:
+if ( target=0116-208 =~ target=* ) then
+set target = `echo $argv[1] | sed 's/target=//' | tr '[a-z]' '[A-Z]'`
+echo target=0116-208
+tr [a-z] [A-Z]
+sed s/target=//
+shift argv
+if ( freq=1.4 options=auto ==  ) set argv = finish
+else if ( freq=1.4 =~ freq=* ) then
+if ( freq=1.4 != finish ) goto varassign
+goto varassign
+if ( freq=1.4 =~ target=* ) then
+if ( freq=1.4 =~ freq=* ) then
+set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print $1*1000}'`
+echo freq=1.4
+awk {print $1*1000}
+sed s/freq=//
+shift argv
+if ( options=auto ==  ) set argv = finish
+else if ( options=auto =~ radec=* ) then
+if ( options=auto != finish ) goto varassign
+goto varassign
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ freq=* ) then
+if ( options=auto =~ radec=* ) then
+if ( options=auto =~ distlim=* ) then
+if ( options=auto =~ flux=* ) then
+if ( options=auto =~ altname=* ) then
+if ( options=auto =~ addflux=* ) then
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ options=* ) then
+set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
+echo options=auto
+sed s/options=//g
+tr [A-Z] [a-z]
+tr ,  
+set badopt
+foreach option ( `echo $options` )
+echo auto
+if ( auto == debug ) then
+if ( auto == info ) then
+if ( auto == find ) then
+if ( auto == best ) then
+if ( auto == modify ) then
+if ( auto == dwflux ) then
+if ( auto == dwdist ) then
+if ( auto == dwtime ) then
+if ( auto == auto ) then
+set auto = 1
+else
+end
+if (  !=  ) echo options=`echo $badopt | tr ' ' ','` not recognized!
+shift argv
+if (  ==  ) set argv = finish
+set argv = finish
+else
+if ( finish != finish ) goto varassign
+set wd = ( `mktemp -d cal3XXXXX` )
+mktemp -d cal3XXXXX
+if ! ( -e cal3QN474 ) then
+if ( info == info ) goto infocal
+goto infocal
+if ( 0116-208 ==  &&  ==  ) then
+if ( 0116-208 ==  ) then
+awk {if ($1 == target || $2 == target) print $0} target=0116-208 /home/obs/mmm/karto/cals/calsdata
+sort -nk7
+if ! ( `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3QN474/calinfo
+if ( 1400 ==  ) then
+set linemark = `awk '{print NR,(($7-freq)^2)^.5}' freq=$freq $wd/calinfo | sort -nk2 | head -n 1 | awk '{print $1}'`
+awk {print NR,(($7-freq)^2)^.5} freq=1400 cal3QN474/calinfo
+sort -nk2
+awk {print $1}
+head -n 1
+set preline = `echo $linemark | awk '{print $1-1}'`
+awk {print $1-1}
+echo 2
+set postline = `echo $linemark | awk '{print $1+1}'`
+awk {print $1+1}
+echo 2
+set altcaldata = ( `sed -n {$linemark}p $wd/calinfo | awk '{print $1,$2,$3,$4}'` )
+awk {print $1,$2,$3,$4}
+sed -n 2p cal3QN474/calinfo
+if ( 2 == 1 ) then
+if ( 2 == `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3QN474/calinfo
+set fluxinfo = ( `sed -n {$preline},{$postline}p $wd/calinfo | awk '{if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}; if (NR == 3) {fl3=$5; fr3 = $7; af3 = $8}} END {sidx1 = log(fl1/fl2)/log(fr1/fr2); sidx2 = log(fl2/fl3)/log(fr2/fr3); sfr1 = exp((log(fr1)+log(fr2))/2); sfr2 = exp((log(fr2)+log(fr3))/2); if (freq <= sfr1) {sidx = sidx1; reffreq = fr1; refflux = fl1; aflux = af1}; if (freq >= sfr2) {sidx = sidx2; reffreq = fr3; refflux = fl3; aflux = af2} ; if (freq > sfr1 && freq < sfr2) {sidx = ((sidx1*log(freq/sfr1))+(sidx2*log(sfr2/freq)))/(log(sfr2/sfr1)); reffreq = fr2; refflux = fl2; aflux = af3}; print refflux,reffreq/1000,sidx,aflux}' freq=$freq` )
+awk {if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}; if (NR == 3) {fl3=$5; fr3 = $7; af3 = $8}} END {sidx1 = log(fl1/fl2)/log(fr1/fr2); sidx2 = log(fl2/fl3)/log(fr2/fr3); sfr1 = exp((log(fr1)+log(fr2))/2); sfr2 = exp((log(fr2)+log(fr3))/2); if (freq <= sfr1) {sidx = sidx1; reffreq = fr1; refflux = fl1; aflux = af1}; if (freq >= sfr2) {sidx = sidx2; reffreq = fr3; refflux = fl3; aflux = af2} ; if (freq > sfr1 && freq < sfr2) {sidx = ((sidx1*log(freq/sfr1))+(sidx2*log(sfr2/freq)))/(log(sfr2/sfr1)); reffreq = fr2; refflux = fl2; aflux = af3}; print refflux,reffreq/1000,sidx,aflux} freq=1400
+sed -n 1,3p cal3QN474/calinfo
+endif
+if ( 1 ) then
+echo 3.6 1.425 -0.868536 0116-208 NA 1.280945639 -19.13144083 2
+else
+goto finish
+if ! ( 0 ) rm -rf cal3QN474
+rm -rf cal3QN474
+exit 0
+if ! ( -0.868536 == NA && `echo $calvals[2] | awk '{if ((($1-freq)^2)^.5 > 0.21*freq) print "1"}' freq=$freq` ) then
+awk {if ((($1-freq)^2)^.5 > 0.21*freq) print "1"} freq=1.4
+echo 1.425
+if ( 0 == 0 ) then
+if ( -0.868536 == NA && `echo $calvals[1] | awk '{if ($1 >= flux) print 1; else print 0}' flux=$flux[1]` ) then
+awk {if ($1 >= flux) print 1; else print 0} flux=10
+echo 3.6
+if ( -0.868536 != NA && `echo $calvals[1-3] | awk '{if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0}' freq=$freq flux=$flux[1]` ) then
+awk {if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0} freq=1.4 flux=10
+echo 3.6 1.425 -0.868536
+else
+endif
+end
+set calvals = ( `calinfo target=$pcal freq=$freq options=auto` )
+calinfo target=0120-153 freq=1.4 options=auto
+onintr enderr
+set datapath = /home/obs/mmm/karto/cals
+set target
+set debug = 0
+set freq
+set flux = ( 0 0 )
+set mode = info
+set dwflux = 1
+set dwdist = 1
+set dwtime = 1
+set ra = 0
+set dec = 0
+set pi = 3.14159265
+set distlim = 3.14159265
+set auto = 0
+set calgrade = U
+set addflux
+set altname
+if ( 3 == 0 ) then
+varassign:
+if ( target=0120-153 =~ target=* ) then
+set target = `echo $argv[1] | sed 's/target=//' | tr '[a-z]' '[A-Z]'`
+echo target=0120-153
+tr [a-z] [A-Z]
+sed s/target=//
+shift argv
+if ( freq=1.4 options=auto ==  ) set argv = finish
+else if ( freq=1.4 =~ freq=* ) then
+if ( freq=1.4 != finish ) goto varassign
+goto varassign
+if ( freq=1.4 =~ target=* ) then
+if ( freq=1.4 =~ freq=* ) then
+set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print $1*1000}'`
+echo freq=1.4
+awk {print $1*1000}
+sed s/freq=//
+shift argv
+if ( options=auto ==  ) set argv = finish
+else if ( options=auto =~ radec=* ) then
+if ( options=auto != finish ) goto varassign
+goto varassign
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ freq=* ) then
+if ( options=auto =~ radec=* ) then
+if ( options=auto =~ distlim=* ) then
+if ( options=auto =~ flux=* ) then
+if ( options=auto =~ altname=* ) then
+if ( options=auto =~ addflux=* ) then
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ options=* ) then
+set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
+echo options=auto
+sed s/options=//g
+tr ,  
+tr [A-Z] [a-z]
+set badopt
+foreach option ( `echo $options` )
+echo auto
+if ( auto == debug ) then
+if ( auto == info ) then
+if ( auto == find ) then
+if ( auto == best ) then
+if ( auto == modify ) then
+if ( auto == dwflux ) then
+if ( auto == dwdist ) then
+if ( auto == dwtime ) then
+if ( auto == auto ) then
+set auto = 1
+else
+end
+if (  !=  ) echo options=`echo $badopt | tr ' ' ','` not recognized!
+shift argv
+if (  ==  ) set argv = finish
+set argv = finish
+else
+if ( finish != finish ) goto varassign
+set wd = ( `mktemp -d cal3XXXXX` )
+mktemp -d cal3XXXXX
+if ! ( -e cal33POa5 ) then
+if ( info == info ) goto infocal
+goto infocal
+if ( 0120-153 ==  &&  ==  ) then
+if ( 0120-153 ==  ) then
+awk {if ($1 == target || $2 == target) print $0} target=0120-153 /home/obs/mmm/karto/cals/calsdata
+sort -nk7
+if ! ( `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal33POa5/calinfo
+if ( 1400 ==  ) then
+set linemark = `awk '{print NR,(($7-freq)^2)^.5}' freq=$freq $wd/calinfo | sort -nk2 | head -n 1 | awk '{print $1}'`
+awk {print NR,(($7-freq)^2)^.5} freq=1400 cal33POa5/calinfo
+sort -nk2
+awk {print $1}
+head -n 1
+set preline = `echo $linemark | awk '{print $1-1}'`
+awk {print $1-1}
+echo 2
+set postline = `echo $linemark | awk '{print $1+1}'`
+awk {print $1+1}
+echo 2
+set altcaldata = ( `sed -n {$linemark}p $wd/calinfo | awk '{print $1,$2,$3,$4}'` )
+awk {print $1,$2,$3,$4}
+sed -n 2p cal33POa5/calinfo
+if ( 2 == 1 ) then
+if ( 2 == `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal33POa5/calinfo
+set fluxinfo = ( `sed -n {$preline},{$linemark}p $wd/calinfo | awk '{if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}} END {sfr = exp((log(fr1)+log(fr2))/2); if (freq <= sfr) {reffreq = fr1; refflux = fl1; aflux = af1}; if (freq > sfr) {reffreq = fr2; refflux = fl2; aflux = af2}; print refflux,reffreq/1000,log(fl1/fl2)/log(fr1/fr2),aflux}' freq=$freq` )
+awk {if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}} END {sfr = exp((log(fr1)+log(fr2))/2); if (freq <= sfr) {reffreq = fr1; refflux = fl1; aflux = af1}; if (freq > sfr) {reffreq = fr2; refflux = fl2; aflux = af2}; print refflux,reffreq/1000,log(fl1/fl2)/log(fr1/fr2),aflux} freq=1400
+sed -n 1,2p cal33POa5/calinfo
+else
+if ( 1 ) then
+echo 4.8 1.425 -0.775699 0120-153 NA 1.340888111 -14.66204694 2
+else
+goto finish
+if ! ( 0 ) rm -rf cal33POa5
+rm -rf cal33POa5
+exit 0
+if ! ( -0.775699 == NA && `echo $calvals[2] | awk '{if ((($1-freq)^2)^.5 > 0.21*freq) print "1"}' freq=$freq` ) then
+awk {if ((($1-freq)^2)^.5 > 0.21*freq) print "1"} freq=1.4
+echo 1.425
+if ( 0 == 0 ) then
+if ( -0.775699 == NA && `echo $calvals[1] | awk '{if ($1 >= flux) print 1; else print 0}' flux=$flux[1]` ) then
+awk {if ($1 >= flux) print 1; else print 0} flux=10
+echo 4.8
+if ( -0.775699 != NA && `echo $calvals[1-3] | awk '{if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0}' freq=$freq flux=$flux[1]` ) then
+awk {if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0} freq=1.4 flux=10
+echo 4.8 1.425 -0.775699
+else
+endif
+end
+set calvals = ( `calinfo target=$pcal freq=$freq options=auto` )
+calinfo target=0137+331 freq=1.4 options=auto
+onintr enderr
+set datapath = /home/obs/mmm/karto/cals
+set target
+set debug = 0
+set freq
+set flux = ( 0 0 )
+set mode = info
+set dwflux = 1
+set dwdist = 1
+set dwtime = 1
+set ra = 0
+set dec = 0
+set pi = 3.14159265
+set distlim = 3.14159265
+set auto = 0
+set calgrade = U
+set addflux
+set altname
+if ( 3 == 0 ) then
+varassign:
+if ( target=0137+331 =~ target=* ) then
+set target = `echo $argv[1] | sed 's/target=//' | tr '[a-z]' '[A-Z]'`
+echo target=0137+331
+tr [a-z] [A-Z]
+sed s/target=//
+shift argv
+if ( freq=1.4 options=auto ==  ) set argv = finish
+else if ( freq=1.4 =~ freq=* ) then
+if ( freq=1.4 != finish ) goto varassign
+goto varassign
+if ( freq=1.4 =~ target=* ) then
+if ( freq=1.4 =~ freq=* ) then
+set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print $1*1000}'`
+awk {print $1*1000}
+echo freq=1.4
+sed s/freq=//
+shift argv
+if ( options=auto ==  ) set argv = finish
+else if ( options=auto =~ radec=* ) then
+if ( options=auto != finish ) goto varassign
+goto varassign
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ freq=* ) then
+if ( options=auto =~ radec=* ) then
+if ( options=auto =~ distlim=* ) then
+if ( options=auto =~ flux=* ) then
+if ( options=auto =~ altname=* ) then
+if ( options=auto =~ addflux=* ) then
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ options=* ) then
+set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
+echo options=auto
+sed s/options=//g
+tr [A-Z] [a-z]
+tr ,  
+set badopt
+foreach option ( `echo $options` )
+echo auto
+if ( auto == debug ) then
+if ( auto == info ) then
+if ( auto == find ) then
+if ( auto == best ) then
+if ( auto == modify ) then
+if ( auto == dwflux ) then
+if ( auto == dwdist ) then
+if ( auto == dwtime ) then
+if ( auto == auto ) then
+set auto = 1
+else
+end
+if (  !=  ) echo options=`echo $badopt | tr ' ' ','` not recognized!
+shift argv
+if (  ==  ) set argv = finish
+set argv = finish
+else
+if ( finish != finish ) goto varassign
+set wd = ( `mktemp -d cal3XXXXX` )
+mktemp -d cal3XXXXX
+if ! ( -e cal3gSyf5 ) then
+if ( info == info ) goto infocal
+goto infocal
+if ( 0137+331 ==  &&  ==  ) then
+if ( 0137+331 ==  ) then
+awk {if ($1 == target || $2 == target) print $0} target=0137+331 /home/obs/mmm/karto/cals/calsdata
+sort -nk7
+if ! ( `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3gSyf5/calinfo
+if ( 1400 ==  ) then
+set linemark = `awk '{print NR,(($7-freq)^2)^.5}' freq=$freq $wd/calinfo | sort -nk2 | head -n 1 | awk '{print $1}'`
+awk {print NR,(($7-freq)^2)^.5} freq=1400 cal3gSyf5/calinfo
+sort -nk2
+awk {print $1}
+head -n 1
+set preline = `echo $linemark | awk '{print $1-1}'`
+awk {print $1-1}
+echo 2
+set postline = `echo $linemark | awk '{print $1+1}'`
+awk {print $1+1}
+echo 2
+set altcaldata = ( `sed -n {$linemark}p $wd/calinfo | awk '{print $1,$2,$3,$4}'` )
+awk {print $1,$2,$3,$4}
+sed -n 2p cal3gSyf5/calinfo
+if ( 2 == 1 ) then
+if ( 2 == `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3gSyf5/calinfo
+set fluxinfo = ( `sed -n {$preline},{$postline}p $wd/calinfo | awk '{if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}; if (NR == 3) {fl3=$5; fr3 = $7; af3 = $8}} END {sidx1 = log(fl1/fl2)/log(fr1/fr2); sidx2 = log(fl2/fl3)/log(fr2/fr3); sfr1 = exp((log(fr1)+log(fr2))/2); sfr2 = exp((log(fr2)+log(fr3))/2); if (freq <= sfr1) {sidx = sidx1; reffreq = fr1; refflux = fl1; aflux = af1}; if (freq >= sfr2) {sidx = sidx2; reffreq = fr3; refflux = fl3; aflux = af2} ; if (freq > sfr1 && freq < sfr2) {sidx = ((sidx1*log(freq/sfr1))+(sidx2*log(sfr2/freq)))/(log(sfr2/sfr1)); reffreq = fr2; refflux = fl2; aflux = af3}; print refflux,reffreq/1000,sidx,aflux}' freq=$freq` )
+awk {if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}; if (NR == 3) {fl3=$5; fr3 = $7; af3 = $8}} END {sidx1 = log(fl1/fl2)/log(fr1/fr2); sidx2 = log(fl2/fl3)/log(fr2/fr3); sfr1 = exp((log(fr1)+log(fr2))/2); sfr2 = exp((log(fr2)+log(fr3))/2); if (freq <= sfr1) {sidx = sidx1; reffreq = fr1; refflux = fl1; aflux = af1}; if (freq >= sfr2) {sidx = sidx2; reffreq = fr3; refflux = fl3; aflux = af2} ; if (freq > sfr1 && freq < sfr2) {sidx = ((sidx1*log(freq/sfr1))+(sidx2*log(sfr2/freq)))/(log(sfr2/sfr1)); reffreq = fr2; refflux = fl2; aflux = af3}; print refflux,reffreq/1000,sidx,aflux} freq=1400
+sed -n 1,3p cal3gSyf5/calinfo
+endif
+if ( 1 ) then
+echo 16.5 1.425 -0.758909 0137+331 3C48 1.628138731 33.15975916 2
+else
+goto finish
+if ! ( 0 ) rm -rf cal3gSyf5
+rm -rf cal3gSyf5
+exit 0
+if ! ( -0.758909 == NA && `echo $calvals[2] | awk '{if ((($1-freq)^2)^.5 > 0.21*freq) print "1"}' freq=$freq` ) then
+awk {if ((($1-freq)^2)^.5 > 0.21*freq) print "1"} freq=1.4
+echo 1.425
+if ( 0 == 0 ) then
+if ( -0.758909 == NA && `echo $calvals[1] | awk '{if ($1 >= flux) print 1; else print 0}' flux=$flux[1]` ) then
+awk {if ($1 >= flux) print 1; else print 0} flux=10
+echo 16.5
+if ( -0.758909 != NA && `echo $calvals[1-3] | awk '{if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0}' freq=$freq flux=$flux[1]` ) then
+awk {if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0} freq=1.4 flux=10
+echo 16.5 1.425 -0.758909
+echo Source: 0137+331 (altname=3C48)
+Source: 0137+331 (altname=3C48)
+echo         flux=`echo $calvals[1-3] | awk '{print int(((freq/$2)^$3)*$1*1000)/1000", specindex="int($3*1000)/1000}' freq=$freq`
+awk {print int(((freq/$2)^$3)*$1*1000)/1000", specindex="int($3*1000)/1000} freq=1.4
+echo 16.5 1.425 -0.758909
+        flux=16.723, specindex=-0.758
+echo         RA=`echo $calvals[6] | awk '{printf "%2d:%2d:%2d.%1d\n",int($1),int($1*60)%60,int($1*3600)%60,int(100*(($1*3600)%1))}' | sed 's/ /0/g'`  Dec=`echo $calvals[7] | awk '{printf "%2d:%2d:%2d.%1d\n",int($1),int($1*60)%60,int($1*3600)%60,int(100*(($1*3600)%1))}' | sed 's/ /0/g'`
+echo 1.628138731
+sed s/ /0/g
+awk {printf "%2d:%2d:%2d.%1d\n",int($1),int($1*60)%60,int($1*3600)%60,int(100*(($1*3600)%1))}
+echo 33.15975916
+sed s/ /0/g
+awk {printf "%2d:%2d:%2d.%1d\n",int($1),int($1*60)%60,int($1*3600)%60,int(100*(($1*3600)%1))}
+        RA=01:37:41.29  Dec=33:09:35.13
+@ idx++
+endif
+else
+endif
+end
+set calvals = ( `calinfo target=$pcal freq=$freq options=auto` )
+calinfo target=0220-019 freq=1.4 options=auto
+onintr enderr
+set datapath = /home/obs/mmm/karto/cals
+set target
+set debug = 0
+set freq
+set flux = ( 0 0 )
+set mode = info
+set dwflux = 1
+set dwdist = 1
+set dwtime = 1
+set ra = 0
+set dec = 0
+set pi = 3.14159265
+set distlim = 3.14159265
+set auto = 0
+set calgrade = U
+set addflux
+set altname
+if ( 3 == 0 ) then
+varassign:
+if ( target=0220-019 =~ target=* ) then
+set target = `echo $argv[1] | sed 's/target=//' | tr '[a-z]' '[A-Z]'`
+echo target=0220-019
+tr [a-z] [A-Z]
+sed s/target=//
+shift argv
+if ( freq=1.4 options=auto ==  ) set argv = finish
+else if ( freq=1.4 =~ freq=* ) then
+if ( freq=1.4 != finish ) goto varassign
+goto varassign
+if ( freq=1.4 =~ target=* ) then
+if ( freq=1.4 =~ freq=* ) then
+set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print $1*1000}'`
+echo freq=1.4
+awk {print $1*1000}
+sed s/freq=//
+shift argv
+if ( options=auto ==  ) set argv = finish
+else if ( options=auto =~ radec=* ) then
+if ( options=auto != finish ) goto varassign
+goto varassign
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ freq=* ) then
+if ( options=auto =~ radec=* ) then
+if ( options=auto =~ distlim=* ) then
+if ( options=auto =~ flux=* ) then
+if ( options=auto =~ altname=* ) then
+if ( options=auto =~ addflux=* ) then
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ options=* ) then
+set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
+echo options=auto
+sed s/options=//g
+tr [A-Z] [a-z]
+tr ,  
+set badopt
+foreach option ( `echo $options` )
+echo auto
+if ( auto == debug ) then
+if ( auto == info ) then
+if ( auto == find ) then
+if ( auto == best ) then
+if ( auto == modify ) then
+if ( auto == dwflux ) then
+if ( auto == dwdist ) then
+if ( auto == dwtime ) then
+if ( auto == auto ) then
+set auto = 1
+else
+end
+if (  !=  ) echo options=`echo $badopt | tr ' ' ','` not recognized!
+shift argv
+if (  ==  ) set argv = finish
+set argv = finish
+else
+if ( finish != finish ) goto varassign
+set wd = ( `mktemp -d cal3XXXXX` )
+mktemp -d cal3XXXXX
+if ! ( -e cal3ZUil5 ) then
+if ( info == info ) goto infocal
+goto infocal
+if ( 0220-019 ==  &&  ==  ) then
+if ( 0220-019 ==  ) then
+awk {if ($1 == target || $2 == target) print $0} target=0220-019 /home/obs/mmm/karto/cals/calsdata
+sort -nk7
+if ! ( `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3ZUil5/calinfo
+if ( 1400 ==  ) then
+set linemark = `awk '{print NR,(($7-freq)^2)^.5}' freq=$freq $wd/calinfo | sort -nk2 | head -n 1 | awk '{print $1}'`
+awk {print NR,(($7-freq)^2)^.5} freq=1400 cal3ZUil5/calinfo
+awk {print $1}
+head -n 1
+sort -nk2
+set preline = `echo $linemark | awk '{print $1-1}'`
+awk {print $1-1}
+echo 2
+set postline = `echo $linemark | awk '{print $1+1}'`
+awk {print $1+1}
+echo 2
+set altcaldata = ( `sed -n {$linemark}p $wd/calinfo | awk '{print $1,$2,$3,$4}'` )
+awk {print $1,$2,$3,$4}
+sed -n 2p cal3ZUil5/calinfo
+if ( 2 == 1 ) then
+if ( 2 == `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3ZUil5/calinfo
+set fluxinfo = ( `sed -n {$preline},{$linemark}p $wd/calinfo | awk '{if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}} END {sfr = exp((log(fr1)+log(fr2))/2); if (freq <= sfr) {reffreq = fr1; refflux = fl1; aflux = af1}; if (freq > sfr) {reffreq = fr2; refflux = fl2; aflux = af2}; print refflux,reffreq/1000,log(fl1/fl2)/log(fr1/fr2),aflux}' freq=$freq` )
+sed -n 1,2p cal3ZUil5/calinfo
+awk {if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}} END {sfr = exp((log(fr1)+log(fr2))/2); if (freq <= sfr) {reffreq = fr1; refflux = fl1; aflux = af1}; if (freq > sfr) {reffreq = fr2; refflux = fl2; aflux = af2}; print refflux,reffreq/1000,log(fl1/fl2)/log(fr1/fr2),aflux} freq=1400
+else
+if ( 1 ) then
+echo 3.2 1.425 -1.05173 0220-019 3C63 2.348411111 -0.052277778 2
+else
+goto finish
+if ! ( 0 ) rm -rf cal3ZUil5
+rm -rf cal3ZUil5
+exit 0
+if ! ( -1.05173 == NA && `echo $calvals[2] | awk '{if ((($1-freq)^2)^.5 > 0.21*freq) print "1"}' freq=$freq` ) then
+awk {if ((($1-freq)^2)^.5 > 0.21*freq) print "1"} freq=1.4
+echo 1.425
+if ( 0 == 0 ) then
+if ( -1.05173 == NA && `echo $calvals[1] | awk '{if ($1 >= flux) print 1; else print 0}' flux=$flux[1]` ) then
+awk {if ($1 >= flux) print 1; else print 0} flux=10
+echo 3.2
+if ( -1.05173 != NA && `echo $calvals[1-3] | awk '{if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0}' freq=$freq flux=$flux[1]` ) then
+awk {if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0} freq=1.4 flux=10
+echo 3.2 1.425 -1.05173
+else
+endif
+end
+set calvals = ( `calinfo target=$pcal freq=$freq options=auto` )
+calinfo target=0223+400 freq=1.4 options=auto
+onintr enderr
+set datapath = /home/obs/mmm/karto/cals
+set target
+set debug = 0
+set freq
+set flux = ( 0 0 )
+set mode = info
+set dwflux = 1
+set dwdist = 1
+set dwtime = 1
+set ra = 0
+set dec = 0
+set pi = 3.14159265
+set distlim = 3.14159265
+set auto = 0
+set calgrade = U
+set addflux
+set altname
+if ( 3 == 0 ) then
+varassign:
+if ( target=0223+400 =~ target=* ) then
+set target = `echo $argv[1] | sed 's/target=//' | tr '[a-z]' '[A-Z]'`
+echo target=0223+400
+sed s/target=//
+tr [a-z] [A-Z]
+shift argv
+if ( freq=1.4 options=auto ==  ) set argv = finish
+else if ( freq=1.4 =~ freq=* ) then
+if ( freq=1.4 != finish ) goto varassign
+goto varassign
+if ( freq=1.4 =~ target=* ) then
+if ( freq=1.4 =~ freq=* ) then
+set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print $1*1000}'`
+echo freq=1.4
+sed s/freq=//
+awk {print $1*1000}
+shift argv
+if ( options=auto ==  ) set argv = finish
+else if ( options=auto =~ radec=* ) then
+if ( options=auto != finish ) goto varassign
+goto varassign
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ freq=* ) then
+if ( options=auto =~ radec=* ) then
+if ( options=auto =~ distlim=* ) then
+if ( options=auto =~ flux=* ) then
+if ( options=auto =~ altname=* ) then
+if ( options=auto =~ addflux=* ) then
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ options=* ) then
+set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
+echo options=auto
+sed s/options=//g
+tr [A-Z] [a-z]
+tr ,  
+set badopt
+foreach option ( `echo $options` )
+echo auto
+if ( auto == debug ) then
+if ( auto == info ) then
+if ( auto == find ) then
+if ( auto == best ) then
+if ( auto == modify ) then
+if ( auto == dwflux ) then
+if ( auto == dwdist ) then
+if ( auto == dwtime ) then
+if ( auto == auto ) then
+set auto = 1
+else
+end
+if (  !=  ) echo options=`echo $badopt | tr ' ' ','` not recognized!
+shift argv
+if (  ==  ) set argv = finish
+set argv = finish
+else
+if ( finish != finish ) goto varassign
+set wd = ( `mktemp -d cal3XXXXX` )
+mktemp -d cal3XXXXX
+if ! ( -e cal3xXiq5 ) then
+if ( info == info ) goto infocal
+goto infocal
+if ( 0223+400 ==  &&  ==  ) then
+if ( 0223+400 ==  ) then
+awk {if ($1 == target || $2 == target) print $0} target=0223+400 /home/obs/mmm/karto/cals/calsdata
+sort -nk7
+if ! ( `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3xXiq5/calinfo
+if ( 1400 ==  ) then
+set linemark = `awk '{print NR,(($7-freq)^2)^.5}' freq=$freq $wd/calinfo | sort -nk2 | head -n 1 | awk '{print $1}'`
+awk {print NR,(($7-freq)^2)^.5} freq=1400 cal3xXiq5/calinfo
+awk {print $1}
+sort -nk2
+head -n 1
+set preline = `echo $linemark | awk '{print $1-1}'`
+awk {print $1-1}
+echo 2
+set postline = `echo $linemark | awk '{print $1+1}'`
+awk {print $1+1}
+echo 2
+set altcaldata = ( `sed -n {$linemark}p $wd/calinfo | awk '{print $1,$2,$3,$4}'` )
+awk {print $1,$2,$3,$4}
+sed -n 2p cal3xXiq5/calinfo
+if ( 2 == 1 ) then
+if ( 2 == `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3xXiq5/calinfo
+set fluxinfo = ( `sed -n {$preline},{$linemark}p $wd/calinfo | awk '{if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}} END {sfr = exp((log(fr1)+log(fr2))/2); if (freq <= sfr) {reffreq = fr1; refflux = fl1; aflux = af1}; if (freq > sfr) {reffreq = fr2; refflux = fl2; aflux = af2}; print refflux,reffreq/1000,log(fl1/fl2)/log(fr1/fr2),aflux}' freq=$freq` )
+sed -n 1,2p cal3xXiq5/calinfo
+awk {if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}} END {sfr = exp((log(fr1)+log(fr2))/2); if (freq <= sfr) {reffreq = fr1; refflux = fl1; aflux = af1}; if (freq > sfr) {reffreq = fr2; refflux = fl2; aflux = af2}; print refflux,reffreq/1000,log(fl1/fl2)/log(fr1/fr2),aflux} freq=1400
+else
+if ( 1 ) then
+echo 3 1.425 -0.943755 0223+400 3C65 2.395302778 40.01472222 2
+else
+goto finish
+if ! ( 0 ) rm -rf cal3xXiq5
+rm -rf cal3xXiq5
+exit 0
+if ! ( -0.943755 == NA && `echo $calvals[2] | awk '{if ((($1-freq)^2)^.5 > 0.21*freq) print "1"}' freq=$freq` ) then
+awk {if ((($1-freq)^2)^.5 > 0.21*freq) print "1"} freq=1.4
+echo 1.425
+if ( 0 == 0 ) then
+if ( -0.943755 == NA && `echo $calvals[1] | awk '{if ($1 >= flux) print 1; else print 0}' flux=$flux[1]` ) then
+echo 3
+awk {if ($1 >= flux) print 1; else print 0} flux=10
+if ( -0.943755 != NA && `echo $calvals[1-3] | awk '{if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0}' freq=$freq flux=$flux[1]` ) then
+awk {if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0} freq=1.4 flux=10
+echo 3 1.425 -0.943755
+else
+endif
+end
+set calvals = ( `calinfo target=$pcal freq=$freq options=auto` )
+calinfo target=0224+278 freq=1.4 options=auto
+onintr enderr
+set datapath = /home/obs/mmm/karto/cals
+set target
+set debug = 0
+set freq
+set flux = ( 0 0 )
+set mode = info
+set dwflux = 1
+set dwdist = 1
+set dwtime = 1
+set ra = 0
+set dec = 0
+set pi = 3.14159265
+set distlim = 3.14159265
+set auto = 0
+set calgrade = U
+set addflux
+set altname
+if ( 3 == 0 ) then
+varassign:
+if ( target=0224+278 =~ target=* ) then
+set target = `echo $argv[1] | sed 's/target=//' | tr '[a-z]' '[A-Z]'`
+sed s/target=//
+tr [a-z] [A-Z]
+echo target=0224+278
+shift argv
+if ( freq=1.4 options=auto ==  ) set argv = finish
+else if ( freq=1.4 =~ freq=* ) then
+if ( freq=1.4 != finish ) goto varassign
+goto varassign
+if ( freq=1.4 =~ target=* ) then
+if ( freq=1.4 =~ freq=* ) then
+set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print $1*1000}'`
+echo freq=1.4
+sed s/freq=//
+awk {print $1*1000}
+shift argv
+if ( options=auto ==  ) set argv = finish
+else if ( options=auto =~ radec=* ) then
+if ( options=auto != finish ) goto varassign
+goto varassign
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ freq=* ) then
+if ( options=auto =~ radec=* ) then
+if ( options=auto =~ distlim=* ) then
+if ( options=auto =~ flux=* ) then
+if ( options=auto =~ altname=* ) then
+if ( options=auto =~ addflux=* ) then
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ options=* ) then
+set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
+sed s/options=//g
+tr [A-Z] [a-z]
+echo options=auto
+tr ,  
+set badopt
+foreach option ( `echo $options` )
+echo auto
+if ( auto == debug ) then
+if ( auto == info ) then
+if ( auto == find ) then
+if ( auto == best ) then
+if ( auto == modify ) then
+if ( auto == dwflux ) then
+if ( auto == dwdist ) then
+if ( auto == dwtime ) then
+if ( auto == auto ) then
+set auto = 1
+else
+end
+if (  !=  ) echo options=`echo $badopt | tr ' ' ','` not recognized!
+shift argv
+if (  ==  ) set argv = finish
+set argv = finish
+else
+if ( finish != finish ) goto varassign
+set wd = ( `mktemp -d cal3XXXXX` )
+mktemp -d cal3XXXXX
+if ! ( -e cal3T14u5 ) then
+if ( info == info ) goto infocal
+goto infocal
+if ( 0224+278 ==  &&  ==  ) then
+if ( 0224+278 ==  ) then
+awk {if ($1 == target || $2 == target) print $0} target=0224+278 /home/obs/mmm/karto/cals/calsdata
+sort -nk7
+if ! ( `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3T14u5/calinfo
+if ( 1400 ==  ) then
+set linemark = `awk '{print NR,(($7-freq)^2)^.5}' freq=$freq $wd/calinfo | sort -nk2 | head -n 1 | awk '{print $1}'`
+awk {print NR,(($7-freq)^2)^.5} freq=1400 cal3T14u5/calinfo
+sort -nk2
+awk {print $1}
+head -n 1
+set preline = `echo $linemark | awk '{print $1-1}'`
+awk {print $1-1}
+echo 2
+set postline = `echo $linemark | awk '{print $1+1}'`
+awk {print $1+1}
+echo 2
+set altcaldata = ( `sed -n {$linemark}p $wd/calinfo | awk '{print $1,$2,$3,$4}'` )
+awk {print $1,$2,$3,$4}
+sed -n 2p cal3T14u5/calinfo
+if ( 2 == 1 ) then
+if ( 2 == `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3T14u5/calinfo
+set fluxinfo = ( `sed -n {$preline},{$linemark}p $wd/calinfo | awk '{if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}} END {sfr = exp((log(fr1)+log(fr2))/2); if (freq <= sfr) {reffreq = fr1; refflux = fl1; aflux = af1}; if (freq > sfr) {reffreq = fr2; refflux = fl2; aflux = af2}; print refflux,reffreq/1000,log(fl1/fl2)/log(fr1/fr2),aflux}' freq=$freq` )
+awk {if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}} END {sfr = exp((log(fr1)+log(fr2))/2); if (freq <= sfr) {reffreq = fr1; refflux = fl1; aflux = af1}; if (freq > sfr) {reffreq = fr2; refflux = fl2; aflux = af2}; print refflux,reffreq/1000,log(fl1/fl2)/log(fr1/fr2),aflux} freq=1400
+sed -n 1,2p cal3T14u5/calinfo
+else
+if ( 1 ) then
+echo 2.95 1.425 -0.831077 0224+278 NA 2.403415917 27.83667111 2
+else
+goto finish
+if ! ( 0 ) rm -rf cal3T14u5
+rm -rf cal3T14u5
+exit 0
+if ! ( -0.831077 == NA && `echo $calvals[2] | awk '{if ((($1-freq)^2)^.5 > 0.21*freq) print "1"}' freq=$freq` ) then
+awk {if ((($1-freq)^2)^.5 > 0.21*freq) print "1"} freq=1.4
+echo 1.425
+if ( 0 == 0 ) then
+if ( -0.831077 == NA && `echo $calvals[1] | awk '{if ($1 >= flux) print 1; else print 0}' flux=$flux[1]` ) then
+awk {if ($1 >= flux) print 1; else print 0} flux=10
+echo 2.95
+if ( -0.831077 != NA && `echo $calvals[1-3] | awk '{if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0}' freq=$freq flux=$flux[1]` ) then
+awk {if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0} freq=1.4 flux=10
+echo 2.95 1.425 -0.831077
+else
+endif
+end
+set calvals = ( `calinfo target=$pcal freq=$freq options=auto` )
+calinfo target=0242-000 freq=1.4 options=auto
+onintr enderr
+set datapath = /home/obs/mmm/karto/cals
+set target
+set debug = 0
+set freq
+set flux = ( 0 0 )
+set mode = info
+set dwflux = 1
+set dwdist = 1
+set dwtime = 1
+set ra = 0
+set dec = 0
+set pi = 3.14159265
+set distlim = 3.14159265
+set auto = 0
+set calgrade = U
+set addflux
+set altname
+if ( 3 == 0 ) then
+varassign:
+if ( target=0242-000 =~ target=* ) then
+set target = `echo $argv[1] | sed 's/target=//' | tr '[a-z]' '[A-Z]'`
+echo target=0242-000
+tr [a-z] [A-Z]
+sed s/target=//
+shift argv
+if ( freq=1.4 options=auto ==  ) set argv = finish
+else if ( freq=1.4 =~ freq=* ) then
+if ( freq=1.4 != finish ) goto varassign
+goto varassign
+if ( freq=1.4 =~ target=* ) then
+if ( freq=1.4 =~ freq=* ) then
+set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print $1*1000}'`
+echo freq=1.4
+awk {print $1*1000}
+sed s/freq=//
+shift argv
+if ( options=auto ==  ) set argv = finish
+else if ( options=auto =~ radec=* ) then
+if ( options=auto != finish ) goto varassign
+goto varassign
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ freq=* ) then
+if ( options=auto =~ radec=* ) then
+if ( options=auto =~ distlim=* ) then
+if ( options=auto =~ flux=* ) then
+if ( options=auto =~ altname=* ) then
+if ( options=auto =~ addflux=* ) then
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ options=* ) then
+set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
+echo options=auto
+sed s/options=//g
+tr [A-Z] [a-z]
+tr ,  
+set badopt
+foreach option ( `echo $options` )
+echo auto
+if ( auto == debug ) then
+if ( auto == info ) then
+if ( auto == find ) then
+if ( auto == best ) then
+if ( auto == modify ) then
+if ( auto == dwflux ) then
+if ( auto == dwdist ) then
+if ( auto == dwtime ) then
+if ( auto == auto ) then
+set auto = 1
+else
+end
+if (  !=  ) echo options=`echo $badopt | tr ' ' ','` not recognized!
+shift argv
+if (  ==  ) set argv = finish
+set argv = finish
+else
+if ( finish != finish ) goto varassign
+set wd = ( `mktemp -d cal3XXXXX` )
+mktemp -d cal3XXXXX
+if ! ( -e cal3c5Oz5 ) then
+if ( info == info ) goto infocal
+goto infocal
+if ( 0242-000 ==  &&  ==  ) then
+if ( 0242-000 ==  ) then
+awk {if ($1 == target || $2 == target) print $0} target=0242-000 /home/obs/mmm/karto/cals/calsdata
+sort -nk7
+if ! ( `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3c5Oz5/calinfo
+if ( 1400 ==  ) then
+set linemark = `awk '{print NR,(($7-freq)^2)^.5}' freq=$freq $wd/calinfo | sort -nk2 | head -n 1 | awk '{print $1}'`
+awk {print NR,(($7-freq)^2)^.5} freq=1400 cal3c5Oz5/calinfo
+sort -nk2
+awk {print $1}
+head -n 1
+set preline = `echo $linemark | awk '{print $1-1}'`
+awk {print $1-1}
+echo 1
+set postline = `echo $linemark | awk '{print $1+1}'`
+awk {print $1+1}
+echo 1
+set altcaldata = ( `sed -n {$linemark}p $wd/calinfo | awk '{print $1,$2,$3,$4}'` )
+awk {print $1,$2,$3,$4}
+sed -n 1p cal3c5Oz5/calinfo
+if ( 1 == 1 ) then
+if ( `wc -l $wd/calinfo | awk '{print $1}'` == 1 ) then
+awk {print $1}
+wc -l cal3c5Oz5/calinfo
+set fluxinfo = ( `head -n 1 $wd/calinfo | awk '{print $5,$7/1000,"NA",$8}'` )
+awk {print $5,$7/1000,"NA",$8}
+head -n 1 cal3c5Oz5/calinfo
+else
+else if ( 1 == `wc -l $wd/calinfo | awk '{print $1}'` ) then
+if ( 1 ) then
+echo 15 0.328 NA 0242-000 NA 2.711315083 0.013121389 2
+else
+goto finish
+if ! ( 0 ) rm -rf cal3c5Oz5
+rm -rf cal3c5Oz5
+exit 0
+if ! ( NA == NA && `echo $calvals[2] | awk '{if ((($1-freq)^2)^.5 > 0.21*freq) print "1"}' freq=$freq` ) then
+awk {if ((($1-freq)^2)^.5 > 0.21*freq) print "1"} freq=1.4
+echo 0.328
+end
+set calvals = ( `calinfo target=$pcal freq=$freq options=auto` )
+calinfo target=0319+415 freq=1.4 options=auto
+onintr enderr
+set datapath = /home/obs/mmm/karto/cals
+set target
+set debug = 0
+set freq
+set flux = ( 0 0 )
+set mode = info
+set dwflux = 1
+set dwdist = 1
+set dwtime = 1
+set ra = 0
+set dec = 0
+set pi = 3.14159265
+set distlim = 3.14159265
+set auto = 0
+set calgrade = U
+set addflux
+set altname
+if ( 3 == 0 ) then
+varassign:
+if ( target=0319+415 =~ target=* ) then
+set target = `echo $argv[1] | sed 's/target=//' | tr '[a-z]' '[A-Z]'`
+echo target=0319+415
+tr [a-z] [A-Z]
+sed s/target=//
+shift argv
+if ( freq=1.4 options=auto ==  ) set argv = finish
+else if ( freq=1.4 =~ freq=* ) then
+if ( freq=1.4 != finish ) goto varassign
+goto varassign
+if ( freq=1.4 =~ target=* ) then
+if ( freq=1.4 =~ freq=* ) then
+set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print $1*1000}'`
+echo freq=1.4
+awk {print $1*1000}
+sed s/freq=//
+shift argv
+if ( options=auto ==  ) set argv = finish
+else if ( options=auto =~ radec=* ) then
+if ( options=auto != finish ) goto varassign
+goto varassign
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ freq=* ) then
+if ( options=auto =~ radec=* ) then
+if ( options=auto =~ distlim=* ) then
+if ( options=auto =~ flux=* ) then
+if ( options=auto =~ altname=* ) then
+if ( options=auto =~ addflux=* ) then
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ options=* ) then
+set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
+echo options=auto
+sed s/options=//g
+tr [A-Z] [a-z]
+tr ,  
+set badopt
+foreach option ( `echo $options` )
+echo auto
+if ( auto == debug ) then
+if ( auto == info ) then
+if ( auto == find ) then
+if ( auto == best ) then
+if ( auto == modify ) then
+if ( auto == dwflux ) then
+if ( auto == dwdist ) then
+if ( auto == dwtime ) then
+if ( auto == auto ) then
+set auto = 1
+else
+end
+if (  !=  ) echo options=`echo $badopt | tr ' ' ','` not recognized!
+shift argv
+if (  ==  ) set argv = finish
+set argv = finish
+else
+if ( finish != finish ) goto varassign
+set wd = ( `mktemp -d cal3XXXXX` )
+mktemp -d cal3XXXXX
+if ! ( -e cal3c74D5 ) then
+if ( info == info ) goto infocal
+goto infocal
+if ( 0319+415 ==  &&  ==  ) then
+if ( 0319+415 ==  ) then
+awk {if ($1 == target || $2 == target) print $0} target=0319+415 /home/obs/mmm/karto/cals/calsdata
+sort -nk7
+if ! ( `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3c74D5/calinfo
+if ( 1400 ==  ) then
+set linemark = `awk '{print NR,(($7-freq)^2)^.5}' freq=$freq $wd/calinfo | sort -nk2 | head -n 1 | awk '{print $1}'`
+awk {print NR,(($7-freq)^2)^.5} freq=1400 cal3c74D5/calinfo
+sort -nk2
+awk {print $1}
+head -n 1
+set preline = `echo $linemark | awk '{print $1-1}'`
+awk {print $1-1}
+echo 2
+set postline = `echo $linemark | awk '{print $1+1}'`
+awk {print $1+1}
+echo 2
+set altcaldata = ( `sed -n {$linemark}p $wd/calinfo | awk '{print $1,$2,$3,$4}'` )
+awk {print $1,$2,$3,$4}
+sed -n 2p cal3c74D5/calinfo
+if ( 2 == 1 ) then
+if ( 2 == `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3c74D5/calinfo
+set fluxinfo = ( `sed -n {$preline},{$postline}p $wd/calinfo | awk '{if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}; if (NR == 3) {fl3=$5; fr3 = $7; af3 = $8}} END {sidx1 = log(fl1/fl2)/log(fr1/fr2); sidx2 = log(fl2/fl3)/log(fr2/fr3); sfr1 = exp((log(fr1)+log(fr2))/2); sfr2 = exp((log(fr2)+log(fr3))/2); if (freq <= sfr1) {sidx = sidx1; reffreq = fr1; refflux = fl1; aflux = af1}; if (freq >= sfr2) {sidx = sidx2; reffreq = fr3; refflux = fl3; aflux = af2} ; if (freq > sfr1 && freq < sfr2) {sidx = ((sidx1*log(freq/sfr1))+(sidx2*log(sfr2/freq)))/(log(sfr2/sfr1)); reffreq = fr2; refflux = fl2; aflux = af3}; print refflux,reffreq/1000,sidx,aflux}' freq=$freq` )
+awk {if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}; if (NR == 3) {fl3=$5; fr3 = $7; af3 = $8}} END {sidx1 = log(fl1/fl2)/log(fr1/fr2); sidx2 = log(fl2/fl3)/log(fr2/fr3); sfr1 = exp((log(fr1)+log(fr2))/2); sfr2 = exp((log(fr2)+log(fr3))/2); if (freq <= sfr1) {sidx = sidx1; reffreq = fr1; refflux = fl1; aflux = af1}; if (freq >= sfr2) {sidx = sidx2; reffreq = fr3; refflux = fl3; aflux = af2} ; if (freq > sfr1 && freq < sfr2) {sidx = ((sidx1*log(freq/sfr1))+(sidx2*log(sfr2/freq)))/(log(sfr2/sfr1)); reffreq = fr2; refflux = fl2; aflux = af3}; print refflux,reffreq/1000,sidx,aflux} freq=1400
+sed -n 1,3p cal3c74D5/calinfo
+endif
+if ( 1 ) then
+echo 23.9 1.425 0.386494 0319+415 3C84 3.330044473 41.51169529 2
+else
+goto finish
+if ! ( 0 ) rm -rf cal3c74D5
+rm -rf cal3c74D5
+exit 0
+if ! ( 0.386494 == NA && `echo $calvals[2] | awk '{if ((($1-freq)^2)^.5 > 0.21*freq) print "1"}' freq=$freq` ) then
+awk {if ((($1-freq)^2)^.5 > 0.21*freq) print "1"} freq=1.4
+echo 1.425
+if ( 0 == 0 ) then
+if ( 0.386494 == NA && `echo $calvals[1] | awk '{if ($1 >= flux) print 1; else print 0}' flux=$flux[1]` ) then
+awk {if ($1 >= flux) print 1; else print 0} flux=10
+echo 23.9
+if ( 0.386494 != NA && `echo $calvals[1-3] | awk '{if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0}' freq=$freq flux=$flux[1]` ) then
+awk {if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0} freq=1.4 flux=10
+echo 23.9 1.425 0.386494
+echo Source: 0319+415 (altname=3C84)
+Source: 0319+415 (altname=3C84)
+echo         flux=`echo $calvals[1-3] | awk '{print int(((freq/$2)^$3)*$1*1000)/1000", specindex="int($3*1000)/1000}' freq=$freq`
+awk {print int(((freq/$2)^$3)*$1*1000)/1000", specindex="int($3*1000)/1000} freq=1.4
+echo 23.9 1.425 0.386494
+        flux=23.737, specindex=0.386
+echo         RA=`echo $calvals[6] | awk '{printf "%2d:%2d:%2d.%1d\n",int($1),int($1*60)%60,int($1*3600)%60,int(100*(($1*3600)%1))}' | sed 's/ /0/g'`  Dec=`echo $calvals[7] | awk '{printf "%2d:%2d:%2d.%1d\n",int($1),int($1*60)%60,int($1*3600)%60,int(100*(($1*3600)%1))}' | sed 's/ /0/g'`
+echo 3.330044473
+sed s/ /0/g
+awk {printf "%2d:%2d:%2d.%1d\n",int($1),int($1*60)%60,int($1*3600)%60,int(100*(($1*3600)%1))}
+echo 41.51169529
+sed s/ /0/g
+awk {printf "%2d:%2d:%2d.%1d\n",int($1),int($1*60)%60,int($1*3600)%60,int(100*(($1*3600)%1))}
+        RA=03:19:48.16  Dec=41:30:42.10
+@ idx++
+endif
+else
+endif
+end
+set calvals = ( `calinfo target=$pcal freq=$freq options=auto` )
+calinfo target=0336+057 freq=1.4 options=auto
+onintr enderr
+set datapath = /home/obs/mmm/karto/cals
+set target
+set debug = 0
+set freq
+set flux = ( 0 0 )
+set mode = info
+set dwflux = 1
+set dwdist = 1
+set dwtime = 1
+set ra = 0
+set dec = 0
+set pi = 3.14159265
+set distlim = 3.14159265
+set auto = 0
+set calgrade = U
+set addflux
+set altname
+if ( 3 == 0 ) then
+varassign:
+if ( target=0336+057 =~ target=* ) then
+set target = `echo $argv[1] | sed 's/target=//' | tr '[a-z]' '[A-Z]'`
+echo target=0336+057
+tr [a-z] [A-Z]
+sed s/target=//
+shift argv
+if ( freq=1.4 options=auto ==  ) set argv = finish
+else if ( freq=1.4 =~ freq=* ) then
+if ( freq=1.4 != finish ) goto varassign
+goto varassign
+if ( freq=1.4 =~ target=* ) then
+if ( freq=1.4 =~ freq=* ) then
+set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print $1*1000}'`
+echo freq=1.4
+awk {print $1*1000}
+sed s/freq=//
+shift argv
+if ( options=auto ==  ) set argv = finish
+else if ( options=auto =~ radec=* ) then
+if ( options=auto != finish ) goto varassign
+goto varassign
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ freq=* ) then
+if ( options=auto =~ radec=* ) then
+if ( options=auto =~ distlim=* ) then
+if ( options=auto =~ flux=* ) then
+if ( options=auto =~ altname=* ) then
+if ( options=auto =~ addflux=* ) then
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ options=* ) then
+set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
+echo options=auto
+sed s/options=//g
+tr ,  
+tr [A-Z] [a-z]
+set badopt
+foreach option ( `echo $options` )
+echo auto
+if ( auto == debug ) then
+if ( auto == info ) then
+if ( auto == find ) then
+if ( auto == best ) then
+if ( auto == modify ) then
+if ( auto == dwflux ) then
+if ( auto == dwdist ) then
+if ( auto == dwtime ) then
+if ( auto == auto ) then
+set auto = 1
+else
+end
+if (  !=  ) echo options=`echo $badopt | tr ' ' ','` not recognized!
+shift argv
+if (  ==  ) set argv = finish
+set argv = finish
+else
+if ( finish != finish ) goto varassign
+set wd = ( `mktemp -d cal3XXXXX` )
+mktemp -d cal3XXXXX
+if ! ( -e cal3894L5 ) then
+if ( info == info ) goto infocal
+goto infocal
+if ( 0336+057 ==  &&  ==  ) then
+if ( 0336+057 ==  ) then
+awk {if ($1 == target || $2 == target) print $0} target=0336+057 /home/obs/mmm/karto/cals/calsdata
+sort -nk7
+if ! ( `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3894L5/calinfo
+if ( 1400 ==  ) then
+set linemark = `awk '{print NR,(($7-freq)^2)^.5}' freq=$freq $wd/calinfo | sort -nk2 | head -n 1 | awk '{print $1}'`
+awk {print NR,(($7-freq)^2)^.5} freq=1400 cal3894L5/calinfo
+sort -nk2
+awk {print $1}
+head -n 1
+set preline = `echo $linemark | awk '{print $1-1}'`
+awk {print $1-1}
+echo 1
+set postline = `echo $linemark | awk '{print $1+1}'`
+awk {print $1+1}
+echo 1
+set altcaldata = ( `sed -n {$linemark}p $wd/calinfo | awk '{print $1,$2,$3,$4}'` )
+awk {print $1,$2,$3,$4}
+sed -n 1p cal3894L5/calinfo
+if ( 1 == 1 ) then
+if ( `wc -l $wd/calinfo | awk '{print $1}'` == 1 ) then
+awk {print $1}
+wc -l cal3894L5/calinfo
+set fluxinfo = ( `head -n 1 $wd/calinfo | awk '{print $5,$7/1000,"NA",$8}'` )
+awk {print $5,$7/1000,"NA",$8}
+head -n 1 cal3894L5/calinfo
+else
+else if ( 1 == `wc -l $wd/calinfo | awk '{print $1}'` ) then
+if ( 1 ) then
+echo 10 0.328 NA 0336+057 NA 3.611963639 5.766164722 2
+else
+goto finish
+if ! ( 0 ) rm -rf cal3894L5
+rm -rf cal3894L5
+exit 0
+if ! ( NA == NA && `echo $calvals[2] | awk '{if ((($1-freq)^2)^.5 > 0.21*freq) print "1"}' freq=$freq` ) then
+awk {if ((($1-freq)^2)^.5 > 0.21*freq) print "1"} freq=1.4
+echo 0.328
+end
+set calvals = ( `calinfo target=$pcal freq=$freq options=auto` )
+calinfo target=0337+507 freq=1.4 options=auto
+onintr enderr
+set datapath = /home/obs/mmm/karto/cals
+set target
+set debug = 0
+set freq
+set flux = ( 0 0 )
+set mode = info
+set dwflux = 1
+set dwdist = 1
+set dwtime = 1
+set ra = 0
+set dec = 0
+set pi = 3.14159265
+set distlim = 3.14159265
+set auto = 0
+set calgrade = U
+set addflux
+set altname
+if ( 3 == 0 ) then
+varassign:
+if ( target=0337+507 =~ target=* ) then
+set target = `echo $argv[1] | sed 's/target=//' | tr '[a-z]' '[A-Z]'`
+echo target=0337+507
+tr [a-z] [A-Z]
+sed s/target=//
+shift argv
+if ( freq=1.4 options=auto ==  ) set argv = finish
+else if ( freq=1.4 =~ freq=* ) then
+if ( freq=1.4 != finish ) goto varassign
+goto varassign
+if ( freq=1.4 =~ target=* ) then
+if ( freq=1.4 =~ freq=* ) then
+set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print $1*1000}'`
+echo freq=1.4
+awk {print $1*1000}
+sed s/freq=//
+shift argv
+if ( options=auto ==  ) set argv = finish
+else if ( options=auto =~ radec=* ) then
+if ( options=auto != finish ) goto varassign
+goto varassign
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ freq=* ) then
+if ( options=auto =~ radec=* ) then
+if ( options=auto =~ distlim=* ) then
+if ( options=auto =~ flux=* ) then
+if ( options=auto =~ altname=* ) then
+if ( options=auto =~ addflux=* ) then
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ options=* ) then
+set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
+echo options=auto
+sed s/options=//g
+tr [A-Z] [a-z]
+tr ,  
+set badopt
+foreach option ( `echo $options` )
+echo auto
+if ( auto == debug ) then
+if ( auto == info ) then
+if ( auto == find ) then
+if ( auto == best ) then
+if ( auto == modify ) then
+if ( auto == dwflux ) then
+if ( auto == dwdist ) then
+if ( auto == dwtime ) then
+if ( auto == auto ) then
+set auto = 1
+else
+end
+if (  !=  ) echo options=`echo $badopt | tr ' ' ','` not recognized!
+shift argv
+if (  ==  ) set argv = finish
+set argv = finish
+else
+if ( finish != finish ) goto varassign
+set wd = ( `mktemp -d cal3XXXXX` )
+mktemp -d cal3XXXXX
+if ! ( -e cal3iaOQ5 ) then
+if ( info == info ) goto infocal
+goto infocal
+if ( 0337+507 ==  &&  ==  ) then
+if ( 0337+507 ==  ) then
+awk {if ($1 == target || $2 == target) print $0} target=0337+507 /home/obs/mmm/karto/cals/calsdata
+sort -nk7
+if ! ( `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3iaOQ5/calinfo
+if ( 1400 ==  ) then
+set linemark = `awk '{print NR,(($7-freq)^2)^.5}' freq=$freq $wd/calinfo | sort -nk2 | head -n 1 | awk '{print $1}'`
+awk {print NR,(($7-freq)^2)^.5} freq=1400 cal3iaOQ5/calinfo
+sort -nk2
+awk {print $1}
+head -n 1
+set preline = `echo $linemark | awk '{print $1-1}'`
+awk {print $1-1}
+echo 2
+set postline = `echo $linemark | awk '{print $1+1}'`
+awk {print $1+1}
+echo 2
+set altcaldata = ( `sed -n {$linemark}p $wd/calinfo | awk '{print $1,$2,$3,$4}'` )
+awk {print $1,$2,$3,$4}
+sed -n 2p cal3iaOQ5/calinfo
+if ( 2 == 1 ) then
+if ( 2 == `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3iaOQ5/calinfo
+set fluxinfo = ( `sed -n {$preline},{$linemark}p $wd/calinfo | awk '{if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}} END {sfr = exp((log(fr1)+log(fr2))/2); if (freq <= sfr) {reffreq = fr1; refflux = fl1; aflux = af1}; if (freq > sfr) {reffreq = fr2; refflux = fl2; aflux = af2}; print refflux,reffreq/1000,log(fl1/fl2)/log(fr1/fr2),aflux}' freq=$freq` )
+awk {if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}} END {sfr = exp((log(fr1)+log(fr2))/2); if (freq <= sfr) {reffreq = fr1; refflux = fl1; aflux = af1}; if (freq > sfr) {reffreq = fr2; refflux = fl2; aflux = af2}; print refflux,reffreq/1000,log(fl1/fl2)/log(fr1/fr2),aflux} freq=1400
+sed -n 1,2p cal3iaOQ5/calinfo
+else
+if ( 1 ) then
+echo 3.2 1.425 -0.775699 0337+507 NA 3.628725 50.76458333 2
+else
+goto finish
+if ! ( 0 ) rm -rf cal3iaOQ5
+rm -rf cal3iaOQ5
+exit 0
+if ! ( -0.775699 == NA && `echo $calvals[2] | awk '{if ((($1-freq)^2)^.5 > 0.21*freq) print "1"}' freq=$freq` ) then
+awk {if ((($1-freq)^2)^.5 > 0.21*freq) print "1"} freq=1.4
+echo 1.425
+if ( 0 == 0 ) then
+if ( -0.775699 == NA && `echo $calvals[1] | awk '{if ($1 >= flux) print 1; else print 0}' flux=$flux[1]` ) then
+awk {if ($1 >= flux) print 1; else print 0} flux=10
+echo 3.2
+if ( -0.775699 != NA && `echo $calvals[1-3] | awk '{if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0}' freq=$freq flux=$flux[1]` ) then
+awk {if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0} freq=1.4 flux=10
+echo 3.2 1.425 -0.775699
+else
+endif
+end
+set calvals = ( `calinfo target=$pcal freq=$freq options=auto` )
+calinfo target=0437+296 freq=1.4 options=auto
+onintr enderr
+set datapath = /home/obs/mmm/karto/cals
+set target
+set debug = 0
+set freq
+set flux = ( 0 0 )
+set mode = info
+set dwflux = 1
+set dwdist = 1
+set dwtime = 1
+set ra = 0
+set dec = 0
+set pi = 3.14159265
+set distlim = 3.14159265
+set auto = 0
+set calgrade = U
+set addflux
+set altname
+if ( 3 == 0 ) then
+varassign:
+if ( target=0437+296 =~ target=* ) then
+set target = `echo $argv[1] | sed 's/target=//' | tr '[a-z]' '[A-Z]'`
+echo target=0437+296
+tr [a-z] [A-Z]
+sed s/target=//
+shift argv
+if ( freq=1.4 options=auto ==  ) set argv = finish
+else if ( freq=1.4 =~ freq=* ) then
+if ( freq=1.4 != finish ) goto varassign
+goto varassign
+if ( freq=1.4 =~ target=* ) then
+if ( freq=1.4 =~ freq=* ) then
+set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print $1*1000}'`
+echo freq=1.4
+awk {print $1*1000}
+sed s/freq=//
+shift argv
+if ( options=auto ==  ) set argv = finish
+else if ( options=auto =~ radec=* ) then
+if ( options=auto != finish ) goto varassign
+goto varassign
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ freq=* ) then
+if ( options=auto =~ radec=* ) then
+if ( options=auto =~ distlim=* ) then
+if ( options=auto =~ flux=* ) then
+if ( options=auto =~ altname=* ) then
+if ( options=auto =~ addflux=* ) then
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ options=* ) then
+set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
+echo options=auto
+tr [A-Z] [a-z]
+tr ,  
+sed s/options=//g
+set badopt
+foreach option ( `echo $options` )
+echo auto
+if ( auto == debug ) then
+if ( auto == info ) then
+if ( auto == find ) then
+if ( auto == best ) then
+if ( auto == modify ) then
+if ( auto == dwflux ) then
+if ( auto == dwdist ) then
+if ( auto == dwtime ) then
+if ( auto == auto ) then
+set auto = 1
+else
+end
+if (  !=  ) echo options=`echo $badopt | tr ' ' ','` not recognized!
+shift argv
+if (  ==  ) set argv = finish
+set argv = finish
+else
+if ( finish != finish ) goto varassign
+set wd = ( `mktemp -d cal3XXXXX` )
+mktemp -d cal3XXXXX
+if ! ( -e cal3HciW5 ) then
+if ( info == info ) goto infocal
+goto infocal
+if ( 0437+296 ==  &&  ==  ) then
+if ( 0437+296 ==  ) then
+awk {if ($1 == target || $2 == target) print $0} target=0437+296 /home/obs/mmm/karto/cals/calsdata
+sort -nk7
+if ! ( `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3HciW5/calinfo
+if ( 1400 ==  ) then
+set linemark = `awk '{print NR,(($7-freq)^2)^.5}' freq=$freq $wd/calinfo | sort -nk2 | head -n 1 | awk '{print $1}'`
+awk {print NR,(($7-freq)^2)^.5} freq=1400 cal3HciW5/calinfo
+head -n 1
+sort -nk2
+awk {print $1}
+set preline = `echo $linemark | awk '{print $1-1}'`
+awk {print $1-1}
+echo 1
+set postline = `echo $linemark | awk '{print $1+1}'`
+awk {print $1+1}
+echo 1
+set altcaldata = ( `sed -n {$linemark}p $wd/calinfo | awk '{print $1,$2,$3,$4}'` )
+sed -n 1p cal3HciW5/calinfo
+awk {print $1,$2,$3,$4}
+if ( 1 == 1 ) then
+if ( `wc -l $wd/calinfo | awk '{print $1}'` == 1 ) then
+awk {print $1}
+wc -l cal3HciW5/calinfo
+set fluxinfo = ( `head -n 1 $wd/calinfo | awk '{print $5,$7/1000,"NA",$8}'` )
+awk {print $5,$7/1000,"NA",$8}
+head -n 1 cal3HciW5/calinfo
+else
+else if ( 1 == `wc -l $wd/calinfo | awk '{print $1}'` ) then
+if ( 1 ) then
+echo 130 0.328 NA 0437+296 3C123 4.617881944 29.67050556 2
+else
+goto finish
+if ! ( 0 ) rm -rf cal3HciW5
+rm -rf cal3HciW5
+exit 0
+if ! ( NA == NA && `echo $calvals[2] | awk '{if ((($1-freq)^2)^.5 > 0.21*freq) print "1"}' freq=$freq` ) then
+awk {if ((($1-freq)^2)^.5 > 0.21*freq) print "1"} freq=1.4
+echo 0.328
+end
+set calvals = ( `calinfo target=$pcal freq=$freq options=auto` )
+calinfo target=0455-205 freq=1.4 options=auto
+onintr enderr
+set datapath = /home/obs/mmm/karto/cals
+set target
+set debug = 0
+set freq
+set flux = ( 0 0 )
+set mode = info
+set dwflux = 1
+set dwdist = 1
+set dwtime = 1
+set ra = 0
+set dec = 0
+set pi = 3.14159265
+set distlim = 3.14159265
+set auto = 0
+set calgrade = U
+set addflux
+set altname
+if ( 3 == 0 ) then
+varassign:
+if ( target=0455-205 =~ target=* ) then
+set target = `echo $argv[1] | sed 's/target=//' | tr '[a-z]' '[A-Z]'`
+echo target=0455-205
+sed s/target=//
+tr [a-z] [A-Z]
+shift argv
+if ( freq=1.4 options=auto ==  ) set argv = finish
+else if ( freq=1.4 =~ freq=* ) then
+if ( freq=1.4 != finish ) goto varassign
+goto varassign
+if ( freq=1.4 =~ target=* ) then
+if ( freq=1.4 =~ freq=* ) then
+set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print $1*1000}'`
+echo freq=1.4
+awk {print $1*1000}
+sed s/freq=//
+shift argv
+if ( options=auto ==  ) set argv = finish
+else if ( options=auto =~ radec=* ) then
+if ( options=auto != finish ) goto varassign
+goto varassign
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ freq=* ) then
+if ( options=auto =~ radec=* ) then
+if ( options=auto =~ distlim=* ) then
+if ( options=auto =~ flux=* ) then
+if ( options=auto =~ altname=* ) then
+if ( options=auto =~ addflux=* ) then
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ options=* ) then
+set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
+echo options=auto
+sed s/options=//g
+tr [A-Z] [a-z]
+tr ,  
+set badopt
+foreach option ( `echo $options` )
+echo auto
+if ( auto == debug ) then
+if ( auto == info ) then
+if ( auto == find ) then
+if ( auto == best ) then
+if ( auto == modify ) then
+if ( auto == dwflux ) then
+if ( auto == dwdist ) then
+if ( auto == dwtime ) then
+if ( auto == auto ) then
+set auto = 1
+else
+end
+if (  !=  ) echo options=`echo $badopt | tr ' ' ','` not recognized!
+shift argv
+if (  ==  ) set argv = finish
+set argv = finish
+else
+if ( finish != finish ) goto varassign
+set wd = ( `mktemp -d cal3XXXXX` )
+mktemp -d cal3XXXXX
+if ! ( -e cal34ey05 ) then
+if ( info == info ) goto infocal
+goto infocal
+if ( 0455-205 ==  &&  ==  ) then
+if ( 0455-205 ==  ) then
+awk {if ($1 == target || $2 == target) print $0} target=0455-205 /home/obs/mmm/karto/cals/calsdata
+sort -nk7
+if ! ( `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal34ey05/calinfo
+if ( 1400 ==  ) then
+set linemark = `awk '{print NR,(($7-freq)^2)^.5}' freq=$freq $wd/calinfo | sort -nk2 | head -n 1 | awk '{print $1}'`
+awk {print NR,(($7-freq)^2)^.5} freq=1400 cal34ey05/calinfo
+awk {print $1}
+sort -nk2
+head -n 1
+set preline = `echo $linemark | awk '{print $1-1}'`
+awk {print $1-1}
+echo 2
+set postline = `echo $linemark | awk '{print $1+1}'`
+echo 2
+awk {print $1+1}
+set altcaldata = ( `sed -n {$linemark}p $wd/calinfo | awk '{print $1,$2,$3,$4}'` )
+awk {print $1,$2,$3,$4}
+sed -n 2p cal34ey05/calinfo
+if ( 2 == 1 ) then
+if ( 2 == `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal34ey05/calinfo
+set fluxinfo = ( `sed -n {$preline},{$linemark}p $wd/calinfo | awk '{if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}} END {sfr = exp((log(fr1)+log(fr2))/2); if (freq <= sfr) {reffreq = fr1; refflux = fl1; aflux = af1}; if (freq > sfr) {reffreq = fr2; refflux = fl2; aflux = af2}; print refflux,reffreq/1000,log(fl1/fl2)/log(fr1/fr2),aflux}' freq=$freq` )
+awk {if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}} END {sfr = exp((log(fr1)+log(fr2))/2); if (freq <= sfr) {reffreq = fr1; refflux = fl1; aflux = af1}; if (freq > sfr) {reffreq = fr2; refflux = fl2; aflux = af2}; print refflux,reffreq/1000,log(fl1/fl2)/log(fr1/fr2),aflux} freq=1400
+sed -n 1,2p cal34ey05/calinfo
+else
+if ( 1 ) then
+echo 4.5 1.425 -0.667724 0455-205 NA 4.923239861 -19.4293025 2
+else
+goto finish
+if ! ( 0 ) rm -rf cal34ey05
+rm -rf cal34ey05
+exit 0
+if ! ( -0.667724 == NA && `echo $calvals[2] | awk '{if ((($1-freq)^2)^.5 > 0.21*freq) print "1"}' freq=$freq` ) then
+awk {if ((($1-freq)^2)^.5 > 0.21*freq) print "1"} freq=1.4
+echo 1.425
+if ( 0 == 0 ) then
+if ( -0.667724 == NA && `echo $calvals[1] | awk '{if ($1 >= flux) print 1; else print 0}' flux=$flux[1]` ) then
+awk {if ($1 >= flux) print 1; else print 0} flux=10
+echo 4.5
+if ( -0.667724 != NA && `echo $calvals[1-3] | awk '{if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0}' freq=$freq flux=$flux[1]` ) then
+echo 4.5 1.425 -0.667724
+awk {if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0} freq=1.4 flux=10
+else
+endif
+end
+set calvals = ( `calinfo target=$pcal freq=$freq options=auto` )
+calinfo target=2137-207 freq=1.4 options=auto
+onintr enderr
+set datapath = /home/obs/mmm/karto/cals
+set target
+set debug = 0
+set freq
+set flux = ( 0 0 )
+set mode = info
+set dwflux = 1
+set dwdist = 1
+set dwtime = 1
+set ra = 0
+set dec = 0
+set pi = 3.14159265
+set distlim = 3.14159265
+set auto = 0
+set calgrade = U
+set addflux
+set altname
+if ( 3 == 0 ) then
+varassign:
+if ( target=2137-207 =~ target=* ) then
+set target = `echo $argv[1] | sed 's/target=//' | tr '[a-z]' '[A-Z]'`
+sed s/target=//
+tr [a-z] [A-Z]
+echo target=2137-207
+shift argv
+if ( freq=1.4 options=auto ==  ) set argv = finish
+else if ( freq=1.4 =~ freq=* ) then
+if ( freq=1.4 != finish ) goto varassign
+goto varassign
+if ( freq=1.4 =~ target=* ) then
+if ( freq=1.4 =~ freq=* ) then
+set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print $1*1000}'`
+echo freq=1.4
+sed s/freq=//
+awk {print $1*1000}
+shift argv
+if ( options=auto ==  ) set argv = finish
+else if ( options=auto =~ radec=* ) then
+if ( options=auto != finish ) goto varassign
+goto varassign
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ freq=* ) then
+if ( options=auto =~ radec=* ) then
+if ( options=auto =~ distlim=* ) then
+if ( options=auto =~ flux=* ) then
+if ( options=auto =~ altname=* ) then
+if ( options=auto =~ addflux=* ) then
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ options=* ) then
+set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
+tr [A-Z] [a-z]
+sed s/options=//g
+tr ,  
+echo options=auto
+set badopt
+foreach option ( `echo $options` )
+echo auto
+if ( auto == debug ) then
+if ( auto == info ) then
+if ( auto == find ) then
+if ( auto == best ) then
+if ( auto == modify ) then
+if ( auto == dwflux ) then
+if ( auto == dwdist ) then
+if ( auto == dwtime ) then
+if ( auto == auto ) then
+set auto = 1
+else
+end
+if (  !=  ) echo options=`echo $badopt | tr ' ' ','` not recognized!
+shift argv
+if (  ==  ) set argv = finish
+set argv = finish
+else
+if ( finish != finish ) goto varassign
+set wd = ( `mktemp -d cal3XXXXX` )
+mktemp -d cal3XXXXX
+if ! ( -e cal3uji55 ) then
+if ( info == info ) goto infocal
+goto infocal
+if ( 2137-207 ==  &&  ==  ) then
+if ( 2137-207 ==  ) then
+awk {if ($1 == target || $2 == target) print $0} target=2137-207 /home/obs/mmm/karto/cals/calsdata
+sort -nk7
+if ! ( `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3uji55/calinfo
+if ( 1400 ==  ) then
+set linemark = `awk '{print NR,(($7-freq)^2)^.5}' freq=$freq $wd/calinfo | sort -nk2 | head -n 1 | awk '{print $1}'`
+awk {print NR,(($7-freq)^2)^.5} freq=1400 cal3uji55/calinfo
+head -n 1
+awk {print $1}
+sort -nk2
+set preline = `echo $linemark | awk '{print $1-1}'`
+awk {print $1-1}
+echo 2
+set postline = `echo $linemark | awk '{print $1+1}'`
+echo 2
+awk {print $1+1}
+set altcaldata = ( `sed -n {$linemark}p $wd/calinfo | awk '{print $1,$2,$3,$4}'` )
+awk {print $1,$2,$3,$4}
+sed -n 2p cal3uji55/calinfo
+if ( 2 == 1 ) then
+if ( 2 == `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3uji55/calinfo
+set fluxinfo = ( `sed -n {$preline},{$postline}p $wd/calinfo | awk '{if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}; if (NR == 3) {fl3=$5; fr3 = $7; af3 = $8}} END {sidx1 = log(fl1/fl2)/log(fr1/fr2); sidx2 = log(fl2/fl3)/log(fr2/fr3); sfr1 = exp((log(fr1)+log(fr2))/2); sfr2 = exp((log(fr2)+log(fr3))/2); if (freq <= sfr1) {sidx = sidx1; reffreq = fr1; refflux = fl1; aflux = af1}; if (freq >= sfr2) {sidx = sidx2; reffreq = fr3; refflux = fl3; aflux = af2} ; if (freq > sfr1 && freq < sfr2) {sidx = ((sidx1*log(freq/sfr1))+(sidx2*log(sfr2/freq)))/(log(sfr2/sfr1)); reffreq = fr2; refflux = fl2; aflux = af3}; print refflux,reffreq/1000,sidx,aflux}' freq=$freq` )
+awk {if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}; if (NR == 3) {fl3=$5; fr3 = $7; af3 = $8}} END {sidx1 = log(fl1/fl2)/log(fr1/fr2); sidx2 = log(fl2/fl3)/log(fr2/fr3); sfr1 = exp((log(fr1)+log(fr2))/2); sfr2 = exp((log(fr2)+log(fr3))/2); if (freq <= sfr1) {sidx = sidx1; reffreq = fr1; refflux = fl1; aflux = af1}; if (freq >= sfr2) {sidx = sidx2; reffreq = fr3; refflux = fl3; aflux = af2} ; if (freq > sfr1 && freq < sfr2) {sidx = ((sidx1*log(freq/sfr1))+(sidx2*log(sfr2/freq)))/(log(sfr2/sfr1)); reffreq = fr2; refflux = fl2; aflux = af3}; print refflux,reffreq/1000,sidx,aflux} freq=1400
+sed -n 1,3p cal3uji55/calinfo
+endif
+if ( 1 ) then
+echo 3.6 1.425 -0.730306 2137-207 NA 21.63055606 -19.29118028 2
+else
+goto finish
+if ! ( 0 ) rm -rf cal3uji55
+rm -rf cal3uji55
+exit 0
+if ! ( -0.730306 == NA && `echo $calvals[2] | awk '{if ((($1-freq)^2)^.5 > 0.21*freq) print "1"}' freq=$freq` ) then
+awk {if ((($1-freq)^2)^.5 > 0.21*freq) print "1"} freq=1.4
+echo 1.425
+if ( 0 == 0 ) then
+if ( -0.730306 == NA && `echo $calvals[1] | awk '{if ($1 >= flux) print 1; else print 0}' flux=$flux[1]` ) then
+awk {if ($1 >= flux) print 1; else print 0} flux=10
+echo 3.6
+if ( -0.730306 != NA && `echo $calvals[1-3] | awk '{if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0}' freq=$freq flux=$flux[1]` ) then
+awk {if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0} freq=1.4 flux=10
+echo 3.6 1.425 -0.730306
+else
+endif
+end
+set calvals = ( `calinfo target=$pcal freq=$freq options=auto` )
+calinfo target=2206-185 freq=1.4 options=auto
+onintr enderr
+set datapath = /home/obs/mmm/karto/cals
+set target
+set debug = 0
+set freq
+set flux = ( 0 0 )
+set mode = info
+set dwflux = 1
+set dwdist = 1
+set dwtime = 1
+set ra = 0
+set dec = 0
+set pi = 3.14159265
+set distlim = 3.14159265
+set auto = 0
+set calgrade = U
+set addflux
+set altname
+if ( 3 == 0 ) then
+varassign:
+if ( target=2206-185 =~ target=* ) then
+set target = `echo $argv[1] | sed 's/target=//' | tr '[a-z]' '[A-Z]'`
+tr [a-z] [A-Z]
+echo target=2206-185
+sed s/target=//
+shift argv
+if ( freq=1.4 options=auto ==  ) set argv = finish
+else if ( freq=1.4 =~ freq=* ) then
+if ( freq=1.4 != finish ) goto varassign
+goto varassign
+if ( freq=1.4 =~ target=* ) then
+if ( freq=1.4 =~ freq=* ) then
+set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print $1*1000}'`
+echo freq=1.4
+awk {print $1*1000}
+sed s/freq=//
+shift argv
+if ( options=auto ==  ) set argv = finish
+else if ( options=auto =~ radec=* ) then
+if ( options=auto != finish ) goto varassign
+goto varassign
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ freq=* ) then
+if ( options=auto =~ radec=* ) then
+if ( options=auto =~ distlim=* ) then
+if ( options=auto =~ flux=* ) then
+if ( options=auto =~ altname=* ) then
+if ( options=auto =~ addflux=* ) then
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ options=* ) then
+set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
+echo options=auto
+sed s/options=//g
+tr [A-Z] [a-z]
+tr ,  
+set badopt
+foreach option ( `echo $options` )
+echo auto
+if ( auto == debug ) then
+if ( auto == info ) then
+if ( auto == find ) then
+if ( auto == best ) then
+if ( auto == modify ) then
+if ( auto == dwflux ) then
+if ( auto == dwdist ) then
+if ( auto == dwtime ) then
+if ( auto == auto ) then
+set auto = 1
+else
+end
+if (  !=  ) echo options=`echo $badopt | tr ' ' ','` not recognized!
+shift argv
+if (  ==  ) set argv = finish
+set argv = finish
+else
+if ( finish != finish ) goto varassign
+set wd = ( `mktemp -d cal3XXXXX` )
+mktemp -d cal3XXXXX
+if ! ( -e cal3Cm495 ) then
+if ( info == info ) goto infocal
+goto infocal
+if ( 2206-185 ==  &&  ==  ) then
+if ( 2206-185 ==  ) then
+awk {if ($1 == target || $2 == target) print $0} target=2206-185 /home/obs/mmm/karto/cals/calsdata
+sort -nk7
+if ! ( `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3Cm495/calinfo
+if ( 1400 ==  ) then
+set linemark = `awk '{print NR,(($7-freq)^2)^.5}' freq=$freq $wd/calinfo | sort -nk2 | head -n 1 | awk '{print $1}'`
+awk {print NR,(($7-freq)^2)^.5} freq=1400 cal3Cm495/calinfo
+awk {print $1}
+sort -nk2
+head -n 1
+set preline = `echo $linemark | awk '{print $1-1}'`
+awk {print $1-1}
+echo 2
+set postline = `echo $linemark | awk '{print $1+1}'`
+awk {print $1+1}
+echo 2
+set altcaldata = ( `sed -n {$linemark}p $wd/calinfo | awk '{print $1,$2,$3,$4}'` )
+awk {print $1,$2,$3,$4}
+sed -n 2p cal3Cm495/calinfo
+if ( 2 == 1 ) then
+if ( 2 == `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3Cm495/calinfo
+set fluxinfo = ( `sed -n {$preline},{$postline}p $wd/calinfo | awk '{if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}; if (NR == 3) {fl3=$5; fr3 = $7; af3 = $8}} END {sidx1 = log(fl1/fl2)/log(fr1/fr2); sidx2 = log(fl2/fl3)/log(fr2/fr3); sfr1 = exp((log(fr1)+log(fr2))/2); sfr2 = exp((log(fr2)+log(fr3))/2); if (freq <= sfr1) {sidx = sidx1; reffreq = fr1; refflux = fl1; aflux = af1}; if (freq >= sfr2) {sidx = sidx2; reffreq = fr3; refflux = fl3; aflux = af2} ; if (freq > sfr1 && freq < sfr2) {sidx = ((sidx1*log(freq/sfr1))+(sidx2*log(sfr2/freq)))/(log(sfr2/sfr1)); reffreq = fr2; refflux = fl2; aflux = af3}; print refflux,reffreq/1000,sidx,aflux}' freq=$freq` )
+awk {if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}; if (NR == 3) {fl3=$5; fr3 = $7; af3 = $8}} END {sidx1 = log(fl1/fl2)/log(fr1/fr2); sidx2 = log(fl2/fl3)/log(fr2/fr3); sfr1 = exp((log(fr1)+log(fr2))/2); sfr2 = exp((log(fr2)+log(fr3))/2); if (freq <= sfr1) {sidx = sidx1; reffreq = fr1; refflux = fl1; aflux = af1}; if (freq >= sfr2) {sidx = sidx2; reffreq = fr3; refflux = fl3; aflux = af2} ; if (freq > sfr1 && freq < sfr2) {sidx = ((sidx1*log(freq/sfr1))+(sidx2*log(sfr2/freq)))/(log(sfr2/sfr1)); reffreq = fr2; refflux = fl2; aflux = af3}; print refflux,reffreq/1000,sidx,aflux} freq=1400
+sed -n 1,3p cal3Cm495/calinfo
+endif
+if ( 1 ) then
+echo 6.44 1.425 -0.360638 2206-185 NA 22.10289363 -17.40590374 2
+else
+goto finish
+if ! ( 0 ) rm -rf cal3Cm495
+rm -rf cal3Cm495
+exit 0
+if ! ( -0.360638 == NA && `echo $calvals[2] | awk '{if ((($1-freq)^2)^.5 > 0.21*freq) print "1"}' freq=$freq` ) then
+awk {if ((($1-freq)^2)^.5 > 0.21*freq) print "1"} freq=1.4
+echo 1.425
+if ( 0 == 0 ) then
+if ( -0.360638 == NA && `echo $calvals[1] | awk '{if ($1 >= flux) print 1; else print 0}' flux=$flux[1]` ) then
+awk {if ($1 >= flux) print 1; else print 0} flux=10
+echo 6.44
+if ( -0.360638 != NA && `echo $calvals[1-3] | awk '{if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0}' freq=$freq flux=$flux[1]` ) then
+awk {if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0} freq=1.4 flux=10
+echo 6.44 1.425 -0.360638
+else
+endif
+end
+set calvals = ( `calinfo target=$pcal freq=$freq options=auto` )
+calinfo target=2225-049 freq=1.4 options=auto
+onintr enderr
+set datapath = /home/obs/mmm/karto/cals
+set target
+set debug = 0
+set freq
+set flux = ( 0 0 )
+set mode = info
+set dwflux = 1
+set dwdist = 1
+set dwtime = 1
+set ra = 0
+set dec = 0
+set pi = 3.14159265
+set distlim = 3.14159265
+set auto = 0
+set calgrade = U
+set addflux
+set altname
+if ( 3 == 0 ) then
+varassign:
+if ( target=2225-049 =~ target=* ) then
+set target = `echo $argv[1] | sed 's/target=//' | tr '[a-z]' '[A-Z]'`
+echo target=2225-049
+tr [a-z] [A-Z]
+sed s/target=//
+shift argv
+if ( freq=1.4 options=auto ==  ) set argv = finish
+else if ( freq=1.4 =~ freq=* ) then
+if ( freq=1.4 != finish ) goto varassign
+goto varassign
+if ( freq=1.4 =~ target=* ) then
+if ( freq=1.4 =~ freq=* ) then
+set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print $1*1000}'`
+echo freq=1.4
+awk {print $1*1000}
+sed s/freq=//
+shift argv
+if ( options=auto ==  ) set argv = finish
+else if ( options=auto =~ radec=* ) then
+if ( options=auto != finish ) goto varassign
+goto varassign
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ freq=* ) then
+if ( options=auto =~ radec=* ) then
+if ( options=auto =~ distlim=* ) then
+if ( options=auto =~ flux=* ) then
+if ( options=auto =~ altname=* ) then
+if ( options=auto =~ addflux=* ) then
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ options=* ) then
+set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
+echo options=auto
+sed s/options=//g
+tr [A-Z] [a-z]
+tr ,  
+set badopt
+foreach option ( `echo $options` )
+echo auto
+if ( auto == debug ) then
+if ( auto == info ) then
+if ( auto == find ) then
+if ( auto == best ) then
+if ( auto == modify ) then
+if ( auto == dwflux ) then
+if ( auto == dwdist ) then
+if ( auto == dwtime ) then
+if ( auto == auto ) then
+set auto = 1
+else
+end
+if (  !=  ) echo options=`echo $badopt | tr ' ' ','` not recognized!
+shift argv
+if (  ==  ) set argv = finish
+set argv = finish
+else
+if ( finish != finish ) goto varassign
+set wd = ( `mktemp -d cal3XXXXX` )
+mktemp -d cal3XXXXX
+if ! ( -e cal3.oyd6 ) then
+if ( info == info ) goto infocal
+goto infocal
+if ( 2225-049 ==  &&  ==  ) then
+if ( 2225-049 ==  ) then
+awk {if ($1 == target || $2 == target) print $0} target=2225-049 /home/obs/mmm/karto/cals/calsdata
+sort -nk7
+if ! ( `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3.oyd6/calinfo
+if ( 1400 ==  ) then
+set linemark = `awk '{print NR,(($7-freq)^2)^.5}' freq=$freq $wd/calinfo | sort -nk2 | head -n 1 | awk '{print $1}'`
+awk {print NR,(($7-freq)^2)^.5} freq=1400 cal3.oyd6/calinfo
+sort -nk2
+awk {print $1}
+head -n 1
+set preline = `echo $linemark | awk '{print $1-1}'`
+awk {print $1-1}
+echo 2
+set postline = `echo $linemark | awk '{print $1+1}'`
+awk {print $1+1}
+echo 2
+set altcaldata = ( `sed -n {$linemark}p $wd/calinfo | awk '{print $1,$2,$3,$4}'` )
+awk {print $1,$2,$3,$4}
+sed -n 2p cal3.oyd6/calinfo
+if ( 2 == 1 ) then
+if ( 2 == `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3.oyd6/calinfo
+set fluxinfo = ( `sed -n {$preline},{$postline}p $wd/calinfo | awk '{if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}; if (NR == 3) {fl3=$5; fr3 = $7; af3 = $8}} END {sidx1 = log(fl1/fl2)/log(fr1/fr2); sidx2 = log(fl2/fl3)/log(fr2/fr3); sfr1 = exp((log(fr1)+log(fr2))/2); sfr2 = exp((log(fr2)+log(fr3))/2); if (freq <= sfr1) {sidx = sidx1; reffreq = fr1; refflux = fl1; aflux = af1}; if (freq >= sfr2) {sidx = sidx2; reffreq = fr3; refflux = fl3; aflux = af2} ; if (freq > sfr1 && freq < sfr2) {sidx = ((sidx1*log(freq/sfr1))+(sidx2*log(sfr2/freq)))/(log(sfr2/sfr1)); reffreq = fr2; refflux = fl2; aflux = af3}; print refflux,reffreq/1000,sidx,aflux}' freq=$freq` )
+awk {if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}; if (NR == 3) {fl3=$5; fr3 = $7; af3 = $8}} END {sidx1 = log(fl1/fl2)/log(fr1/fr2); sidx2 = log(fl2/fl3)/log(fr2/fr3); sfr1 = exp((log(fr1)+log(fr2))/2); sfr2 = exp((log(fr2)+log(fr3))/2); if (freq <= sfr1) {sidx = sidx1; reffreq = fr1; refflux = fl1; aflux = af1}; if (freq >= sfr2) {sidx = sidx2; reffreq = fr3; refflux = fl3; aflux = af2} ; if (freq > sfr1 && freq < sfr2) {sidx = ((sidx1*log(freq/sfr1))+(sidx2*log(sfr2/freq)))/(log(sfr2/sfr1)); reffreq = fr2; refflux = fl2; aflux = af3}; print refflux,reffreq/1000,sidx,aflux} freq=1400
+sed -n 1,3p cal3.oyd6/calinfo
+endif
+if ( 1 ) then
+echo 5.7 1.425 -0.505023 2225-049 3C446 22.42979425 -3.049613686 2
+else
+goto finish
+if ! ( 0 ) rm -rf cal3.oyd6
+rm -rf cal3.oyd6
+exit 0
+if ! ( -0.505023 == NA && `echo $calvals[2] | awk '{if ((($1-freq)^2)^.5 > 0.21*freq) print "1"}' freq=$freq` ) then
+awk {if ((($1-freq)^2)^.5 > 0.21*freq) print "1"} freq=1.4
+echo 1.425
+if ( 0 == 0 ) then
+if ( -0.505023 == NA && `echo $calvals[1] | awk '{if ($1 >= flux) print 1; else print 0}' flux=$flux[1]` ) then
+awk {if ($1 >= flux) print 1; else print 0} flux=10
+echo 5.7
+if ( -0.505023 != NA && `echo $calvals[1-3] | awk '{if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0}' freq=$freq flux=$flux[1]` ) then
+awk {if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0} freq=1.4 flux=10
+echo 5.7 1.425 -0.505023
+else
+endif
+end
+set calvals = ( `calinfo target=$pcal freq=$freq options=auto` )
+calinfo target=2253+161 freq=1.4 options=auto
+onintr enderr
+set datapath = /home/obs/mmm/karto/cals
+set target
+set debug = 0
+set freq
+set flux = ( 0 0 )
+set mode = info
+set dwflux = 1
+set dwdist = 1
+set dwtime = 1
+set ra = 0
+set dec = 0
+set pi = 3.14159265
+set distlim = 3.14159265
+set auto = 0
+set calgrade = U
+set addflux
+set altname
+if ( 3 == 0 ) then
+varassign:
+if ( target=2253+161 =~ target=* ) then
+set target = `echo $argv[1] | sed 's/target=//' | tr '[a-z]' '[A-Z]'`
+echo target=2253+161
+tr [a-z] [A-Z]
+sed s/target=//
+shift argv
+if ( freq=1.4 options=auto ==  ) set argv = finish
+else if ( freq=1.4 =~ freq=* ) then
+if ( freq=1.4 != finish ) goto varassign
+goto varassign
+if ( freq=1.4 =~ target=* ) then
+if ( freq=1.4 =~ freq=* ) then
+set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print $1*1000}'`
+echo freq=1.4
+awk {print $1*1000}
+sed s/freq=//
+shift argv
+if ( options=auto ==  ) set argv = finish
+else if ( options=auto =~ radec=* ) then
+if ( options=auto != finish ) goto varassign
+goto varassign
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ freq=* ) then
+if ( options=auto =~ radec=* ) then
+if ( options=auto =~ distlim=* ) then
+if ( options=auto =~ flux=* ) then
+if ( options=auto =~ altname=* ) then
+if ( options=auto =~ addflux=* ) then
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ options=* ) then
+set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
+echo options=auto
+sed s/options=//g
+tr [A-Z] [a-z]
+tr ,  
+set badopt
+foreach option ( `echo $options` )
+echo auto
+if ( auto == debug ) then
+if ( auto == info ) then
+if ( auto == find ) then
+if ( auto == best ) then
+if ( auto == modify ) then
+if ( auto == dwflux ) then
+if ( auto == dwdist ) then
+if ( auto == dwtime ) then
+if ( auto == auto ) then
+set auto = 1
+else
+end
+if (  !=  ) echo options=`echo $badopt | tr ' ' ','` not recognized!
+shift argv
+if (  ==  ) set argv = finish
+set argv = finish
+else
+if ( finish != finish ) goto varassign
+set wd = ( `mktemp -d cal3XXXXX` )
+mktemp -d cal3XXXXX
+if ! ( -e cal3krii6 ) then
+if ( info == info ) goto infocal
+goto infocal
+if ( 2253+161 ==  &&  ==  ) then
+if ( 2253+161 ==  ) then
+awk {if ($1 == target || $2 == target) print $0} target=2253+161 /home/obs/mmm/karto/cals/calsdata
+sort -nk7
+if ! ( `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3krii6/calinfo
+if ( 1400 ==  ) then
+set linemark = `awk '{print NR,(($7-freq)^2)^.5}' freq=$freq $wd/calinfo | sort -nk2 | head -n 1 | awk '{print $1}'`
+awk {print NR,(($7-freq)^2)^.5} freq=1400 cal3krii6/calinfo
+awk {print $1}
+sort -nk2
+head -n 1
+set preline = `echo $linemark | awk '{print $1-1}'`
+awk {print $1-1}
+echo 2
+set postline = `echo $linemark | awk '{print $1+1}'`
+awk {print $1+1}
+echo 2
+set altcaldata = ( `sed -n {$linemark}p $wd/calinfo | awk '{print $1,$2,$3,$4}'` )
+awk {print $1,$2,$3,$4}
+sed -n 2p cal3krii6/calinfo
+if ( 2 == 1 ) then
+if ( 2 == `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3krii6/calinfo
+set fluxinfo = ( `sed -n {$preline},{$postline}p $wd/calinfo | awk '{if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}; if (NR == 3) {fl3=$5; fr3 = $7; af3 = $8}} END {sidx1 = log(fl1/fl2)/log(fr1/fr2); sidx2 = log(fl2/fl3)/log(fr2/fr3); sfr1 = exp((log(fr1)+log(fr2))/2); sfr2 = exp((log(fr2)+log(fr3))/2); if (freq <= sfr1) {sidx = sidx1; reffreq = fr1; refflux = fl1; aflux = af1}; if (freq >= sfr2) {sidx = sidx2; reffreq = fr3; refflux = fl3; aflux = af2} ; if (freq > sfr1 && freq < sfr2) {sidx = ((sidx1*log(freq/sfr1))+(sidx2*log(sfr2/freq)))/(log(sfr2/sfr1)); reffreq = fr2; refflux = fl2; aflux = af3}; print refflux,reffreq/1000,sidx,aflux}' freq=$freq` )
+awk {if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}; if (NR == 3) {fl3=$5; fr3 = $7; af3 = $8}} END {sidx1 = log(fl1/fl2)/log(fr1/fr2); sidx2 = log(fl2/fl3)/log(fr2/fr3); sfr1 = exp((log(fr1)+log(fr2))/2); sfr2 = exp((log(fr2)+log(fr3))/2); if (freq <= sfr1) {sidx = sidx1; reffreq = fr1; refflux = fl1; aflux = af1}; if (freq >= sfr2) {sidx = sidx2; reffreq = fr3; refflux = fl3; aflux = af2} ; if (freq > sfr1 && freq < sfr2) {sidx = ((sidx1*log(freq/sfr1))+(sidx2*log(sfr2/freq)))/(log(sfr2/sfr1)); reffreq = fr2; refflux = fl2; aflux = af3}; print refflux,reffreq/1000,sidx,aflux} freq=1400
+sed -n 1,3p cal3krii6/calinfo
+endif
+if ( 1 ) then
+echo 10 1.425 -0.146783 2253+161 3C454.3 22.89937443 16.14821136 2
+else
+goto finish
+if ! ( 0 ) rm -rf cal3krii6
+rm -rf cal3krii6
+exit 0
+if ! ( -0.146783 == NA && `echo $calvals[2] | awk '{if ((($1-freq)^2)^.5 > 0.21*freq) print "1"}' freq=$freq` ) then
+awk {if ((($1-freq)^2)^.5 > 0.21*freq) print "1"} freq=1.4
+echo 1.425
+if ( 0 == 0 ) then
+if ( -0.146783 == NA && `echo $calvals[1] | awk '{if ($1 >= flux) print 1; else print 0}' flux=$flux[1]` ) then
+awk {if ($1 >= flux) print 1; else print 0} flux=10
+echo 10
+if ( -0.146783 != NA && `echo $calvals[1-3] | awk '{if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0}' freq=$freq flux=$flux[1]` ) then
+awk {if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0} freq=1.4 flux=10
+echo 10 1.425 -0.146783
+echo Source: 2253+161 (altname=3C454.3)
+Source: 2253+161 (altname=3C454.3)
+echo         flux=`echo $calvals[1-3] | awk '{print int(((freq/$2)^$3)*$1*1000)/1000", specindex="int($3*1000)/1000}' freq=$freq`
+awk {print int(((freq/$2)^$3)*$1*1000)/1000", specindex="int($3*1000)/1000} freq=1.4
+echo 10 1.425 -0.146783
+        flux=10.026, specindex=-0.146
+echo         RA=`echo $calvals[6] | awk '{printf "%2d:%2d:%2d.%1d\n",int($1),int($1*60)%60,int($1*3600)%60,int(100*(($1*3600)%1))}' | sed 's/ /0/g'`  Dec=`echo $calvals[7] | awk '{printf "%2d:%2d:%2d.%1d\n",int($1),int($1*60)%60,int($1*3600)%60,int(100*(($1*3600)%1))}' | sed 's/ /0/g'`
+echo 22.89937443
+sed s/ /0/g
+awk {printf "%2d:%2d:%2d.%1d\n",int($1),int($1*60)%60,int($1*3600)%60,int(100*(($1*3600)%1))}
+echo 16.14821136
+sed s/ /0/g
+awk {printf "%2d:%2d:%2d.%1d\n",int($1),int($1*60)%60,int($1*3600)%60,int(100*(($1*3600)%1))}
+        RA=22:53:57.74  Dec=16:08:53.56
+@ idx++
+endif
+else
+endif
+end
+set calvals = ( `calinfo target=$pcal freq=$freq options=auto` )
+calinfo target=2316+040 freq=1.4 options=auto
+onintr enderr
+set datapath = /home/obs/mmm/karto/cals
+set target
+set debug = 0
+set freq
+set flux = ( 0 0 )
+set mode = info
+set dwflux = 1
+set dwdist = 1
+set dwtime = 1
+set ra = 0
+set dec = 0
+set pi = 3.14159265
+set distlim = 3.14159265
+set auto = 0
+set calgrade = U
+set addflux
+set altname
+if ( 3 == 0 ) then
+varassign:
+if ( target=2316+040 =~ target=* ) then
+set target = `echo $argv[1] | sed 's/target=//' | tr '[a-z]' '[A-Z]'`
+echo target=2316+040
+tr [a-z] [A-Z]
+sed s/target=//
+shift argv
+if ( freq=1.4 options=auto ==  ) set argv = finish
+else if ( freq=1.4 =~ freq=* ) then
+if ( freq=1.4 != finish ) goto varassign
+goto varassign
+if ( freq=1.4 =~ target=* ) then
+if ( freq=1.4 =~ freq=* ) then
+set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print $1*1000}'`
+echo freq=1.4
+awk {print $1*1000}
+sed s/freq=//
+shift argv
+if ( options=auto ==  ) set argv = finish
+else if ( options=auto =~ radec=* ) then
+if ( options=auto != finish ) goto varassign
+goto varassign
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ freq=* ) then
+if ( options=auto =~ radec=* ) then
+if ( options=auto =~ distlim=* ) then
+if ( options=auto =~ flux=* ) then
+if ( options=auto =~ altname=* ) then
+if ( options=auto =~ addflux=* ) then
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ options=* ) then
+set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
+echo options=auto
+sed s/options=//g
+tr [A-Z] [a-z]
+tr ,  
+set badopt
+foreach option ( `echo $options` )
+echo auto
+if ( auto == debug ) then
+if ( auto == info ) then
+if ( auto == find ) then
+if ( auto == best ) then
+if ( auto == modify ) then
+if ( auto == dwflux ) then
+if ( auto == dwdist ) then
+if ( auto == dwtime ) then
+if ( auto == auto ) then
+set auto = 1
+else
+end
+if (  !=  ) echo options=`echo $badopt | tr ' ' ','` not recognized!
+shift argv
+if (  ==  ) set argv = finish
+set argv = finish
+else
+if ( finish != finish ) goto varassign
+set wd = ( `mktemp -d cal3XXXXX` )
+mktemp -d cal3XXXXX
+if ! ( -e cal3Vt4n6 ) then
+if ( info == info ) goto infocal
+goto infocal
+if ( 2316+040 ==  &&  ==  ) then
+if ( 2316+040 ==  ) then
+awk {if ($1 == target || $2 == target) print $0} target=2316+040 /home/obs/mmm/karto/cals/calsdata
+sort -nk7
+if ! ( `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3Vt4n6/calinfo
+if ( 1400 ==  ) then
+set linemark = `awk '{print NR,(($7-freq)^2)^.5}' freq=$freq $wd/calinfo | sort -nk2 | head -n 1 | awk '{print $1}'`
+awk {print NR,(($7-freq)^2)^.5} freq=1400 cal3Vt4n6/calinfo
+sort -nk2
+awk {print $1}
+head -n 1
+set preline = `echo $linemark | awk '{print $1-1}'`
+awk {print $1-1}
+echo 2
+set postline = `echo $linemark | awk '{print $1+1}'`
+awk {print $1+1}
+echo 2
+set altcaldata = ( `sed -n {$linemark}p $wd/calinfo | awk '{print $1,$2,$3,$4}'` )
+awk {print $1,$2,$3,$4}
+sed -n 2p cal3Vt4n6/calinfo
+if ( 2 == 1 ) then
+if ( 2 == `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3Vt4n6/calinfo
+set fluxinfo = ( `sed -n {$preline},{$linemark}p $wd/calinfo | awk '{if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}} END {sfr = exp((log(fr1)+log(fr2))/2); if (freq <= sfr) {reffreq = fr1; refflux = fl1; aflux = af1}; if (freq > sfr) {reffreq = fr2; refflux = fl2; aflux = af2}; print refflux,reffreq/1000,log(fl1/fl2)/log(fr1/fr2),aflux}' freq=$freq` )
+awk {if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}} END {sfr = exp((log(fr1)+log(fr2))/2); if (freq <= sfr) {reffreq = fr1; refflux = fl1; aflux = af1}; if (freq > sfr) {reffreq = fr2; refflux = fl2; aflux = af2}; print refflux,reffreq/1000,log(fl1/fl2)/log(fr1/fr2),aflux} freq=1400
+sed -n 1,2p cal3Vt4n6/calinfo
+else
+if ( 1 ) then
+echo 4.3 1.425 -0.974705 2316+040 NA 23.27644717 4.088374444 2
+else
+goto finish
+if ! ( 0 ) rm -rf cal3Vt4n6
+rm -rf cal3Vt4n6
+exit 0
+if ! ( -0.974705 == NA && `echo $calvals[2] | awk '{if ((($1-freq)^2)^.5 > 0.21*freq) print "1"}' freq=$freq` ) then
+awk {if ((($1-freq)^2)^.5 > 0.21*freq) print "1"} freq=1.4
+echo 1.425
+if ( 0 == 0 ) then
+if ( -0.974705 == NA && `echo $calvals[1] | awk '{if ($1 >= flux) print 1; else print 0}' flux=$flux[1]` ) then
+awk {if ($1 >= flux) print 1; else print 0} flux=10
+echo 4.3
+if ( -0.974705 != NA && `echo $calvals[1-3] | awk '{if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0}' freq=$freq flux=$flux[1]` ) then
+awk {if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0} freq=1.4 flux=10
+echo 4.3 1.425 -0.974705
+else
+endif
+end
+set calvals = ( `calinfo target=$pcal freq=$freq options=auto` )
+calinfo target=2321-163 freq=1.4 options=auto
+onintr enderr
+set datapath = /home/obs/mmm/karto/cals
+set target
+set debug = 0
+set freq
+set flux = ( 0 0 )
+set mode = info
+set dwflux = 1
+set dwdist = 1
+set dwtime = 1
+set ra = 0
+set dec = 0
+set pi = 3.14159265
+set distlim = 3.14159265
+set auto = 0
+set calgrade = U
+set addflux
+set altname
+if ( 3 == 0 ) then
+varassign:
+if ( target=2321-163 =~ target=* ) then
+set target = `echo $argv[1] | sed 's/target=//' | tr '[a-z]' '[A-Z]'`
+echo target=2321-163
+tr [a-z] [A-Z]
+sed s/target=//
+shift argv
+if ( freq=1.4 options=auto ==  ) set argv = finish
+else if ( freq=1.4 =~ freq=* ) then
+if ( freq=1.4 != finish ) goto varassign
+goto varassign
+if ( freq=1.4 =~ target=* ) then
+if ( freq=1.4 =~ freq=* ) then
+set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print $1*1000}'`
+echo freq=1.4
+awk {print $1*1000}
+sed s/freq=//
+shift argv
+if ( options=auto ==  ) set argv = finish
+else if ( options=auto =~ radec=* ) then
+if ( options=auto != finish ) goto varassign
+goto varassign
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ freq=* ) then
+if ( options=auto =~ radec=* ) then
+if ( options=auto =~ distlim=* ) then
+if ( options=auto =~ flux=* ) then
+if ( options=auto =~ altname=* ) then
+if ( options=auto =~ addflux=* ) then
+if ( options=auto =~ target=* ) then
+if ( options=auto =~ options=* ) then
+set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
+echo options=auto
+sed s/options=//g
+tr ,  
+tr [A-Z] [a-z]
+set badopt
+foreach option ( `echo $options` )
+echo auto
+if ( auto == debug ) then
+if ( auto == info ) then
+if ( auto == find ) then
+if ( auto == best ) then
+if ( auto == modify ) then
+if ( auto == dwflux ) then
+if ( auto == dwdist ) then
+if ( auto == dwtime ) then
+if ( auto == auto ) then
+set auto = 1
+else
+end
+if (  !=  ) echo options=`echo $badopt | tr ' ' ','` not recognized!
+shift argv
+if (  ==  ) set argv = finish
+set argv = finish
+else
+if ( finish != finish ) goto varassign
+set wd = ( `mktemp -d cal3XXXXX` )
+mktemp -d cal3XXXXX
+if ! ( -e cal3gw4s6 ) then
+if ( info == info ) goto infocal
+goto infocal
+if ( 2321-163 ==  &&  ==  ) then
+if ( 2321-163 ==  ) then
+awk {if ($1 == target || $2 == target) print $0} target=2321-163 /home/obs/mmm/karto/cals/calsdata
+sort -nk7
+if ! ( `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3gw4s6/calinfo
+if ( 1400 ==  ) then
+set linemark = `awk '{print NR,(($7-freq)^2)^.5}' freq=$freq $wd/calinfo | sort -nk2 | head -n 1 | awk '{print $1}'`
+awk {print NR,(($7-freq)^2)^.5} freq=1400 cal3gw4s6/calinfo
+head -n 1
+awk {print $1}
+sort -nk2
+set preline = `echo $linemark | awk '{print $1-1}'`
+awk {print $1-1}
+echo 2
+set postline = `echo $linemark | awk '{print $1+1}'`
+awk {print $1+1}
+echo 2
+set altcaldata = ( `sed -n {$linemark}p $wd/calinfo | awk '{print $1,$2,$3,$4}'` )
+awk {print $1,$2,$3,$4}
+sed -n 2p cal3gw4s6/calinfo
+if ( 2 == 1 ) then
+if ( 2 == `wc -l $wd/calinfo | awk '{print $1}'` ) then
+awk {print $1}
+wc -l cal3gw4s6/calinfo
+set fluxinfo = ( `sed -n {$preline},{$linemark}p $wd/calinfo | awk '{if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}} END {sfr = exp((log(fr1)+log(fr2))/2); if (freq <= sfr) {reffreq = fr1; refflux = fl1; aflux = af1}; if (freq > sfr) {reffreq = fr2; refflux = fl2; aflux = af2}; print refflux,reffreq/1000,log(fl1/fl2)/log(fr1/fr2),aflux}' freq=$freq` )
+awk {if (NR == 1) {fl1=$5; fr1 = $7; af1 = $8}; if (NR == 2) {fl2 = $5; fr2 = $7; af2 = $8}} END {sfr = exp((log(fr1)+log(fr2))/2); if (freq <= sfr) {reffreq = fr1; refflux = fl1; aflux = af1}; if (freq > sfr) {reffreq = fr2; refflux = fl2; aflux = af2}; print refflux,reffreq/1000,log(fl1/fl2)/log(fr1/fr2),aflux} freq=1400
+sed -n 1,2p cal3gw4s6/calinfo
+else
+if ( 1 ) then
+echo 2.2 1.425 -1.03078 2321-163 NA 23.35054414 -15.61522583 2
+else
+goto finish
+if ! ( 0 ) rm -rf cal3gw4s6
+rm -rf cal3gw4s6
+exit 0
+if ! ( -1.03078 == NA && `echo $calvals[2] | awk '{if ((($1-freq)^2)^.5 > 0.21*freq) print "1"}' freq=$freq` ) then
+awk {if ((($1-freq)^2)^.5 > 0.21*freq) print "1"} freq=1.4
+echo 1.425
+if ( 0 == 0 ) then
+if ( -1.03078 == NA && `echo $calvals[1] | awk '{if ($1 >= flux) print 1; else print 0}' flux=$flux[1]` ) then
+awk {if ($1 >= flux) print 1; else print 0} flux=10
+echo 2.2
+if ( -1.03078 != NA && `echo $calvals[1-3] | awk '{if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0}' freq=$freq flux=$flux[1]` ) then
+awk {if (((freq/$2)^$3)*$1 >= flux) print 1; else print 0} freq=1.4 flux=10
+echo 2.2 1.425 -1.03078
+else
+endif
+end
+if ! ( 3 ) echo No sources found
+goto finish
+if ! ( 0 ) rm -rf cal3uxiF4
+rm -rf cal3uxiF4
+exit 0

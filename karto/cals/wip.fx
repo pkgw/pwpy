@@ -1,0 +1,43 @@
+lwidth 3
+expand 1
+plot -195 -45 F1 FXA
+plot -195 -25 F2 FXA
+plot -210 -45 X2 FXA
+plot -210 -25 X2 FXA
+plot -255 -45 F1 FXC
+plot -255 -25 F2 FXC
+plot -270 -45 X2 FXC
+plot -270 -25 X2 FXC
+expand .6
+plot -225 -48 i1 FXA
+plot -225 -36 i2 FXA
+plot -225 -24 i3 FXA
+plot -225 -12 i4 FXA
+plot -225 0 i5 FXA
+plot -225 12 i6 FXA
+plot -225 24 i7 FXA
+plot -225 36 i8 FXA
+plot -235 -48 i9 FXA
+plot -235 -36 i10 FXA
+plot -235 -24 i11 FXA
+plot -235 -12 i12 FXA
+plot -235 0 i13 FXA
+plot -235 12 i14 FXA
+plot -235 24 i15 FXA
+plot -235 36 i16 FXA
+plot -285 -48 i1 FXC
+plot -285 -36 i2 FXC
+plot -285 -24 i3 FXC
+plot -285 -12 i4 FXC
+plot -285 0 i5 FXC
+plot -285 12 i6 FXC
+plot -285 24 i7 FXC
+plot -285 36 i8 FXC
+plot -295 -48 i9 FXC
+plot -295 -36 i10 FXC
+plot -295 -24 i11 FXC
+plot -295 -12 i12 FXC
+plot -295 0 i13 FXC
+plot -295 12 i14 FXC
+plot -295 24 i15 FXC
+plot -295 36 i16 FXC
