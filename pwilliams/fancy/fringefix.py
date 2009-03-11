@@ -89,7 +89,7 @@ if opts.out == ' ':
 
 # Multifile UV copying algorithm copied from uvcat.for.
 
-dOut = miriad.VisData (opts.out).open ('w')
+dOut = miriad.VisData (opts.out).open ('c')
 dOut.setPreambleType ('uvw', 'time', 'baseline')
 
 first = True

@@ -81,7 +81,7 @@ if opts.rank > 0:
 else:
     rankMode = False
     
-ds = miriad.Data (opts.vis).open ('r')
+ds = miriad.Data (opts.vis).open ('rw')
 gr = readgains.GainsReader (ds)
 gr.prep ()
 ndata = gr.nfeeds + gr.ntau
