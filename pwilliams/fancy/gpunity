@@ -1,0 +1,79 @@
+#! /usr/bin/env python
+
+"""= gpunity - keep delays but set gains to 1+0j
+& pkgw
+: calibration
++
+ Edit a dataset to set all of its antenna gains to 1+0j, but do
+ not change the delay values. Requires a calibrated visibility
+ dataset with a 'gains' item to operate on.
+
+< vis
+ Only a single input UV dataset is supported by GPUNITY.
+--
+"""
+
+import sys, miriad
+from mirtask import keys, readgains
+from mirtask.util import printBannerSvn
+
+SVNID = '$Id gpunity 666 2009-03-11 q13123123 pkwill $'
+banner = printBannerSvn ('gpunity', 'keep delays but set gains to 1+0j', SVNID)
+
+# Get args and check for consistency.
+
+keys.keyword ('vis', 'f', ' ')
+opts = keys.process ()
+
+if opts.vis == ' ':
+    print >>sys.stderr, 'Error: an input file must be given'
+    sys.exit (1)
+
+# Init gains, check that args make sense given the dataset.
+
+ds = miriad.Data (opts.vis).open ('rw')
+gr = readgains.GainsReader (ds)
+gr.prep ()
+ndata = gr.nfeeds + gr.ntau
+
+if gr.ntau != 1:
+    print >>sys.stderr, 'Error: use gpedit if your dataset doesn\'t have delay info.'
+    sys.exit (1)
+
+# Read and edit data. Could no doubt be more efficient.
+
+time, gains = gr.readAll ()
+ndata = gr.nfeeds + gr.ntau
+
+for j in xrange (gr.nants):
+    o = j * ndata
+        
+    for k in xrange (gr.nfeeds):
+        gains[:,o + k] = 1.0
+
+# Write them back out.
+
+item = ds.getItem ('gains', 'w')
+ofs = 8
+
+for i in xrange (time.size):
+    t = time[0]
+    g = gains[0]
+
+    item.writeDoubles (t, ofs)
+    ofs += 8
+    item.writeComplex (g, ofs)
+    ofs += 8 * gr.ngains
+
+del item
+
+# Write history and call it a day.
+
+ds.openHistory ()
+ds.writeHistory (banner)
+ds.logInvocation ('GPUNITY')
+ds.closeHistory ()
+
+del ds
+
+sys.exit (0)
