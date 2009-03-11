@@ -137,12 +137,12 @@ print 'Timestamp tolerance: %g s' % opts.tol
 
 # Setup.
 
-dOut = VisData (opts.out).open ('w')
+dOut = VisData (opts.out).open ('c')
 dOut.setPreambleType ('uvw', 'time', 'baseline')
 
-in1 = VisData (opts.vis[0]).open ('r')
+in1 = VisData (opts.vis[0]).open ('rw')
 in1.setPreambleType ('uvw', 'time', 'baseline')
-in2 = VisData (opts.vis[1]).open ('r')
+in2 = VisData (opts.vis[1]).open ('rw')
 in2.setPreambleType ('uvw', 'time', 'baseline')
 
 in1.copyHeader (dOut, 'history')
