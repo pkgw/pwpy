@@ -571,7 +571,7 @@ class DataProcessor (object):
 # Rewrite a dataset with new TSys solutions embedded
 
 def rewriteData (banner, vis, out, solutions):
-    dOut = out.open ('w')
+    dOut = out.open ('c')
     dOut.setPreambleType ('uvw', 'time', 'baseline')
 
     first = True

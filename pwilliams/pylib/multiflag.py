@@ -644,7 +644,7 @@ class MultiFlag (object):
             if inp is not curInp:
                 if curInp is not None:
                     # See comment below.
-                    curInp = curInp.refobj.open ('r')
+                    curInp = curInp.refobj.open ('rw')
                     self.doneFile (curInp)
                     curInp.close ()
 
@@ -656,7 +656,7 @@ class MultiFlag (object):
         
         # Need to reopen the dataset to be able to get back to the history.
         # Not too elegant, but life goes on.
-        curInp = curInp.refobj.open ('r')
+        curInp = curInp.refobj.open ('rw')
         self.doneFile (curInp)
         curInp.close ()
 
@@ -672,7 +672,7 @@ class MultiFlag (object):
         
         # Need to reopen the dataset to be able to get back to the history.
         # Not too elegant, but life goes on.
-        inp = dset.open ('r')
+        inp = dset.open ('rw')
         self.doneFile (inp)
         inp.close ()
 
