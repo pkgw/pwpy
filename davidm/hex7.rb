@@ -31,7 +31,7 @@ optvals = options(optkeys, :hexopts)
 opts = Hash[*optkeys.zip(optvals).flatten!]
 keyfin
 
-if opts[:azel] && opts[:azel]
+if opts[:azel] && opts[:radec]
   bug('f',"cannot specify both azel and radec")
 elsif !opts[:radec]
   opts[:azel] = true
