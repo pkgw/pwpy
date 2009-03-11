@@ -17,7 +17,7 @@ import sys, miriad
 from mirtask import keys, readgains
 from mirtask.util import printBannerSvn
 
-SVNID = '$Id gpunity 666 2009-03-11 q13123123 pkwill $'
+SVNID = '$Id$'
 banner = printBannerSvn ('gpunity', 'keep delays but set gains to 1+0j', SVNID)
 
 # Get args and check for consistency.
