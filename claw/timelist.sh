@@ -31,8 +31,10 @@ suffix="$9"
 numpulses=`echo 'scale=0;'${ints}'*'${bin}'/'${period}'+ 1' | bc`  # original
 numpulses_half=`echo 'scale=0;'${ints}'*'${bin}'/(2*'${period}')' | bc`
 
-echo '***Data has '${numpulses}' pulses with period '${period}'s sampled at '${bin}'s***'
-echo '***Averaging into '${phasebins}' bins across 1 phase***'  # to do:  multiple phases
+echo
+echo '***Getting '${numpulses}' pulses assuming period '${period}'s***'
+echo '***Averaging into '${phasebins}' '${bin}'s bins across 1 phase***'  # to do:  multiple phases
+echo
 
 for ((j=0; j<=${phasebins}-1; j++))   # iterate over pulse phase, zero based
 do

@@ -20,6 +20,10 @@ phasebins="$4"
 
 #set -e -x   # for debugging
 
+echo
+echo '***Starting averaging of images across pols (and any split for miriad line limit)***'
+echo
+
 for ((i=0; i<=${phasebins}-1; i++))
     do
     expmp=''

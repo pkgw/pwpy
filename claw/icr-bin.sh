@@ -22,6 +22,10 @@ suffix="$3"
 halflist="$4"
 phasebins="$5"
 
+echo
+echo '***Imaging phase bins***'
+echo
+
 #set -e -x  # for debugging
 file='time-'${suffix}
 
@@ -38,6 +42,7 @@ for half in ${halflist}
     invert vis=${visroot}'-yy' map=$mpsmall beam=$bmsmall select='@'${file}'-bin'${i}${half} options=double,mfs sup=0 imsize=78,78
   done
 
+  echo
   echo '***Dirty image stats***'
 
   for ((i=0; i<=${phasebins}-1; i++))

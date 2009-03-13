@@ -18,7 +18,7 @@ period=0.7136692   # period that fixes phase shift?
 bin=0.1
 phasebins=16
 outphases=1  # not yet implemented
-ints=1500
+ints=500
 t0h=02
 t0m=05
 t0s=02.4
@@ -27,15 +27,21 @@ visroot='fxc-j0332-0.1s'
 imroot='j0332-0.1s'
 suffix='tst'
 halflist='aa'     # data split?  half = aa, ab, ac, ...
+cleanup=1
 ######################
 
 set -e -x
 
 #clean up
-rm -rf ${imroot}-*-${suffix}-*.bm ${imroot}-*-${suffix}-*.* ${imroot}-icube-${suffix}.* time-${suffix}-bin*
+rm -rf ${imroot}-?-${suffix}-*.* ${imroot}-??-${suffix}-bin*.* ${imroot}-icube-${suffix}*.* time-${suffix}-bin*
 
 timelist.sh ${period} ${bin} ${phasebins} ${outphases} ${ints} ${t0h} ${t0m} ${t0s} ${suffix}
 
 icr-bin.sh ${visroot} ${imroot} ${suffix} ${halflist} ${phasebins}
 
 avgim.sh ${imroot} ${suffix} ${halflist} ${phasebins}
+
+if [ $cleanup -eq 1 ]
+    then
+    rm -rf ${imroot}-?-${suffix}-*.* ${imroot}-??-${suffix}-bin*.* time-${suffix}-bin*
+fi
