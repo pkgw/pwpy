@@ -13,12 +13,11 @@
 
 visroot='fxc-j0332-0.1s'
 suffix='tst'
-halflist='aa ab'     # data split?  half = aa, ab, ac, ...
-half=''   # hack!
+halflist='aa'     # data split?  half = aa, ab, ac, ...
 file='time-'${suffix}
 
-#for half in ${halflist}
-#  do
+for half in ${halflist}
+  do
 
   for ((i=0; i<=7; i++))
     do
@@ -39,4 +38,4 @@ file='time-'${suffix}
     imstat in=${visroot}'-yy-'${suffix}'-bin'${i}${half}.mp | tail -n 2
   done
 
-#done
+done

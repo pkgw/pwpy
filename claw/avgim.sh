@@ -7,12 +7,11 @@
 #
 #
 
-set -e -x
+# set -e -x   # for debugging
 
 visroot='fxc-j0332-0.1s'
-suffix='tst2'
-halflist=''   # not yet implemented for averaging
-half=''
+suffix='tst'
+halflist='aa'
 
 for ((i=0; i<=7; i++))
     do
@@ -20,12 +19,12 @@ for ((i=0; i<=7; i++))
     expbm=''
     nhalves=0
     # average bm and mp across pols and halves (split for 256 line limit of miriad)
-#    for half in $halflist
-#	do
+    for half in $halflist
+	do
 	expmp='+<'${visroot}-xx-${suffix}'-bin'${i}${half}'.mp>+<'${visroot}-yy-${suffix}'-bin'${i}${half}'.mp>'${expmp}
 	expbm='+<'${visroot}-xx-${suffix}'-bin'${i}${half}'.bm>+<'${visroot}-yy-${suffix}'-bin'${i}${half}'.bm>'${expbm}
 	nhalves=`echo ${nhalves}+2 | bc`
-#    done
+    done
     # need to use cut to remove superfluous + symbol
     expmp=`echo $expmp | cut -c2-`
     expbm=`echo $expbm | cut -c2-`
@@ -43,6 +42,7 @@ imcat in=${visroot}'-i-'${suffix}'-bin?.bm' out=${visroot}'-icube-'${suffix}'.bm
 # arithmetic on mp
 avmaths in=${visroot}'-icube-'${suffix}'.mp' out=${visroot}'-icube-'${suffix}'-sub.mp' options=subtract
 
+echo
 echo '***Mean-subtracted image stats***'
 imstat in=${visroot}'-icube-'${suffix}'-sub.mp'
 
@@ -50,6 +50,7 @@ imstat in=${visroot}'-icube-'${suffix}'-sub.mp'
 clean map=${visroot}'-icube-'${suffix}'-sub.mp' beam=${visroot}'-icube-'${suffix}'.bm' out=${visroot}'-icube-'${suffix}'-sub.cl' niters=100
 restor map=${visroot}'-icube-'${suffix}'-sub.mp' beam=${visroot}'-icube-'${suffix}'.bm' model=${visroot}'-icube-'${suffix}'-sub.cl' out=${visroot}'-icube-'${suffix}'-sub.rm'
 
+echo
 echo '***Restored image stats***'
 imstat in=${visroot}'-icube-'${suffix}'-sub.rm'
 

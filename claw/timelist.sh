@@ -32,8 +32,8 @@ outn='time-'${suffix}
 file=${outn}'-bin'${j}
 touch $file
 
-for ((i=${numpulses_half}; i<${numpulses}; i++))   # iterate over pulse number, 0-based
-do
+for ((i=0; i<${numpulses}; i++))   # iterate over pulse number, 0-based
+  do
   # get seconds offset
   t1s=`echo 'scale=5; ('${t0s}' + '${j}' * '${period}' / ' ${phasebins} ' + '${period}' * '${i}') ' | bc`
   t2s=`echo 'scale=5; ('${t0s}' + ('${j}' + 1) * '${period}' / ' ${phasebins} ' + '${period}' * '${i} ') ' | bc`
@@ -62,9 +62,13 @@ done
 
 # check if file is over miriad select limit of 256 lines.  if so, split
 numlines=`wc ${file} | gawk '{printf "%d \n", $0}' | head -n 1`
-if [ $numlines -ge 256 ]; then
+if [ $numlines -ge 256 ]
+    then
     echo 'Files to long.  Splitting.'
     split ${file} --lines=255 ${outn}'-bin'${j}
+    rm -f ${file}
+else
+    mv ${file} ${file}aa
     rm -f ${file}
 fi
 
