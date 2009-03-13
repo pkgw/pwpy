@@ -1,39 +1,64 @@
-# average bm
-set i=0 ; maths exp='(<fxc-j0332-0.1s-xx-bin'${i}'aa.bm>+<fxc-j0332-0.1s-xx-bin'${i}'ab.bm>+<fxc-j0332-0.1s-yy-bin'${i}'aa.bm>+<fxc-j0332-0.1s-yy-bin'${i}'ab.bm>)/4' out=fxc-j0332-0.1s-i${i}.bm
-set i=1 ; maths exp='(<fxc-j0332-0.1s-xx-bin'${i}'aa.bm>+<fxc-j0332-0.1s-xx-bin'${i}'ab.bm>+<fxc-j0332-0.1s-yy-bin'${i}'aa.bm>+<fxc-j0332-0.1s-yy-bin'${i}'ab.bm>)/4' out=fxc-j0332-0.1s-i${i}.bm
-set i=2 ; maths exp='(<fxc-j0332-0.1s-xx-bin'${i}'aa.bm>+<fxc-j0332-0.1s-xx-bin'${i}'ab.bm>+<fxc-j0332-0.1s-yy-bin'${i}'aa.bm>+<fxc-j0332-0.1s-yy-bin'${i}'ab.bm>)/4' out=fxc-j0332-0.1s-i${i}.bm
-set i=3 ; maths exp='(<fxc-j0332-0.1s-xx-bin'${i}'aa.bm>+<fxc-j0332-0.1s-xx-bin'${i}'ab.bm>+<fxc-j0332-0.1s-yy-bin'${i}'aa.bm>+<fxc-j0332-0.1s-yy-bin'${i}'ab.bm>)/4' out=fxc-j0332-0.1s-i${i}.bm
-set i=4 ; maths exp='(<fxc-j0332-0.1s-xx-bin'${i}'aa.bm>+<fxc-j0332-0.1s-xx-bin'${i}'ab.bm>+<fxc-j0332-0.1s-yy-bin'${i}'aa.bm>+<fxc-j0332-0.1s-yy-bin'${i}'ab.bm>)/4' out=fxc-j0332-0.1s-i${i}.bm
-set i=5 ; maths exp='(<fxc-j0332-0.1s-xx-bin'${i}'aa.bm>+<fxc-j0332-0.1s-xx-bin'${i}'ab.bm>+<fxc-j0332-0.1s-yy-bin'${i}'aa.bm>+<fxc-j0332-0.1s-yy-bin'${i}'ab.bm>)/4' out=fxc-j0332-0.1s-i${i}.bm
-set i=6 ; maths exp='(<fxc-j0332-0.1s-xx-bin'${i}'aa.bm>+<fxc-j0332-0.1s-xx-bin'${i}'ab.bm>+<fxc-j0332-0.1s-yy-bin'${i}'aa.bm>+<fxc-j0332-0.1s-yy-bin'${i}'ab.bm>)/4' out=fxc-j0332-0.1s-i${i}.bm
-set i=7 ; maths exp='(<fxc-j0332-0.1s-xx-bin'${i}'aa.bm>+<fxc-j0332-0.1s-xx-bin'${i}'ab.bm>+<fxc-j0332-0.1s-yy-bin'${i}'aa.bm>+<fxc-j0332-0.1s-yy-bin'${i}'ab.bm>)/4' out=fxc-j0332-0.1s-i${i}.bm
+#! /bin/bash
+#
+# Usage: avgim.sh
+#
+# Output files are
+#
+#
+#
 
-# average mp
-set i=0 ; maths exp='(<fxc-j0332-0.1s-xx-bin'${i}'aa.mp>+<fxc-j0332-0.1s-xx-bin'${i}'ab.mp>+<fxc-j0332-0.1s-yy-bin'${i}'aa.mp>+<fxc-j0332-0.1s-yy-bin'${i}'ab.mp>)/4' out=fxc-j0332-0.1s-i${i}.mp
-set i=1 ; maths exp='(<fxc-j0332-0.1s-xx-bin'${i}'aa.mp>+<fxc-j0332-0.1s-xx-bin'${i}'ab.mp>+<fxc-j0332-0.1s-yy-bin'${i}'aa.mp>+<fxc-j0332-0.1s-yy-bin'${i}'ab.mp>)/4' out=fxc-j0332-0.1s-i${i}.mp
-set i=2 ; maths exp='(<fxc-j0332-0.1s-xx-bin'${i}'aa.mp>+<fxc-j0332-0.1s-xx-bin'${i}'ab.mp>+<fxc-j0332-0.1s-yy-bin'${i}'aa.mp>+<fxc-j0332-0.1s-yy-bin'${i}'ab.mp>)/4' out=fxc-j0332-0.1s-i${i}.mp
-set i=3 ; maths exp='(<fxc-j0332-0.1s-xx-bin'${i}'aa.mp>+<fxc-j0332-0.1s-xx-bin'${i}'ab.mp>+<fxc-j0332-0.1s-yy-bin'${i}'aa.mp>+<fxc-j0332-0.1s-yy-bin'${i}'ab.mp>)/4' out=fxc-j0332-0.1s-i${i}.mp
-set i=4 ; maths exp='(<fxc-j0332-0.1s-xx-bin'${i}'aa.mp>+<fxc-j0332-0.1s-xx-bin'${i}'ab.mp>+<fxc-j0332-0.1s-yy-bin'${i}'aa.mp>+<fxc-j0332-0.1s-yy-bin'${i}'ab.mp>)/4' out=fxc-j0332-0.1s-i${i}.mp
-set i=5 ; maths exp='(<fxc-j0332-0.1s-xx-bin'${i}'aa.mp>+<fxc-j0332-0.1s-xx-bin'${i}'ab.mp>+<fxc-j0332-0.1s-yy-bin'${i}'aa.mp>+<fxc-j0332-0.1s-yy-bin'${i}'ab.mp>)/4' out=fxc-j0332-0.1s-i${i}.mp
-set i=6 ; maths exp='(<fxc-j0332-0.1s-xx-bin'${i}'aa.mp>+<fxc-j0332-0.1s-xx-bin'${i}'ab.mp>+<fxc-j0332-0.1s-yy-bin'${i}'aa.mp>+<fxc-j0332-0.1s-yy-bin'${i}'ab.mp>)/4' out=fxc-j0332-0.1s-i${i}.mp
-set i=7 ; maths exp='(<fxc-j0332-0.1s-xx-bin'${i}'aa.mp>+<fxc-j0332-0.1s-xx-bin'${i}'ab.mp>+<fxc-j0332-0.1s-yy-bin'${i}'aa.mp>+<fxc-j0332-0.1s-yy-bin'${i}'ab.mp>)/4' out=fxc-j0332-0.1s-i${i}.mp
+set -e -x
+
+visroot='fxc-j0332-0.1s'
+suffix='tst'
+halflist='aa ab'   # not yet implemented for averaging
+
+for ((i=0; i<=7; i++))
+    do
+    expmp=''
+    expbm=''
+    nhalves=0
+    # average bm and mp across pols and halves (split for 256 line limit of miriad)
+    for half in $halflist
+	do
+	expmp='+<'${visroot}-xx-${suffix}'-bin'${i}${half}'.mp>+<'${visroot}-yy-${suffix}'-bin'${i}${half}'.mp>'${expmp}
+	expbm='+<'${visroot}-xx-${suffix}'-bin'${i}${half}'.bm>+<'${visroot}-yy-${suffix}'-bin'${i}${half}'.bm>'${expbm}
+	nhalves=`echo ${nhalves}+2 | bc`
+    done
+    # need to use cut to remove superfluous + symbol
+    expmp=`echo $expmp | cut -c2-`
+    expbm=`echo $expbm | cut -c2-`
+    expmp='('${expmp}')/'${nhalves}
+    expbm='('${expbm}')/'${nhalves}
+
+    maths exp=${expmp} out=${visroot}'-i-'${suffix}'-bin'${i}$'.mp'
+    maths exp=${expbm} out=${visroot}'-i-'${suffix}'-bin'${i}$'.bm'
+done
 
 # cat together along third axis
-imcat in=fxc-j0332-0.1s-i"?".mp out=fxc-j0332-0.1s-icube.mp options=relax
-imcat in=fxc-j0332-0.1s-i"?".bm out=fxc-j0332-0.1s-icube.bm options=relax
+imcat in=${visroot}'-i-'${suffix}'-bin?.mp' out=${visroot}'-icube-'${suffix}'.mp' options=relax
+imcat in=${visroot}'-i-'${suffix}'-bin?.bm' out=${visroot}'-icube-'${suffix}'.bm' options=relax
 
 # arithmetic on mp
-avmaths in=fxc-j0332-0.1s-icube.mp out=fxc-j0332-0.1s-icube-sub.mp options=subtract
+avmaths in=${visroot}'-icube-'${suffix}'.mp' out=${visroot}'-icube-'${suffix}'-sub.mp' options=subtract
+
+echo '***Mean-subtracted image stats***'
+imstat in=${visroot}'-icube-'${suffix}'-sub.mp'
 
 # clean map (lightly) and restore
-clean map=fxc-j0332-0.1s-icube-sub.mp beam=fxc-j0332-0.1s-icube.bm out=fxc-j0332-0.1s-icube-sub.cl niters=100
-restor map=fxc-j0332-0.1s-icube-sub.mp beam=fxc-j0332-0.1s-icube.bm model=fxc-j0332-0.1s-icube-sub.cl out=fxc-j0332-0.1s-icube-sub.rm
+clean map=${visroot}'-icube-'${suffix}'-sub.mp' beam=${visroot}'-icube-'${suffix}'.bm' out=${visroot}'-icube-'${suffix}'-sub.cl' niters=100
+restor map=${visroot}'-icube-'${suffix}'-sub.mp' beam=${visroot}'-icube-'${suffix}'.bm' model=${visroot}'-icube-'${suffix}'-sub.cl' out=${visroot}'-icube-'${suffix}'-sub.rm'
 
+echo '***Restored image stats***'
+imstat in=${visroot}'-icube-'${suffix}'-sub.rm'
+
+# other analysis
+#
 # fit the source!
-imfit in=fxc-j0332-0.1s-icube-sub.rm region='boxes(30,30,50,50)(2,2)' object=gaussian
-
+#imfit in=fxc-j0332-0.1s-icube-sub.rm region='boxes(30,30,50,50)(2,2)' object=gaussian
+#
 # redo cube without chan 2
-avmaths in=fxc-j0332-0.1s-icube.mp out=fxc-j0332-0.1s-icube-subno2.mp options=subtract region='image(1,1),image(3,8)'
-
-clean map=fxc-j0332-0.1s-icube-subno2.mp beam=fxc-j0332-0.1s-icube.bm out=fxc-j0332-0.1s-icube-subno2.cl niters=100
-restor map=fxc-j0332-0.1s-icube-subno2.mp beam=fxc-j0332-0.1s-icube.bm model=fxc-j0332-0.1s-icube-subno2.cl out=fxc-j0332-0.1s-icube-subno2.rm
+#avmaths in=fxc-j0332-0.1s-icube.mp out=fxc-j0332-0.1s-icube-subno2.mp options=subtract region='image(1,1),image(3,8)'
+#
+#clean map=fxc-j0332-0.1s-icube-subno2.mp beam=fxc-j0332-0.1s-icube.bm out=fxc-j0332-0.1s-icube-subno2.cl niters=100
+#restor map=fxc-j0332-0.1s-icube-subno2.mp beam=fxc-j0332-0.1s-icube.bm model=fxc-j0332-0.1s-icube-subno2.cl out=fxc-j0332-0.1s-icube-subno2.rm

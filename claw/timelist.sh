@@ -1,26 +1,41 @@
 #! /bin/bash
 #
 # Makes files with select statements for imaging a pulsar
-
+#
+######################
+# customize here
 period=0.71452
 bin=0.1
+phasebins=8
+outphases=1  # not yet implemented
+ints=3000
 t0h=02
 t0m=05
 t0s=02.4
+suffix='tst'
+######################
 
-numpulses=`echo 'scale=0;3000*0.1/'${period}'+1' | bc`  # a guess at the number of pulses to interate over
+# set -e -x  # for debugging
 
-for ((j=0; j<=7; j++))   # iterate over pulse phase (slightly oversampled)
+# a guess at the number of pulses to interate over
+numpulses=`echo 'scale=0;'${ints}'*'${bin}'/'${period}'+ 1' | bc`  # original
+numpulses_half=`echo 'scale=0;'${ints}'*'${bin}'/(2*'${period}')' | bc`
+
+echo '***Data has '${numpulses}' pulses with period '${period}'s sampled at '${bin}'s***'
+echo '***Averaging into '${phasebins}' bins across 1 phase***'  # to do:  multiple phases
+
+for ((j=0; j<=${phasebins}-1; j++))   # iterate over pulse phase, zero based
 do
 
-file='time-bin'${j}
+outn='time-'${suffix}
+file=${outn}'-bin'${j}
 touch $file
 
-for ((i=0; i<=${numpulses}; i++))   # iterate over pulse number
+for ((i=0; i<${numpulses}; i++))   # iterate over pulse number, 0-based
 do
   # get seconds offset
-  t1s=`echo 'scale=5; ('${t0s}' + '${j}' * '${period}' / 8 + '${period}' * '${i}') ' | bc`  # slightly oversamples pulse phase from 0.1/0.71452 to 1/8
-  t2s=`echo 'scale=5; ('${t0s}' + ('${j}' + 1) * '${period}' / 8 + '${period}' * '${i} ') ' | bc`  # slightly oversamples pulse phase from 0.1/0.71452 to 1/8
+  t1s=`echo 'scale=5; ('${t0s}' + '${j}' * '${period}' / ' ${phasebins} ' + '${period}' * '${i}') ' | bc`
+  t2s=`echo 'scale=5; ('${t0s}' + ('${j}' + 1) * '${period}' / ' ${phasebins} ' + '${period}' * '${i} ') ' | bc`
 
   # adjust minutes offset
   t1m=`echo 'scale=0; '${t1s}'/60' | bc`
@@ -40,10 +55,16 @@ do
   t1h=`echo 'scale=0; '${t0h}' + '${t1h} | bc`
   t2h=`echo 'scale=0; '${t0h}' + '${t2h} | bc`
 
+  # print time filter to file
   echo 'time('${t1h}':'${t1m}':'${t1s}','${t1h}':'${t2m}':'${t2s}')'  >> $file
 done
 
-split ${file} --lines=255 'time-bin'${j}
-rm -f ${file}
+# check if file is over miriad select limit of 256 lines.  if so, split
+numlines=`wc ${file} | gawk '{printf "%d \n", $0}' | head -n 1`
+if [ $numlines -ge 256 ]; then
+    echo 'Files to long.  Splitting.'
+    split ${file} --lines=255 ${outn}'-bin'${j}
+    rm -f ${file}
+fi
 
 done
