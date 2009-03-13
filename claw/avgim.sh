@@ -12,8 +12,9 @@
 visroot='fxc-j0332-0.1s'
 suffix='tst'
 halflist='aa'
+phasebins=16
 
-for ((i=0; i<=7; i++))
+for ((i=0; i<=${phasebines}-1; i++))
     do
     expmp=''
     expbm=''

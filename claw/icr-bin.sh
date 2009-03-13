@@ -15,11 +15,12 @@ visroot='fxc-j0332-0.1s'
 suffix='tst'
 halflist='aa'     # data split?  half = aa, ab, ac, ...
 file='time-'${suffix}
+phasebins=16
 
 for half in ${halflist}
   do
 
-  for ((i=0; i<=7; i++))
+  for ((i=0; i<=${phasebins}-1; i++))
     do
     mpsmall=${visroot}'-xx-'${suffix}'-bin'${i}${half}.mp
     bmsmall=${visroot}'-xx-'${suffix}'-bin'${i}${half}.bm
@@ -31,7 +32,7 @@ for half in ${halflist}
 
   echo '***Dirty image stats***'
 
-  for ((i=0; i<=7; i++))
+  for ((i=0; i<=${phasebins}-1; i++))
     do
     echo 'Image '${i}':'
     imstat in=${visroot}'-xx-'${suffix}'-bin'${i}${half}.mp | tail -n 2

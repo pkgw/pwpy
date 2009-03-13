@@ -64,7 +64,7 @@ done
 numlines=`wc ${file} | gawk '{printf "%d \n", $0}' | head -n 1`
 if [ $numlines -ge 256 ]
     then
-    echo 'Files to long.  Splitting.'
+    echo 'File too long.  Splitting.'
     split ${file} --lines=255 ${outn}'-bin'${j}
     rm -f ${file}
 else
