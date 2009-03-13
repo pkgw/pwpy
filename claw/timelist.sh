@@ -5,16 +5,25 @@
 ######################
 # customize here
 #period=0.71452    # period from literature
-period=0.7136692   # period that fixes phase shift?
-bin=0.1
-phasebins=16
-outphases=1  # not yet implemented
-ints=3000
-t0h=02
-t0m=05
-t0s=02.4
-suffix='tst'
+#period=0.7136692   # period that fixes phase shift?
+#bin=0.1
+#phasebins=16
+#outphases=1  # not yet implemented
+#ints=3000
+#t0h=02
+#t0m=05
+#t0s=02.4
+#suffix='tst'
 ######################
+period="$1"
+bin="$2"
+phasebins="$3"
+outphases="$4"
+ints="$5"
+t0h="$6"
+t0m="$7"
+t0s="$8"
+suffix="$9"
 
 # set -e -x  # for debugging
 

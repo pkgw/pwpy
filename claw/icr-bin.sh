@@ -10,12 +10,17 @@
 # Assumes data with no autos or cross-hand pol
 #
 ##################
-visroot='fxc-j0332-0.1s'
-imroot='j0332-0.1s'
-suffix='tst'
-halflist='aa ab'     # data split?  half = aa, ab, ac, ...
-phasebins=16
+#visroot='fxc-j0332-0.1s'
+#imroot='j0332-0.1s'
+#suffix='tst'
+#halflist='aa ab'     # data split?  half = aa, ab, ac, ...
+#phasebins=16
 ##################
+visroot="$1"
+imroot="$2"
+suffix="$3"
+halflist="$4"
+phasebins="$5"
 
 #set -e -x  # for debugging
 file='time-'${suffix}

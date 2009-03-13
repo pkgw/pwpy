@@ -7,11 +7,16 @@
 #
 #
 ##################
-imroot='j0332-0.1s'
-suffix='tst'
-halflist='aa ab'
-phasebins=16
+# default params?
+#imroot='j0332-0.1s'
+#suffix='tst'
+#halflist='aa ab'
+#phasebins=16
 ##################
+imroot="$1"
+suffix="$2"
+halflist="$3"
+phasebins="$4"
 
 #set -e -x   # for debugging
 
