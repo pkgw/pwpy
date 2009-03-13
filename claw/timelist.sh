@@ -4,9 +4,10 @@
 #
 ######################
 # customize here
-period=0.71452
+#period=0.71452    # period from literature
+period=0.7136692   # period that fixes phase shift?
 bin=0.1
-phasebins=8
+phasebins=16
 outphases=1  # not yet implemented
 ints=3000
 t0h=02
@@ -31,7 +32,7 @@ outn='time-'${suffix}
 file=${outn}'-bin'${j}
 touch $file
 
-for ((i=0; i<${numpulses}; i++))   # iterate over pulse number, 0-based
+for ((i=${numpulses_half}; i<${numpulses}; i++))   # iterate over pulse number, 0-based
 do
   # get seconds offset
   t1s=`echo 'scale=5; ('${t0s}' + '${j}' * '${period}' / ' ${phasebins} ' + '${period}' * '${i}') ' | bc`
