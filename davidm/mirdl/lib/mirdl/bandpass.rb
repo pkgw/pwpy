@@ -57,8 +57,8 @@ module Mirdl
     select = []
     n = -1
     off = 8
-    for i in 1..nspect
-      nschan = hreadi(item,ibuf,off,8)[0]
+    for i in 0...nspect
+      nschan = hreadi(item,ibuf,off,4)[0]
       off += 8
       hreadd(item,sfreq_sdf,off,2*8)
       off += 2*8
@@ -78,12 +78,8 @@ module Mirdl
     hdaccess(item)
 
     # Take reciprocal of gains
-    for i in 0...nchan
-      for j in 0...nfeeds
-        for k in 0...nants
-          bandpass[i,j,k] = 1.0 / bandpass[i,j,k] if bandpass[i,j,k].abs > 0
-        end
-      end
+    for i in 0...nchan*nfeeds*nants
+      bandpass[i] = 1.0 / bandpass[i] if bandpass[i].abs > 0
     end
 
     # TODO Perform frequency selection, if needed.
