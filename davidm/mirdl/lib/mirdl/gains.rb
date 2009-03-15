@@ -10,7 +10,7 @@ module Mirdl
 
   # Returns Hash with jd as key and NArray.scomplex(ngains) of gains.
   # NArray has gains for a1f1, ..., a1fF, a2f1, ..., a2fF, ..., aNf1, ..., aNfF
-  # where F is nfeeds and N is nanta.
+  # where F is nfeeds and N is nants.
   def get_gains(tno, sels=nil)
     return nil unless hdprsnt(tno, :gains)
 
@@ -57,7 +57,7 @@ module Mirdl
       t = hreadd(item,tbuf,offset,8)[0]
       offset = offset + 8
       if(doselect)then
-        select = SelProbe(sels,'time',t)
+        select = selProbe(sels,'time',t)
       else
         select = true
       end
