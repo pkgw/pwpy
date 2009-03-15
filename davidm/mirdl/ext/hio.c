@@ -26,8 +26,8 @@ static enum NArray_Types hio2na[] = {
 static int hio_sizeof[] = {
   /* dummy   -> */ 0,
   /* H_BYTE  -> */ 1,
-  /* H_INT   -> */ 2,
-  /* H_INT2  -> */ 4,
+  /* H_INT   -> */ 4,
+  /* H_INT2  -> */ 2,
   /* H_REAL  -> */ 4,
   /* H_DBLE  -> */ 8,
   /* H_TXT   -> */ 0,
