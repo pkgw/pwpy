@@ -10,13 +10,12 @@ module Mirdl
 
   # Returns [bandpass, freqs]
   # +bandpass+ is NArray that is nants*nfeeds*nchan long
-  # +freqs+ is an array of frequencies corresponding to each channel
+  # +freqs+ is an Array of frequencies corresponding to each channel
   def get_bandpass(tno, sels=nil)
     return nil unless hdprsnt(tno, :bandpass)
 
     # Determine the various parameters, and check their validity. We have pretty
     # well checked that all is OK before, so nothing should go wrong.
-    #TODO doselect = sels && selProbe(sels,'time?')
     nfeeds = rdhdi(tno,'nfeeds',1)
     ngains = rdhdi(tno,'ngains',1)
     ntau   = rdhdi(tno,'ntau',0)
@@ -48,13 +47,13 @@ module Mirdl
       bug('f', 'Bad number of frequency spectral windows')
     end
 
-    doselect = selProbe(sels,'frequency?')
+    doselect = sels && selProbe(sels,'frequency?')
 
     #  Read the frequency table.
     item = haccess(tno,'freqs','read')
     ibuf = NArray.int(1)
     sfreq_sdf = NArray.float(2)
-    freqs = NArray.float(nspect*nschan)
+    freqs = []
     select = []
     n = -1
     off = 8
@@ -66,21 +65,25 @@ module Mirdl
       for j in 0...nschan
         n += 1
         freqs[n] = sfreq_sdf[0] + j*sfreq_sdf[1]
-        select[n] = !doselect || selProbe(sels,'frequency',freqs[n])
+        select[n] = !doselect || (sels && selProbe(sels,'frequency',freqs[n]))
       end
     end
     hdaccess(item)
 
     # Read the bandpass table now
     item = haccess(tno,'bandpass','read')
-    bandpass = NArray.scomplex(nants*nfeeds*nchan)
+    bandpass = NArray.scomplex(nchan,nfeeds,nants)
     off = 8
-    hreadc(item,bandpass,off,8*nants*nfeeds*nchan,iostat)
+    hreadc(item,bandpass,off,8*nants*nfeeds*nchan)
     hdaccess(item)
 
     # Take reciprocal of gains
-    for i in 0...(nants*nfeeds*nchan)
-      bandpass[i] = 1.0 / bandpass[i] if bandpass[i].abs > 0
+    for i in 0...nchan
+      for j in 0...nfeeds
+        for k in 0...nants
+          bandpass[i,j,k] = 1.0 / bandpass[i,j,k] if bandpass[i,j,k].abs > 0
+        end
+      end
     end
 
     # TODO Perform frequency selection, if needed.
