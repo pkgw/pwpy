@@ -5,7 +5,7 @@ import miriad, numpy, pylab
 from mirtask import readgains
 
 # read in data
-ds = miriad.Data ('fx64c-cyga-32-480-0.2s-2').open ('r')
+ds = miriad.Data ('fx64c-cyga-32-480-0.2s-2').open ('rw')
 gr = readgains.GainsReader (ds)
 gr.prep ()
 

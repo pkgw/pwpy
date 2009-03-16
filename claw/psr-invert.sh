@@ -13,14 +13,12 @@
 #visroot='fxc-j0332-0.1s'
 #imroot='j0332-0.1s'
 #suffix='tst'
-#halflist='aa ab'     # data split?  half = aa, ab, ac, ...
 #phasebins=16
 ##################
 visroot="$1"
 imroot="$2"
 suffix="$3"
-halflist="$4"
-phasebins="$5"
+phasebins="$4"
 
 echo
 echo '***Imaging phase bins***'
@@ -28,6 +26,25 @@ echo
 
 #set -e -x  # for debugging
 file='time-'${suffix}
+
+
+nsplit=`ls ${file}-bin0a? | wc | gawk '{printf "%d \n", $0}' | head -n 1`
+if [ $nsplit -eq 1 ]
+then
+    halflist='aa'
+elif [ $nsplit -eq 2 ]
+then
+    halflist='aa ab'
+elif [ $nsplit -eq 3 ]
+then
+    halflist='aa ab ac'
+elif [ $nsplit -eq 4 ]
+then
+    halflist='aa ab ac ad'
+else
+    print 'Not getting split files higher than ad!'
+    halflist='aa ab ac ad'
+fi
 
 for half in ${halflist}
   do

@@ -2,7 +2,7 @@
 # claw 10mar09
 
 import miriad, mirexec
-import glob
+import glob, string
 
 def main():
     # get files in order
@@ -10,6 +10,8 @@ def main():
     filesort = natsorted(files)
 
     peak = []
+    bmaj = []
+    bmin = []
 
     # loop over all images
     for file in filesort:
@@ -17,15 +19,36 @@ def main():
         im = miriad.ImData(file)
         stdout, stderr = mirexec.TaskImFit(in_=im, object='gaussian').snarf()
 
+#        print stdout
+        
         # parse output
         for line in stdout:
             if string.find(line, 'Peak') >= 0:
-                peakline = line
-                sp = peakline.split(' ')
-            elif string.find(line, 'Major axis') >= 0: majorline = line
-            elif string.find(line, 'Minor axis') >= 0: minorline = line
+                if len(line.split('   ')) > 8:
+                    sp = (float(line.split('   ')[6]), float(line.split('   ')[8]))   # tuple of peak and error
+                    peak.append(sp)
+                else:
+                    sp = (float(line.split('   ')[6]),-1)   # tuple of peak and error
+                    peak.append(sp)
+            elif string.find(line, 'Major axis') >= 0:
+                if len(line.split(' ')) > 16:
+                       major = (float(line.split(' ')[13]), float(line.split(' ')[16]))   # tuple of bmaj and error
+                       bmaj.append(major)
+                else:
+                       major = (float(line.split(' ')[13]),-1)   # tuple of bmaj and error
+                       bmaj.append(major)
+            elif string.find(line, 'Minor axis') >= 0:
+                if len(line.split(' ')) > 16:
+                       minor = (float(line.split(' ')[13]), float(line.split(' ')[16]))   # tuple of bmin and error
+                       bmin.append(minor)
+                else:
+                       minor = (float(line.split(' ')[13]),-1)   # tuple of bmin and error
+                       bmin.append(minor)
+                
 
-        # fill result array
+        print 'Fit %s' % (file)
+        print sp, major, minor
+    return peak, bmaj, bmin
 
 
 # "natural" sorting of string list

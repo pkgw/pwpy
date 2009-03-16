@@ -13,20 +13,29 @@
 
 ######################
 # customize here
-#period=0.71452    # period from literature
-period=0.7136692   # period that fixes phase shift?
+
+# observation properties:
+period=0.7   # period that fixes phase shift?
+#period=0.7136692   # period that fixes phase shift?
 bin=0.1
-phasebins=16
-outphases=1  # not yet implemented
-ints=500
+ints=3000
+
+# time for j0332-0.1s:
 t0h=02
 t0m=05
 t0s=02.4
+# time for j0332-0.03s:
+#t0h=02
+#t0m=11
+#t0s=00.7
+
+# output properties:
+phasebins=8
+outphases=1  # not yet implemented
 suffix='tst'
 visroot='fxc-j0332-0.1s'
 imroot='j0332-0.1s'
 suffix='tst'
-halflist='aa'     # data split?  half = aa, ab, ac, ...
 cleanup=1
 ######################
 
@@ -35,11 +44,11 @@ set -e -x
 #clean up
 rm -rf ${imroot}-?-${suffix}-*.* ${imroot}-??-${suffix}-bin*.* ${imroot}-icube-${suffix}*.* time-${suffix}-bin*
 
-timelist.sh ${period} ${bin} ${phasebins} ${outphases} ${ints} ${t0h} ${t0m} ${t0s} ${suffix}
+psr-timeselect.sh ${period} ${bin} ${phasebins} ${outphases} ${ints} ${t0h} ${t0m} ${t0s} ${suffix}
 
-icr-bin.sh ${visroot} ${imroot} ${suffix} ${halflist} ${phasebins}
+psr-invert.sh ${visroot} ${imroot} ${suffix} ${phasebins}
 
-avgim.sh ${imroot} ${suffix} ${halflist} ${phasebins}
+psr-avsubcl.sh ${imroot} ${suffix} ${phasebins}
 
 if [ $cleanup -eq 1 ]
     then

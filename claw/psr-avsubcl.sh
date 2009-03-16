@@ -10,15 +10,32 @@
 # default params?
 #imroot='j0332-0.1s'
 #suffix='tst'
-#halflist='aa ab'
 #phasebins=16
 ##################
 imroot="$1"
 suffix="$2"
-halflist="$3"
-phasebins="$4"
+phasebins="$3"
 
-#set -e -x   # for debugging
+set -e -x   # for debugging
+file='time-'${suffix}
+
+nsplit=`ls ${file}-bin0a? | wc | gawk '{printf "%d \n", $0}' | head -n 1`
+if [ $nsplit -eq 1 ]
+then
+    halflist='aa'
+elif [ $nsplit -eq 2 ]
+then
+    halflist='aa ab'
+elif [ $nsplit -eq 3 ]
+then
+    halflist='aa ab ac'
+elif [ $nsplit -eq 4 ]
+then
+    halflist='aa ab ac ad'
+else
+    print 'Not getting split files higher than ad!'
+    halflist='aa ab ac ad'
+fi
 
 echo
 echo '***Starting averaging of images across pols (and any split for miriad line limit)***'

@@ -33,7 +33,7 @@ numpulses_half=`echo 'scale=0;'${ints}'*'${bin}'/(2*'${period}')' | bc`
 
 echo
 echo '***Getting '${numpulses}' pulses assuming period '${period}'s***'
-echo '***Averaging into '${phasebins}' '${bin}'s bins across 1 phase***'  # to do:  multiple phases
+echo '***Averaging into '${phasebins}' bins across 1 phase. Data bin size is '${bin}'s.***'  # to do:  multiple phases
 echo
 
 for ((j=0; j<=${phasebins}-1; j++))   # iterate over pulse phase, zero based
