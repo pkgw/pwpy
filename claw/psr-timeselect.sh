@@ -24,12 +24,37 @@ t0h="$6"
 t0m="$7"
 t0s="$8"
 suffix="$9"
+frac="${10}"
 
-# set -e -x  # for debugging
+#set -e -x  # for debugging
 
 # a guess at the number of pulses to interate over
 numpulses=`echo 'scale=0;'${ints}'*'${bin}'/'${period}'+ 1' | bc`  # original
 numpulses_half=`echo 'scale=0;'${ints}'*'${bin}'/(2*'${period}')' | bc`
+numpulses_third=`echo 'scale=0;'${ints}'*'${bin}'/(3*'${period}')' | bc`
+numpulses_2third=`echo 'scale=0;'2*${ints}'*'${bin}'/(3*'${period}')' | bc`
+
+echo $frac
+
+if [ "$frac" = 'all' ]; then
+    istart=0
+    istop=${numpulses}
+elif [ "$frac" = '1/2' ]; then
+    istart=0
+    istop=${numpulses_half}
+elif [ "$frac" = '2/2' ]; then
+    istart=${numpulses_half}
+    istop=${numpulses}
+elif [ "$frac" = '1/3' ]; then
+    istart=0
+    istop=${numpulses_third}
+elif [ "$frac" = '2/3' ]; then
+    istart=${numpulses_third}
+    istop=${numpulses_2third}
+elif [ "$frac" = '3/3' ]; then
+    istart=${numpulses_2third}
+    istop=${numpulses}
+fi
 
 echo
 echo '***Getting '${numpulses}' pulses assuming period '${period}'s***'
@@ -43,7 +68,7 @@ outn='time-'${suffix}
 file=${outn}'-bin'${j}
 touch $file
 
-for ((i=0; i<${numpulses}; i++))   # iterate over pulse number, 0-based
+for ((i=${istart}; i<${istop}; i++))   # iterate over pulse number, 0-based
   do
   # get seconds offset
   t1s=`echo 'scale=5; ('${t0s}' + '${j}' * '${period}' / ' ${phasebins} ' + '${period}' * '${i}') ' | bc`

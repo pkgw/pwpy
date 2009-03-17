@@ -16,7 +16,7 @@ imroot="$1"
 suffix="$2"
 phasebins="$3"
 
-set -e -x   # for debugging
+#set -e -x   # for debugging
 file='time-'${suffix}
 
 nsplit=`ls ${file}-bin0a? | wc | gawk '{printf "%d \n", $0}' | head -n 1`

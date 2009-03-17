@@ -15,7 +15,7 @@
 # customize here
 
 # observation properties:
-period=0.7   # period that fixes phase shift?
+period=0.714   # period that fixes phase shift?
 #period=0.7136692   # period that fixes phase shift?
 bin=0.1
 ints=3000
@@ -24,18 +24,14 @@ ints=3000
 t0h=02
 t0m=05
 t0s=02.4
-# time for j0332-0.03s:
-#t0h=02
-#t0m=11
-#t0s=00.7
 
 # output properties:
 phasebins=8
 outphases=1  # not yet implemented
-suffix='tst'
+suffix='1-3-try3'
 visroot='fxc-j0332-0.1s'
 imroot='j0332-0.1s'
-suffix='tst'
+frac='1/3'
 cleanup=1
 ######################
 
@@ -44,7 +40,7 @@ set -e -x
 #clean up
 rm -rf ${imroot}-?-${suffix}-*.* ${imroot}-??-${suffix}-bin*.* ${imroot}-icube-${suffix}*.* time-${suffix}-bin*
 
-psr-timeselect.sh ${period} ${bin} ${phasebins} ${outphases} ${ints} ${t0h} ${t0m} ${t0s} ${suffix}
+psr-timeselect.sh ${period} ${bin} ${phasebins} ${outphases} ${ints} ${t0h} ${t0m} ${t0s} ${suffix} ${frac}
 
 psr-invert.sh ${visroot} ${imroot} ${suffix} ${phasebins}
 
