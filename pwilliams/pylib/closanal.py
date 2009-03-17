@@ -115,9 +115,9 @@ def _flushOneInteg3 (integData, accData, ap1, ap2, ap3):
     if tup12 is None or tup13 is None or tup23 is None:
         return
 
-    (d12, f12, v12, t12) =  tup12
-    (d13, f13, v13, t13) =  tup13
-    (d23, f23, v23, t23) =  tup23
+    (d12, f12, v12, t12, e12) =  tup12
+    (d13, f13, v13, t13, e13) =  tup13
+    (d23, f23, v23, t23, e23) =  tup23
 
     assert t12 == t13 and t12 == t23
     
@@ -129,13 +129,14 @@ def _flushOneInteg3 (integData, accData, ap1, ap2, ap3):
     t = n * t12
     c = (d12[w].sum () * d23[w].sum () * d13[w].sum ().conj ()) * t
     v = (v12 + v13 + v23) * t
+    e2 = 0.0
     
     accKey = (ap1, ap2, ap3)
     if accKey not in accData:
-        accData[accKey] = (t, c, v)
+        accData[accKey] = (t, c, v, e2)
     else:
-        (t0, c0, v0) = accData[accKey]
-        accData[accKey] = (t + t0, c + c0, v + v0)
+        (t0, c0, v0, e20) = accData[accKey]
+        accData[accKey] = (t + t0, c + c0, v + v0, e2 + e20)
 
 
 def _flushOneInteg4 (integData, accData, ap1, ap2, ap3, ap4):
@@ -147,10 +148,10 @@ def _flushOneInteg4 (integData, accData, ap1, ap2, ap3, ap4):
     if tup12 is None or tup13 is None or tup24 is None or tup34 is None:
         return
 
-    (d12, f12, v12, t12) =  tup12
-    (d13, f13, v13, t13) =  tup13
-    (d24, f24, v24, t24) =  tup24
-    (d34, f34, v34, t34) =  tup34
+    (d12, f12, v12, t12, e12) =  tup12
+    (d13, f13, v13, t13, e13) =  tup13
+    (d24, f24, v24, t24, e24) =  tup24
+    (d34, f34, v34, t34, e34) =  tup34
 
     assert t12 == t13 and t12 == t24 and t12 == t34
 
@@ -163,13 +164,14 @@ def _flushOneInteg4 (integData, accData, ap1, ap2, ap3, ap4):
     t = n * t12
     c = (d12[w].sum () * d34[w].sum () / d13[w].sum () / d24[w].sum ().conj ()) * t
     v = (v12 + v13 + v24 + v34) * t
-
+    e2 = 0.0
+    
     accKey = (ap1, ap2, ap3, ap4)
     if accKey not in accData:
-        accData[accKey] = (t, c, v)
+        accData[accKey] = (t, c, v, e2)
     else:
-        (t0, c0, v0) = accData[accKey]
-        accData[accKey] = (t + t0, c + c0, v + v0)
+        (t0, c0, v0, e20) = accData[accKey]
+        accData[accKey] = (t + t0, c + c0, v + v0, e2 + e20)
 
 
 def _flushOneAcc3 (accData, allData, ap1, ap2, ap3):
@@ -178,7 +180,7 @@ def _flushOneAcc3 (accData, allData, ap1, ap2, ap3):
     if tup is None:
         return
 
-    (time, c, v) = tup
+    (time, c, v, e2) = tup
 
     # note! not dividing by time since that doesn't affect phase.
     # Does affect amp though.
@@ -194,7 +196,7 @@ def _flushOneAcc4 (accData, allData, ap1, ap2, ap3, ap4):
     if tup is None:
         return
 
-    (time, c, v) = tup
+    (time, c, v, e2) = tup
     amp = N.abs (c) / time
     allData.accum (key, amp)
 
@@ -219,7 +221,7 @@ class ClosureComputer (object):
             else:
                 self.seenaps[fpol] = set ((ap, ))
 
-        self.integData[bp] = (data, flags, var, inttime)
+        self.integData[bp] = (data, flags, var, inttime, 0.0)
 
 
     def pDataSummary (self):
