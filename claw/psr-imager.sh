@@ -15,8 +15,7 @@
 # customize here
 
 # observation properties:
-period=0.714   # period that fixes phase shift?
-#period=0.7136692   # period that fixes phase shift?
+period=0.7136692   # period that fixes phase shift?
 bin=0.1
 ints=3000
 
@@ -28,10 +27,10 @@ t0s=02.4
 # output properties:
 phasebins=8
 outphases=1  # not yet implemented
-suffix='1-3-try3'
+suffix='tst'
 visroot='fxc-j0332-0.1s'
 imroot='j0332-0.1s'
-frac='1/3'
+frac='all'   # 'all', '1/3', '2/3', '2/2', etc.
 cleanup=1
 ######################
 

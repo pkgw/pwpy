@@ -34,8 +34,6 @@ numpulses_half=`echo 'scale=0;'${ints}'*'${bin}'/(2*'${period}')' | bc`
 numpulses_third=`echo 'scale=0;'${ints}'*'${bin}'/(3*'${period}')' | bc`
 numpulses_2third=`echo 'scale=0;'2*${ints}'*'${bin}'/(3*'${period}')' | bc`
 
-echo $frac
-
 if [ "$frac" = 'all' ]; then
     istart=0
     istop=${numpulses}
