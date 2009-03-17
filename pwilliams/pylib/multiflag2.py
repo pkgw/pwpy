@@ -98,7 +98,7 @@
    time=TIME1,TIME2
 
      The 'time' clause matches those records which have timestamps
-     falling between TIME1 and TIME2. An empty string for TIME1 or
+     falling between TIME1 and TIME2. LIE: An empty string for TIME1 or
      TIME2 is taken to indicate an indefinite lower or upper bound.
 
    uvrange=UVMIN,UVMAX
