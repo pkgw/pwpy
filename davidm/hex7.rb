@@ -25,7 +25,7 @@ SIGMA2FWHM = 2*sqrt(-log(0.5)/2)
 keyini
 vis = mkeyf(:vis)
 
-optkeys = [:squint, :absolute, :azel, :radec, :rect, :polar]
+optkeys = [:squint, :absolute, :azel, :radec, :rect, :polar, :verbose]
 optvals = options(optkeys, :hexopts)
 # Convert optkeys and optvals into a Hash
 opts = Hash[*optkeys.zip(optvals).flatten!]
@@ -56,7 +56,7 @@ azellst0 = []
 # For each dataset name given
 first_vis = true
 for dsname in vis
-  STDERR.puts "reading dataset #{dsname}"
+  STDERR.puts "reading dataset #{dsname}" if opts[:verbose]
 
   # Open dataset
   tno = uvopen(dsname, :r)
@@ -106,7 +106,7 @@ all_times = all_gains.keys.sort!
 
 nsols = all_times.length
 raise "invalid number of solutions (#{nsols} % 7 != 0)" if nsols % 7 != 0
-STDERR.puts "got a total of #{nsols} solutions, #{nsols/7} hex patterns"
+STDERR.puts "got a total of #{nsols} solutions, #{nsols/7} hex patterns" if opts[:verbose]
 
 ## Dump all data in time order
 #for t in all_times
@@ -176,7 +176,7 @@ all_times.each_slice(7) do |hex_times|
   invgains7 = invgains7.transpose
 
   # For each invgains7 element (i.e. antpol hex inverse gains)
-  STDERR.puts "Fitting Gaussian to hex pattern #{hexes.length+1}"
+  STDERR.puts "Fitting Gaussian to hex pattern #{hexes.length+1}" if opts[:verbose]
   hexes << invgains7.map do |aphexinvgains|
     if aphexinvgains[0] != 0
       # fit 2d gaussian
@@ -219,14 +219,23 @@ if opts[:squint]
     sq1 = yoff[1] - xoff[1]
     sqr, sqt = Complex(sq0, sq1).polar
     sqt = sqt.r2d
-    # TODO Print header
     # TODO Print quality indicated (X^2, ave_iters, etc)
     printf "%02d squint %7.3f x %7.3f arcmin  --> %7.3f arcmin @ %8.3f degrees\n",
       ant, sq0, sq1, sqr, sqt
   end
 else
+  # Print column header
+  if opts[:azel] && opts[:rect]
+    puts '#ant pol hex  iters : pkval    az_off    el_off   az_fwhm   el_fwhm   |residual|'
+  elsif opts[:radec] && opts[:rect]
+    puts '#ant pol hex  iters : pkval    ra_off   dec_off   ra_fwhm  dec_fwhm   |residual|'
+  elsif opts[:azel] && opts[:polar]
+    puts '#ant pol hex  iters : pkval   abs_off   ang_off   az_fwhm   el_fwhm   |residual|'
+  else # opts[:radec] && opts[:polar]
+    puts '#ant pol hex  iters : pkval   abs_off   ang_off   ra_fwhm  dec_fwhm   |residual|'
+  end
+    puts '################################################################################'
   # dump results for each hex pattern
-  # TODO Print column header
   hexes.transpose.each_with_index do |fits, ap|
     ant = (ap >> 1) + 1
     pol = (?X + (ap&1)).chr
