@@ -16,7 +16,7 @@ src._dec = '-29:00:00'
 src.compute(ata)
 
 # get transit properties -- note times are normally in UT!
-print ephem.localtime(src.rise_time)
-print ephem.localtime(src.set_time)
-print ephem.localtime(src.transit_time)
-print ephem.localtime(src.transit_alt)
+print ephem.localtime(ata.next_rising(src))
+print ephem.localtime(ata.next_setting(src))
+print ephem.localtime(ata.transit(src))
+print src.transit_alt
