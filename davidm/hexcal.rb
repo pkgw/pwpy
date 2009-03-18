@@ -9,6 +9,7 @@ include FileUtils
 
 # Get vis list from command line and sort it
 viskey = ARGV.grep(/^vis[-=]/)[-1]
+raise 'No vis files given (use vis=...)' unless viskey
 kw, vis = viskey.split(/[-=]/, 2)
 vis = vis.split(',')
 vis = vis.map {|v| Dir.glob(v)}
@@ -26,6 +27,9 @@ uvcal_opts = ARGV.grep(/^select[-=]/)
 hexopts = ARGV.grep(/^hexopts[-=]/)[-1]
 # Strip 'hexopts=' part
 hexopts = hexopts.sub(/^hexopts[-=]/,'') if hexopts
+
+# Insert placeholder flux for mfcal
+mfcal_opts.unshift 'flux=1'
 
 # Run mfcal on central pointing
 puts "Running mfcal on central pointing (#{cvis})"
@@ -45,11 +49,11 @@ end
 # Apply gains and recalibrate
 vouts = []
 for v in vis
-  vouts << (vout = "#{v}.mfcal")
+  vouts << (vout = "#{v}.hexcal")
   rm_rf(vout, :verbose => true)
 
   puts "Running uvcal to apply gains to #{v}"
-  out = run(:uvcal, uvcal_opts + ["vis=#{v}", "out=#{vout}"])
+  out = run(:uvcal, uvcal_opts + ["vis=#{v}", "out=#{vout}", '2>&1'])
   # TODO check for error in $? or output
   #puts out
 
