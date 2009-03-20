@@ -215,7 +215,11 @@ class FitBase (object):
         self.y = y + _N.random.standard_normal (self.x.shape) * self.sigmas
 
         return self
-        
+
+    def augmentSigmas (self, val):
+        self.sigmas = _N.sqrt (self.sigmas**2 + val**2)
+        return self
+    
     def guess (self):
         """Return a tuple of parameter guesses based on the X and Y data."""
         raise NotImplementedError ()
@@ -247,7 +251,7 @@ class FitBase (object):
         
         raise NotImplementedError ()
 
-    def fit (self, guess=None):
+    def fit (self, guess=None, **kwargs):
         guess = guess or self.guess ()
 
         self.params = None
@@ -259,7 +263,7 @@ class FitBase (object):
         if self.sigmas is None:
             raise ValueError ('Must assess uncertainties; try fakeSigmas')
 
-        self._fitImpl (self.x, self.y, self.sigmas, guess)
+        self._fitImpl (self.x, self.y, self.sigmas, guess, **kwargs)
 
         if self.params is None:
             raise RuntimeError ('Failed to find best-fit parameters')
@@ -364,18 +368,18 @@ class LinearFit (FitBase):
         sm2 = sm1 ** 2
         
         S = sm2.sum ()
-        Sx = (x * sm2).sum ()
-        Sy = (y * sm2).sum ()
-        Sxx = (x**2 * sm2).sum ()
-        Syy = (y**2 * sm2).sum ()
-        Sxy = (x * y * sm2).sum ()
+        Sx = _N.dot (x, sm2)
+        Sy = _N.dot (y, sm2)
+        Sxx = _N.dot (x**2, sm2)
+        Syy = _N.dot (y**2, sm2)
+        Sxy = _N.dot (x * y, sm2)
 
         D = S * Sxx - Sx**2
 
         t = (x - Sx / S) * sm1
         Stt = (t**2).sum ()
         
-        self.b = (t * y * sm1).sum () / Stt
+        self.b = _N.dot (t * y, sm1) / Stt
         self.a = (Sy - Sx * self.b) / S
         
         self.sigma_a = _N.sqrt ((1 + Sx**2 / S / Stt) / S)
@@ -398,14 +402,15 @@ class SlopeFit (FitBase):
 
         sm2 = sig ** -2
         
-        Sxx = (x**2 * sm2).sum ()
-        Sxy = (x * y * sm2).sum ()
+        Sxx = _N.dot (x**2, sm2)
+        Sxy = _N.dot (x * y, sm2)
 
         self.m = Sxy / Sxx
         self.sigma_m = 1. / _N.sqrt (Sxx)
         
         self.params = _N.asarray ((self.m, ))
         self.uncerts = _N.asarray ((self.sigma_m, ))
+
 
 class LeastSquaresFit (FitBase):
     """A Fit object that implements its fit via a generic least-squares
@@ -462,6 +467,199 @@ class LeastSquaresFit (FitBase):
         self.uncerts = _N.sqrt (cov.diagonal ())
 
         self.cov = cov
+
+        if self._fitExport is not None:
+            self._fitExport ()
+
+class ConstrainedMinFit (FitBase):
+    """A Fit object that implements its fit via a generic constrained
+    function minimization algorithm. Extra fields are:
+
+      ??
+
+    Subclassers must implement:
+
+      _paramNames - A list of textual names corresponding to the model parameters.
+            guess - The function to guess initial parameters, given the data.
+        makeModel - The function to return a model evaluator function.
+       _fitExport - (Optional.) Set individual fields equivalent to the best-fit
+                    parameters for ease of use.
+    """
+    
+    _fitExport = None
+    makeModelDeriv = None
+    
+    """Returns a function d(x) such that
+    
+    d(x) = J
+    
+    J.shape = (len (params), x.size)
+    J[ip,ix] = dModel(x[ix])/dparams[ip]
+    
+    """
+
+    def __init__ (self):
+        super (ConstrainedMinFit, self).__init__ ()
+
+        self._bounds = [(None, None)] * len (self._paramNames)
+
+    def setBound (self, pidx, min=None, max=None):
+        if pidx < 0 or pidx >= len (self._paramNames):
+            raise ValueError ('pidx')
+        
+        self._bounds[pidx] = (min, max)
+        return self
+    
+    def _fitImpl (self, x, y, sig, guess, **kwargs):
+        """Obtain a fit in some way, and set at least the following
+        fields:
+        
+        params - a tuple of best-fit parameters (compatible with the result of guess)
+        uncerts - A tuple of uncertainties of the parameters.
+        """
+
+        from mpfit import mpfit
+        
+        w = sig ** -1
+        ndof = x.size - len (guess)
+
+        def error (p, fjac=None):
+            self.mfunc = f = self.makeModel (*p)
+            self.mdata = d = f (x)
+            self.resids = r = y - d
+            print 'W:', w
+            print 'R:', r
+            return 0, _N.ravel (r * w)
+
+        info = [{'value': guess[i], 'parname': self._paramNames[i],
+                 'limited': [False, False], 'limits': [0., 0.]}
+                for i in xrange (0, len (self._paramNames))]
+        for i in xrange (0, len (self._paramNames)):
+            bmin, bmax = self._bounds[i]
+
+            if bmin is not None:
+                info[i]['limited'][0] = True
+                info[i]['limits'][0] = bmin
+            if bmax is not None:
+                info[i]['limited'][1] = True
+                info[i]['limits'][1] = bmax
+                
+        self.mpobj = o = mpfit (error, parinfo=info, **kwargs)
+
+        if o.status < 0 or o.status == 5:
+            raise Exception ('MPFIT minimization failed: %d, %s' % (o.status,
+                                                                    o.errmsg))
+
+        if len (guess) == 1:
+            # Coerce into arrayness.
+            self.params = _N.asarray ((o.params, ))
+        else:
+            self.params = o.params
+
+        self.uncerts = o.perror
+
+        if self._fitExport is not None:
+            self._fitExport ()
+
+class MPFitTest (ConstrainedMinFit):
+    _paramNames = ['a', 'b']
+
+    def guess (self):
+        return (0, 0)
+    
+    def makeModel (self, a, b):
+        return lambda x: a + b * x
+
+    def _fitExport (self):
+        self.a, self.b = self.params
+        self.sigma_a, self.sigma_b = self.uncerts
+        
+class RealConstrainedMinFit (FitBase):
+    """A Fit object that implements its fit via a generic constrained
+    function minimization algorithm. Extra fields are:
+
+      ??
+
+    Subclassers must implement:
+
+      _paramNames - A list of textual names corresponding to the model parameters.
+            guess - The function to guess initial parameters, given the data.
+        makeModel - The function to return a model evaluator function.
+       _fitExport - (Optional.) Set individual fields equivalent to the best-fit
+                    parameters for ease of use.
+    """
+    
+    _fitExport = None
+    makeModelDeriv = None
+    
+    """Returns a function d(x) such that
+    
+    d(x) = J
+    
+    J.shape = (len (params), x.size)
+    J[ip,ix] = dModel(x[ix])/dparams[ip]
+    
+    """
+
+    def __init__ (self):
+        super (ConstrainedMinFit, self).__init__ ()
+
+        self._bounds = [(None, None)] * len (self._paramNames)
+
+    def setBound (self, pidx, min=None, max=None):
+        if pidx < 0 or pidx >= len (self._paramNames):
+            raise ValueError ('pidx')
+        
+        self._bounds[pidx] = (min, max)
+        return self
+    
+    def _fitImpl (self, x, y, sig, guess, **kwargs):
+        """Obtain a fit in some way, and set at least the following
+        fields:
+        
+        params - a tuple of best-fit parameters (compatible with the result of guess)
+        uncerts - A tuple of uncertainties of the parameters.
+        """
+
+        from scipy.optimize import fmin_l_bfgs_b
+        
+        w2 = sig ** -2
+        ndof = x.size - len (guess)
+
+        def rchisq (p):
+            self.mfunc = f = self.makeModel (*p)
+            self.mdata = d = f (x)
+            self.resids = r = d - y
+            self.rchisq = c = _N.dot (r**2, w2) / ndof
+            return c
+
+        if self.makeModelDeriv is None:
+            approx_grad = True
+            grad = None
+        else:
+            approx_grad = False
+            def grad (p):
+                self.dfunc = d = self.makeModelDeriv (*p)
+                g = (2 * self.resids * w2 * d(x)).sum (1)
+                print 'R:', 2 * self.resids * w2
+                print 'G:', g
+                return g
+
+        pfit, c, info = fmin_l_bfgs_b (rchisq, guess, grad, (), approx_grad,
+                                       self._bounds, **kwargs)
+
+        if info['warnflag'] != 0:
+            raise Exception ('L-BFGS-B minimization failed: %d, %s' % (info['warnflag'],
+                                                                       info['task']))
+
+        if len (guess) == 1:
+            # Coerce into arrayness.
+            self.params = _N.asarray ((pfit, ))
+        else:
+            self.params = pfit
+
+        print 'FIXME uncertainties???'
+        self.uncerts = _N.zeros_like (self.params)
 
         if self._fitExport is not None:
             self._fitExport ()
