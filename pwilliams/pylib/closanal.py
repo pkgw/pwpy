@@ -53,6 +53,11 @@
 
  'best'    Print out the best closure values rather than the worst.
 
+ 'relative'  Sort "best" and "worst" values according to the ratio of
+             the computed value to the theoretical value. Useful for
+             identifying baselines/antpols with non-thermal noise
+             properties (i.e., bad hardware).
+
  'blhist'  Plot a histogram of the average closure values for each
            baseline. Requires the Python module 'omega'.
 
@@ -115,9 +120,9 @@ def _flushOneInteg3 (integData, accData, ap1, ap2, ap3):
     if tup12 is None or tup13 is None or tup23 is None:
         return
 
-    (d12, f12, v12, t12, e12) =  tup12
-    (d13, f13, v13, t13, e13) =  tup13
-    (d23, f23, v23, t23, e23) =  tup23
+    (d12, f12, v12, t12) =  tup12
+    (d13, f13, v13, t13) =  tup13
+    (d23, f23, v23, t23) =  tup23
 
     assert t12 == t13 and t12 == t23
     
@@ -128,15 +133,14 @@ def _flushOneInteg3 (integData, accData, ap1, ap2, ap3):
     
     t = n * t12
     c = (d12[w].sum () * d23[w].sum () * d13[w].sum ().conj ()) * t
-    v = (v12 + v13 + v23) * t
-    e2 = 0.0
+    v = (v12 + v13 + v23) * n**3 * t
     
     accKey = (ap1, ap2, ap3)
     if accKey not in accData:
-        accData[accKey] = (t, c, v, e2)
+        accData[accKey] = (t, c, v)
     else:
-        (t0, c0, v0, e20) = accData[accKey]
-        accData[accKey] = (t + t0, c + c0, v + v0, e2 + e20)
+        (t0, c0, v0) = accData[accKey]
+        accData[accKey] = (t + t0, c + c0, v + v0)
 
 
 def _flushOneInteg4 (integData, accData, ap1, ap2, ap3, ap4):
@@ -148,10 +152,10 @@ def _flushOneInteg4 (integData, accData, ap1, ap2, ap3, ap4):
     if tup12 is None or tup13 is None or tup24 is None or tup34 is None:
         return
 
-    (d12, f12, v12, t12, e12) =  tup12
-    (d13, f13, v13, t13, e13) =  tup13
-    (d24, f24, v24, t24, e24) =  tup24
-    (d34, f34, v34, t34, e34) =  tup34
+    (d12, f12, v12, t12) =  tup12
+    (d13, f13, v13, t13) =  tup13
+    (d24, f24, v24, t24) =  tup24
+    (d34, f34, v34, t34) =  tup34
 
     assert t12 == t13 and t12 == t24 and t12 == t34
 
@@ -163,15 +167,19 @@ def _flushOneInteg4 (integData, accData, ap1, ap2, ap3, ap4):
     
     t = n * t12
     c = (d12[w].sum () * d34[w].sum () / d13[w].sum () / d24[w].sum ().conj ()) * t
+
+    # FIXME: in closure.for, the variance is the sum of the variances
+    # over flux**2, where flux = (|d12| + |d34| + |d14| + |d23|) / 4,
+    # but need to think through whether this is by channel or what.
+
     v = (v12 + v13 + v24 + v34) * t
-    e2 = 0.0
     
     accKey = (ap1, ap2, ap3, ap4)
     if accKey not in accData:
-        accData[accKey] = (t, c, v, e2)
+        accData[accKey] = (t, c, v)
     else:
-        (t0, c0, v0, e20) = accData[accKey]
-        accData[accKey] = (t + t0, c + c0, v + v0, e2 + e20)
+        (t0, c0, v0) = accData[accKey]
+        accData[accKey] = (t + t0, c + c0, v + v0)
 
 
 def _flushOneAcc3 (accData, allData, ap1, ap2, ap3):
@@ -180,13 +188,15 @@ def _flushOneAcc3 (accData, allData, ap1, ap2, ap3):
     if tup is None:
         return
 
-    (time, c, v, e2) = tup
+    (time, c, v) = tup
 
     # note! not dividing by time since that doesn't affect phase.
     # Does affect amp though.
     ph = 180/N.pi * N.arctan2 (c.imag, c.real)
+    amp = N.abs (c) / time
+    thy = 180/N.pi * N.sqrt (v) / time / (amp ** (1./3))
 
-    allData.accum (key, ph)
+    allData.accum (key, (ph, thy))
     #allData.accum (key, (time, ph, v / time))
 
 
@@ -196,18 +206,21 @@ def _flushOneAcc4 (accData, allData, ap1, ap2, ap3, ap4):
     if tup is None:
         return
 
-    (time, c, v, e2) = tup
+    (time, c, v) = tup
     amp = N.abs (c) / time
-    allData.accum (key, amp)
+    thy = N.sqrt (v) / time
+    
+    allData.accum (key, (amp, thy))
 
 
 class ClosureComputer (object):
-    def __init__ (self, rmshist):
+    def __init__ (self, rmshist, relative):
         self.rmshist = rmshist
+        self.relative = relative
         
         self.integData = {}
         self.accData = {}
-        self.allData = AccDict (VectorGrower, lambda o, v: o.add (v))
+        self.allData = AccDict (lambda: ArrayGrower (2), lambda o, v: o.addLine (v))
         self.seenaps = {}
         self.seenpols = set ()
 
@@ -221,7 +234,7 @@ class ClosureComputer (object):
             else:
                 self.seenaps[fpol] = set ((ap, ))
 
-        self.integData[bp] = (data, flags, var, inttime, 0.0)
+        self.integData[bp] = (data, flags, var, inttime)
 
 
     def pDataSummary (self):
@@ -266,16 +279,27 @@ class ClosureComputer (object):
         print '%s with %s %s closure values:' % (capname, adj, self.item)
         
         if haveStats:
-            print '%15s  %14s (%10s, %5s)' % (capname[:-1], self.manystat,
-                                              'StdDev', self.ndatum)
+            if self.relative:
+                err = 'Th.Uncert.'
+            else:
+                err = 'StdDev'
+                
+            print '%15s  %14s (%10s, %5s) %14s' % (capname[:-1], self.manystat,
+                                                   err, self.ndatum,
+                                                   self.manystat + '/T.U.')
             
             for ident, val, std, num in subset:
-                print '%15s: %14g (%10g, %5d)' % (_format (ident), val, std, num)
+                print '%15s: %14g (%10g, %5d) %14g' % (_format (ident), val,
+                                                       std, num, val / std)
         else:
-            print '%15s  %14s' % (capname[:-1], self.onestat)
+            print '%15s  %14s %14s %14s' % (capname[:-1],
+                                            self.onestat,
+                                            'Th. Uncert.',
+                                            self.onestat + '/ThUn')
 
-            for ident, val in subset:
-                print '%15s: %14g' % (_format (ident), val)
+            for ident, val, thy in subset:
+                print '%15s: %14g %14g %14g' % (_format (ident), val, thy,
+                                                val / thy)
 
 
     def pQuantities (self, n, best):
@@ -297,7 +321,7 @@ class TripleComputer (ClosureComputer):
     ndatum ='nTrip'
     onestat = 'RMS'
     manystat = 'Mean(RMS)'
-
+    
     
     def flushInteg (self):
         id, ac = self.integData, self.accData
@@ -338,37 +362,60 @@ class TripleComputer (ClosureComputer):
 
 
     def process (self):
-        bpStats = AccDict (StatsAccumulator, lambda sa, rms: sa.add (rms))
-        bpacc = bpStats.accum
-        
-        apStats = AccDict (StatsAccumulator, lambda sa, rms: sa.add (rms))
-        apacc = apStats.accum
+        if self.relative:
+            bpStats = AccDict (WeightAccumulator, lambda sa, t: sa.add (*t))
+            bpacc = bpStats.accum
+            apStats = AccDict (WeightAccumulator, lambda sa, t: sa.add (*t))
+            apacc = apStats.accum
+        else:
+            bpStats = AccDict (StatsAccumulator, lambda sa, rms: sa.add (rms))
+            bpacc = bpStats.accum
+            apStats = AccDict (StatsAccumulator, lambda sa, rms: sa.add (rms))
+            apacc = apStats.accum
 
         def c ():
-            for (key, vg) in self.allData.iteritems ():
-                phs = vg.finish ()
+            for (key, ag) in self.allData.iteritems ():
+                phs, thys = ag.finish ().T
                 (ap1, ap2, ap3) = key
                 rms = N.sqrt (N.mean (phs**2))
+                thy = N.sqrt (N.mean (thys**2))
 
+                if thy == 0.:
+                    thy = -1
+                
                 if self.rmshist:
                     self.allrms.add (rms)
 
-                bpacc ((ap1, ap2), rms)
-                bpacc ((ap1, ap3), rms)
-                bpacc ((ap2, ap3), rms)
-                apacc (ap1, rms)
-                apacc (ap2, rms)
-                apacc (ap3, rms)
+                if self.relative:
+                    q = (rms, thy**-2)
+                else:
+                    q = rms
+                    
+                bpacc ((ap1, ap2), q)
+                bpacc ((ap1, ap3), q)
+                bpacc ((ap2, ap3), q)
+                apacc (ap1, q)
+                apacc (ap2, q)
+                apacc (ap3, q)
 
-                yield key, rms
+                yield key, rms, thy
 
-        self.qtyData = sorted (c (), key=lambda t: t[1])
+        if self.relative:
+            key = lambda t: t[1] / t[2]
+            tval = lambda t: (t[0], t[1].wtavg (), t[1].std (),
+                              t[1].num ())
+        else:
+            key = lambda t: t[1]
+            tval = lambda t: (t[0], t[1].mean (), t[1].std (),
+                              t[1].num ())
+            
+        self.qtyData = sorted (c (), key=key)
 
-        g = ((t[0], t[1].mean (), t[1].std (), t[1].num ()) for t in bpStats.iteritems ())
-        self.bpData = sorted (g, key=lambda t: t[1])
+        g = (tval (t) for t in bpStats.iteritems ())
+        self.bpData = sorted (g, key=key)
         
-        g = ((t[0], t[1].mean (), t[1].std (), t[1].num ()) for t in apStats.iteritems ())
-        self.apData = sorted (g, key=lambda t: t[1])
+        g = (tval (t) for t in apStats.iteritems ())
+        self.apData = sorted (g, key=key)
 
     
 class QuadComputer (ClosureComputer):
@@ -431,8 +478,8 @@ class QuadComputer (ClosureComputer):
         apacc = apStats.accum
 
         def c ():
-            for (key, vg) in self.allData.iteritems ():
-                amps = vg.finish ()
+            for (key, ag) in self.allData.iteritems ():
+                amps, thy = ag.finish ().T
                 (ap1, ap2, ap3, ap4) = key
 
                 # Cf. Pearson & Readhead 1984 ARAA 22 97:
@@ -589,7 +636,7 @@ def task (argv):
     keys.keyword ('nclos', 'i', 10)
     keys.keyword ('nbl', 'i', 10)
     keys.keyword ('nant', 'i', 10)
-    keys.option ('rmshist', 'best', 'uvdplot', 'blhist', 'amplitude')
+    keys.option ('rmshist', 'best', 'uvdplot', 'blhist', 'amplitude', 'relative')
     keys.doUvdat ('dsl3xw', True)
 
     args = keys.process (argv)
@@ -604,14 +651,19 @@ def task (argv):
     # Summarize parameters
 
     if args.amplitude:
-        cc = QuadComputer (args.rmshist)
+        cc = QuadComputer (args.rmshist, args.relative)
     else:
-        cc = TripleComputer (args.rmshist)
+        cc = TripleComputer (args.rmshist, args.relative)
         
     print 'Configuration:'
     print '  Averaging interval: %g minutes' % (args.interval)
     print '  Calculating %s closure %s' % (cc.item, cc.datum)
 
+    if args.relative:
+        print '  Using relative (x/sigma_x) ranking'
+    else:
+        print '  Using absolute ranking'
+        
     # Read the info
 
     cp = ClosureProcessor (interval, [cc], args.uvdplot)
