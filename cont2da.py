@@ -176,7 +176,7 @@ maxnewt - Maximum number of Newton's method steps to take when
         # that we don't just exit on the first iteration.
         
         if quitflag == 2:
-            dist2 = (x - x0)**2 + (y - y0)**2
+            dist2 = (x0/x - 1)**2 + (y0/y - 1)**2
             if dist2 < vtol1**2:
                 break
     else:
