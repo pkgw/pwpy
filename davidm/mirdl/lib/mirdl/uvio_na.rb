@@ -474,7 +474,7 @@ module Mirdl
     when Vis
       p = vis_flags.flags_p
     when NArray
-      p = PtrData.new(vis_flags.ptr, vis_flags.bsize)
+      p = DL::PtrData.new(vis_flags.ptr, vis_flags.bsize)
     when Array
       p = vis_flags.pack('i*') # TODO use DL.strdup?
     end
@@ -489,7 +489,7 @@ module Mirdl
     when Vis
       p = vis_flags.flags_p
     when NArray
-      p = PtrData.new(vis_flags.ptr, vis_flags.bsize)
+      p = DL::PtrData.new(vis_flags.ptr, vis_flags.bsize)
     when Array
       p = vis_flags.pack('i*') # TODO use DL.strdup?
     end
