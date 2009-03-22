@@ -12,6 +12,8 @@ module Mirdl
   # void uvDatInp(const char *key, const char *flags)
   SYM[:uvDatInp] = LIBMIR['uvdatinp_', '0SS'+'II']
   def uvDatInp(flags, key='vis')
+    flags = flags.to_s
+    key = key.to_s
     SYM[:uvDatInp][key, flags, key.length, flags.length]
   end
   module_function :uvDatInp
