@@ -1,14 +1,24 @@
 #!/usr/bin/env ruby
 
+# $Id$
+
 require 'mirdl'
 include Mirdl
 
 keyini
+  # d = use select keyword
+  # s = use stokes keyword (needed?)
+  # l = use line keyword
+  # 3 = include w in preamble
   uvDatInp('dsl3')
 
-  nsigma = keyr(:nsigma, 5.0)
+  # Acceptance threshhold from mean (as multiples of standard deviation)
+  # NB: This can be a floating point number!
+  nsigma = keyr(:nsigma, 3.0)
   iter_limit = keyi(:maxiter, 50)
   
+  # Allow "options=dryrun" to not do any modifications, but to report what
+  # would have been done.
   optkeys = [:dryrun]
   optvals = options(optkeys)
   # Convert optkeys and optvals into a Hash
