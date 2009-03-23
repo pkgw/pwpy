@@ -858,10 +858,11 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	uvflag vis=$wd/sefdcal flagval=f select='amp(0,0.0000000000000001)' options=none >& /dev/null #This is here since uvcal is stupid, and this corresponds to a noise level of 80 dBS (SNR of 1:10^8)
 	echo -n ", calculating gains tables..."
 	mfcal vis=$wd/sefdcal refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& /dev/null
-	echo " Ant Pol  R-Gain Avg  R-Gain RMS  I-Gain Avg  I-Gain RMS   SEFD (Jy)" >> $wd/sefd.$ipol$cycle
-	echo "====================================================================" >> $wd/sefd.$ipol$cycle
+	echo "$freq $regtimes[$postidx] " > $wd/sefd.$ipol.$regtimes[$postidx]
+	echo " Ant Pol  R-Gain Avg  R-Gain RMS  I-Gain Avg  I-Gain RMS   SEFD (Jy)" >> $wd/sefd.$ipol.$regtimes[$postidx]
+	echo "====================================================================" >> $wd/sefd.$ipol.$regtimes[$postidx]
 
-	gplist vis=$wd/sefdcal options=all | sed 's/^.\{10\}//g' | grep "Ant" | sort -nk2 | awk '{if (NR == 1 || ant == $2) {ant=$2;n++; re += $5; rs += $5*$5;im += $6;is += $6*$6}; if (ant != $2) {printf "%4s   %1s % .4e % .4e % .4e % .4e % .4e\n",ant,pol,re/n,sqrt((rs-n*(re/n)*(re/n))/n),im/n,sqrt((is-(n*(im/n)*(im/n)))/n),((re*re)+(im*im))/(n^2);ant=$2;n=1;re=$5;rs=$5*$5;im=$6;is=$6*$6}}' pol=`echo $ipol | sed -e 's/xx/x/g' -e 's/yy/y/g'`| awk '{if ($7*1 != 0) print $0}' >> $wd/sefd.$ipol$cycle
+	gplist vis=$wd/sefdcal options=all | sed 's/^.\{10\}//g' | grep "Ant" | sort -nk2 | awk '{if (NR == 1 || ant == $2) {ant=$2;n++; re += $5; rs += $5*$5;im += $6;is += $6*$6}; if (ant != $2) {printf "%4s   %1s % .4e % .4e % .4e % .4e % .4e\n",ant,pol,re/n,sqrt((rs-n*(re/n)*(re/n))/n),im/n,sqrt((is-(n*(im/n)*(im/n)))/n),((re*re)+(im*im))/(n^2);ant=$2;n=1;re=$5;rs=$5*$5;im=$6;is=$6*$6}}' pol=`echo $ipol | sed -e 's/xx/x/g' -e 's/yy/y/g'`| awk '{if ($7*1 != 0) print $0}' >> $wd/sefd.$ipol.$regtimes[$postidx]
 	rm -rf $wd/sefdcal
 	echo "done!"
     endif
@@ -967,7 +968,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
     
     # Horray again for MFCAL
     if ("$smooth" == "") mfcal vis=$wd/tempcal$ipol refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& /dev/null
-    if ("$smooth" != "") smamfcal =$wd/tempcal$ipol refant=$refant options=interpolate minants=4 flux=$flux interval=$int smooth=$smooth weight=-1 >& /dev/null
+    if ("$smooth" != "") smamfcal =$wd/tempcal$ipol refant=$refant options=interpolate minants=4 flux=$flux interval=$int $smooth weight=-1 >& /dev/null
     if ($polsplit && $sefd) then
         echo -n "Beginning SEFD calculation"
 	uvflag vis=$wd/tempcal$ipol options=none flagval=u select=auto >& /dev/null
@@ -975,6 +976,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	uvflag vis=$wd/sefdcal flagval=f select='amp(0,0.0000000000000001)' options=none >& /dev/null #This is here since uvcal is stupid, and this corresponds to a noise level of 80 dBS (SNR of 1:10^8)
 	echo -n ", calculating gains tables..."
 	mfcal vis=$wd/sefdcal refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& /dev/null
+	echo "$freq" > $wd/sefd.$ipol
 	echo " Ant Pol  R-Gain Avg  R-Gain RMS  I-Gain Avg  I-Gain RMS   SEFD (Jy)" > $wd/sefd.$ipol
 	echo "====================================================================" >> $wd/sefd.$ipol
 
@@ -990,12 +992,13 @@ end
 uvaver vis=`echo " $pollist" | sed -e 's/ /,'$wd'\/tempcal/g' -e 's/,//'` options=relax out=$wd/tempcalfin >& /dev/null
 
 # Put the results of the mapping process into a specified directory
-set outfile = "cal-$source-maps"
+set outfile = "cal-$source-"`echo $freq | awk '{print int($1*1000)}'`"-maps"
+
 
 set idx = 0
 while (-e $outfile)
     @ idx++
-    set outfile = "cal-$source-maps.$idx"
+    set outfile = "cal-$source-"`echo $freq | awk '{print int($1*1000)}'`"-maps.$idx"
 end
 
 #################################################################    
@@ -1019,8 +1022,13 @@ end
 
 newautomap.csh vis=$wd/tempcalfin mode=auto outdir=$outfile $mapopt $olay $device `if ($debug) echo "options=debug"`
 
+if !(-e $outfile/imgrpt) then
+    echo "FATAL ERROR: Automapping stage has failed!"
+    goto fail
+endif
+
 if (-e $wd/sefd.xx) cp $wd/sefd.xx $outfile/sefd.xx
-if (-e $wd/sefd.xx) cp $wd/sefd.yy $outfile/sefd.yy
+if (-e $wd/sefd.yy) cp $wd/sefd.yy $outfile/sefd.yy
 
 echo "Copying gains back to original file ($vis)"
 
