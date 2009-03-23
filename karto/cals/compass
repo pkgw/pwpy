@@ -90,6 +90,12 @@ newcalcal.csh vis=caldata sysflux=$sysflux addflux=$addflux flux=$flux plim=$pli
 
 # Move results to a "display" directory
 
+if !(-e cal-$cal-maps/$cal.cm && (-e cal-$cal-maps/sefd.xx || -e cal-$cal-maps/sefd.yy)) then
+    echo "WARNING: COMPASS failed to complete!"
+    rm -rf cal-$cal-maps caldata
+    goto restart
+endif
+
 stat:
 
 sed 1,2d cal-$cal-maps/sefd.xx | tr '[a-z]' '[A-Z]' | awk '{print $1,$2,$7}' > jypk

@@ -16,7 +16,7 @@ set dec = 0
 set pi = 3.14159265
 set distlim = $pi
 set auto = 0
-set calgrade = "U"
+set calgrade
 set addflux
 set altname
 set up = 0
@@ -241,12 +241,6 @@ if ("$target" == "" && "$altname" == "") then
 else if ("$freq" == "") then
     echo "FATAL ERROR: Frequency not specified"
     goto enderr
-else if ("$flux[1]" == 0) then
-    echo "FATAL ERROR: Target flux not specified"
-    goto enderr
-else if ("$addflux" == "") then
-    echo "FATAL ERROR: Additional flux not specified"
-    goto enderr
 endif
 
 set ra = `echo $ra | awk '{print $1*180/pi}' pi=$pi`
@@ -280,6 +274,19 @@ if ("$ra" == "" && "$dec" == "")  then
     echo "FATAL ERROR: Source requires an RA/Dec specification."
     goto enderr
 endif
+
+if ("$flux[1]" == "0") set flux = `awk '{if ($1 == target && $7 == freq) print $5}' target=$target freq=$freq $datapath/calsdata | head -n 1`
+
+if ("$calgrade" == "") set calgrade = `awk '{if ($1 == target && $7 == freq) print $6}' target=$target freq=$freq $datapath/calsdata | head -n 1`
+
+if ("$addflux" == "") set addflux = `awk '{if ($1 == target && $7 == freq) print $8}' target=$target freq=$freq $datapath/calsdata | head -n 1`
+
+if ("$flux[1]" == "" || "$addflux" == "")then
+    echo "FATAL ERROR: Target flux not specified"
+    goto enderr
+endif
+
+if ("$calgrade" == "") set calgrade = "U"
 
 if (`awk '{if (target == $1 || altname == $2 || target == $2 || altname == $1) print $0}' target=$target altname=$altname $datapath/calsdata | awk '{if (((($7-freq)^2)^.5)/freq < 0.258925) idx += 1} END {if (idx >= 1) print 1; else print 0}' target=$target altname=$altname freq=$freq`) then
     echo "WARNING: Cals database already contains info for this target at a frequency within 1 dB of the frequency that you specified. Would you like to [o]verwrite, (i)gnore, or (c)ancel?"
