@@ -69,7 +69,16 @@ def print_centers(centerl,centerb):
     # This function can take the returned field center values and print them out with the syntax of 'catalog.list'.
     # Note:  you will need to edit the string below for yourself.
 
+    ra = []
+    dec = []
     for i in range(len(centerl)):
         gal = ephem.Galactic(str(centerl[i]),str(centerb[i]),epoch='2000')
         cel = ephem.Equatorial(gal)
-        print 'ata  mosaic     gc-seti2-%d     %.10f           %.10f           cjl' % (i+1,cel.ra*12/ephem.pi, cel.dec*180/ephem.pi)
+        ra.append(cel.ra*12/ephem.pi)
+        dec.append(cel.dec*180/ephem.pi)
+
+    radec = numpy.array(zip(ra,dec), dtype=[('ra','float'),('dec','float')])
+    radec.sort(order='dec')
+
+    for i in range(len(radec)):
+        print 'ata  mosaic     gc-seti3-%d     %.10f           %.10f           cjl' % (i+1,radec[i][0],radec[i][1])
