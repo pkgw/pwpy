@@ -41,9 +41,15 @@ then
 elif [ $nsplit -eq 4 ]
 then
     halflist='aa ab ac ad'
+elif [ $nsplit -eq 5 ]
+then
+    halflist='aa ab ac ad ae'
+elif [ $nsplit -eq 6 ]
+then
+    halflist='aa ab ac ad ae af'
 else
-    print 'Not getting split files higher than ad!'
-    halflist='aa ab ac ad'
+    echo 'Not getting split files higher than af!'
+    halflist='aa ab ac ad ae af'
 fi
 
 for half in ${halflist}

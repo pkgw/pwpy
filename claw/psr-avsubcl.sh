@@ -32,9 +32,15 @@ then
 elif [ $nsplit -eq 4 ]
 then
     halflist='aa ab ac ad'
+elif [ $nsplit -eq 5 ]
+then
+    halflist='aa ab ac ad ae'
+elif [ $nsplit -eq 6 ]
+then
+    halflist='aa ab ac ad ad ae af'
 else
-    print 'Not getting split files higher than ad!'
-    halflist='aa ab ac ad'
+    echo 'Not getting split files higher than af!'
+    halflist='aa ab ac ad ae af'
 fi
 
 echo
@@ -49,9 +55,15 @@ for ((i=0; i<=${phasebins}-1; i++))
     # average bm and mp across pols and halves (split for 256 line limit of miriad)
     for half in $halflist
 	do
-	expmp='+<'${imroot}-xx-${suffix}'-bin'${i}${half}'.mp>+<'${imroot}-yy-${suffix}'-bin'${i}${half}'.mp>'${expmp}
-	expbm='+<'${imroot}-xx-${suffix}'-bin'${i}${half}'.bm>+<'${imroot}-yy-${suffix}'-bin'${i}${half}'.bm>'${expbm}
-	nhalves=`echo ${nhalves}+2 | bc`
+	expmpxx='+<'${imroot}-xx-${suffix}'-bin'${i}${half}'.mp>'${expmp}
+	expbmxx='+<'${imroot}-xx-${suffix}'-bin'${i}${half}'.bm>'${expbm}
+	expmpyy='+<'${imroot}-yy-${suffix}'-bin'${i}${half}'.mp>'${expmp}
+	expbmyy='+<'${imroot}-yy-${suffix}'-bin'${i}${half}'.bm>'${expbm}
+	nhalves=`echo ${nhalves}+1 | bc`
+# original for only a few split files
+#	expmp='+<'${imroot}-xx-${suffix}'-bin'${i}${half}'.mp>+<'${imroot}-yy-${suffix}'-bin'${i}${half}'.mp>'${expmp}
+#	expbm='+<'${imroot}-xx-${suffix}'-bin'${i}${half}'.bm>+<'${imroot}-yy-${suffix}'-bin'${i}${half}'.bm>'${expbm}
+#	nhalves=`echo ${nhalves}+2 | bc`
     done
     # need to use cut to remove superfluous + symbol
     expmp=`echo $expmp | cut -c2-`
@@ -61,8 +73,15 @@ for ((i=0; i<=${phasebins}-1; i++))
     expmp='('${expmp}')/'${nhalves}
     expbm='('${expbm}')/'${nhalves}
 
-    maths exp=${expmp} out=${imroot}'-i-'${suffix}'-bin'${i}$'.mp'
-    maths exp=${expbm} out=${imroot}'-i-'${suffix}'-bin'${i}$'.bm'
+# original...
+#    maths exp=${expmp} out=${imroot}'-i-'${suffix}'-bin'${i}$'.mp'
+#    maths exp=${expbm} out=${imroot}'-i-'${suffix}'-bin'${i}$'.bm'
+    maths exp=${expmpxx} out=${imroot}'-ixx-'${suffix}'-bin'${i}$'.mp'
+    maths exp=${expbmxx} out=${imroot}'-ixx-'${suffix}'-bin'${i}$'.bm'
+    maths exp=${expmpyy} out=${imroot}'-iyy-'${suffix}'-bin'${i}$'.mp'
+    maths exp=${expbmyy} out=${imroot}'-iyy-'${suffix}'-bin'${i}$'.bm'
+    maths exp='(<'${imroot}'-ixx-'${suffix}'-bin'${i}$'.mp>+<'${imroot}'-iyy-'${suffix}'-bin'${i}$'.mp>)/2' out=${imroot}'-i-'${suffix}'-bin'${i}$'.mp'
+    maths exp='(<'${imroot}'-ixx-'${suffix}'-bin'${i}$'.bm>+<'${imroot}'-iyy-'${suffix}'-bin'${i}$'.bm>)/2' out=${imroot}'-i-'${suffix}'-bin'${i}$'.bm'
 done
 
 # cat together along third axis
