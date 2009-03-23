@@ -26,7 +26,7 @@ t0s="$8"
 suffix="$9"
 frac="${10}"
 
-#set -e -x  # for debugging
+set -e -x  # for debugging
 
 # a guess at the number of pulses to interate over
 numpulses=`echo 'scale=0;'${ints}'*'${bin}'/'${period}'+ 1' | bc`  # original
