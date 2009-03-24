@@ -17,7 +17,7 @@
 # observation properties:
 #period=0.7136692   # period that fixes b0329 phase shift
 #period=0.358738    # period for b1933
-period=0.398478    # trial period for b1933
+period=0.398738    # trial period for b1933
 bin=0.1
 ints=12000
 
@@ -38,7 +38,7 @@ suffix='tst'
 visroot='fxc-b1933-0.1s-12000-shad'
 imroot='b1933-0.1s'
 frac='all'   # 'all', '1/3', '2/3', '2/2', etc.
-cleanup=0
+cleanup=1
 ######################
 
 set -e -x

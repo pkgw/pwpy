@@ -24,7 +24,7 @@ echo
 echo '***Imaging phase bins***'
 echo
 
-set -e -x  # for debugging
+#set -e -x  # for debugging
 file='time-'${suffix}
 
 
@@ -101,10 +101,10 @@ for split in ${splitlist}
     do
     mpsmall=${imroot}'-xx-'${suffix}'-bin'${i}${split}.mp
     bmsmall=${imroot}'-xx-'${suffix}'-bin'${i}${split}.bm
-    invert vis=${visroot}'-xx' map=$mpsmall beam=$bmsmall select='@'${file}'-bin'${i}${split} options=double,mfs sup=0 imsize=78,78
+    invert vis=${visroot}'-xx' map=$mpsmall beam=$bmsmall select='@'${file}'-bin'${i}${split} options=double,mfs sup=0 imsize=50,50
     mpsmall=${imroot}'-yy-'${suffix}'-bin'${i}${split}.mp
     bmsmall=${imroot}'-yy-'${suffix}'-bin'${i}${split}.bm
-    invert vis=${visroot}'-yy' map=$mpsmall beam=$bmsmall select='@'${file}'-bin'${i}${split} options=double,mfs sup=0 imsize=78,78
+    invert vis=${visroot}'-yy' map=$mpsmall beam=$bmsmall select='@'${file}'-bin'${i}${split} options=double,mfs sup=0 imsize=50,50
   done
 
   echo
