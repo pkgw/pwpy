@@ -29,6 +29,7 @@ keyfin
 while tno = uvDatOpn
   # Count newly-flagged channels
   nflagged = 0
+  nretained = 0
   # Track maxiter
   maxiter = 1
 
@@ -73,13 +74,16 @@ while tno = uvDatOpn
     # NB: 1 means GOOD data, 0 means BAD data
     new_flags = v.flags * not_bird
     #p [v.preamble[4], mean, sigma, not_bird.where2[1].to_a, new_flags.sum - v.flags.sum]
-    nflagged += v.flags.sum - new_flags.sum
+    ngood_orig = v.flags.sum
+    ngood_now = new_flags.sum
+    nflagged += (ngood_orig - ngood_now)
+    nretained += ngood_now
 
     # Write out new flags
     uvflgwr(tno, new_flags) unless opts[:dryrun]
   end
 
   print("would have ") if opts[:dryrun]
-  puts "flagged #{nflagged} baseline-channels in #{uvDatGta(:name)} (nsigma= #{nsigma} )(maxiter= #{maxiter} )"
+  puts "flagged/retained #{nflagged}/#{nretained} baseline-channels in #{uvDatGta(:name)} (nsigma= #{nsigma} )(maxiter= #{maxiter} )"
   uvDatCls
 end
