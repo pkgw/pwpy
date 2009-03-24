@@ -18,6 +18,11 @@
 require 'rubygems'
 require "mkmf"
 
+# This is an attempt to work around an incompatibility between Mac gcc
+# CFLAGS/LDFLAGS and MacPorts gcc CFLAGS/LDFLAGS.
+$CFLAGS.gsub!(/(^|\s+)-arch\s+\w+/,'')
+$LDFLAGS.gsub!(/(^|\s+)-arch\s+\w+/,'')
+
 # Check NArray
 na_gemspec=Gem.searcher.find('narray')
 if na_gemspec
