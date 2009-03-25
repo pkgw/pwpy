@@ -51,7 +51,7 @@ echo "error. Remnant directories can be safely deleted."
 echo ""
 echo "CALLING SEQUENCE: newrfisweep.csh vis=vis (tvis=tvis"
 echo "    interval=interval nsig=nsig npoly=npoly tsig=tsig csig=csig"
-echo "    cpoly=cpoly edgerfi=edgerfi device=device" 
+echo "    cpoly=cpoly crange=crange edgerfi=edgerfi device=device" 
 echo "    corrcycle=corrcycle options=[corr,nocorr],[recover,destory,"
 echo "    ignore],[pos,neg,mixed],rescan,debug,[outsource.insource],"
 echo "    [autoedge,noautoedge],[seedcorr,noseedcorr]),noflag"
@@ -108,6 +108,18 @@ echo "    as 'bad' and edgerfi=1, then channels 2,3 and 4 will be"
 echo "    marked as bad. Helpful for protecting against RFI that"
 echo "    shifts frequencies over time, and broadband RFI. Default is"
 echo "    1."
+echo ""
+echo " crange - Channel range(s) to be analyzed by RFISWEEP. Individual"
+echo "    ranges must be enclosed within a pair of parentheses, with a"
+echo "    comma seperating different ranges (e.g. crange=(1),(2,5))."
+echo "    Ranges can be either 'positive' or 'negative' (e.g. crange="
+echo "    (100) will select only channel 100, while crange=-(100) will"
+echo "    select everything but channel 100), and can give either a"
+echo "    single channel or a range of channels (e.g. crange=(2,5) will"
+echo "    select all channels between 2 and 5). This can be very"
+echo "    useful for removing channels that are known to contain"
+echo "    spectral line emission so that they are not mistakenly"
+echo "    identified as RFI. Default is all channels."
 echo ""
 echo " device - Device to plot results to (e.g. /xw for x-window)."
 echo '    Default is /null'
@@ -313,6 +325,11 @@ if ("$argv[1]" != "finish") goto varassign
 set fulllist = (`echo $vis $tvis`)
 set listlim = `echo $fulllist | wc -w`
 set idx = 1
+
+if ($listlim == 0) then
+    echo "FATAL ERROR: No visibilities found!"
+    exit 1
+endif
 
 while ($idx <= $listlim)
     if (! -e $fulllist[$idx]/specdata || $rescan) then
