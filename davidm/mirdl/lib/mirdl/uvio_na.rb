@@ -436,9 +436,9 @@ module Mirdl
   module_function :uvsela
 
   # void uvselect_c (int tno, Const char *object, double p1, double p2, int datasel);
-  SYM[:uvselect] = LIBMIR_UVIO['uvselect_c', 'ISDDI']
-  def uvselect(tno, object, p1, p2, dataset) # TODO Reorder inputs to allow defaults?
-    SYM[:uvselect][tno, object.to_s, p1, p2, dataset] # TODO Test, might need (datasel ? 1 : 0)
+  SYM[:uvselect] = LIBMIR_UVIO['uvselect_c', '0ISDDI']
+  def uvselect(tno, object, p1, p2, datasel) # TODO Reorder inputs to allow defaults?
+    SYM[:uvselect][tno, object.to_s, p1.to_f, p2.to_f, datasel ? 1 : 0]
   end
   module_function :uvselect
 
