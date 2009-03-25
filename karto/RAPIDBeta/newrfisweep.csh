@@ -341,9 +341,13 @@ while ($idx <= $listlim)
 		newrfi.csh vis=$fulllist[$idx] interval=1
 	    endif
         else
-            echo "FATAL ERROR: No specdata or visibilities found!"
+            echo "FATAL ERROR: No specdata or visibilities found for $fulllist[$idx] !"
             exit 1
         endif
+	if (! -e $fulllist[$idx]/specdata) then
+	    echo "FATAL ERROR: No specdata or visibilities found for $fulllist[$idx]!"
+	    exit 1
+	endif
     endif
     @ idx++
 end
