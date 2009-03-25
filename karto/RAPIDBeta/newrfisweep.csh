@@ -379,14 +379,22 @@ set fulllist = (`echo $vis`)
 set listlim = `echo $fulllist | wc -w`
 set trlist
 set idx = 1
-
+touch $wd/vistimes
 while ($idx <= $listlim)
     set filemark = `echo $idx | awk '{print $1+100000}' | sed 's/1//'`
     set trlist = ($trlist "vis$filemark")
-    cat $fulllist[$idx]/specdata >> $wd/vis/specdata
-    cat $fulllist[$idx]/specdata | awk '{print filename,$4,($5-$4)*1440,"vis",tname}' filename=$fulllist[$idx] tname="vis$filemark" >> $wd/vistimes
+    if ("head -n 1 $fulllist[$idx]/specdata" == "") then
+	echo "WARNING: No specdata found for $fulllist[$idx], omitting data..."
+    else
+	cat $fulllist[$idx]/specdata >> $wd/vis/specdata
+	cat $fulllist[$idx]/specdata | awk '{print filename,$4,($5-$4)*1440,"vis",tname}' filename=$fulllist[$idx] tname="vis$filemark" >> $wd/vistimes
+    endif
     @ idx++
 end
+if (`head -n 1 $wd/vistimes` == "") then
+    echo "FATAL ERROR: No data found (data may be entirely flagged)"
+    goto fail
+endif
 
 # If the autoedge parameter is used, figure out if dealing with a half or whole spectra, and flag edge channels accordingly
 

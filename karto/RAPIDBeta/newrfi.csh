@@ -412,10 +412,14 @@ foreach file ($filelist)
 
     echo -n 'sed ' > $wd/julday.source
     #Substitute dates for Julian dates in uvlist data
+
+    if ($#odates == 0) then
+	echo "FATAL ERROR: No visibilities found (data has possibly been completely flagged)"
+	goto finish
+    endif
     foreach odate (`echo $odates`)
 	echo -n "-e 's/"`julian date=$odate | grep 'Modified' | awk '{print $1"0/"int($6)"/g"}'`"' " >> $wd/julday.source
     end
-
     echo "$wd/temp.xlist2" >> $wd/julday.source
     source $wd/julday.source > $wd/temp.xlist3
     cp $wd/$file.obstimes $wd/obstimes
