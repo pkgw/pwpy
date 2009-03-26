@@ -183,5 +183,5 @@ while tno = uvDatOpn
     end
   end
 
-  uvclose(tno)
+  uvDatCls
 end # uvDatOpn
