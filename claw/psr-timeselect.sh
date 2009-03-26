@@ -66,7 +66,7 @@ outn='time-'${suffix}
 file=${outn}'-bin'${j}
 touch $file
 
-for ((i=${istart}; i<${istop}; i++))   # iterate over pulse number, 0-based
+for ((i=${istart}; i<=${istop}; i++))   # iterate over pulse number, 0-based
   do
   # get seconds offset
   t1s=`echo 'scale=5; ('${t0s}' + '${j}' * '${period}' / ' ${phasebins} ' + '${period}' * '${i}') ' | bc`

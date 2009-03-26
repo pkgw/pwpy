@@ -15,9 +15,10 @@
 # customize here
 
 # observation properties:
-period=0.7136692   # period that fixes b0329 phase shift
+#period=0.7136692   # period that fixes b0329 phase shift
+period=0.71375   # period that makes b0329 pulse more constant with time
 #period=0.358738    # period for b1933
-bin=0.1
+binsize=0.1
 ints=3000
 
 # time for j0332-0.1s:
@@ -31,12 +32,13 @@ t0s=02.4
 #t0s=25.3
 
 # output properties:
+imagebin=4
 phasebins=8
 outphases=1  # not yet implemented
 suffix='tst'
 visroot='fxc-j0332-0.1s'
 imroot='j0332-0.1s'
-frac='all'   # 'all', '1/3', '2/3', '2/2', etc.
+timebins=6   # how to split in time
 cleanup=1
 ######################
 
@@ -49,16 +51,16 @@ set -e -x
 #  suffix=p${i}
   
 #clean up
-  rm -rf ${imroot}-?-${suffix}-*.* ${imroot}-??-${suffix}-bin*.* ${imroot}-???-${suffix}-bin*.* ${imroot}-icube-${suffix}*.* time-${suffix}-bin*
+  rm -rf ${imroot}-?-${suffix}-*.* ${imroot}-??-${suffix}-time*.* ${imroot}-???-${suffix}-time*.* ${imroot}-itime-${suffix}.* ${imroot}-itime-${suffix}-sub.* ${imroot}-itimeavg-${suffix}*.* time-${suffix}-time*
 
-  psr-timeselect.sh ${period} ${bin} ${phasebins} ${outphases} ${ints} ${t0h} ${t0m} ${t0s} ${suffix} ${frac}
+  psrbin-timeselect.sh ${period} ${binsize} ${phasebins} ${outphases} ${ints} ${t0h} ${t0m} ${t0s} ${suffix} ${timebins} ${imagebin}
 
-  psr-invert.sh ${visroot} ${imroot} ${suffix} ${phasebins}
+  psrbin-invert.sh ${visroot} ${imroot} ${suffix} ${timebins}
 
-  psr-avsubcl.sh ${imroot} ${suffix} ${phasebins}
+  psrbin-avsubcl.sh ${imroot} ${suffix} ${timebins}
 
   if [ $cleanup -eq 1 ]
       then
-      rm -rf ${imroot}-?-${suffix}-*.* ${imroot}-??-${suffix}-bin*.* time-${suffix}-bin*
+      rm -rf ${imroot}-?-${suffix}-*.* ${imroot}-??-${suffix}-time*.* time-${suffix}-time*
   fi
 #done
