@@ -1,5 +1,7 @@
 #!/usr/bin/env ruby
 
+# $Id$
+
 require 'gsl'
 require 'mirdl'
 include Mirdl
