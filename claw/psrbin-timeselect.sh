@@ -31,10 +31,11 @@ imagebin="${11}"
 
 # a guess at the number of pulses to interate over
 numpulses=`echo 'scale=0;'${ints}'*'${binsize}'/'${period}'+ 1' | bc`  # original
+timebinsize=`echo 'scale=1;'${ints}'*'${binsize}'/'${timebins} | bc`  # original
 
 echo
 echo '***Getting '${numpulses}' pulses assuming period '${period}'s***'
-echo '***Averaging into '${timebins}' bins in time.  Data bin size is '${binsize}'s.***'  # to do:  multiple phases
+echo '***Averaging into '${timebins}' bins in time.  Data bin size is '${timebinsize}'s.***'  # to do:  multiple phases
 echo
 
 for ((j=0; j<=${timebins}-1; j++))   # iterate over pulse phase, zero based
@@ -42,7 +43,7 @@ do
 
 outn='time-'${suffix}
 file=${outn}'-time'${j}
-fileavg=${outn}'-timeavg'${j}
+fileavg=${outn}'-avg'${j}
 touch $file
 touch $fileavg
 

@@ -15,7 +15,8 @@
 # customize here
 
 # observation properties:
-period=0.7136692   # period that fixes b0329 phase shift
+#period=0.7136692   # period that fixes b0329 phase shift
+period=0.7137   # period that makes b0329 pulse more constant with time
 #period=0.358738    # period for b1933
 bin=0.1
 ints=3000
@@ -31,7 +32,7 @@ t0s=02.4
 #t0s=25.3
 
 # output properties:
-phasebins=8
+phasebins=4
 outphases=1  # not yet implemented
 suffix='tst'
 visroot='fxc-j0332-0.1s'

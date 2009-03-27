@@ -19,6 +19,7 @@ visroot="$1"
 imroot="$2"
 suffix="$3"
 timebins="$4"
+imsize="$5"
 
 echo
 echo '***Imaging time bins***'
@@ -100,26 +101,30 @@ for split in ${splitlist}
     do
     mpsmall=${imroot}'-xx-'${suffix}'-time'${i}${split}.mp
     bmsmall=${imroot}'-xx-'${suffix}'-time'${i}${split}.bm
-    invert vis=${visroot}'-xx' map=$mpsmall beam=$bmsmall select='@'${file}'-time'${i}${split} options=double,mfs sup=0 imsize=70,70
+    invert vis=${visroot}'-xx' map=$mpsmall beam=$bmsmall select='@'${file}'-time'${i}${split} options=double,mfs sup=0 imsize=${imsize},${imsize}
     mpsmall=${imroot}'-yy-'${suffix}'-time'${i}${split}.mp
     bmsmall=${imroot}'-yy-'${suffix}'-time'${i}${split}.bm
-    invert vis=${visroot}'-yy' map=$mpsmall beam=$bmsmall select='@'${file}'-time'${i}${split} options=double,mfs sup=0 imsize=70,70
-    mpsmall=${imroot}'-xx-'${suffix}'-timeavg'${i}.mp
-    bmsmall=${imroot}'-xx-'${suffix}'-timeavg'${i}.bm
-    invert vis=${visroot}'-xx' map=$mpsmall beam=$bmsmall select='@'${file}'-timeavg'${i} options=double,mfs sup=0 imsize=70,70
-    mpsmall=${imroot}'-yy-'${suffix}'-timeavg'${i}.mp
-    bmsmall=${imroot}'-yy-'${suffix}'-timeavg'${i}.bm
-    invert vis=${visroot}'-yy' map=$mpsmall beam=$bmsmall select='@'${file}'-timeavg'${i} options=double,mfs sup=0 imsize=70,70
+    invert vis=${visroot}'-yy' map=$mpsmall beam=$bmsmall select='@'${file}'-time'${i}${split} options=double,mfs sup=0 imsize=${imsize},${imsize}
   done
 
-  echo
-  echo '***Dirty image stats***'
+#  echo
+#  echo '***Dirty image stats***'
+#
+#  for ((i=0; i<=${timebins}-1; i++))
+#    do
+#    echo 'Image '${i}':'
+#    imstat in=${imroot}'-xx-'${suffix}'-time'${i}${split}.mp | tail -n 2
+#    imstat in=${imroot}'-yy-'${suffix}'-time'${i}${split}.mp | tail -n 2
+#  done
 
-  for ((i=0; i<=${timebins}-1; i++))
-    do
-    echo 'Image '${i}':'
-    imstat in=${imroot}'-xx-'${suffix}'-time'${i}${split}.mp | tail -n 2
-    imstat in=${imroot}'-yy-'${suffix}'-time'${i}${split}.mp | tail -n 2
-  done
+done
 
+for ((i=0; i<=${timebins}-1; i++))
+  do
+  mpsmall=${imroot}'-xx-'${suffix}'-avg'${i}.mp
+  bmsmall=${imroot}'-xx-'${suffix}'-avg'${i}.bm
+  invert vis=${visroot}'-xx' map=$mpsmall beam=$bmsmall select='@'${file}'-avg'${i} options=double,mfs sup=0 imsize=${imsize},${imsize}
+  mpsmall=${imroot}'-yy-'${suffix}'-avg'${i}.mp
+  bmsmall=${imroot}'-yy-'${suffix}'-avg'${i}.bm
+  invert vis=${visroot}'-yy' map=$mpsmall beam=$bmsmall select='@'${file}'-avg'${i} options=double,mfs sup=0 imsize=${imsize},${imsize}
 done
