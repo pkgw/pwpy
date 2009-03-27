@@ -96,6 +96,8 @@ while tno = uvDatOpn
   v = Vis.new(nchan)
   xx=NArray.float(nchan).indgen!
 
+  bx = nil
+  mfwork = nil
   # Setup B-Spline solver for this nchan
   if bss_nchan != nchan
     bss_nchan != nchan
@@ -111,6 +113,8 @@ while tno = uvDatOpn
     (0...nchan).each do |i|
       bss.eval(xx[i], bx[i,nil])
     end
+    # Create multi-fit workspace
+    mfwork = GSL::MultiFit::Workspace.new(nchan, ncoeff)
   end
 
   while uvDatRd(v)
@@ -139,8 +143,8 @@ while tno = uvDatOpn
         # Do weighted B-Spline fits to real and imag
         inliers_count = inliers.sum
         wv = inliers.to_gv
-        bcr, covr, chisqr, statusr = GSL::MultiFit.wlinear(bx, wv, yrv)
-        bci, covi, chisqi, statusi = GSL::MultiFit.wlinear(bx, wv, yiv)
+        bcr, covr, chisqr, statusr = GSL::MultiFit.wlinear(bx, wv, yrv, mfwork)
+        bci, covi, chisqi, statusi = GSL::MultiFit.wlinear(bx, wv, yiv, mfwork)
         var = (chisqr + chisqi)/(nchan - 1)
 
         # Evaluate fits to get smoothed real/imag
@@ -153,13 +157,14 @@ while tno = uvDatOpn
 
         # Identify points that are more than nsigma standard deviations out from
         # real/imag fits
-        rr = yr-byr_na
-        ir = yi-byi_na
+        rr = byr_na.dup.sbt!(yr) #yr-byr_na
+        ir = byi_na.dup.sbt!(yi) #yi-byi_na
         res2 = rr**2 + ir**2
         inliers = res2.lt(nsigma*var).and(inliers).to_type(NArray::INT)
       
       # Keep iterating until limit is exceeded or no new outliers found
       end until iter >= iter_limit || inliers_count == inliers.sum
+      p [uvDatGti(:visno), iter]
     end
 
     # Convert NArray.floats to NArray.scomplex (scomplex should provide
@@ -171,7 +176,7 @@ while tno = uvDatOpn
     # If flagging
     if opts[:flag]
       # Write out new flags
-      uvflgwr(tno, outliers)
+      uvflgwr(tno, outliers.to_type(NArray::INT))
       next # Skip plots
     end
     # Determine outlier indexes
@@ -188,7 +193,7 @@ while tno = uvDatOpn
     # title is "src utstr polstr a1-a2"
     title = '%s %s %s %d-%d' % [src, utstr, polstr, a1, a2]
     # title2 is "plot_type"
-    title2 = opts[:nofit] ? ('%s') : ('%%s: RMS=%.2g Iters=%d' % [rms, iter])
+    title2 = opts[:nofit] ? ('%s') : ('%%s: RMS=%.5g Iters=%d' % [rms, iter])
     lineinfo ||= uvinfo(tno, :line, 6)
     # Compute "virtual" channel numbers based on line parameters
     xxplot = xx * lineinfo[4] + lineinfo[2] + lineinfo[3]/2.0 - 0.5
@@ -226,18 +231,18 @@ while tno = uvDatOpn
           )
 
       pgsci(Color::BLUE)
-      pgline(xx+lineinfo[2], yr)
+      pgline(xxplot, yr)
       pgsci(Color::YELLOW)
-      pgline(xx+lineinfo[2], yi)
+      pgline(xxplot, yi)
       if byr_na
         pgsci(Color::CYAN)
-        pgline(xx+lineinfo[2], byr_na)
+        pgline(xxplot, byr_na)
         pgsci(Color::GREEN)
-        pgline(xx+lineinfo[2], byi_na)
+        pgline(xxplot, byi_na)
       end
       pgsci(Color::RED)
-      pgpt((xx+lineinfo[2])[outliers_idx], yr[outliers_idx], Marker::CIRCDOT)
-      pgpt((xx+lineinfo[2])[outliers_idx], yi[outliers_idx], Marker::CIRCDOT)
+      pgpt((xxplot)[outliers_idx], yr[outliers_idx], Marker::CIRCDOT)
+      pgpt((xxplot)[outliers_idx], yi[outliers_idx], Marker::CIRCDOT)
     end
     if opts[:scatter]
       xmin, xmax = yrv.minmax
