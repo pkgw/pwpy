@@ -19,7 +19,7 @@ imsize="$4"
 
 #set -e -x   # for debugging
 file='time-'${suffix}
-cleansize=`echo 'scale=0; '${imsize}'/6' | bc`    # cleans in box +-cleansize
+cleansize=`echo 'scale=0; '${imsize}'/8' | bc`    # cleans in box +-cleansize
 
 nsplit=`ls ${file}-time0a? | wc | gawk '{printf "%d \n", $0}' | head -n 1`
 if [ $nsplit -eq 1 ]
@@ -175,7 +175,7 @@ elif [ $timebins -ge 100 ] && [ $timebins -lt 200 ]
     imcat in=${imroot}'-itime1-'${suffix}'.bm,'${imroot}'-itime2-'${suffix}'.bm,'${imroot}'-itime3-'${suffix}'.bm' out=${imroot}'-itime-'${suffix}'.bm' options=relax
     imcat in=${imroot}'-iavg1-'${suffix}'.mp,'${imroot}'-iavg2-'${suffix}'.mp,'${imroot}'-iavg3-'${suffix}'.mp' out=${imroot}'-iavg-'${suffix}'.mp' options=relax
     imcat in=${imroot}'-iavg1-'${suffix}'.bm,'${imroot}'-iavg2-'${suffix}'.bm,'${imroot}'-iavg3-'${suffix}'.bm' out=${imroot}'-iavg-'${suffix}'.bm' options=relax
-elif [ $timebins -ge 200 ] && [ $timebins -lt 300 ]
+elif [ $timebins -ge 200 ]
     then
     imcat in=${imroot}'-i-'${suffix}'-time?.mp' out=${imroot}'-itime1-'${suffix}'.mp' options=relax
     imcat in=${imroot}'-i-'${suffix}'-time?.bm' out=${imroot}'-itime1-'${suffix}'.bm' options=relax
@@ -197,6 +197,10 @@ elif [ $timebins -ge 200 ] && [ $timebins -lt 300 ]
     imcat in=${imroot}'-itime1-'${suffix}'.bm,'${imroot}'-itime2-'${suffix}'.bm,'${imroot}'-itime3-'${suffix}'.bm,'${imroot}'-itime4-'${suffix}'.bm' out=${imroot}'-itime-'${suffix}'.bm' options=relax
     imcat in=${imroot}'-iavg1-'${suffix}'.mp,'${imroot}'-iavg2-'${suffix}'.mp,'${imroot}'-iavg3-'${suffix}'.mp,'${imroot}'-iavg4-'${suffix}'.mp' out=${imroot}'-iavg-'${suffix}'.mp' options=relax
     imcat in=${imroot}'-iavg1-'${suffix}'.bm,'${imroot}'-iavg2-'${suffix}'.bm,'${imroot}'-iavg3-'${suffix}'.bm,'${imroot}'-iavg4-'${suffix}'.bm' out=${imroot}'-iavg-'${suffix}'.bm' options=relax
+    if [ $timebins -ge 300 ]
+	then
+	echo 'Note that timebins higher than 299 will not be in itime image cube'
+    fi
 elif [ $timebins -eq 1 ]
     then
     mv ${imroot}'-i-'${suffix}'-time0.mp' ${imroot}'-itime-'${suffix}'.mp'
@@ -205,7 +209,7 @@ elif [ $timebins -eq 1 ]
     mv ${imroot}'-i-'${suffix}'-avg0.bm' ${imroot}'-iavg-'${suffix}'.bm'
 else
     echo
-    echo 'Sorry, too many timebins!'
+    echo 'Sorry, I cannot parse that value of timebins!'
 fi
 
 # arithmetic on mp
@@ -216,7 +220,7 @@ maths exp='<'${imroot}'-itime-'${suffix}'.mp>-<'${imroot}'-iavg-'${suffix}'.mp>'
 #imstat in=${imroot}'-itime-'${suffix}'-sub.mp'
 
 # clean map (lightly) and restore
-clean map=${imroot}'-itime-'${suffix}'-sub.mp' beam=${imroot}'-itime-'${suffix}'.bm' out=${imroot}'-itime-'${suffix}'-sub.cl' niters=100 gain=0.03 region='relpixel,boxes(-'${cleansize}',-'${cleansize}','${cleansize}','${cleansize}')'
+clean map=${imroot}'-itime-'${suffix}'-sub.mp' beam=${imroot}'-itime-'${suffix}'.bm' out=${imroot}'-itime-'${suffix}'-sub.cl' niters=100 gain=0.02 region='relpixel,boxes(-'${cleansize}',-'${cleansize}','${cleansize}','${cleansize}')'
 restor map=${imroot}'-itime-'${suffix}'-sub.mp' beam=${imroot}'-itime-'${suffix}'.bm' model=${imroot}'-itime-'${suffix}'-sub.cl' out=${imroot}'-itime-'${suffix}'-sub.rm'
 
 echo

@@ -32,10 +32,10 @@ t0s=02.4
 #t0s=25.3
 
 # output properties:
-imagebin=4   # zero-based
+imagebin=3   # zero-based
 phasebins=6
 outphases=1  # not yet implemented
-timebins=8   # how to split in time
+timebins=420   # how to split in time
 suffix='tst'
 visroot='fxc-j0332-0.1s'
 imroot='j0332-0.1s'
@@ -52,7 +52,8 @@ set -e -x
 #  suffix=p${i}
   
 #clean up
-  rm -rf ${imroot}-i-${suffix}-*.* ${imroot}-xx-${suffix}-*.* ${imroot}-yy-${suffix}-*.* ${imroot}-i??-${suffix}-*.*  # remove i, xx, yy, ixx, iyy ims for time and avg
+  rm -rf ${imroot}-xx-${suffix}-*.* ${imroot}-yy-${suffix}-*.* # remove xx, yy ims for time and avg
+  rm -rf ${imroot}-i-${suffix}-*.* ${imroot}-i??-${suffix}-*.*  # i, ixx, iyy
   rm -rf ${imroot}-itime*-${suffix}.* ${imroot}-itime*-${suffix}-sub.* ${imroot}-iavg*-${suffix}*.*   # remove old image cubes
   rm -f time-${suffix}-time* time-${suffix}-avg*    # remove time filter files
 
@@ -64,6 +65,10 @@ set -e -x
 
   if [ $cleanup -eq 1 ]
       then
-      rm -rf ${imroot}-?-${suffix}-*.* ${imroot}-??-${suffix}-time*.* ${imroot}-??-${suffix}-avg*.* ${imroot}-itime?-${suffix}.* ${imroot}-itimeavg-${suffix}.* time-${suffix}-time* time-${suffix}-avg*
+      rm -rf ${imroot}-?-${suffix}-*.* 
+      rm -rf ${imroot}-??-${suffix}-time*.* 
+      rm -rf ${imroot}-??-${suffix}-avg*.* 
+      rm -rf ${imroot}-itime?-${suffix}.* ${imroot}-itimeavg-${suffix}.* 
+      rm -f time-${suffix}-time* time-${suffix}-avg*
   fi
 #done
