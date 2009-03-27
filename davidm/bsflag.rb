@@ -122,10 +122,18 @@ while tno = uvDatOpn
     mfwork = GSL::MultiFit::Workspace.new(nchan, ncoeff)
   end
 
+  # Counter so we cal call garbage collector every so often
+  gc_counter = 0
   while uvDatRd(v)
     # Skip to next if completely flagged
     next if v.flags.sum == 0
     # TODO Handle partial flagging
+
+    gc_counter += 1
+    if gc_counter % 10 == 0
+      ObjectSpace.garbage_collect
+      gc_counter = 0
+    end
 
     # Setup for B-Spline fits to real and imag
     yr = v.data.real
@@ -135,8 +143,8 @@ while tno = uvDatOpn
     inliers = v.flags
     inliers_count = inliers.sum
     var = 0.0
-    byr_na = nil
-    byi_na = nil
+    byr_na = NArray.float(yr.length)
+    byi_na = NArray.float(yi.length)
 
     # Iteration loop
     iter = 0
@@ -157,13 +165,15 @@ while tno = uvDatOpn
         byi = bx * bci
 
         # Convert GSL::Vector to NArray.float
-        byr_na = byr.to_na
-        byi_na = byi.to_na
+        byr_na[] = byr.to_na_ref
+        byi_na[] = byi.to_na_ref
 
         # Identify points that are more than nsigma standard deviations out from
         # real/imag fits
-        rr = byr_na.dup.sbt!(yr) #yr-byr_na
-        ir = byi_na.dup.sbt!(yi) #yi-byi_na
+        #rr = byr_na.dup.sbt!(yr)
+        #ir = byi_na.dup.sbt!(yi)
+        rr = yr-byr_na
+        ir = yi-byi_na
         res2 = rr**2 + ir**2
         inliers = res2.lt(nsigma*var).and(inliers).to_type(NArray::INT)
       
@@ -174,7 +184,8 @@ while tno = uvDatOpn
 
     # Convert NArray.floats to NArray.scomplex (scomplex should provide
     # sufficent resolution/precision and facilitates subsequenct plotting).
-    bz = byr_na + byi_na.to_type(NArray::SCOMPLEX)*1.im unless opts[:nofit]
+    #bz = byr_na + byi_na.to_type(NArray::SCOMPLEX)*1.im unless opts[:nofit]
+    bz = byi_na.to_type(NArray::SCOMPLEX).mul!(1.im).add!(byr_na) unless opts[:nofit]
 
     # If flagging
     if opts[:flag]
