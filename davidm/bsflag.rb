@@ -47,6 +47,9 @@ keyini
   # Get maxiters
   iter_limit = keyr(:maxiter, 10)
 
+  # Get nbs, number of basis splines
+  nbs = keyi(:nbs)
+
   # Get options
   optkeys = [:polar, :rect, :scatter, :nofit, :flag]
   optvals = options(optkeys)
@@ -101,7 +104,7 @@ while tno = uvDatOpn
   # Setup B-Spline solver for this nchan
   if bss_nchan != nchan
     bss_nchan != nchan
-    ncoeff = (nchan+31) / 32
+    ncoeff = (nbs != 0 ? nbs : (nchan+31) / 32)
     nbreak = ncoeff - k + 2
     if nbreak < 2
       nbreak = 2
@@ -164,23 +167,21 @@ while tno = uvDatOpn
       
       # Keep iterating until limit is exceeded or no new outliers found
       end until iter >= iter_limit || inliers_count == inliers.sum
-      p [uvDatGti(:visno), iter]
+      #TODO p [uvDatGti(:visno), iter]
     end
 
     # Convert NArray.floats to NArray.scomplex (scomplex should provide
     # sufficent resolution/precision and facilitates subsequenct plotting).
     bz = byr_na + byi_na.to_type(NArray::SCOMPLEX)*1.im unless opts[:nofit]
 
-    # Determine outliers
-    outliers = inliers.not
     # If flagging
     if opts[:flag]
       # Write out new flags
-      uvflgwr(tno, outliers.to_type(NArray::INT))
+      uvflgwr(tno, inliers.to_type(NArray::INT))
       next # Skip plots
     end
     # Determine outlier indexes
-    outliers_idx = outliers.where
+    outliers_idx = inliers.not.where
 
     # Setup plot metadata
     rms = Math.sqrt(var)
