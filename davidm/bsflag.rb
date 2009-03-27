@@ -48,7 +48,7 @@ keyini
   iter_limit = keyr(:maxiter, 10)
 
   # Get options
-  optkeys = [:polar, :rect, :scatter, :nofit]
+  optkeys = [:polar, :rect, :scatter, :nofit, :flag]
   optvals = options(optkeys)
   # Convert optkeys and optvals into a Hash
   opts = Hash[*optkeys.zip(optvals).flatten!]
@@ -59,16 +59,30 @@ if ltype != '' && ltype != 'channel'
   bug(:fatal, "unsupported line type '#{ltype}'")
 end
 
-# Default to polar
-opts[:polar] ||= (!opts[:rect] && !opts[:scatter])
+# Require flag or plot type option
+if !opts[:flag] && !opts[:polar] && !opts[:rect] && !opts[:scatter]
+  bug(:fatal, 'must specify flag or plot type using options=')
+end
 
-# Iniitalize plot device
-Plotter.new(:device => device,
-            :nx=>nx,
-            :ny=>ny,
-            :ask=>true)
-# Make text bigger
-pgsch(1.5)
+# Disallow flagging and plotting simultaneously
+if opts[:flag] && (opts[:polar] || opts[:rect] || opts[:scatter])
+  bug(:fatal, 'cannot flag and plot at the same time')
+end
+
+# Disallow flag and nofit options simultaneously
+if opts[:flag] && opts[:nofit]
+  bug(:fatal, "cannot specify both 'flag' and 'nofit' at the same time")
+end
+
+if opts[:polar] || opts[:rect] || opts[:scatter]
+  # Iniitalize plot device
+  Plotter.new(:device => device,
+              :nx=>nx,
+              :ny=>ny,
+              :ask=>true)
+  # Make text bigger
+  pgsch(1.5)
+end
 
 k = 4 # Cubic
 bss_nchan = nil
@@ -152,8 +166,16 @@ while tno = uvDatOpn
     # sufficent resolution/precision and facilitates subsequenct plotting).
     bz = byr_na + byi_na.to_type(NArray::SCOMPLEX)*1.im unless opts[:nofit]
 
+    # Determine outliers
+    outliers = inliers.not
+    # If flagging
+    if opts[:flag]
+      # Write out new flags
+      uvflgwr(tno, outliers)
+      next # Skip plots
+    end
     # Determine outlier indexes
-    outliers_idx = inliers.not.where
+    outliers_idx = outliers.where
 
     # Setup plot metadata
     rms = Math.sqrt(var)
@@ -165,13 +187,8 @@ while tno = uvDatOpn
     #title = '%s %d-%d (rms=%.3f, niter=%d)' % [src, a1, a2, rms, iter]
     # title is "src utstr polstr a1-a2"
     title = '%s %s %s %d-%d' % [src, utstr, polstr, a1, a2]
-    if opts[:nofit]
-      # title2 is "plot_type"
-      title2 = '%%s'
-    else
-      # title2 is "plot_type, rms, niter"
-      title2 = '%%s: RMS=%.2g Iters=%d' % [rms, iter]
-    end
+    # title2 is "plot_type"
+    title2 = opts[:nofit] ? ('%s') : ('%%s: RMS=%.2g Iters=%d' % [rms, iter])
     lineinfo ||= uvinfo(tno, :line, 6)
     # Compute "virtual" channel numbers based on line parameters
     xxplot = xx * lineinfo[4] + lineinfo[2] + lineinfo[3]/2.0 - 0.5
