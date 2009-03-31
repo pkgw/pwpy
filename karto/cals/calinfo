@@ -32,7 +32,11 @@ if ("$argv[1]" =~ 'target='*) then
     set target = `echo $argv[1] | sed 's/target=//' | tr '[a-z]' '[A-Z]'`
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'freq='*) then
-    set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print $1*1000}'`
+    set freq = `echo $argv[1] | sed 's/freq=//' | awk '{print int($1*1000)}'`
+    if ($freq < 300 || $freq > 15000) then
+	echo "FATAL ERROR: Bad entry for freq (should be in GHz)"
+	exit 1
+    endif
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'radec='*) then
     set ra  = `echo $argv[1] | sed 's/radec=//' | tr ',' ' ' | awk '{print $1}' | tr ':' ' ' | awk '{print (1*$1+($2/60)+($3/3600))*pi/12}' pi=$pi`

@@ -66,6 +66,8 @@ while ("$freq" == "")
     endif
 end
 
+set mfreq = `echo $freq | awk '{print int($1*1000)}'`
+
 set calvals = (`calinfo target=$cal freq=$freq options=auto`)
 if ("$calvals[1]" == "FATAL") then
     rm -rf caldata $histview
@@ -90,16 +92,16 @@ newcalcal.csh vis=caldata sysflux=$sysflux addflux=$addflux flux=$flux plim=$pli
 
 # Move results to a "display" directory
 
-if !(-e cal-$cal-maps/$cal.cm && (-e cal-$cal-maps/sefd.xx || -e cal-$cal-maps/sefd.yy)) then
+if !(-e cal-$cal-$mfreq-maps/$cal.cm && (-e cal-$cal-$mfreq-maps/sefd.xx || -e cal-$cal-$mfreq-maps/sefd.yy)) then
     echo "WARNING: COMPASS failed to complete!"
-    rm -rf cal-$cal-maps caldata
+    rm -rf cal-$cal-$mfreq-maps caldata
     goto restart
 endif
 
 stat:
 
-sed 1,2d cal-$cal-maps/sefd.xx | tr '[a-z]' '[A-Z]' | awk '{print $1,$2,$7}' > jypk
-sed 1,2d cal-$cal-maps/sefd.yy | tr '[a-z]' '[A-Z]' | awk '{print $1,$2,$7}' >> jypk
+sed 1,2d cal-$cal-$mfreq-maps/sefd.xx | tr '[a-z]' '[A-Z]' | awk '{print $1,$2,$7}' > jypk
+sed 1,2d cal-$cal-$mfreq-maps/sefd.yy | tr '[a-z]' '[A-Z]' | awk '{print $1,$2,$7}' >> jypk
 
 set llim = `awk '{print int(10*log($3)/log(10))-2}' jypk | sort -n | head -n 1`
 set ulim = `echo $llim | awk '{print $1+20}'`
@@ -149,15 +151,15 @@ echo end >> wip.jypkstat
 wip wip.jypkstat -d jypkstat.png/png >& /dev/null
 set arc = `echo 4500 | awk '{print int($1*1.430/freq)}' freq=$freq`
 echo "arc = $arc"
-set imstats = (`imstat in=cal-$cal-maps/$cal.rs | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
-set imstats2 = (`imstat in=cal-$cal-maps/$cal.cm region=relcen,arcsec,"box(-$arc,-$arc,$arc,$arc)" | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
+set imstats = (`imstat in=cal-$cal-$mfreq-maps/$cal.rs | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
+set imstats2 = (`imstat in=cal-$cal-$mfreq-maps/$cal.cm region=relcen,arcsec,"box(-$arc,-$arc,$arc,$arc)" | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
 set range = `echo $imstats[3] $imstats2[4] | awk '{print $2/$1}'`
 set plotscale = `echo $range | awk '{if ($1 > 500) print "log"; else print "lin"}'`
 set levs = (`echo $imstats[3] $imstats2[4] | awk '{lim = 4*$1; while (lim < $2) {print lim; lim=2*lim}}'`)
 set levs = `echo $levs | tr ' ' ','`
 set alevel = `echo $imstats[3] $imstats2[5] | awk '{print (($2/$1)^2)^.5}'`
 
-cgdisp in=cal-$cal-maps/$cal.cm,cal-$cal-maps/$cal.cm region=relcenter,arcsec,box"(-$arc,-$arc,$arc,$arc)" device=cal.png/png labtyp=arcmin options=beambl,wedge,3value,mirr,full csize=0.6,1 olay=cal-$cal-maps/$cal.olay type=contour,pix levs1=$levs range=0,0,$plotscale,3 >& /dev/null
+cgdisp in=cal-$cal-$mfreq-maps/$cal.cm,cal-$cal-$mfreq-maps/$cal.cm region=relcenter,arcsec,box"(-$arc,-$arc,$arc,$arc)" device=cal.png/png labtyp=arcmin options=beambl,wedge,3value,mirr,full csize=0.6,1 olay=cal-$cal-$mfreq-maps/$cal.olay type=contour,pix levs1=$levs range=0,0,$plotscale,3 >& /dev/null
 
 echo `date +%s` 100 100 $range $imstats[3] $alevel >> obsstats
 
@@ -227,8 +229,8 @@ cp wip.jypkstat view/wip.jypkstat
 cp temp.jypk2 view/temp.jypk2
 cp wip.prsv view/wip.prsv
 cp temp.prsv view/temp.prsv
-cp -r cal-$cal-maps/$cal.cm view/cal.cm
-cp cal-$cal-maps/$cal.olay view/cal.olay
+cp -r cal-$cal-$mfreq-maps/$cal.cm view/cal.cm
+cp cal-$cal-$mfreq-maps/$cal.olay view/cal.olay
 echo "cgdisp in=cal.cm,cal.cm region=relcenter,arcsec,box"'"'"(-$arc,-$arc,$arc,$arc)"'"'" device=1/xs labtyp=arcmin options=beambl,wedge,3value,mirr,full csize=0.6,1 olay=cal.olay type=contour,pix levs1=$levs range=0,0,$plotscale,3" > view/mapcmd
 cp -r view/* $histview/.
 cp *.png $histview/.
@@ -236,7 +238,7 @@ scp *.png logbook:/srv/www/htdocs/files/plots/.
 rm -rf caldata
 rm -rf calreduc
 rm *.png
-mv cal-$cal-maps calreduc
+mv cal-$cal-$mfreq-maps calreduc
 goto restart
 
 exit 0
