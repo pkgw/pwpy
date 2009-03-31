@@ -511,13 +511,6 @@ class ConstrainedMinFit (FitBase):
         return self
     
     def _fitImpl (self, x, y, sig, guess, **kwargs):
-        """Obtain a fit in some way, and set at least the following
-        fields:
-        
-        params - a tuple of best-fit parameters (compatible with the result of guess)
-        uncerts - A tuple of uncertainties of the parameters.
-        """
-
         from mpfit import mpfit
         
         w = sig ** -1
@@ -527,8 +520,8 @@ class ConstrainedMinFit (FitBase):
             self.mfunc = f = self.makeModel (*p)
             self.mdata = d = f (x)
             self.resids = r = y - d
-            print 'W:', w
-            print 'R:', r
+            #print 'W:', w
+            #print 'R:', r
             return 0, _N.ravel (r * w)
 
         info = [{'value': guess[i], 'parname': self._paramNames[i],
@@ -544,20 +537,17 @@ class ConstrainedMinFit (FitBase):
                 info[i]['limited'][1] = True
                 info[i]['limits'][1] = bmax
                 
-        self.mpobj = o = mpfit (error, parinfo=info, **kwargs)
+        self.mpobj = o = mpfit (error, parinfo=info, quiet=True, **kwargs)
 
         if o.status < 0 or o.status == 5:
             raise Exception ('MPFIT minimization failed: %d, %s' % (o.status,
                                                                     o.errmsg))
 
-        if len (guess) == 1:
-            # Coerce into arrayness.
-            self.params = _N.asarray ((o.params, ))
-        else:
-            self.params = o.params
-
-        self.uncerts = o.perror
-
+        # Coerce into arrayness.
+        self.params = _N.atleast_1d (o.params)
+        self.uncerts = _N.atleast_1d (o.perror)
+        self.cov = o.covar
+        
         if self._fitExport is not None:
             self._fitExport ()
 
@@ -691,15 +681,16 @@ class PowerLawFit (LeastSquaresFit):
     _paramNames = ['q', 'alpha']
     
     def guess (self):
-        l = _N.log
+        lx = _N.log (self.x)
+        ly = _N.log (self.y)
         
-        dlx = l (self.x.max ()) - l (self.x.min ())
-        dly = l (self.y.max ()) - l (self.y.min ())
+        dlx = lx.max () - lx.min ()
+        dly = ly.max () - ly.min ()
         alpha = dly / dlx
 
-        mlx = l (self.x).mean ()
-        mly = l (self.y).mean ()
-        q = _N.exp (- mly / alpha / mlx)
+        mlx = lx.mean ()
+        mly = ly.mean ()
+        q = _N.exp (mly - alpha * mlx)
 
         return (q, alpha)
 

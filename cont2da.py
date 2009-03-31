@@ -12,10 +12,13 @@ def cont2da (f, df, x0, y0, maxiters=5000, defeta=0.05, netastep=12,
     """Required arguments:
     
 f  - a function, mapping (x, y) -> z
-df - the derivative: df (x, y) -> [df/dx, df/dy]
-     (Should be 1D size-2 ndarray)
-x0 - initial x value
-y0 - initial y value
+df - the derivative: df (x, y) -> [df/dx, df/dy]. If None, the
+     derivative of f is approximated numerically with
+     scipy.derivative.
+x0 - initial x value. Should be of "typical" size for the problem;
+     avoid 0.
+y0 - initial y value. Should be of "typical" size for the problem;
+     avoid 0.
 
 Optional arguments:
 
@@ -38,9 +41,11 @@ maxnewt - Maximum number of Newton's method steps to take when
     # Coerce argument types.
 
     if not callable (f): raise ValueError ('f')
-    if not callable (df): raise ValueError ('df')
+    if df is not None and not callable (df): raise ValueError ('df')
     x0 = float (x0)
+    if x0 == 0.: raise ValueError ('x0')
     y0 = float (y0)
+    if y0 == 0.: raise ValueError ('y0')
     maxiters = int (maxiters)
     if maxiters < 3: raise ValueError ('maxiters')
     defeta = float (defeta)
@@ -57,6 +62,21 @@ maxnewt - Maximum number of Newton's method steps to take when
     # What value are we contouring?
     v = f (x0, y0)
 
+    # If no derivative is given, use a numerical approximation.
+
+    if df is None:
+        derivx = abs (x0 * 0.025)
+        derivy = abs (y0 * 0.025)
+        from scipy import derivative
+        print 'derivxy %.20g %.20g' % (derivx, derivy)
+        
+        def df (x1, y1):
+            print 'df %.20g %.20g' % (x1, y1)
+            dx = derivative (lambda x: f (x, y1), x1, derivx, order=7)
+            dy = derivative (lambda y: f (x1, y), y1, derivy, order=7)
+            print '   -> %.20g %.20g' % (dx, dy)
+            return [dx, dy]
+    
     # Init eta progression
     rez = N.finfo (N.double).resolution
     if rez > defeta: raise ValueError ('defeta below resolution!')
@@ -72,7 +92,7 @@ maxnewt - Maximum number of Newton's method steps to take when
     # Quitflag: 0 if first iteration
     # 1 if inited but not yet ok to quit (definition of this below)
     # 2 if ok to quit
-    # intiquad: 0 if x > 0, y > 0
+    # initquad: 0 if x > 0, y > 0
     # 1 if x < 0, y > 0
     # 2 if x < 0, y < 0
     # 3 if x > 0, y < 0
@@ -156,6 +176,7 @@ maxnewt - Maximum number of Newton's method steps to take when
 
             nx -= dv * dfdx / df2
             ny -= dv * dfdy / df2
+            print 'N:', nx, ny, dfdx/df2, dfdy/df2, dv
             nv = f (nx, ny)
 
             if abs (nv/v - 1) < vtol2:
@@ -176,7 +197,7 @@ maxnewt - Maximum number of Newton's method steps to take when
         # that we don't just exit on the first iteration.
         
         if quitflag == 2:
-            dist2 = (x0/x - 1)**2 + (y0/y - 1)**2
+            dist2 = (x/x0 - 1)**2 + (y/y0 - 1)**2
             if dist2 < vtol1**2:
                 break
     else:
