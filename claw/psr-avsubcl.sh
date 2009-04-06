@@ -170,7 +170,7 @@ echo '***Mean-subtracted image stats***'
 imstat in=${imroot}'-icube-'${suffix}'-sub.mp'
 
 # clean map (lightly) and restore
-clean map=${imroot}'-icube-'${suffix}'-sub.mp' beam=${imroot}'-icube-'${suffix}'.bm' out=${imroot}'-icube-'${suffix}'-sub.cl' niters=100
+clean map=${imroot}'-icube-'${suffix}'-sub.mp' beam=${imroot}'-icube-'${suffix}'.bm' out=${imroot}'-icube-'${suffix}'-sub.cl' niters=100 region='relpixel,boxes(-10,-10,10,10)' gain=0.03
 restor map=${imroot}'-icube-'${suffix}'-sub.mp' beam=${imroot}'-icube-'${suffix}'.bm' model=${imroot}'-icube-'${suffix}'-sub.cl' out=${imroot}'-icube-'${suffix}'-sub.rm'
 
 echo

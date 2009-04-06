@@ -16,27 +16,39 @@
 
 # observation properties:
 #period=0.7136692   # period that fixes b0329 phase shift
-period=0.7137   # period that makes b0329 pulse more constant with time
+#period=0.7137   # period that makes b0329 pulse more constant with time
 #period=0.358738    # period for b1933
-bin=0.1
-ints=3000
+#period=0.253065    # nominal period for b0950+08
+#period=0.25304    # period that works for b0950+08-0.15s-4000
+bin=0.10
+ints=6000
 
 # time for j0332-0.1s:
-t0h=02
-t0m=05
-t0s=02.4
+#t0h=02
+#t0m=05
+#t0s=02.4
 
 # time for b1933-0.1s:
 #t0h=19
 #t0m=37
 #t0s=25.3
 
+# time for b0950+09-0.15s-4000
+#t0h=02
+#t0m=07
+#t0s=19.7
+
+# time for b0950+09-0.1s-6000
+t0h=01
+t0m=32
+t0s=35.7
+
 # output properties:
-phasebins=4
+phasebins=3
 outphases=1  # not yet implemented
-suffix='tst'
-visroot='fxc-j0332-0.1s'
-imroot='j0332-0.1s'
+#suffix='tst'
+visroot='fxc-b0950-0.1s-6000'
+imroot='b0950-0.1s'
 frac='all'   # 'all', '1/3', '2/3', '2/2', etc.
 cleanup=1
 ######################
@@ -44,10 +56,10 @@ cleanup=1
 set -e -x
 
 # loop to do trial periods
-#for ((i=1; i<=25; i++))
-#  do
-#  period=`echo 0.3593-0.00003*${i} | bc`
-#  suffix=p${i}
+for ((i=1; i<=10; i++))
+  do
+  period=`echo 0.25275-0.00002*${i} | bc`
+  suffix=p${i}
   
 #clean up
   rm -rf ${imroot}-?-${suffix}-*.* ${imroot}-??-${suffix}-bin*.* ${imroot}-???-${suffix}-bin*.* ${imroot}-icube-${suffix}*.* time-${suffix}-bin*
@@ -62,4 +74,4 @@ set -e -x
       then
       rm -rf ${imroot}-?-${suffix}-*.* ${imroot}-??-${suffix}-bin*.* time-${suffix}-bin*
   fi
-#done
+done

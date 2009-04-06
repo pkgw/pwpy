@@ -90,6 +90,8 @@ for ((i=${istart}; i<=${istop}; i++))   # iterate over pulse number, 0-based
   t1h=`echo 'scale=0; '${t0h}' + '${t1h} | bc`
   t2h=`echo 'scale=0; '${t0h}' + '${t2h} | bc`
 
+## bug in here somewhere.  turning of hour doesn't work ##
+
   # print time filter to file
   echo 'time('${t1h}':'${t1m}':'${t1s}','${t1h}':'${t2m}':'${t2s}')'  >> $file
 done
