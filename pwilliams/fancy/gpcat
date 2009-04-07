@@ -122,7 +122,7 @@ for (time, gains) in gr.readSeq ():
 
             print '                   ', 
             for ant in ants:
-                print ' Ant %4d' % (ant + 1, ),
+                print ' Ant %04d' % (ant + 1, ),
             print
 
         first = False
@@ -150,7 +150,7 @@ for (time, gains) in gr.readSeq ():
     else:
         # default mode: print table of gains in numerical order
         for ant in ants:
-            print ' %8.7lg' % (v(ant)),
+            print ' %-+#8.3g' % (v(ant)),
     print
 
 # All done.
