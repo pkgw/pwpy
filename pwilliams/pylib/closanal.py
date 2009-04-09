@@ -1,7 +1,6 @@
 #! /usr/bin/env python
 
-# TODO: 'closure' can compute theoretical RMS closure values. Should
-# find out how they do that.
+# TODO: theoretical uncerts on amplitude quad closures.
 
 """= closanal.py - Attempt to identify bad baselines based on closure quantities
 & pkgw
@@ -53,8 +52,8 @@
 
  'best'    Print out the best closure values rather than the worst.
 
- 'relative'  Sort "best" and "worst" values according to the ratio of
-             the computed value to the theoretical value. Useful for
+ 'relative'  Sort values according to the ratio of the computed
+             value to the theoretical value. Useful for
              identifying baselines/antpols with non-thermal noise
              properties (i.e., bad hardware).
 
