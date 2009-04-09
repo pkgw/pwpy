@@ -14,8 +14,10 @@
  The system temperatures are computed from the variance in the real
  and imaginary parts across the spectral window of a visibility. The
  data for each baseline are averaged in time (see the "interval"
- keyword) before the variances are computed. The effective system
- temperature for a baseline is computed as:
+ keyword) before the variances are computed. A smoothed version of the
+ data may also be subtracted off before the variances are computed
+ (see the "hann" keyword). The effective system temperature for a
+ baseline is computed as:
 
  TSys = G * (SRe + SIm)/2 * etaQ * sqrt(2 * SDF * tau) / jyperk .
 
@@ -111,6 +113,26 @@
  involving any such antenna will be flagged. Default is 350. The
  input dataset is never modified.
 
+@ hann
+ The Hanning smoothing window size. Default is 1, equivalent to no
+ smoothing. If specified to be greater than 3, a copy of the
+ spectral data is smoothed with a Hanning window of this width and
+ then subtracted from the raw spectral data. Values of 2 or 3 remove
+ all information and are forbidden. Windows with fewer than (hann + 2)
+ channels also lose all information and are discarded.
+
+ Smoothing should yield better calculations of the per-baseline TSys
+ values if the bandpass is not quite flat. Larger values are more
+ conservative because they vary more slowly across the
+ spectrum. Values that are too small will make your TSys values be
+ smaller than they really are; unfortunately, I do not think it is
+ possible to quantify just what"too small" is.
+ This smoothing does not compensate for flagged channels or different
+ spectral windows, so discontinuities in the spectral data will
+ worsen the results of the smoothing. Data means are calculated
+ before subtraction of the smoothed component, so the "flux" keyword
+ should behave identically regardless of the value of this parameter.
+ 
 @ quant
  The nature of the quantization in the correlator. Two integer values
  can be given: the first is the number of quantization levels and
@@ -166,11 +188,12 @@ reallyBadTSys = 9999
 # Iterative averaging TSys computer
 
 class SysTemps (object):
-    def __init__ (self, flux, etaQ, maxtsys, showpre, showall, showfinal):
+    def __init__ (self, flux, etaQ, hann, maxtsys, showpre, showall, showfinal):
         self.integData = {}
         self.tmin = None
         self.flux = flux
         self.etaQ = etaQ
+        self.hann = hann
         self.maxtsys = maxtsys
         self.showpre = showpre
         self.showall = showall
@@ -201,16 +224,33 @@ class SysTemps (object):
         aginfo = ArrayGrower (6, N.double)
         agants = ArrayGrower (2, N.int)
 
+        doHann = self.hann > 1
+        if doHann:
+            window = N.hanning (self.hann) * 2 / (self.hann - 1)
+        
         for bp, (dt, times) in self.integData.iteritems ():
             w = N.where (times > 0)
-            if len (w[0]) < 2: continue # if only 1 item, can't calc meaningful std
+            if len (w[0]) < self.hann + 2:
+                # if only 1 item after smoothing, can't calc meaningful std
+                continue
             tw = times[w]
             dt = dt[w] / tw
 
-            mreal = dt.real.mean ()
-            sreal = dt.real.std ()
-            mimag = dt.imag.mean ()
-            simag = dt.imag.std ()
+            r = dt.real
+            i = dt.imag
+
+            mreal = r.mean ()
+            mimag = i.mean ()
+
+            if doHann:
+                r = r[self.hann / 2 : -self.hann / 2 + 1]
+                i = i[self.hann / 2 : -self.hann / 2 + 1]
+                r -= N.convolve (dt.real, window, mode='valid')
+                i -= N.convolve (dt.imag, window, mode='valid')
+                tw = N.convolve (tw, window, mode='valid')
+                
+            sreal = r.std ()
+            simag = i.std ()
             
             agants.add (bp[0], bp[1])
             aginfo.add (mreal, sreal, mimag, simag, tw.mean (), 0.)
@@ -486,10 +526,11 @@ class SysTemps (object):
 # Hooks up the SysTemp calculator to the reading of a dataset
 
 class DataProcessor (object):
-    def __init__ (self, interval, flux, etaQ, maxtsys, showpre=False, showall=False, showfinal=False):
+    def __init__ (self, interval, flux, etaQ, hann, maxtsys,
+                  showpre=False, showall=False, showfinal=False):
         self.interval = interval
         
-        self.sts = SysTemps (flux, etaQ, maxtsys, showpre, showall, showfinal)
+        self.sts = SysTemps (flux, etaQ, hann, maxtsys, showpre, showall, showfinal)
         self.first = True
         self.solutions = []
 
@@ -741,6 +782,7 @@ def task ():
     keys.keyword ('vis', 'f', ' ')
     keys.keyword ('out', 'f', ' ')
     keys.keyword ('quant', 'i', None, 2)
+    keys.keyword ('hann', 'i', 1)
     keys.option ('showpre', 'showfinal', 'showall')
 
     args = keys.process ()
@@ -765,6 +807,10 @@ def task ():
     interval = args.interval / 60. / 24.
     if interval <= 0:
         print >>sys.stderr, 'Error: invalid interval', interval
+        sys.exit (1)
+
+    if args.hann < 1 or args.hann == 2 or args.hann == 3:
+        print >>sys.stderr, 'Error: Hanning smoothing width must be 1 or >3; got', args.hann
         sys.exit (1)
 
     # Print out summary of config
@@ -809,10 +855,15 @@ def task ():
 
     print '  Quantization efficiency: %g' % etaQ
 
+    if args.hann == 1:
+        print '  Not subtracted smoothed spectral data.'
+    else:
+        print '  Subtracting spectral data Hanning-smoothed with window size %d.' % args.hann
+    
     # Let's go!
 
-    dp = DataProcessor (interval, args.flux, etaQ, args.maxtsys, args.showpre,
-                        args.showall, args.showfinal)
+    dp = DataProcessor (interval, args.flux, etaQ, args.hann, args.maxtsys,
+                        args.showpre, args.showall, args.showfinal)
 
     for tup in vis.readLowlevel (False):
         dp.process (*tup)
