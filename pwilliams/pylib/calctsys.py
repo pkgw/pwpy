@@ -85,8 +85,7 @@
  polarizations internally, but the author is unclear how best to write
  out TSys values for multiple feeds on the same antenna. (There are the
  UV variables "xtsys" and "ytsys" but they don't seem to be hooked up
- the UVIO code in the same way that "systemp" is.) CALCTSYS doesn't
- write very useful history entries.
+ the UVIO code in the same way that "systemp" is.)
 
 < vis
  Only a single input file is supported by CALCTSYS.
