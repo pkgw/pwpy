@@ -1,4 +1,4 @@
-#! /usr/bin/tcsh -f
+#! /bin/tcsh -f
 # $Id$
 onintr fail
 
@@ -8,7 +8,7 @@ echo "================================================================="
 echo "RFISCAN - RFI scanning utility"
 echo "'The interference is out there.'"
 echo ""
-echo "CALLS - MIRIAD (uvlist, uvaver,uvcal,uvflag)"
+echo "CALLS - MIRIAD (uvlist, /o/scroft/uvaver,uvcal,uvflag)"
 echo "PURPOSE - Build spectral occupancy datasets for RFI processing."
 echo "RESPONSIBLE - Karto (karto@hcro.org)"
 echo "================================================================="
@@ -213,11 +213,11 @@ foreach file ($vislist)
 	uvcal vis=$file options=fxcal,`echo $options | tr ' ' ','` select='pol(xx)' out=$wd/$outfile-xpol >& /dev/null
 	uvcal vis=$file options=fxcal,`echo $options | tr ' ' ','` select='pol(yy)' out=$wd/$outfile-ypol >& /dev/null
     else if ($crosspol != "crosspol") then
-	uvaver vis=$file options=relax,`echo $options | tr ' ' ','` select='pol(xx)' out=$wd/$outfile-xpol > /dev/null
-    	uvaver vis=$file options=relax,`echo $options | tr ' ' ','` select='pol(yy)' out=$wd/$outfile-ypol > /dev/null
+	/o/scroft/uvaver vis=$file options=relax,`echo $options | tr ' ' ','` select='pol(xx)' out=$wd/$outfile-xpol > /dev/null
+    	/o/scroft/uvaver vis=$file options=relax,`echo $options | tr ' ' ','` select='pol(yy)' out=$wd/$outfile-ypol > /dev/null
     else
-	uvaver vis=$file options=relax,`echo $options | tr ' ' ','` select='pol(xx,xy)' out=$wd/$outfile-xpol > /dev/null
-	uvaver vis=$file options=relax,`echo $options | tr ' ' ','` select='pol(yy,yx)' out=$wd/$outfile-ypol > /dev/null
+	/o/scroft/uvaver vis=$file options=relax,`echo $options | tr ' ' ','` select='pol(xx,xy)' out=$wd/$outfile-xpol > /dev/null
+	/o/scroft/uvaver vis=$file options=relax,`echo $options | tr ' ' ','` select='pol(yy,yx)' out=$wd/$outfile-ypol > /dev/null
     endif
     echo "Preliminary processing for $file complete..."
 end

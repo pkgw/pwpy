@@ -1,4 +1,4 @@
-#! /usr/bin/tcsh -f
+#! /bin/tcsh -f
 # $Id$
 onintr fail
 

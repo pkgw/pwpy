@@ -1,4 +1,4 @@
-#! /usr/bin/tcsh -f
+#! /bin/tcsh -f
 # $Id$
 set date1 = `date +%s.%N`
 

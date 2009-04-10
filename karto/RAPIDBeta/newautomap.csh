@@ -1,4 +1,4 @@
-#! /usr/bin/tcsh -f
+#! /bin/tcsh -f
 #
 # $Id$
 #
@@ -414,6 +414,7 @@ end
 #################################################################
 
 if ($imsize == "") set imsize = 512
+
 set badcal # Debugging var to tell what happened if auto-selfcal fails
 set psci = 0 # Phase auto-selfcal iterations
 set asci = 0 # Amp auto-selfcal iterations
@@ -531,9 +532,9 @@ set idx = 0
 foreach file ($vis)
     echo -n "Splitting $file..."
     @ idx++
-    uvaver vis=$file out=$wd/tempmap$idx.xpol options=relax select="-shadow(7.5),pol(xx),$uselect" interval=$interval >& /dev/null 
+    /o/scroft/uvaver vis=$file out=$wd/tempmap$idx.xpol options=relax select="-shadow(7.5),pol(xx),$uselect" interval=$interval >& /dev/null 
     echo -n "."
-    uvaver vis=$file out=$wd/tempmap$idx.ypol options=relax select="-shadow(7.5),pol(yy),$uselect" interval=$interval >& /dev/null 
+    /o/scroft/uvaver vis=$file out=$wd/tempmap$idx.ypol options=relax select="-shadow(7.5),pol(yy),$uselect" interval=$interval >& /dev/null 
     if !(-e $wd/tempmap$idx.xpol/visdata || -e $wd/tempmap$idx.ypol/visdata) then
 	echo "FATAL ERROR: UVAVER has failed! $file shows no viable data!" 
 	goto enderr
@@ -554,7 +555,7 @@ foreach file ($vis)
 	    if (-e $file/gains.mp) mv $file/gains.mp $file/gains
 	    if (-e $file/bandpass) mv $file/bandpass $file/bandpass.$dp$dp
 	    if (-e $file/bandpass.mp) mv $file/bandpass.mp $file/bandpass
-	    uvaver vis=$wd/tempmap$idx.{$dp}pol out=$wd/tempgmap options=relax >& /dev/null
+	    /o/scroft/uvaver vis=$wd/tempmap$idx.{$dp}pol out=$wd/tempgmap options=relax >& /dev/null
 	    rm -rf $wd/tempmap$idx.{$dp}pol; mv $wd/tempgmap $wd/tempmap$idx.{$dp}pol
 	    echo ""
 	endif
@@ -571,7 +572,7 @@ foreach file ($vis)
 	    if (-e $file/gains.mp) mv $file/gains.mp $file/gains
 	    if (-e $file/bandpass) mv $file/bandpass $file/bandpass.{$dp$dp}p
 	    if (-e $file/bandpass.mp) mv $file/bandpass.mp $file/bandpass
-	    uvaver vis=$wd/tempmap$idx.{$dp}pol out=$wd/tempgmap options=relax >& /dev/null
+	    /o/scroft/uvaver vis=$wd/tempmap$idx.{$dp}pol out=$wd/tempgmap options=relax >& /dev/null
 	    rm -rf $wd/tempmap$idx.{$dp}pol; mv $wd/tempgmap $wd/tempmap$idx.{$dp}pol
 	endif
 	if (-e $wd/tempmap$idx.{$dp}pol/visdata) then
@@ -594,7 +595,7 @@ foreach file ($vislist)
     set idx = 0
     foreach chan (`echo $crange`)
 	@ idx++
-	uvaver vis=$file line=chan,$chan options=relax out=$wd/$file.S$idx >& /dev/null
+	/o/scroft/uvaver vis=$file line=chan,$chan options=relax out=$wd/$file.S$idx >& /dev/null
 	if !(-e $file.S$idx/visdata) then
 	    echo "UVAVER has failed! (probably too much data, try x and y pols seperately)"
 	    goto enderr
@@ -901,7 +902,7 @@ endif
 autoflag:
 
 ################################################################# 
-# Autoflagging is fairly simple, automap uses uvaver to apply
+# Autoflagging is fairly simple, automap uses /o/scroft/uvaver to apply
 # the gains solution (if there is one) and uses uvlist to calc
 # the amplitude of each integrated spectra. If the amplitude
 # falls outside of some preset limit (amplim[1] being the lower
@@ -925,7 +926,7 @@ if ($autoflag) then
     foreach file ($vislist)
 	rm -rf $wd/tempmap2
 	
-	uvaver vis=$file out=$wd/tempmap2 options=relax > /dev/null
+	/o/scroft/uvaver vis=$file out=$wd/tempmap2 options=relax > /dev/null
 	if !(-e $wd/tempmap2/visdata) then
 	    echo "UVAVER has failed! (probably too much data, try x and y pols seperately)" 
 	    goto enderr
