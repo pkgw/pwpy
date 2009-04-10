@@ -58,8 +58,10 @@
 
  Very bad antennas will give poor fits to the baseline-based system
  temperatures. CALCTSYS will fit iteratively, flagging out antennas
- with excessively high TSys values. (See the "maxtsys" keyword.) The
- removal of such antennas generally improves the quality of the fit.
+ with excessively high TSys values (see the "maxtsys" keyword) and
+ baselines with excessively high residuals to the model fit (see the
+ "maxresid" keyword). The removal of such antennas and baselines
+ generally improves the quality of the fit.
 
  CALCTSYS will print out its progress as it iteratively solves for the
  antenna TSys values and then print out the values that it computes as
@@ -77,7 +79,8 @@
  antennas for which no solution was found (by virtue of being either
  absent or having a computed TSys above "maxtsys") will be given a
  system temperature of 9999 K. Baselines involving such antennas will
- written into the new dataset, but be completely flagged.
+ written into the new dataset, but be completely flagged. Any baselines
+ with residuals to the fit above "maxresid" will also be flagged.
  
  LIMITATIONS: Currently CALCTSYS can only handle data with a single
  spectral window and no wide channels. CALCTSYS will only process data
@@ -113,6 +116,15 @@
  involving any such antenna will be flagged. Default is 350. The
  input dataset is never modified.
 
+@ maxresid
+ The maximum allowed residual for a baseline, in Kelvin. If the
+ magnitude of the difference between the computed TSys value for the
+ baseline and the model value for it is greater than this number, the
+ baseline is flagged out in the internal data structures and TSys
+ values are recomputed. If an output dataset is being created,
+ visibilities involving any such antenna will be flagged. Default is
+ 50. The input dataset is never modified.
+
 @ hann
  The Hanning smoothing window size. Default is 1, equivalent to no
  smoothing. If specified to be greater than 3, a copy of the
@@ -124,14 +136,16 @@
  Smoothing should yield better calculations of the per-baseline TSys
  values if the bandpass is not quite flat. Larger values are more
  conservative because they vary more slowly across the
- spectrum. Values that are too small will make your TSys values be
- smaller than they really are; unfortunately, I do not think it is
- possible to quantify just what"too small" is.
- This smoothing does not compensate for flagged channels or different
- spectral windows, so discontinuities in the spectral data will
- worsen the results of the smoothing. Data means are calculated
- before subtraction of the smoothed component, so the "flux" keyword
- should behave identically regardless of the value of this parameter.
+ spectrum. Larger values also lose more of your data because (hann/2)
+ channels at each edge of the spectral window must be discaded.
+ Values that are too small will make your TSys values be smaller than
+ they really are; unfortunately, I do not think it is possible to
+ quantify just what "too small" is. This smoothing does not compensate
+ for flagged channels or different spectral windows, so
+ discontinuities in the spectral data will worsen the results of the
+ smoothing. Data means are calculated before subtraction of the
+ smoothed component, so the "flux" keyword should behave identically
+ regardless of the value of this parameter.
  
 @ quant
  The nature of the quantization in the correlator. Two integer values
@@ -153,9 +167,9 @@
  negative value, the jyperk value embedded in the UV stream is
  multiplied by the absolute value of this argument. Thus -1, which is
  the default value, means that the value of jyperk embedded in the file
- will be used. If jyperk=1, you will need to specify a non-default
- value for the "maxtsys" keyword to prevent all the data from being
- flagged.
+ will be used. If jyperk=1, you will likely need to specify non-default
+ values for the "maxtsys" and "maxresid" keywords to prevent all the
+ data from being flagged.
 
 @ options
  Multiple options can be specified, separated by commas. Minimum-match
@@ -199,13 +213,15 @@ reallyBadTSys = 9999
 # Iterative averaging TSys computer
 
 class SysTemps (object):
-    def __init__ (self, flux, etaQ, hann, maxtsys, showpre, showall, showfinal):
+    def __init__ (self, flux, etaQ, hann, maxtsys, maxresid,
+                  showpre, showall, showfinal):
         self.integData = {}
         self.tmin = None
         self.flux = flux
         self.etaQ = etaQ
         self.hann = hann
         self.maxtsys = maxtsys
+        self.maxresid = maxresid
         self.showpre = showpre
         self.showall = showall
         self.showfinal = showfinal
@@ -315,7 +331,7 @@ class SysTemps (object):
         
             tsyses[i] = tsys
 
-    def _reflattenFiltered (self, skipAps):
+    def _reflattenFiltered (self, skipAps, skipBps):
         # prefix: o = old, n = new
 
         seenAps = set ()
@@ -329,6 +345,7 @@ class SysTemps (object):
         for i in self.idxs:
             oa1, oa2 = oAnts[i]
             a1, a2 = oAps[oa1], oAps[oa2]
+            if (a1, a2) in skipBps: continue
             if a1 in skipAps or a2 in skipAps: continue
 
             naginfo.addLine (self.info[i])
@@ -494,6 +511,7 @@ class SysTemps (object):
         if self.showpre: self._show (False)
         
         print 'Iteratively flagging ...'
+        allBadBps = set ()
         
         while True:
             #self._solve_miriad ()
@@ -501,23 +519,44 @@ class SysTemps (object):
             #self._print ()
 
             if self.showall: self._show (True)
-            
-            badAps = []
-            for i in xrange (0, self.nap):
-                if self.soln[i] > self.maxtsys:
-                    badAps.append ((self.aps[i], self.soln[i]))
 
-            if len (badAps) == 0: break
+            # First look for bad baselines. Flag antennas after
+            # we've gotten all of those -- don't want to let one
+            # really bad baseline cause an otherwise good antenna
+            # to be flagged.
+
+            badBps = []
+            badAps = []
+            
+            for i in self.idxs:
+                if abs (self.resid[i]) > self.maxresid:
+                    a1, a2 = self.ants[i]
+                    bp = (self.aps[a1], self.aps[a2])
+                    badBps.append ((bp, self.resid[i]))
+                    allBadBps.add (bp)
+
+            if len (badBps) == 0:
+                for i in xrange (0, self.nap):
+                    if self.soln[i] > self.maxtsys:
+                        badAps.append ((self.aps[i], self.soln[i]))
+
+                if len (badAps) == 0: break
 
             # Let's not flag too many at once here
+            badBps.sort (key = lambda t: t[1], reverse=True)
+            badBps = badBps[0:3]
             badAps.sort (key = lambda t: t[1], reverse=True)
             badAps = badAps[0:3]
             
+            for bp, resid in badBps:
+                print '      Flagging basepol %s: resid |%#4g| > %#4g' % \
+                      (util.fmtAPs (bp), resid, self.maxresid)
             for ap, soln in badAps:
                 print '      Flagging antpol %s: TSys %#4g > %#4g' % \
                       (util.fmtAP (ap), soln, self.maxtsys)
 
-            self._reflattenFiltered ([t[0] for t in badAps])
+            self._reflattenFiltered ([t[0] for t in badAps],
+                                     [t[0] for t in badBps])
 
         print
         self._print ()
@@ -530,17 +569,18 @@ class SysTemps (object):
         self.integData = {}
         self.tmin = None
 
-        return tmin, dict (zip (self.aps, self.soln))
+        return tmin, dict (zip (self.aps, self.soln)), allBadBps
 
 # Hooks up the SysTemp calculator to the reading of a dataset
 
 class DataProcessor (object):
     def __init__ (self, interval, flux, etaQ, hann, fjyperk, maxtsys,
-                  showpre=False, showall=False, showfinal=False):
+                  maxresid, showpre=False, showall=False, showfinal=False):
         self.interval = interval
         self.fjyperk = fjyperk
         
-        self.sts = SysTemps (flux, etaQ, hann, maxtsys, showpre, showall, showfinal)
+        self.sts = SysTemps (flux, etaQ, hann, maxtsys, maxresid,
+                             showpre, showall, showfinal)
         self.first = True
         self.solutions = []
 
@@ -635,7 +675,7 @@ class DataProcessor (object):
         self.solutions.sort (key = lambda t: t[0])
 
         # Sentinel entry to make rewriteData algorithm simpler.
-        self.solutions.append ((self.solutions[-1][0] + self.interval, None))
+        self.solutions.append ((self.solutions[-1][0] + self.interval, None, None))
 
 # Rewrite a dataset with new TSys solutions embedded
 
@@ -737,6 +777,7 @@ def rewriteData (banner, vis, out, solutions):
 
         if time >= solutions[nextSolnIdx][0]:
             solns = solutions[nextSolnIdx][1]
+            badBps = solutions[nextSolnIdx][2]
             assert solns is not None, 'Bizarre interval calculation issues?'
 
             if flaggedAps is not None:
@@ -757,6 +798,11 @@ def rewriteData (banner, vis, out, solutions):
                 systemps[ant-1] = tsys
                 dOut.writeHistory ('CALCTSYS:  %5s %f' % (util.fmtAP (ap), tsys))
 
+            dOut.writeHistory ('CALCTSYS: soln %s: flagging %d basepols' % (jd, len (badBps)))
+
+            for bp in sorted (badBps):
+                dOut.writeHistory ('CALCTSYS:   flagging %s' % util.fmtAPs (bp))
+                
             dOut.writeVarFloat ('systemp', systemps)
 
             nextSolnIdx += 1
@@ -771,6 +817,8 @@ def rewriteData (banner, vis, out, solutions):
             bad = True
         if bp[1] not in goodAps:
             flaggedAps.add (bp[1])
+            bad = True
+        if bp in badBps:
             bad = True
 
         if bad:
@@ -807,6 +855,7 @@ def task ():
     keys.keyword ('interval', 'd', 5.)
     keys.keyword ('flux', 'd', -1)
     keys.keyword ('maxtsys', 'd', 350.)
+    keys.keyword ('maxresid', 'd', 50.)
     keys.keyword ('vis', 'f', ' ')
     keys.keyword ('out', 'f', ' ')
     keys.keyword ('quant', 'i', None, 2)
@@ -831,6 +880,10 @@ def task ():
     
     if args.maxtsys <= 0:
         print >>sys.stderr, 'Error: invalid maximum TSys', maxtsys
+        sys.exit (1)
+
+    if args.maxresid <= 0:
+        print >>sys.stderr, 'Error: invalid maximum residual', maxresid
         sys.exit (1)
 
     interval = args.interval / 60. / 24.
@@ -859,7 +912,8 @@ def task ():
     else:
         print '  Assuming data are uncalibrated, using source flux %3g' % args.flux
 
-    print '  Flagging TSyses above %g' % args.maxtsys
+    print '  Flagging TSyses above %g, BL residuals above %g' % (args.maxtsys,
+                                                                 args.maxresid)
 
     vis = VisData (args.vis)
 
@@ -905,7 +959,8 @@ def task ():
     # Let's go!
 
     dp = DataProcessor (interval, args.flux, etaQ, args.hann, args.jyperk,
-                        args.maxtsys, args.showpre, args.showall, args.showfinal)
+                        args.maxtsys, args.maxresid, args.showpre, args.showall,
+                        args.showfinal)
 
     for tup in vis.readLowlevel (False):
         dp.process (*tup)
