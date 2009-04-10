@@ -27,7 +27,8 @@
  SDF is the width of the spectral window. tau is the mean integration
  time of data feeding into the computation. (This will be different than
  "interval" if data are flagged or there are no observations for part of
- the interval.) jyperk is the current value of the "jyperk" UV variable.
+ the interval.) jyperk is usually the current value of the "jyperk" UV
+ variable, but see the "jyperk" keyword.
 
  G is a "gain" parameter used to convert SRe and SIm from their native
  units into Janskys. By default, G is 1, which is appropriate for
@@ -145,6 +146,17 @@
  and 3-level quantization at 1 or 2 times the Nyquist rate. If
  unspecified or an unsupported bits-rate pair is given, a
  quantization efficiency of unity is used.
+
+@ jyperk
+ Possibly override the Jy/K setting used in the TSys computation. If
+ set to a positive value, that value is use for jyperk. A value of one
+ corresponds to computing the SEFD rather than TSys. If set to a
+ negative value, the jyperk value embedded in the UV stream is
+ multiplied by the absolute value of this argument. Thus -1, which is
+ the default value, means that the value of jyperk embedded in the file
+ will be used. If jyperk=1, you will need to specify a non-default
+ value for the "maxtsys" keyword to prevent all the data from being
+ flagged.
 
 @ options
  Multiple options can be specified, separated by commas. Minimum-match
@@ -285,8 +297,6 @@ class SysTemps (object):
         etaQ = self.etaQ
         tsyses = self.tsyses
 
-        print 'Computing temps in Kelvin, using Jy/K =', jyperk, '(from "jyperk" in dataset)'
-        
         for i in self.idxs:
             mreal, sreal, mimag, simag, meantime, tmp1 = self.info[i]
             s = (sreal + simag) / 2
@@ -391,7 +401,7 @@ class SysTemps (object):
         resid = self.resid
         ants = self.ants
         
-        print 'Systemp solutions:'
+        print 'Solutions:'
 
         col = 0
         sa = StatsAccumulator ()
@@ -526,14 +536,33 @@ class SysTemps (object):
 # Hooks up the SysTemp calculator to the reading of a dataset
 
 class DataProcessor (object):
-    def __init__ (self, interval, flux, etaQ, hann, maxtsys,
+    def __init__ (self, interval, flux, etaQ, hann, fjyperk, maxtsys,
                   showpre=False, showall=False, showfinal=False):
         self.interval = interval
+        self.fjyperk = fjyperk
         
         self.sts = SysTemps (flux, etaQ, hann, maxtsys, showpre, showall, showfinal)
         self.first = True
         self.solutions = []
 
+    def _jyperk (self, rawval):
+        if self.fjyperk == 1.:
+            print 'Computing SEFDs in Jy.'
+            return 1.
+
+        if self.fjyperk > 0:
+            print 'Computing temps in Kelvin, using Jy/K =', self.fjyperk, '(from task arguments)'
+            return self.fjyperk
+
+        if self.fjyperk == -1.:
+            print 'Computing temps in Kelvin, using Jy/K =', rawval, '(from "jyperk" in dataset)'
+            return rawval
+
+        v = -self.fjyperk * rawval
+        print 'Computing temps in Kelvin, using Jy/K =', v, \
+              '(%g * "jyperk" in dataset)' % (-self.fjyperk)
+        return v
+    
     def process (self, inp, preamble, data, flags, nread):
         time = preamble[3]
 
@@ -594,7 +623,7 @@ class DataProcessor (object):
             # We only consider intensity-type cross-correlations ...
 
             if (time - tmin) > self.interval or (tmax - time) > self.interval:
-                self.solutions.append (self.sts.flush (jyperk, sdf))
+                self.solutions.append (self.sts.flush (self._jyperk (jyperk), sdf))
                 tmin = tmax = time
 
             self.sts.accumulate (time, bp, data, flags, inttime)
@@ -603,7 +632,7 @@ class DataProcessor (object):
         self.jyperk, self.inttime, self.sdf = jyperk, inttime, sdf
 
     def finish (self):
-        self.solutions.append (self.sts.flush (self.jyperk, self.sdf))
+        self.solutions.append (self.sts.flush (self._jyperk (self.jyperk), self.sdf))
         self.solutions.sort (key = lambda t: t[0])
 
         # Sentinel entry to make rewriteData algorithm simpler.
@@ -783,6 +812,7 @@ def task ():
     keys.keyword ('out', 'f', ' ')
     keys.keyword ('quant', 'i', None, 2)
     keys.keyword ('hann', 'i', 1)
+    keys.keyword ('jyperk', 'd', -1.0)
     keys.option ('showpre', 'showfinal', 'showall')
 
     args = keys.process ()
@@ -813,6 +843,10 @@ def task ():
         print >>sys.stderr, 'Error: Hanning smoothing width must be 1 or >3; got', args.hann
         sys.exit (1)
 
+    if args.jyperk == 0.:
+        print >>sys.stderr, 'Error: jyperk argument may not be zero.'
+        sys.exit (1)
+    
     # Print out summary of config
     
     print 'Configuration:'
@@ -859,11 +893,20 @@ def task ():
         print '  Not subtracted smoothed spectral data.'
     else:
         print '  Subtracting spectral data Hanning-smoothed with window size %d.' % args.hann
-    
+
+    if args.jyperk == -1.:
+        print '  Using jyperk from UV data.'
+    elif args.jyperk == 1.:
+        print '  Computing SEFDs rather than TSyses.'
+    elif args.jyperk > 0:
+        print '  Using Jy/K = %g' % args.jyperk
+    else:
+        print '  Scaling value of jyperk in file by %g' % (-args.jyperk)
+
     # Let's go!
 
-    dp = DataProcessor (interval, args.flux, etaQ, args.hann, args.maxtsys,
-                        args.showpre, args.showall, args.showfinal)
+    dp = DataProcessor (interval, args.flux, etaQ, args.hann, args.jyperk,
+                        args.maxtsys, args.showpre, args.showall, args.showfinal)
 
     for tup in vis.readLowlevel (False):
         dp.process (*tup)
