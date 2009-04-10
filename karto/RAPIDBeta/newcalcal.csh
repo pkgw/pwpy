@@ -11,7 +11,7 @@ echo "CALCAL - All in one calibration program"
 echo "'Building a gains solution for a better tomorrow'"
 echo ""
 echo "CALLS - newautomap.csh, neweprms.csh, MIRIAD (uvlist, uvplt,"
-echo "    uvflag,uvaflag,mfcal,/o/scroft/uvaver,gpcopy)"
+echo "    uvflag,uvaflag,mfcal,uvaver,gpcopy)"
 echo "PURPOSE - Build gains and flags solutions based on calibrator"
 echo "    data."
 echo "REPSONSIBLE - Karto (karto@hcro.org)"
@@ -396,12 +396,12 @@ echo -n "Preprocessing data..."
 
 if ($polsplit) then
     set pollist = ("xx" "yy")
-    /o/scroft/uvaver vis=$vis select='window(1),pol(xx)' out=$wd/tempcalxx options=relax,nocal,nopass,nopol >& /dev/null
+    uvaver vis=$vis select='window(1),pol(xx)' out=$wd/tempcalxx options=relax,nocal,nopass,nopol >& /dev/null
     echo -n "."
-    /o/scroft/uvaver vis=$vis select='window(1),pol(yy)' out=$wd/tempcalyy options=relax,nocal,nopass,nopol >& /dev/null
+    uvaver vis=$vis select='window(1),pol(yy)' out=$wd/tempcalyy options=relax,nocal,nopass,nopol >& /dev/null
     echo -n "."
 else
-    /o/scroft/uvaver vis=$vis select='window(1),pol(xx,yy)' out=$wd/tempcalxxyy options=relax,nocal,nopass,nopol >& /dev/null
+    uvaver vis=$vis select='window(1),pol(xx,yy)' out=$wd/tempcalxxyy options=relax,nocal,nopass,nopol >& /dev/null
     echo -n "."
 endif
 echo ""
@@ -444,7 +444,7 @@ while ($idx < $#regtimes)
     set cycle = `echo $idx | awk '{print 999+$1}' | sed 's/1//'` # The cycle number is there to files from a particular time range a unique marker
     echo -n "Preparing file "`echo $idx | awk '{print $1-1}'`" of "`echo $#regtimes | awk '{print $1-2}'`"..."
     foreach pol (`echo $pollist | sed 's/xxyy/xx,yy/g'`)
-	/o/scroft/uvaver vis=$wd/tempcal`echo $pol | tr -d ','` out=$wd/tempcali`echo $pol | tr -d ','`$cycle options=relax,nocal,nopass,nopol select="window(1),time($regtimes[$idx],$regtimes[$postidx]),pol($pol)" >& /dev/null
+	uvaver vis=$wd/tempcal`echo $pol | tr -d ','` out=$wd/tempcali`echo $pol | tr -d ','`$cycle options=relax,nocal,nopass,nopol select="window(1),time($regtimes[$idx],$regtimes[$postidx]),pol($pol)" >& /dev/null
     end
     if ($outsource && "$tvis[1]" != "") then
         set tviscount = ($tviscount 0)
@@ -453,7 +453,7 @@ while ($idx < $#regtimes)
 	    @ fileidx++
 	    set filemark = `echo $fileidx | awk '{print $1+100000}' | sed 's/1//'`
 	    @ tviscount[$idx]++
-	    /o/scroft/uvaver vis=$tfile out=$wd/tvis$filemark$cycle options=relax,nocal,nopass,nopol select="time($regtimes[$idx],$regtimes[$postidx])" >& /dev/null
+	    uvaver vis=$tfile out=$wd/tvis$filemark$cycle options=relax,nocal,nopass,nopol select="time($regtimes[$idx],$regtimes[$postidx])" >& /dev/null
 	    if !(-e $wd/tvis$filemark$cycle/visdata) rm -rf $wd/tvis$filemark$cycle
 	    if !(-e $wd/tvis$filemark$cycle/visdata) @ tviscount[$idx]--
         end
@@ -469,7 +469,7 @@ if ($outsource && "$tvis[1]" != "") then
 	@ fileidx++
 	set filemark = `echo $fileidx | awk '{print $1+100000}' | sed 's/1//'`
 	@ tviscount[1]++
-        /o/scroft/uvaver vis=$tfile out=$wd/tvis{$filemark}000 options=relax,nocal,nopass,nopol select="time($regtimes[1],$regtimes[2])" >& /dev/null
+        uvaver vis=$tfile out=$wd/tvis{$filemark}000 options=relax,nocal,nopass,nopol select="time($regtimes[1],$regtimes[2])" >& /dev/null
         if !(-e $wd/tvis{$filemark}000/visdata) rm -rf $wd/tvis{$filemark}000
         if !(-e $wd/tvis{$filemark}000/visdata) @ tviscount[1]--
     end
@@ -572,7 +572,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
 # Horray for MFCAL!    
 	mfcal vis=$file refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& /dev/null
 # UVAVER is used to "apply" the gains solutions to the dataset.
-	/o/scroft/uvaver vis=$file out=$wd/tempcal2 options=relax >& /dev/null	
+	uvaver vis=$file out=$wd/tempcal2 options=relax >& /dev/null	
 	set sflags = 0
 	if ($display) uvplt vis=$wd/tempcal2 select='-auto' $device options=2pass,nobase,equal,source axis=re,im >& /dev/null # Display results if requested
 #################################################################
@@ -868,9 +868,9 @@ foreach ipol ($pollist) # Work with only one pol at a time
     endif
 
 
-    	# If on the last cycle, then use /o/scroft/uvaver to pull together all of the datasets. Otherwise, repeat with the next time cycle.
+    	# If on the last cycle, then use uvaver to pull together all of the datasets. Otherwise, repeat with the next time cycle.
 	if ($postidx >= $#regtimes) then
-	    /o/scroft/uvaver vis="$wd/tempcali$ipol*" out=$wd/tempcal2 options=relax > /dev/null
+	    uvaver vis="$wd/tempcali$ipol*" out=$wd/tempcal2 options=relax > /dev/null
 	    uvaflag vis=$wd/tempcal$ipol tvis=$wd/tempcal2 > /dev/null
 	    rm -rf $wd/tempcal2
 	    echo "Moving to final cycle!"
@@ -898,7 +898,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
     set checkamp = 1000
     mfcal vis=$wd/tempcal$ipol refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& /dev/null
     # Add a pinch of UVAVER to apply the gains
-    /o/scroft/uvaver vis=$wd/tempcal$ipol out=$wd/tempcal2 options=relax >& /dev/null
+    uvaver vis=$wd/tempcal$ipol out=$wd/tempcal2 options=relax >& /dev/null
     #Display if neccessary
     if ($display) uvplt vis=$wd/tempcal2 select='-auto' $device options=2pass,nobase,equal,source axis=re,im >& /dev/null
     # Error capture if no records to be flagged
@@ -989,7 +989,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
 end
 
 # Pull together all polarizations
-/o/scroft/uvaver vis=`echo " $pollist" | sed -e 's/ /,'$wd'\/tempcal/g' -e 's/,//'` options=relax out=$wd/tempcalfin >& /dev/null
+uvaver vis=`echo " $pollist" | sed -e 's/ /,'$wd'\/tempcal/g' -e 's/,//'` options=relax out=$wd/tempcalfin >& /dev/null
 
 # Put the results of the mapping process into a specified directory
 set outfile = "cal-$source-"`echo $freq | awk '{print int($1*1000)}'`"-maps"
@@ -1101,7 +1101,7 @@ if ($outsource && "$tvis[1]" != "") then
 	@ fileidx++
 	set filemark = `echo $fileidx | awk '{print $1+100000}' | sed 's/1//'`
 	echo "Applying flags for $tfile..."
-        /o/scroft/uvaver vis="$wd/tvis$filemark*" out=$wd/tvis$filemark options=relax,nocal,nopass,nopol >& /dev/null
+        uvaver vis="$wd/tvis$filemark*" out=$wd/tvis$filemark options=relax,nocal,nopass,nopol >& /dev/null
 	uvaflag vis=$tvis tvis=$wd/tvis$filemark > /dev/null
     end
 endif

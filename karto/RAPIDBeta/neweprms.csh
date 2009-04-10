@@ -1,4 +1,4 @@
-#! /bin/tcsh -f
+#! /usr/bin/tcsh -f
 #
 # $Id$
 #    exit script cleanly  on interrupt

@@ -10,7 +10,7 @@ echo "RFISWEEP - All in one RFI flagging program"
 echo "'It's high time someone cleaned up this spectrum.'"
 echo ""
 echo "CALLS - newrfi.csh, newrfi32.csh , newfracture.csh, MIRIAD"
-echo "    (uvflag, uvaflag, /o/scroft/uvaver)"
+echo "    (uvflag, uvaflag, uvaver)"
 echo "PURPOSE - Identify channels with RFI pollution."
 echo "RESPONSIBLE - Karto (karto@hcro.org)"
 echo "================================================================="
@@ -533,7 +533,7 @@ while ($idx <= $lim)
     set fileidx = 0
     foreach file (`echo $vals[3] $vals[4] | tr ',' ' '`)
 	@ fileidx++
-	if (! -e $wd/$tfilelist[$fileidx]$cycle && $flag) /o/scroft/uvaver vis=$file out=$wd/$tfilelist[$fileidx]$cycle select=time"($starttime,$stoptime)" options=relax,nocal,nopass,nopol > /dev/null
+	if (! -e $wd/$tfilelist[$fileidx]$cycle && $flag) uvaver vis=$file out=$wd/$tfilelist[$fileidx]$cycle select=time"($starttime,$stoptime)" options=relax,nocal,nopass,nopol > /dev/null
     end
     @ idx++ jidx++
 end
@@ -663,7 +663,7 @@ set listlim = `echo $fulllist | wc -w`
 set idx = 1
 while ($idx <= $listlim)
     echo "$fulllist[$idx] final flagging..." 
-    if ($flag) /o/scroft/uvaver vis=$wd/$trlist[$idx]'*' options=relax,nocal,nopass,nopol out=$wd/s$trlist[$idx] 
+    if ($flag) uvaver vis=$wd/$trlist[$idx]'*' options=relax,nocal,nopass,nopol out=$wd/s$trlist[$idx] 
     uvaflag vis=$fulllist[$idx] tvis=$wd/s$trlist[$idx] 
     if ($autoedge) then
     echo "Edge flagging $fulllist[$idx]"
