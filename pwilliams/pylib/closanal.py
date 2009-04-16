@@ -193,7 +193,7 @@ def _flushOneAcc3 (accData, allData, ap1, ap2, ap3):
     # Does affect amp though.
     ph = 180/N.pi * N.arctan2 (c.imag, c.real)
     amp = N.abs (c) / time
-    thy = 180/N.pi * N.sqrt (v) / time / (amp ** (1./3))
+    thy = 180/N.pi * N.sqrt (v / time) / (amp ** (1./3))
 
     allData.accum (key, (ph, thy))
     #allData.accum (key, (time, ph, v / time))
