@@ -570,7 +570,14 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	    echo -n "Refant $refant choosen! "
 	endif
 # Horray for MFCAL!    
-	mfcal vis=$file refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& /dev/null
+	mfcal vis=$file refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& $wd/checkmfcal
+
+	if (`grep "time order" $wd/checkmfcal | wc -l`) then
+	    echo ""
+	    echo "WARNING: Data not in time order!"
+	    goto fail
+	endif
+
 # UVAVER is used to "apply" the gains solutions to the dataset.
 	uvaver vis=$file out=$wd/tempcal2 options=relax >& /dev/null	
 	set sflags = 0
@@ -855,9 +862,14 @@ foreach ipol ($pollist) # Work with only one pol at a time
         echo -n "Beginning SEFD calculation"
 	uvflag vis=$file options=none flagval=u select=auto >& /dev/null
 	uvcal vis=$file options=nocal,nopass,nopol,fxcal out=$wd/sefdcal >& /dev/null
-	uvflag vis=$wd/sefdcal flagval=f select='amp(0,0.0000000000000001)' options=none >& /dev/null #This is here since uvcal is stupid, and this corresponds to a noise level of 80 dBS (SNR of 1:10^8)
+	uvflag vis=$wd/sefdcal flagval=f select='amp(0,0.0000000000000001)' options=none >& /dev/null #This is here since uvcal is stupid, and this corresponds to a noise level of 80 dB (SNR of 1:10^8)
 	echo -n ", calculating gains tables..."
-	mfcal vis=$wd/sefdcal refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& /dev/null
+	mfcal vis=$wd/sefdcal refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& $wd/checkmfcal
+	if (`grep "time order" $wd/checkmfcal | wc -l`) then
+	    echo ""
+	    echo "FATAL ERROR: Data not in time order!"
+	    goto fail
+	endif
 	echo "$freq $regtimes[$postidx] " > $wd/sefd.$ipol.$regtimes[$postidx]
 	echo " Ant Pol  R-Gain Avg  R-Gain RMS  I-Gain Avg  I-Gain RMS   SEFD (Jy)" >> $wd/sefd.$ipol.$regtimes[$postidx]
 	echo "====================================================================" >> $wd/sefd.$ipol.$regtimes[$postidx]
@@ -895,8 +907,13 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	echo -n "Refant $refant choosen! "
     endif
     # The final solution check, start with a dash of MFCAL
-    set checkamp = 1000
-    mfcal vis=$wd/tempcal$ipol refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& /dev/null
+    set checkamp = 100
+    mfcal vis=$wd/tempcal$ipol refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& $wd/checkmfcal
+    if (`grep "time order" $wd/checkmfcal | wc -l`) then
+	echo ""
+	echo "FATAL ERROR: Data not in time order!"
+	goto fail
+    endif
     # Add a pinch of UVAVER to apply the gains
     uvaver vis=$wd/tempcal$ipol out=$wd/tempcal2 options=relax >& /dev/null
     #Display if neccessary
@@ -967,7 +984,12 @@ foreach ipol ($pollist) # Work with only one pol at a time
     endif
     
     # Horray again for MFCAL
-    if ("$smooth" == "") mfcal vis=$wd/tempcal$ipol refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& /dev/null
+    if ("$smooth" == "") mfcal vis=$wd/tempcal$ipol refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& $wd/checkmfcal
+    if (`grep "time order" $wd/checkmfcal | wc -l`) then
+	echo ""
+	echo "FATAL ERROR: Data not in time order!"
+	goto fail
+    endif
     if ("$smooth" != "") smamfcal =$wd/tempcal$ipol refant=$refant options=interpolate minants=4 flux=$flux interval=$int $smooth weight=-1 >& /dev/null
     if ($polsplit && $sefd) then
         echo -n "Beginning SEFD calculation"
@@ -975,7 +997,12 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	uvcal vis=$wd/tempcal$ipol options=nocal,nopass,nopol,fxcal out=$wd/sefdcal >& /dev/null
 	uvflag vis=$wd/sefdcal flagval=f select='amp(0,0.0000000000000001)' options=none >& /dev/null #This is here since uvcal is stupid, and this corresponds to a noise level of 80 dBS (SNR of 1:10^8)
 	echo -n ", calculating gains tables..."
-	mfcal vis=$wd/sefdcal refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& /dev/null
+	mfcal vis=$wd/sefdcal refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& $wd/checkmfcal
+	if (`grep "time order" $wd/checkmfcal | wc -l`) then
+	    echo ""
+	    echo "FATAL ERROR: Data not in time order!"
+	    goto fail
+	endif
 	echo "$freq" > $wd/sefd.$ipol
 	echo " Ant Pol  R-Gain Avg  R-Gain RMS  I-Gain Avg  I-Gain RMS   SEFD (Jy)" > $wd/sefd.$ipol
 	echo "====================================================================" >> $wd/sefd.$ipol
@@ -1194,6 +1221,6 @@ if !($debug) rm -rf $wd
 exit 0 
 
 fail:
-echo "Calibration failed for unknown reason! Now exiting..."
+echo "Calibration failed! Now exiting..."
 if !($debug) rm -rf $wd
 exit 1
