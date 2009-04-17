@@ -549,7 +549,8 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	set yantcount = $#yants
 	if ("$xants" == "") set xantcount = 0
 	if ("$yants" == "") set yantcount = 0
-
+# Get rid of the autocorrelation data (for now)
+	uvflag vis=$file select=auto options=none flagval=f >& /dev/null &
 # This starts the calibration part of the code
     jumper:
 	touch $wd/amplog
@@ -574,7 +575,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
 
 	if (`grep "time order" $wd/checkmfcal | wc -l`) then
 	    echo ""
-	    echo "WARNING: Data not in time order!"
+	    echo "FATAL ERROR: Data not in time order!"
 	    goto fail
 	endif
 
