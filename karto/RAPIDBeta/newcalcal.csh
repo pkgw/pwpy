@@ -1130,7 +1130,7 @@ if ($outsource && "$tvis[1]" != "") then
 	set filemark = `echo $fileidx | awk '{print $1+100000}' | sed 's/1//'`
 	echo "Applying flags for $tfile..."
         uvaver vis="$wd/tvis$filemark*" out=$wd/tvis$filemark options=relax,nocal,nopass,nopol >& /dev/null
-	uvaflag vis=$tvis tvis=$wd/tvis$filemark > /dev/null
+	uvaflag vis=$tfile tvis=$wd/tvis$filemark > /dev/null
     end
 endif
 
