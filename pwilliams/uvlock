@@ -31,8 +31,6 @@ while [ $# -gt 0 ] ; do
 	exit 1
     fi
 
-    echo "$uv"
-    
     for f in "$uv"/* ; do
 	if [ "$f" = "$uv/visdata" ] ; then
 	    chmod 444 "$f"
