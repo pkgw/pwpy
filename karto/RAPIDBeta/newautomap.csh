@@ -470,7 +470,6 @@ foreach line ($crange)
 end
 
 set crange = ($linecmds)
-
 echo "Mapping $source..."
 
 set sidx = 0 # Index marker
@@ -594,7 +593,7 @@ foreach file ($vislist)
     set idx = 0
     foreach chan (`echo $crange`)
 	@ idx++
-	uvaver vis=$file line=chan,$chan options=relax out=$wd/$file.S$idx >& /dev/null
+	uvaver vis=$file line=chan,$chan options=relax out=$file.S$idx > /dev/null
 	if !(-e $file.S$idx/visdata) then
 	    echo "UVAVER has failed! (probably too much data, try x and y pols seperately)"
 	    goto enderr
@@ -680,8 +679,8 @@ restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd
 set imstats = (`imstat in=$wd/tempmap.rs | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
 
 cd $wd
-rm -f sfind.log
-sfind in=tempmap.rs options=oldsfind,auto,nofit rmsbox=100 xrms=4 labtyp=arcsec >& /dev/null 
+rm -f sfind.log; touch sfind.log
+if ($mode != "skip") sfind in=tempmap.rs options=oldsfind,auto,nofit rmsbox=100 xrms=4 labtyp=arcsec >& /dev/null 
 cd ..
 
 #Verify that the residual maps look clean. If not, reclean or advise the user that recleaning needs to be performed
@@ -698,7 +697,7 @@ if (`grep -v "#" $wd/sfind.log | awk '{if ($7*$6 > 3000*noise) cycles+=2*log((30
 	endif
 	rm -rf $wd/tempmap.clean $wd/tempmap.rs $wd/tempmap.cm
 	goto clean
-    else if ($mode == "auto") then
+    else if ($mode == "auto" || $mode="skip") then
 	echo "Warning! Automap has determined that this map is possibly undercleaned!"
     else
 	echo "Warning! Automap has determined that this map is possibly undercleaned! Would you like to adjust niters? ([y]es (n)o)"
@@ -712,8 +711,8 @@ else
     echo "Clean looks good! Moving to restoration and analysis/display"
 endif
 
-cd $wd; rm -f sfind.log
-sfind in=tempmap.cm options=oldsfind,auto,nofit rmsbox=256 xrms=4 labtyp=arcsec >& /dev/null
+cd $wd; rm -f sfind.log; touch sfind.log
+if ($mode != "skip") sfind in=tempmap.cm options=oldsfind,auto,nofit rmsbox=256 xrms=4 labtyp=arcsec >& /dev/null
 cd ..
 
 # Find some stats about the map...
@@ -1139,18 +1138,18 @@ endif
 
 if ($savedata != 2) then
     mkdir -p $outfile
-    mv $wd/tempmap.map $outfile/$source.map
-    mv $wd/tempmap.clean $outfile/$source.clean
-    mv $wd/tempmap.beam $outfile/$source.beam
-    mv $wd/tempmap.rs $outfile/$source.rs
-    mv $wd/tempmap.cm $outfile/$source.cm
-    mv $wd/tempmap.ps $outfile/$source.ps
-    mv $wd/mixolay $outfile/$source.olay
+    cp -r $wd/tempmap.map $outfile/$source.map
+    cp -r $wd/tempmap.clean $outfile/$source.clean
+    cp -r $wd/tempmap.beam $outfile/$source.beam
+    cp -r $wd/tempmap.rs $outfile/$source.rs
+    cp -r $wd/tempmap.cm $outfile/$source.cm
+    cp -r $wd/tempmap.ps $outfile/$source.ps
+    cp -r $wd/mixolay $outfile/$source.olay
     if ($savedata) then
 	set idx = 1
 	while ($idx <= $#vis)
-	    if (-e $wd/tempmap$idx.xpol) mv $wd/tempmap$idx.xpol $outfile/$source.$idx.xx
-	    if (-e $wd/tempmap$idx.ypol) mv $wd/tempmap$idx.ypol $outfile/$source.$idx.yy
+	    if (-e $wd/tempmap$idx.xpol) cp -r $wd/tempmap$idx.xpol $outfile/$source.$idx.xx
+	    if (-e $wd/tempmap$idx.ypol) cp -r $wd/tempmap$idx.ypol $outfile/$source.$idx.yy
 	    @ idx++
 	end
     endif
@@ -1158,15 +1157,15 @@ if ($savedata != 2) then
     set idx = 1
     set switch
     if ($savedata) set switch = 'savedata'
-    foreach file ($vislist)
-        foreach chan (`echo $crange`)
+    foreach chan (`echo $crange`)
+	foreach file ($vislist)
     	gpcopy vis=$file out=$file.S$idx
-    	@ idx++
         end
+    	@ idx++
     end
     set idx = 1
     foreach chan (`echo $crange`)
-        newautomap.csh vis="$wd/*.S$idx" mode=skip options=nomfs,$switch outfile=$outfile/SLine$idx cleanlim=$niters
+        newautomap.csh vis="$wd/*.S$idx" mode=skip options=nomfs,$switch outdir=$outfile/SLine$idx cleanlim=$niters
     end
     echo "Imaging report now available under $outfile/imgrpt"
     mv $wd/imgrpt $outfile/imgrpt

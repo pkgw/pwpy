@@ -197,7 +197,7 @@ set fracture = "recover" # Correct (recover), ignore or destory spectrally corru
 set display = 0 # To display or not to display, that is the question 
 set corr = "corr" # Use corrective polynomial to remove bandpass features
 set rfitype = "pos" # RFI above or below band?
-set outsource = "outsource" # Split up file into smaller chunks, or mod files in place?
+set outsource = 1 # Split up file into smaller chunks, or mod files in place?
 set debug = 0 # Save processing data?
 set rescan = 0 # Remake specdata files
 set corrcycle = 4 # Interval for scanning for corruption
@@ -256,9 +256,9 @@ else if ("$argv[1]" =~ 'options='*) then
 	else if ($option == "noseedcorr") then
 	    set seedcorr = 0
 	else if ($option == "outsource") then
-	    set outsource = "outsource"
+	    set outsource = 1
 	else if ($option == "insource") then
-	    set outsource = "insource"
+	    set outsource = 0
 	else if ($option == "debug") then
 	    set debug = 1
 	else if ($option == "autoedge") then
@@ -378,7 +378,7 @@ mkdir $wd/vis
 mkdir $wd/tvis
 
 # For each source file, use the specdata file to figure out when observations took place, and use that information to rebuild the actual obsrevation
-
+#######################
 set fulllist = (`echo $vis`)
 set listlim = `echo $fulllist | wc -w`
 set trlist
@@ -400,8 +400,18 @@ if (`head -n 1 $wd/vistimes` == "") then
     goto fail
 endif
 
-# If the autoedge parameter is used, figure out if dealing with a half or whole spectra, and flag edge channels accordingly
+set fulllist = (`echo $tvis`)
+set listlim = `echo $fulllist | wc -w`
+set idx = 1
 
+while ($idx <= $listlim)
+    set filemark = `echo $idx | awk '{print $1+100000}' | sed 's/1//'`
+    set trlist = ($trlist "tvis$filemark")
+    cat $fulllist[$idx]/specdata >> $wd/tvis/specdata
+    cat $fulllist[$idx]/specdata | awk '{print filename,$4,($5-$4)*1440,"tvis",tname}' filename=$fulllist[$idx] tname="tvis$filemark" >> $wd/vistimes
+    @ idx++
+end
+# If the autoedge parameter is used, figure out if dealing with a half or whole spectra, and flag edge channels accordingly
 if ($autoedge) then
     if ($csel == "") set csel = 'crange='
     set templist = (`head -n 1 $wd/vis/specdata`)
@@ -418,21 +428,7 @@ if ($autoedge) then
     endif
     set csel = `echo "$csel" | sed 's/=,/=/'`
 endif
-
-set fulllist = (`echo $tvis`)
-set listlim = `echo $fulllist | wc -w`
-set idx = 1
-
-while ($idx <= $listlim)
-    set filemark = `echo $idx | awk '{print $1+100000}' | sed 's/1//'`
-    set trlist = ($trlist "tvis$filemark")
-    cat $fulllist[$idx]/specdata >> $wd/tvis/specdata
-    cat $fulllist[$idx]/specdata | awk '{print filename,$4,($5-$4)*1440,"tvis",tname}' filename=$fulllist[$idx] tname="tvis$filemark" >> $wd/vistimes
-    @ idx++
-end
-
 # Now sort the timestamps from the dataset and figure out the "order" of the observation
-
 set lim = `wc -l $wd/vistimes | awk '{print $1}'`
 set idx = 1
 
@@ -521,7 +517,7 @@ if ("$restart" != "") then
     goto restart
 endif
 
-if ($outsource == "insource") goto recon
+if !($outsource) goto recon
 
 while ($idx <= $lim)
     set vals = (`sed -n {$idx}p $wd/obslist`)
@@ -559,10 +555,10 @@ while ($idx <= $lim)
     set vals = (`sed -n {$idx}p $wd/obslist`)
     if ($vals[5] == ",") set vals[5]
     if ($vals[6] == ",") set vals[6]
-    if ($outsource == "outsource") then
+    if ($outsource) then
 	set flaglist = ($wd/`echo "$vals[5]$vals[6]," | sed 's/,,//g' | sed 's/\,/'$cycle' '$wd'\//g'`$cycle)
     else
-	set flaglist = (`echo "$vals[5-6]" | sed 's/\,/ /g'`)
+	set flaglist = (`echo "$vals[3-4]" | sed 's/\,/ /g'`)
     endif
     if ("$vals[3-4]" == " ") set flaglist
     if ($idx == 1) then
@@ -586,23 +582,24 @@ while ($idx <= $lim)
 	while ($blim <= `echo $ulim | awk '{print $1-1}'`)
 	    set altcycle = `echo $blim | awk '{print 1000+$1}' | sed 's/1//'`
 	    set corrvals = (`sed -n {$blim}p $wd/obslist`)
+	    if ($corrvals[3] == ",") set corrvals[3]
+	    if ($corrvals[4] == ",") set corrvals[4]
 	    if ($corrvals[5] == ",") set corrvals[5]
 	    if ($corrvals[6] == ",") set corrvals[6]
-	    if ($outsource == "outsource") set corrfilelist = ($corrfilelist $wd/`echo "$corrvals[5]$corrvals[6]," | sed 's/,,//g' | sed 's/\,/'$altcycle' '$wd'\//g'`$altcycle)
-	    if ($outsource != "outsource") set corrfilelist = ($corrfilelist `echo $corrvals[5]$corrvals[6] | tr ',' ' '`)
+	    if ($outsource) set corrfilelist = ($corrfilelist $wd/`echo "$corrvals[5]$corrvals[6]," | sed 's/,,//g' | sed 's/\,/'$altcycle' '$wd'\//g'`$altcycle)
+	    if !($outsource) set corrfilelist = ($corrfilelist `echo $corrvals[3]$corrvals[4] | tr ',' ' '`)
 	    @ blim++
 	end
 	set timelim = ($mastertime2[$idx] $mastertime2[$ulim])
 	echo "Beginning corruption detection and recovery..."
+	touch $wd/badants
 	if (`echo $vals[5] | wc -w`) then
 	    newrfi32.csh vis=$wd/vis select="time($timelim[1],$timelim[2])" rawdata=$wd/specdata > /dev/null
 	    newfracture.csh vis=$wd npoly=$cpoly nsig=$csig options=$corr,desel,recover,$rfitype,`if ($display == 2) echo "verbose"` $csel > $wd/badants
 	    echo "time($timelim[1],$timelim[2])" >> $wd/badantshist
 	    cat $wd/badants >> $wd/badantshist
 	else
-	    echo "No source files, using results from last decorruption cycle..."
-	 #   newrfi32.csh vis=$wd/vis,$wd/tvis select="time($timelim[1],$timelim[2])" rawdata=$wd/specdata
-	 #   newfracture.csh vis=$wd npoly=$cpoly nsig=$csig options=$corr,desel,recover,$rfitype,`if ($debug) echo "verbose"` $csel > $wd/badants
+	    echo "No source files, using results from last cycle..."
 	endif
         echo `grep "DESEL" $wd/badants | tr -d '[a-z][A-Z]:().-' | tr ',' ' ' | wc -w`" potentially corrupted antennas found..."
 	grep 'select=pol' $wd/badants > $wd/corrflag
@@ -635,14 +632,16 @@ while ($idx <= $lim)
 	set timefocus = "($mastertime2[$preidx],$mastertime2[$idx]),($mastertime2[$idx],$mastertime2[$postidx]),($mastertime2[$postidx],$mastertime2[$dpostidx])"
     endif
     if (-e $wd/flagslist) cp $wd/flagslist $wd/flagslist.bu
+    
     if ($flaglist[1] != "") then
-	newrfi32.csh vis=$wd/vis options=flagopt,$corr,$rfitype chanlist=$wd/flagslist timefocus="$timefocus" edgerfi=$edgerfi npoly=$npoly nsig=$nsig select="$timesel,$fsel[1] $timesel,$fsel[2]" $csel $device > /dev/null
+	newrfi32.csh vis=$wd/vis options=flagopt,$corr,$rfitype chanlist=$wd/flagslist timefocus="$timefocus" edgerfi=$edgerfi npoly=$npoly nsig=$nsig select="$timesel,$fsel[1] $timesel,$fsel[2]" $csel $device >& /dev/null
     else
-	echo "No source information found, zooming out..."
-	#newrfi32.csh vis=$wd/vis options=flagopt,$corr,$rfitype chanlist=$wd/flagslist timefocus="$timefocus" edgerfi=$edgerfi nsig=$nsig select="$fsel[1] $fsel[2]" $csel $device > /dev/null
+	echo "No source information found, using the last results..."
+	if (-e $wd/flagslist.bu) cp $wd/flagslist.bu $wd/flagslist
     endif
+    if !(-e $wd/flagslist) touch $wd/flagslist
     if (! -e $wd/flagslist && -e $wd/flagslist.bu) cp $wd/flagslist.bu $wd/flagslist
-    echo "Beginning cycle $idx (of $lim) flagging. "`grep line=chan $wd/flagslist | tr ',' ' ' | awk '{SUM += $2} END {print SUM}'`" channels to flag in "`grep line=chan $wd/flagslist | wc -l`" iterations."
+    echo "Beginning cycle $idx (of $lim) flagging. "`grep line=chan $wd/flagslist | tr ',' ' ' | awk '{SUM += $2} END {print SUM*1}'`" channels to flag in "`grep line=chan $wd/flagslist | wc -l`" iterations."
     set starttime = "`julian options=quiet jday=$mastertime[$idx]`"
     set stoptime = "`julian options=quiet jday=$mastertime[$postidx]`"
     foreach linecmd (`grep "line=chan" $wd/flagslist`)
@@ -656,7 +655,7 @@ while ($idx <= $lim)
     echo "Completed cycle. Processing time was "`date +%s | awk '{print int(($1-cycletime)/60)" minute(s) "int(($1-cycletime)%60)" second(s)."}' cycletime=$cycletime`
 end
 
-if ($outsource != "outsource" || ! $flag) goto finish
+if (! $outsource || ! $flag) goto finish
 
 set fulllist = (`echo $vis $tvis`)
 set listlim = `echo $fulllist | wc -w`

@@ -1063,12 +1063,12 @@ echo "Copying gains back to original file ($vis)"
 if ($polsplit && $#pollist > 1) then # If pols were split and more than one pol exists
     foreach dp (xx yy)
 	if (-e $outfile/$source.1.$dp/gains) then # If the automapping software had "tweaks" for the gains solution, apply those tweaks
-	    puthd in=$outfile/$source.1.$dp/interval value=.1 > /dev/null
+	    puthd in=$outfile/$source.1.$dp/interval value=.5 > /dev/null
 	    gpcopy vis=$outfile/$source.1.$dp out=$vis > /dev/null
 	    if (-e $vis/gains) mv $vis/gains $vis/gains.{$dp}p
 	    if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.{$dp}p
 	endif
-	puthd in=$wd/tempcal$dp/interval value=.1 > /dev/null 
+	puthd in=$wd/tempcal$dp/interval value=.5 > /dev/null 
 	gpcopy vis=$wd/tempcal$dp out=$vis > /dev/null
     # Move pol-specific gains "out of the way" so that information isnb't overwritten by gpcopy
 	if (-e $vis/gains) mv $vis/gains $vis/gains.$dp 
@@ -1076,12 +1076,12 @@ if ($polsplit && $#pollist > 1) then # If pols were split and more than one pol 
     end
 else if ($polsplit) then # if polspilt was used, but only one pol was found
     if (-e $outfile/$source.1.$pollist[1]/gains) then # If the automapping software had "tweaks" for a single pol gains solution, apply those tweaks
-	puthd in=$outfile/$source.1.$pollist[1]/interval value=.1 > /dev/null
+	puthd in=$outfile/$source.1.$pollist[1]/interval value=.5 > /dev/null
 	gpcopy vis=$outfile/$source.1.$pollist[1] out=$vis > /dev/null
 	if (-e $vis/gains) mv $vis/gains $vis/gains.$pollist[1] 
 	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.$pollist[1]
     endif
-    puthd in=$wd/tempcal$pollist[1]/interval value=.1 > /dev/null
+    puthd in=$wd/tempcal$pollist[1]/interval value=.5 > /dev/null
     gpcopy vis=$wd/tempcal$pollist[1] out=$vis > /dev/null
     # Move pol-specific gains "out of the way" so that information isn't overwritten by gpcopy
     if (-e $vis/gains) mv $vis/gains $vis/gains.$pollist[1]
@@ -1089,14 +1089,14 @@ else if ($polsplit) then # if polspilt was used, but only one pol was found
 else
     foreach dp (xx yy)
 	if (-e $outfile/$source.1.$dp/gains) then # If the automapping software had "tweaks" for the gains solution, apply those tweaks
-	    puthd in=$outfile/$source.1.$dp/interval value=.1 > /dev/null
+	    puthd in=$outfile/$source.1.$dp/interval value=.5 > /dev/null
 	    gpcopy vis=$outfile/$source.1.$dp out=$vis > /dev/null
 	    # Move pol-specific gains "out of the way" so that information isn't overwritten by gpcopy
 	    mv $vis/gains $vis/gains.$dp
 	endif
     end
     # Copy over any "general" gains solutions (relating to multiple pols)
-    puthd in=$wd/tempcal$pollist[1]/interval value=.1 > /dev/null
+    puthd in=$wd/tempcal$pollist[1]/interval value=.5 > /dev/null
     gpcopy vis=$wd/tempcal$pollist[1] out=$vis > /dev/null
 endif
 
