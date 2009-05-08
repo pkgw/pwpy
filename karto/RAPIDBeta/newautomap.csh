@@ -218,11 +218,12 @@ set addflux = 5 # Non-init parameter, awaiting further testnig
 set intamplim = 0 # Initial amp limit for data, non-init
 set plotscale # Plotting scale for map
 set sopt # slop parameter for invert, should be used if MFS is not
-set wrath = 0# Muah ha ha ha, let no RFI escape...
+set wrath = 0 # Muah ha ha ha, let no RFI escape...
 set autolim
 set sysflux = 2
 set verb
 set debug = 0
+set sefd = 0
 if ($#argv == 0) then
     echo "AUTOMAP: No input files detected!"
     exit 0
@@ -382,6 +383,11 @@ else if ("$argv[1]" =~ 'options='*) then
 	    if !($display) set device = 'device=/xs'
 	else if ($option == "debug") then
 	    set debug = 1
+	else if ($option == "sefd") then
+	    set sefd = 1
+	    set iopt = "$iopt,systemp"
+	else if ($option == "nosefd") then
+	    set sefd = 0
 	else
 	    set badopt = ($badopt $option)
 	endif
@@ -455,6 +461,26 @@ while ($source == "")
     else
 	shift sourceline
     endif
+end
+
+set nantsline = (`uvlist vis=$vis[1] options=var | grep "nants" | tr ':' ' '`)
+
+set nants
+
+while ($nants == "")
+    if ($nantsline[1] == "nants") then
+	set nants = "$nantsline[2]" 
+    else if ($#nantsline == 1) then
+	set nants == 43
+    else
+	shift nantsline
+    endif
+end
+
+set tsysarray = (80)
+
+while ($#tsysarray < $nants)
+    set tsysarray = ($tsysarray 80)
 end
 
 set linecmds
@@ -573,6 +599,15 @@ foreach file ($vis)
 	    uvaver vis=$wd/tempmap$idx.{$dp}pol out=$wd/tempgmap options=relax >& /dev/null
 	    rm -rf $wd/tempmap$idx.{$dp}pol; mv $wd/tempgmap $wd/tempmap$idx.{$dp}pol
 	endif
+	if (-e $file/sefd && -e $wd/tempmap$idx.{$dp}pol/visdata && $sefd) then
+	    echo -n "Writing tsys values to file..."
+	    sed 1,2d $file/sefd | awk '{if ($2 == dp) print "set tsysarray["$1"] = "$7*1/153}' dp=$dp > $wd/source.sefd
+	    source $wd/source.sefd
+	    set uvtsys = `echo $tsysarray | tr ' ' ','`
+	    uvputhd vis=$wd/tempmap$idx.{$dp}pol out=$wd/tempgmap hdvar=systemp varval=$uvtsys > /dev/null
+	    rm -rf $wd/tempmap$idx.{$dp}pol; mv $wd/tempgmap $wd/tempmap$idx.{$dp}pol
+	    echo "done!"
+	endif
 	if (-e $wd/tempmap$idx.{$dp}pol/visdata) then
 	    set vislist = ($vislist $wd/tempmap$idx.{$dp}pol)
 	else
@@ -602,7 +637,7 @@ foreach file ($vislist)
 end
 
 foreach chan (`echo $crange`)
-	uvflag vis=`echo $vislist | tr ' ' ','` line=chan,$chan flagval=f options=none > /dev/null
+	uvflag vis=`echo $vislist | tr ' ' ','` line=chan,$chan flagval=f options=none > /dev/null 
 end
 
 invert:
@@ -651,7 +686,7 @@ if ($intclean) then
     clean map=$wd/tempmap.map beam=$wd/tempmap.beam out=$wd/tempmap.clean niters=1000 "$cregion" >& /dev/null 
     restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd/tempmap.cm >& /dev/null 
     restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd/tempmap.rs mode=residual >& /dev/null 
-    set imstats = (`imstat in=$wd/tempmap.rs | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
+    set imstats = (`imstat in=$wd/tempmap.rs | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
 
     cd $wd
     rm -f sfind.log
@@ -676,7 +711,7 @@ clean map=$wd/tempmap.map beam=$wd/tempmap.beam out=$wd/tempmap.clean niters=$ni
 restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd/tempmap.cm >& /dev/null 
 restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd/tempmap.rs mode=residual >& /dev/null 
 
-set imstats = (`imstat in=$wd/tempmap.rs | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
+set imstats = (`imstat in=$wd/tempmap.rs | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
 
 cd $wd
 rm -f sfind.log; touch sfind.log
@@ -718,8 +753,8 @@ cd ..
 # Find some stats about the map...
 #Imstat: 1) Sum 2) Mean 3) RMS 4) Max 5) Min 6) Npoints
 
-set imstats = (`imstat in=$wd/tempmap.rs region=relcen,arcsec,"box(-$arc,-$arc,$arc,$arc)" | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
-set imstats2 = (`imstat in=$wd/tempmap.cm region=relcen,arcsec,"box(-$arc,-$arc,$arc,$arc)" | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
+set imstats = (`imstat in=$wd/tempmap.rs region=relcen,arcsec,"box(-$arc,-$arc,$arc,$arc)" | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
+set imstats2 = (`imstat in=$wd/tempmap.cm region=relcen,arcsec,"box(-$arc,-$arc,$arc,$arc)" | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
 set range = `echo $imstats[3] $imstats2[4] | awk '{print $2/$1}'`
 set alevel = `echo $imstats[3] $imstats2[5] | awk '{print $2/$1}'`
 
@@ -739,7 +774,7 @@ set alevel = `echo $imstats[3] $imstats2[5] | awk '{print $2/$1}'`
 if ($autolim) then
     set nsources = `grep -vc "#" $wd/sfind.log`
     set amplim = (0 5000 10000)
-    set amplim[2] = `imstat in=$wd/tempmap.clean | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | sed 's/\([0-9][0-9]\)-/\1 -/g' | awk '{print (nsources*3*2*noise)+(1.25*$1)+sysflux}' nsources=$nsources noise=$imstats[3] sysflux=$sysflux`
+    set amplim[2] = `imstat in=$wd/tempmap.clean | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g' | awk '{print (nsources*3*2*noise)+(1.25*$1)+sysflux}' nsources=$nsources noise=$imstats[3] sysflux=$sysflux`
     set amplim[3] = `echo $amplim[2] $nchan $sysflux | awk '{print $1+(1.25*$3*($2^.5))}'`
     set amplim[1] = `echo $imstats2[4] $amplim[2] | awk '{if ($1 < $2) print 0; else print $1-$2}'` 
     echo "Amp limits automatically derived - $amplim[1] low, $amplim[2] high, $amplim[3] spectral."
@@ -1001,7 +1036,7 @@ if ($wrath || "$mode" == "inter") then
     echo "restoring..."
     restor map=$wd/wrath.map beam=$wd/wrath.beam model=$wd/wrath.clean out=$wd/wrath.rs mode=residual >& $wd/progress
 
-    imstat in=$wd/wrath.rs options=noheader | sed -e 1d -e 's/\([0-9][0-9]\)-/\1 -/g' | awk '{if ($5 !=0) printf "%s %.24f\n",$1,$5}' | sort -nk2 > $wd/wrathstats
+    imstat in=$wd/wrath.rs options=noheader | tr '*' ' ' | sed -e 1d -e 's/\([0-9][0-9]\)-/\1 -/g' | awk '{if ($5 !=0) printf "%s %.24f\n",$1,$5}' | sort -nk2 > $wd/wrathstats
     set midplane = `wc -l $wd/wrathstats | awk '{print int(.5+$1/2)}' | awk '{if ($1 < 1) print 1; else print $1}'`
     set midnoise = `sed -n {$midplane}p $wd/wrathstats | awk '{print $2}'`
     set midrms = `awk '{if ($2 <= midnoise) {idx++; sms += ($2-midnoise)^2}} END {if (idx > 0) {print (sms/idx)^.5}}' midnoise=$midnoise $wd/wrathstats`

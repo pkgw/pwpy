@@ -153,6 +153,8 @@ set wrath = 0
 set wrathcycle = 0
 set sefd = 0
 set smooth
+set report = 1
+set nogainants
 
 #################################################################
 # Here is the keyword/value pairing code. It basically operates
@@ -205,6 +207,7 @@ else if ("$argv[1]" =~ 'options='*) then
 	    set wrath = 1
 	else if ($option == "sefd") then
 	    set sefd = 1
+	    set mapopt = "$mapopt,sefd"
 	else
 	    set badopt = ($badopt $option)
 	endif
@@ -346,6 +349,19 @@ while ("$freq" == "")
     endif
 end
 
+set nantsline = (`uvlist vis=$vis options=var | grep "nants" | tr ':' ' '`)
+set nants
+#Get the number of antennas
+while ("$nants" == "")
+    if ($nantsline[1] == "nants") then
+	set nants = `echo $nantsline[2] | awk '{print $1}'` 
+    else if ($#nantsline == 1) then
+	set nants == "42" # Default to ATA
+    else
+	shift nantsline
+    endif
+end
+
 set cal = $source
 	
 rm -f $cal.calrpt
@@ -381,14 +397,35 @@ endif
 
 
 echo "Cal is $source - flux is $calflux Jy - nchan is $nchan - freq is $freq GHz"
+set fullxants = (`uvplt vis=$vis device=/null select='pol(xx),-auto' | tr '-' ' ' | grep "Baseline" | awk '{print $2"\n"$3}' | sort -nu`)
+set fullyants = (`uvplt vis=$vis device=/null select='pol(yy),-auto' | tr '-' ' ' | grep "Baseline" | awk '{print $2"\n"$3}' | sort -nu`)
+set fullxret
+set fullyret
+set fullxpos
+set fullypos
 
-set rcount = 0
-set iccount
-set ibcount
-set fbcount
-set fccount
+set idx = 1
+set nantsarray = (0)
+
+while ($nants > $#nantsarray)
+    set nantsarray = (0 $nantsarray)
+end
+
+# A series of 42-element arrays to record data retention
+set fullxaret = ($nantsarray)
+set fullyaret = ($nantsarray)
+set fullxapos = ($nantsarray)
+set fullyapos = ($nantsarray)
 
 set pollist = ("xxyy")
+
+if ("$fullxants" == "" && "$fullyants" == "") then
+    echo "FATAL ERROR: No visibilities present!"
+    goto fail
+endif
+
+if ("$fullxants" == "") set pollist = ("yy")
+if ("$fullyants" == "") set pollist = ("xx")
 
 echo -n "Preprocessing data..."
 
@@ -417,23 +454,6 @@ else if (! -e $wd/tempcalyy/visdata && -e $wd/tempcalxx/visdata) then
     set pollist = ("xx")
     echo "No y-pol data found, continuing..."
 endif
-
-# Below is some old code that needs to be rewritten for reporting.
-
-#uvplt vis=$wd/tempcal select='window(1),pol(xx,yy),-auto' options=2pass,nobase device=/null >& $wd/tempcount
-echo 1 > $wd/tempcount
-#set count = `grep "visibilities from all files" $wd/tempcount | awk '{print $2}'`
-set count = 0
-set rcount = `echo $rcount $count | awk '{print $1+$2}'`
-set iccount = ($iccount $count)
-
-#set bcount = `uvplt vis=$wd/tempcal options=2pass select=-auto device=/null | grep Baseline | wc -l`
-set bcount = 0
-set ibcount = ($ibcount $bcount)
-#uvplt vis=$wd/tempcal select=-auto select='pol(xx)' device=/null options=2pass | grep Baseline | tr "-" " " | awk '{print " "$2"X-"$3"X",$5}' > $wd/ibaselist
-#uvplt vis=$wd/tempcal select=-auto select='pol(yy)' device=/null options=2pass | grep Baseline | tr "-" " " | awk '{print " "$2"Y-"$3"Y",$5}' >> $wd/ibaselist
-echo "" > $wd/ibaselist
-cat $wd/ibaselist | tr "-" " "| awk '{printf "%s\n%s\n",$1,$2}' | sort -nu > $wd/antlist
 
 set idx = 2; set postidx = 3
 set tviscount = 0
@@ -494,6 +514,9 @@ echo "Starting flagging and calibration."
 # all files have been processed.
 #################################################################
 
+set xrefant
+set yrefant
+
 foreach ipol ($pollist) # Work with only one pol at a time
     set idx = 0; set mididx = 1; set postidx = 2
     set wrathcycle = 1
@@ -515,11 +538,16 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	    end
 	endif
 	rm -f $wd/xbase $wd/ybase; touch $wd/xbase; touch $wd/ybase # Files for recording basica information about which baselines are present
+	set pointmax = 0
 	if ("$ipol" =~ *"xx"*) then
 	    uvplt vis=$file options=2pass device=/null options=2pass,all select='pol(xx),-auto' | grep Baseline | awk '{print $2,$3,$5}' | sed 's/-//g' > $wd/xbase # Get xx baselines
+	    set xmax = `awk '{print $3}' $wd/xbase | sort -n | tail -n 1`
+	    if ($xmax > $pointmax) set pointmax = $xmax
 	endif
 	if ("$ipol" =~ *"yy"*) then 
 	    uvplt vis=$file options=2pass device=/null options=2pass,all select='pol(yy),-auto' | grep Baseline | awk '{print $2,$3,$5}' | sed 's/-//g' > $wd/ybase # Get yy baselines
+	    set ymax = `awk '{print $3}' $wd/ybase | sort -n | tail -n 1`
+	    if ($ymax > $pointmax) set pointmax = $ymax
 	endif
 	echo -n "Starting $idx of "`echo $#regtimes | awk '{print $1-2}'`" cycles. Beginning phase RMS scanning."
 
@@ -550,7 +578,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	if ("$xants" == "") set xantcount = 0
 	if ("$yants" == "") set yantcount = 0
 # Get rid of the autocorrelation data (for now)
-	uvflag vis=$file select=auto options=none flagval=f >& /dev/null &
+	uvflag vis=$file select=auto options=none flagval=f >& /dev/null
 # This starts the calibration part of the code
     jumper:
 	touch $wd/amplog
@@ -858,7 +886,59 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	    echo " "
 	    goto jumper
 	endif
-
+#####################
+	if ($report) then
+	    echo "Recording flagging information"
+	    if ("$ipol" =~ *"xx"*) then
+		uvplt vis=$file device=/null select='pol(xx),-auto' | tr '-' ' ' | grep Baseline | awk '{print $2,$3,$5,$2*1000+$3}' | sort -nk4 > $wd/xbasereport
+		echo 1000 1000 1000 10001000 >>$wd/xbasereport
+		set ridx = 1
+		set rvals = (`sed -n {$ridx}p $wd/xbasereport`)
+		echo $pointmax >> $wd/xret$cycle
+		foreach ant1 ($fullxants)
+		    foreach ant2 ($fullxants)
+			if ($ant1 >= $ant2) then
+			else if ("$ant1 $ant2" == "$rvals[1] $rvals[2]") then
+			    echo $rvals[3] $pointmax | awk '{print $1/$2}' >> $wd/xret$cycle
+			    @ fullxaret[$ant1]+=$rvals[3] fullxaret[$ant2]+=$rvals[3] fullxapos[$ant1]+=$pointmax fullxapos[$ant2]+=$pointmax
+			    @ ridx++
+			    set rvals = (`sed -n {$ridx}p $wd/xbasereport`)
+			else
+			    echo 0 >> $wd/xret$cycle
+			    @ fullxapos[$ant1]+=$pointmax fullxapos[$ant2]+=$pointmax
+			endif
+		    end
+		end
+		set fullxret = ($fullxret `sed 1d $wd/xret$cycle | awk '{ total += $1} END {print total*pointmax}' pointmax=$pointmax`)
+		set fullxpos = ($fullxpos `wc -l $wd/xret$cycle | awk '{print ($1-1)*pointmax}' pointmax=$pointmax`)
+		echo "X-pol retention at "`echo $fullxret[$idx] $fullxpos[$idx] | awk '{print int(1000*$1/$2)/10}'`"% for this cycle - "`echo $xants | wc -w | awk '{print fullcount-$1}' fullcount=$#fullxants`" ants (out of $#fullxants) and "`awk '{if ($1 == "0") idx += 1} END {print idx*1}' $wd/xret$cycle`" "`wc -l $wd/xret$cycle | awk '{print "(out of "$1-1")"}'`" baselines were removed."
+	    endif
+	    if ("$ipol" =~ *"yy"*) then
+		uvplt vis=$file device=/null select='pol(yy),-auto' | tr '-' ' ' | grep Baseline | awk '{print $2,$3,$5,$2*1000+$3}' | sort -nk4 > $wd/ybasereport
+		echo 1000 1000 1000 10001000 >>$wd/ybasereport
+		set ridx = 1
+		set rvals = (`sed -n {$ridx}p $wd/ybasereport`)
+		echo $pointmax >> $wd/yret$cycle
+		foreach ant1 ($fullyants)
+		    foreach ant2 ($fullyants)
+			if ($ant1 >= $ant2) then
+			else if ("$ant1 $ant2" == "$rvals[1] $rvals[2]") then
+			    echo $rvals[3] $pointmax | awk '{print $1/$2}' >> $wd/yret$cycle
+			    @ fullyaret[$ant1]+=$rvals[3] fullyaret[$ant2]+=$rvals[3] fullyapos[$ant1]+=$pointmax fullyapos[$ant2]+=$pointmax
+			    @ ridx++
+			    set rvals = (`sed -n {$ridx}p $wd/ybasereport`)
+			else
+			    echo 0 >> $wd/yret$cycle
+			    @ fullyapos[$ant1]+=$pointmax fullyapos[$ant2]+=$pointmax
+			endif
+		    end
+		end
+		set fullyret = ($fullyret `sed 1d $wd/yret$cycle | awk '{ total += $1} END {print total*pointmax}' pointmax=$pointmax`)
+		set fullypos = ($fullypos `wc -l $wd/yret$cycle | awk '{print ($1-1)*pointmax}' pointmax=$pointmax`)
+		echo "Y-pol retention at "`echo $fullyret[$idx] $fullypos[$idx] | awk '{print int(1000*$1/$2)/10}'`"% for this cycle - "`echo $yants | wc -w | awk '{print fullcount-$1}' fullcount=$#fullyants`" ants (out of $#fullyants) and "`awk '{if ($1 == "0") idx += 1} END {print idx*1}' $wd/yret$cycle`" "`wc -l $wd/yret$cycle | awk '{print "(out of "$1-1")"}'`" baselines were removed."
+	    endif
+	endif
+#####################
     if ($polsplit && $sefd) then
         echo -n "Beginning SEFD calculation"
 	uvflag vis=$file options=none flagval=u select=auto >& /dev/null
@@ -907,6 +987,8 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	end
 	echo -n "Refant $refant choosen! "
     endif
+    if ($ipol == "xx") set xrefant = "$refant"
+    if ($ipol == "yy") set yrefant = "$refant"
     # The final solution check, start with a dash of MFCAL
     set checkamp = 100
     mfcal vis=$wd/tempcal$ipol refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& $wd/checkmfcal
@@ -991,7 +1073,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	echo "FATAL ERROR: Data not in time order!"
 	goto fail
     endif
-    if ("$smooth" != "") smamfcal =$wd/tempcal$ipol refant=$refant options=interpolate minants=4 flux=$flux interval=$int $smooth weight=-1 >& /dev/null
+    if ("$smooth" != "") smamfcal vis=$wd/tempcal$ipol refant=$refant options=interpolate,msmooth minants=4 flux=$flux interval=$int $smooth weight=-1 >& /dev/null
     if ($polsplit && $sefd) then
         echo -n "Beginning SEFD calculation"
 	uvflag vis=$wd/tempcal$ipol options=none flagval=u select=auto >& /dev/null
@@ -1009,6 +1091,17 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	echo "====================================================================" >> $wd/sefd.$ipol
 
 	gplist vis=$wd/sefdcal options=all | sed 's/^.\{10\}//g' | grep "Ant" | sort -nk2 | awk '{if (NR == 1 || ant == $2) {ant=$2;n++; re += $5; rs += $5*$5;im += $6;is += $6*$6}; if (ant != $2) {printf "%4s   %1s % .4e % .4e % .4e % .4e % .4e\n",ant,pol,re/n,sqrt((rs-n*(re/n)*(re/n))/n),im/n,sqrt((is-(n*(im/n)*(im/n)))/n),((re*re)+(im*im))/(n^2);ant=$2;n=1;re=$5;rs=$5*$5;im=$6;is=$6*$6}}' pol=`echo $ipol | sed -e 's/xx/x/g' -e 's/yy/y/g'` | awk '{if ($7*1 != 0) print $0}' >> $wd/sefd.$ipol
+
+	if ($ipol == xx) then
+	    foreach antcheck ($fullxants)
+		if !(`awk '{if ($1 == antcheck) idx += 1} END {print idx*1}' antcheck=$antcheck $wd/sefd.$ipol`) set nogainants = ($nogainants {$antcheck}X)
+	    end
+	else if ($ipol == yy) then
+	    foreach antcheck ($fullyants)
+		if !(`awk '{if ($1 == antcheck) idx += 1} END {print idx*1}' antcheck=$antcheck $wd/sefd.$ipol`) set nogainants = ($nogainants {$antcheck}Y)
+	    end
+	endif
+
 	rm -rf $wd/sefdcal
 	echo "done!"
     endif
@@ -1022,17 +1115,27 @@ uvaver vis=`echo " $pollist" | sed -e 's/ /,'$wd'\/tempcal/g' -e 's/,//'` option
 # Put the results of the mapping process into a specified directory
 set outfile = "cal-$source-"`echo $freq | awk '{print int($1*1000)}'`"-maps"
 
-
 set idx = 0
 while (-e $outfile)
     @ idx++
     set outfile = "cal-$source-"`echo $freq | awk '{print int($1*1000)}'`"-maps.$idx"
 end
 
+if (-e $wd/sefd.xx && -e $wd/sefd.yy) then
+    cat $wd/sefd.xx > $wd/sefd
+    sed 1,2d $wd/sefd.yy >> $wd/sefd
+else if (-e $wd/sefd.xx) then
+    cp -rf $wd/sefd.xx $wd/sefd
+else if (-e $wd/sefd.yy) then
+    cp -rf $wd/sefd.yy $wd/sefd
+endif
+
+if (-e $wd/sefd) cp -rf $wd/sefd $wd/tempcalfin/sefd
+
 #################################################################    
 # Once the calibration cycle has completed, the program uses
 # the automapper routine to produce an image,  make any
-# neccessary fine tuning (due to imperfections in out cal model)
+# neccessary fine tuning (due to imperfections in the cal model)
 # and give some information about how good the calibration/
 # imaging processes went (via the imaging report). After this
 # begins the long process of merging all of the gains info
@@ -1055,8 +1158,7 @@ if !(-e $outfile/imgrpt) then
     goto fail
 endif
 
-if (-e $wd/sefd.xx) cp $wd/sefd.xx $outfile/sefd.xx
-if (-e $wd/sefd.yy) cp $wd/sefd.yy $outfile/sefd.yy
+if (-e $wd/sefd) cp $wd/sefd $outfile/sefd
 
 echo "Copying gains back to original file ($vis)"
 
@@ -1137,6 +1239,8 @@ endif
 #
 
 foreach file ($vis $tvis)
+    if (-e $wd/sefd) cp $wd/sefd $file/sefd
+    if (-e $wd/sefd) cp $wd/sefd $file/phoenix/sefd.CAL$dmark
     if (-e $file/gains) cp $file/gains $file/phoenix/gains.CAL$dmark
     if (-e $file/bandpass) cp $file/bandpass $file/phoenix/bandpass.CAL$dmark
     if (-e $file/gains.xx) cp $file/gains.xx $file/phoenix/gains.xx.CAL$dmark
@@ -1158,63 +1262,158 @@ foreach file ($tvis)
     if (-e $file/flags) cp $file/flags $file/phoenix/flags.CAL$dmark
 end
 
-goto finish
-# Below here is reporting information that needs to be upgraded... badly.
-set count = `uvlist vis=$wd/tempcal recnum=0 select='window(1),pol(xx,yy),-auto' | grep -v CHAN | grep ":" | grep -v "e" | wc -l| awk '{print $1}'`
-set fccount = ($fccount $count)
-set bcount = `uvplt vis=$wd/tempcal select='pol(xx,yy),-auto' device=/null options=2pass | grep Baseline | wc -l`
-set fbcount = ($fbcount $bcount)
+if ($report) then
+    set preidx = 1; set idx = 2; set postidx = 3
+    while ($idx < $#regtimes)
+	set cycle = `echo $preidx | awk '{print 1000+$1}' | sed 's/1//'`
+	echo $regtimes[$preidx] >> $wd/ret$cycle
+	echo $regtimes[$idx] >> $wd/ret$cycle
+	echo $regtimes[$postidx] >> $wd/ret$cycle
+	if (-e $wd/xret$cycle && -e $wd/yret$cycle) then
+	    echo `head -n 1 $wd/xret$cycle` `head -n 1 $wd/yret$cycle ` | awk '{if ($1*1 > $2*1) print $1*1; else print $2*1}' >> $wd/ret$cycle
+	    sed 1d $wd/xret$cycle >> $wd/ret$cycle
+	    sed 1d $wd/yret$cycle >> $wd/ret$cycle
+	else if (-e $wd/xret$cycle) then
+	    cat $wd/xret$cycle >> $wd/ret$cycle
+	else if (-e $wd/yret$cycle) then
+	    cat $wd/yret$cycle >> $wd/ret$cycle
+	endif
+	@ preidx++ idx++ postidx++
+    end
+endif
 
-#uvplt vis=$wd/tempcal select='pol(xx),-auto' device=/null options=2pass | grep Baseline | tr "-" " " | awk '{print " "$2"X-"$3"X",$5}' > $wd/fbaselist
-echo " " > $wd/fbaselist
-#uvplt vis=$wd/tempcal select='pol(yy),-auto' device=/null options=2pass | grep Baseline | tr "-" " " | awk '{print " "$2"Y-"$3"Y",$5}' >> $wd/fbaselist
+echo "" >> $wd/ret000
+echo "" >> $wd/ret000
+echo "" >> $wd/ret000
 
-foreach base (`cat $wd/ibaselist | awk '{print $1}'`)
-    set ipts = `grep " $base" $wd/ibaselist | awk '{print $2}'`
-    set fpts = " "`grep " $base" $wd/fbaselist | awk '{print $2}'`
-    if (`echo $fpts | wc -w | awk '{print $1}'` != 0) then
-	set pct = `echo $fpts $ipts | awk '{print 100*$1/$2}' | tr "." " " | awk '{print $1}'`
-	echo " $base --- $fpts out of $ipts spectra preserved ($pct%)" >> $wd/rpttemp
+foreach ant1 ($fullxants)
+    foreach ant2 ($fullxants)
+	if ($ant1 < $ant2) then
+	    echo {$ant1}"-"{$ant2}"-XX"  >> $wd/ret000
+	endif
+    end
+end
+foreach ant1 ($fullyants)
+    foreach ant2 ($fullyants)
+	if ($ant1 < $ant2) then
+	    echo {$ant1}"-"{$ant2}"-YY"  >> $wd/ret000
+	endif
+    end
+end
+
+paste $wd/ret* > $wd/retmap
+
+set orc = `echo 500 $freq | awk '{print int($1*$2/1.43)}'`
+set tnoise = `imfit in=$outfile/$source.cm region=relcen,arcsec,"box(-$orc,-$orc,$orc,$orc)" object=point | grep residual | awk '{print $9*1000}'`
+set noise = `imstat in=$outfile/$source.rs | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g' | awk '{print $3*1000}'`
+set maxmin = (`imstat in=$outfile/$source.cm | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g' | awk '{print $4*1000,$5*1000}'`)
+set derflux = (`imfit in=$outfile/$source.cm region=relcen,arcsec,"box(-$orc,-$orc,$orc,$orc)" object=point | grep Peak | awk '{print $3,$5}'`)
+set derpos = (`imfit in=$outfile/$source.cm region=relcen,arcsec,"box(-$orc,-$orc,$orc,$orc)" object=point | grep Offset | awk '{print $4,$5}'`)
+set derpos = ($derpos `imfit in=$outfile/$source.cm region=relcen,arcsec,"box(-$orc,-$orc,$orc,$orc)" object=point | grep errors | awk '{print $4,$5}'`)
+
+report:
+echo "" 
+echo "CALIBRATION REPORT" | tee -ia $wd/calrpt
+echo "================================================================" | tee -ia $wd/calrpt
+echo "Calibration of $cal was successfully completed." | tee -ia $wd/calrpt
+echo "Image noise is $noise mJy, with a dynamic range of "`echo $maxmin[1] $noise | awk '{print $1/$2}'` | tee -ia $wd/calrpt
+echo "(theoretical noise limit is $tnoise mJy) ." | tee -ia $wd/calrpt
+echo "Derived flux is $derflux[1] +/- $derflux[2] Jy" | tee -ia $wd/calrpt
+echo "(flux provided was $calflux)" | tee -ia $wd/calrpt
+echo "Positional offsets are "$derpos[1]","$derpos[2]" +/- "$derpos[3]","$derpos[4]" arcsec." | tee -ia $wd/calrpt
+if ("$pollist" == "xxyy" || "$xrefant" == "$yrefant") then
+    echo "Antenna $refant is the reference antenna for both X and Y pols." | tee -ia $wd/calrpt
+else
+    if ("$xrefant" != "") echo "Antenna $xrefant is the reference antenna for X-pol." | tee -ia $wd/calrpt
+    if ("$yrefant" != "") echo "Antenna $yrefant is the reference antenna for Y-pol." | tee -ia $wd/calrpt
+endif
+
+echo "Data for $#fullxants x-pol and $#fullyants y-pol inputs were processed"  | tee -ia $wd/calrpt
+
+if ($sefd) then
+    if ("$nogainants" == "") then
+	echo "All antennas have gains solutions." | tee -ia $wd/calrpt
+    else if ($#nogainants == 1) then
+	echo "Antenna $nogainants has no gains solution." | tee -ia $wd/calrpt
     else
-	set fpts = 0
-	echo $base >> $wd/badbase 
-	echo " $base --- $fpts out of $ipts spectra preserved (0%)" >> $wd/rpttemp
+	echo "Antennas "`echo $nogainants | tr ' ' ','`" have no gains solutions." | tee -ia $wd/calrpt
     endif
+    
+endif
+
+set badants
+if !($sefd) then
+    set idx = 1
+    while ($idx <= $nants)
+	if ($fullxaret[$idx] == 0 && $fullxapos[$idx] != 0) set badants = ($badants {$idx}X)
+	if ($fullyaret[$idx] == 0 && $fullyapos[$idx] != 0) set badants = ($badants {$idx}Y)
+	@ idx++
+    end
+    if ("$badants" == "") then
+	echo "No antennas were entirely flagged." | tee -ia $wd/calrpt
+    else if ($#badants == 1) then
+	echo "Antenna $badants was entirely flagged." | tee -ia $wd/calrpt
+    else
+	echo "Antennas "`echo $badants | tr ' ' ','`" were entirely flagged" | tee -ia $wd/calrpt
+    endif
+endif
+
+echo "" | tee -ia $wd/calrpt
+echo "DATA RETENTION RATES:" | tee -ia $wd/calrpt
+echo "+++++++++++++++++++++++++++++++++" | tee -ia $wd/calrpt
+set totalret; set totalpos; set totalxret; set totalxpos; set totalyret; set totalypos
+foreach tick ($fullxret)
+    @ totalret+=$tick totalxret+=$tick
+end
+foreach tick ($fullyret)
+    @ totalret+=$tick totalyret+=$tick
+end
+foreach tick ($fullxpos)
+    @ totalpos+=$tick totalxpos+=$tick
+end
+foreach tick ($fullypos)
+    @ totalpos+=$tick totalypos+=$tick
+end
+echo "All polarizations: "`echo $totalret $totalpos | awk '{print .1*int(1000*$1/$2)"% ("$1" of "$2" datapoints)"}'` | tee -ia $wd/calrpt
+echo "   X-Pol: "`echo $totalxret $totalxpos | awk '{print .1*int(1000*$1/$2)"% ("$1" of "$2" datapoints)"}'` | tee -ia $wd/calrpt
+echo "   Y-Pol: "`echo $totalyret $totalypos | awk '{print .1*int(1000*$1/$2)"% ("$1" of "$2" datapoints)"}'` | tee -ia $wd/calrpt
+echo ""
+
+set idx = 1
+while ($idx <= $#fullxapos)
+    if ($fullxapos[$idx] == "0") then
+	echo "Ant "{$idx}"X -- N/A                 " >> $wd/xfinalret
+    else
+	echo "Ant "{$idx}"X -- "`echo $fullxaret[$idx] $fullxapos[$idx] | awk '{print .1*int(1000*$1/$2)"% ("$1" of "$2")"}'` >> $wd/xfinalret
+    endif
+    if ($fullyapos[$idx] == "0") then
+	echo "Ant "{$idx}"Y -- N/A                 " >> $wd/yfinalret
+    else
+	echo "Ant "{$idx}"X -- "`echo $fullyaret[$idx] $fullyapos[$idx] | awk '{print .1*int(1000*$1/$2)"% ("$1" of "$2")"}'` >> $wd/yfinalret
+    endif
+    @ idx++
 end
 
-report: # Beyond here is pretty boring code, so we'll just "ignore" it for the time being
+paste $wd/xfinalret $wd/yfinalret | tee -ia $wd/calrpt
 
-set scount = `uvlist vis=$wd/tempcal options=stat recnum=0 select=-auto | grep -v CHAN | grep ":" | grep -v "e" | wc -l| awk '{print $1}'`
-echo "Calcal summary for $cal data" >> $cal.calrpt
-echo "------------------------------------------------" >> $cal.calrpt
-echo "$scount out of $rcount records left in image. (`calc -i 100'*'$scount/$rcount`%)" >> $cal.calrpt
-echo " " >> $cal.calrpt
-set bpct = `echo $fbcount[1] $ibcount[1] | awk '{print 100*$1/$2}' | tr "." " " | awk '{print $1}'` >> $cal.calrpt
-set cpct = `echo $fccount[1] $iccount[1] | awk '{print 100*$1/$2}'| tr "." " " | awk '{print $1}'` >> $cal.calrpt
-echo "Correlator file - $vis" >> $cal.calrpt
-echo "--------------------------------------------------------------------" >> $cal.calrpt
-echo " $fbcount[1] out of $ibcount[1] baselines preserved ($bpct%)" >> $cal.calrpt
-echo " $fccount[1] out of $iccount[1] spectra preserved ($cpct%)" >> $cal.calrpt
-echo "--------------------------------------------------------------------" >> $cal.calrpt
-echo " " >> $cal.calrpt
-echo "The following baselines in this file were not preserved (0% spectra):" >> $cal.calrpt
-set badlist = `cat $wd/badbase`
-echo $badlist | tr " " "," >> $cal.calrpt
-echo " "  >> $cal.calrpt
-echo "Antenna Counts" >> $cal.calrpt
-echo "-------------------------"  >> $cal.calrpt
-foreach antpol (`cat $wd/antlist`)
-    set antcount = `cat $wd/badbase | tr "-" " "| awk '{print " "$1" "$2}' | grep " $antpol " | wc -l | awk '{print $1}'`
-    if ($antcount != 0) echo "$antpol --- $antcount affected baseline(s)" >> $cal.calrpt
+echo ""
+
+set idx = 1
+set times = (`sed -n 2p $wd/retmap`)
+
+while ($idx <= $#times)
+    if ($idx != 1) echo "----------" | tee -ia $wd/calrpt
+    echo "Cycle "`echo $idx | awk '{print $1+1000}' | sed 's/1//'`" (timestamp $times[$idx])" | tee -ia $wd/calrpt
+    if ($idx <= $#fullxret) echo -n "  X-Pol: "`echo $fullxret[$idx] $fullxpos[$idx] | awk '{print .1*int(1000*$1/$2)"% ("$1" of "$2" datapoints)"}'` | tee -ia $wd/calrpt
+
+    if ($idx <= $#fullyret) echo -n "  Y-Pol: "`echo $fullyret[$idx] $fullypos[$idx] | awk '{print .1*int(1000*$1/$2)"% ("$1" of "$2" datapoints)"}'` | tee -ia $wd/calrpt
+    if ($idx > $#fullxret && $idx > $#fullyret) echo -n "    NO DATA" | tee -ia $wd/calrpt
+    echo "" | tee -ia $wd/calrpt
+    @ idx++
 end
-echo " "  >> $cal.calrpt
-echo " " >> $cal.calrpt
-echo "END SUMMARY" >> $cal.calrpt
-echo "Full listing" >> $cal.calrpt
-echo "Listing for $vis" >> $cal.calrpt
-echo "--------------------------------------------------------------" >> $cal.calrpt
-cat $wd/rpttemp >> $cal.calrpt
-
+echo "+++++++++++++++++++++++++++++++++" | tee -ia $wd/calrpt
+cp $wd/calrpt $outfile/calrpt
+echo ""
 finish:
 set times = (`date +%s.%N | awk '{print int(($1-date1)/60),int(($1-date1)%60)}' date1=$date1` 0 0)
 echo "Calibration cycle took $times[1] minute(s) and $times[2] second(s)."
