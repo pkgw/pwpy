@@ -2,9 +2,11 @@
 
 set src=c138
 set visroot=mosfxc-3${src}.uvaver.uvcal
-foreach piece (2 3 4 5 6 7 8)
+set chans=25
+foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32)
+set startfreq = `echo '100 + '${chans}' * ('${piece}'-1)' | bc`
 
-uvaver vis=${visroot} out=${visroot}${piece} line=ch,100,${piece}00
+uvaver vis=${visroot} out=${visroot}${piece} line=ch,${chans},${startfreq}
 puthd in=${visroot}${piece}/evector value=1.570796
 uvredo vis=${visroot}${piece} out=${visroot}${piece}.uvredo options=chi
 mfcal vis=${visroot}${piece}.uvredo refant=1
