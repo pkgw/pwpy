@@ -1,3 +1,3 @@
 #! /bin/sh
 exec mirargmerge uvplt device=1/xs nxy=4,3 line=chan,824,101 \
-  select='pol(xx,yy),-auto' axis=ti,ph "$@"
+  select='pol(xx,yy),-auto' axis=ti,ph +source "$@"
