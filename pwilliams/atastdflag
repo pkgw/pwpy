@@ -1,0 +1,14 @@
+#! /bin/sh -ex
+#
+# Apply very standard ATA flags to a visibility dataset.
+# Many datasets benefit from the flagging of very short
+# baselines (uvrange(0,0.1)), but we do not do that here,
+# because sometimes you might want to preserve those
+# short baselines.
+
+v=`C $@`
+
+uvflag flagval=f options=noquery vis="$v" line=chan,100,1
+uvflag flagval=f options=noquery vis="$v" line=chan,100,925
+uvflag flagval=f options=noquery vis="$v" line=chan,1,513
+uvflag flagval=f options=noquery vis="$v" select='shadow(7.5)'

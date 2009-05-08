@@ -1,0 +1,5 @@
+#! /bin/sh
+#
+# Display an image
+
+exec mirargmerge -din cgdisp device=1/xs +wedge "$@"

@@ -1,0 +1,23 @@
+#! /bin/sh
+#
+# Split a UV dataset up by parallel-hand polarizations.
+
+if [ $# -eq 1 ] ; then
+    vis="$1"
+    xout="$1".x
+    yout="$1".y
+    shift
+elif [ $# -eq 3 ] ; then
+    vis="$1"
+    xout="$2"
+    yout="$3"
+    shift
+    shift
+    shift
+else
+    echo "Usage: $0 vis [xout yout]" >&2
+    exit 1
+fi
+
+mirargmerge uvcat select='pol(xx),-auto' +unflagged vis="$vis" out="$xout" "$@"
+exec mirargmerge uvcat select='pol(yy),-auto' +unflagged vis="$vis" out="$yout" "$@"

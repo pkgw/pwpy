@@ -1,0 +1,109 @@
+#! /usr/bin/env python
+# -*- python -*-
+#
+# Compose default task arguments with user-specified
+# task arguments and either print the commandline or
+# execute the task.
+
+import os
+from sys import argv, stderr, exit
+
+mergeOpts = frozenset (('select', 'region'))
+
+# Parse arguments specific to us
+
+if len (argv) == 1:
+    print 'Usage: %s [-n] [-dNAME] taskname [task args...]' % argv[0]
+    exit (1)
+
+printOnly = False
+defaultKW = None
+
+while len (argv) > 1 and argv[1][0] == '-':
+    if argv[1] == '-n':
+        printOnly = True
+    elif argv[1].startswith ('-d'):
+        defaultKW = argv[1][2:]
+    else:
+        print >>stderr, 'Error: unknown mirargmerge argument', argv[1]
+        exit (1)
+    del argv[1]
+
+# Pick up task name.
+
+task = argv[1]
+
+if '=' in task:
+    print >>stderr, 'Forgot to give task name?'
+    exit (1)
+
+if defaultKW is None:
+    if task.startswith ('uv'):
+        defaultKW = 'vis'
+    elif task.startswith ('smauv'):
+        defaultKW = 'vis'
+    elif task.startswith ('im'):
+        defaultKW = 'in'
+
+# Pick up keywords.
+
+options = {}
+args = {}
+defvals = []
+
+for arg in argv[2:]:
+    if arg[0] == '+':
+        opts = arg[1:].split (',')
+        for o in opts:
+            options[o] = True
+    elif arg[0] == '-':
+        opts = arg[1:].split (',')
+        for o in opts:
+            options[o] = False
+    elif arg.startswith ('options='):
+        opts = arg[8:].split (',')
+        for o in opts:
+            options[o] = True
+    elif '=' in arg:
+        aname, aval = arg.split ('=', 1)
+        if aname in mergeOpts and aname in args:
+            print >>stderr, 'Warning: not merging keyword', aname
+        args[aname] = aval
+    else:
+        if defaultKW is None:
+            print >>stderr, 'Error: non-keyword argument', arg, 'and no assigned default'
+            exit (1)
+        defvals.append (arg)
+
+if defaultKW in args:
+    args[defaultKW] += ',' + ','.join (defvals)
+else:
+    args[defaultKW] = ','.join (defvals)
+
+# Generate commandline
+
+cmd = [task]
+
+opts = [i[0] for i in options.iteritems () if i[1]]
+if len (opts) > 0:
+    cmd.append ('options=' + ','.join(opts))
+
+if printOnly: argTmpl = '%s=\'%s\''
+else: argTmpl = '%s=%s'
+
+for nv in args.iteritems ():
+    cmd.append (argTmpl % nv)
+
+# Do whatever.
+
+if printOnly:
+    print ' '.join (cmd)
+else:
+    print >>stderr, '+', ' '.join (cmd)
+    try:
+        os.execvp (cmd[0], cmd)
+    except Exception, e:
+        print 'Error executing command: %s' % (' '.join (cmd), str (e))
+        exit (1)
+
+exit (0)
