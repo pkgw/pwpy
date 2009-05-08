@@ -70,7 +70,7 @@ class AmpRfi (object):
     def __init__ (self, numChans):
         self.numChans = numChans
         
-    def setupNext (self, vises, fname, freq, half, **kwargs):
+    def setupNext (self, vises, fname, freq, half, noshow=False, **kwargs):
         self.vises = vises
         self.fname = fname
         self.freq = freq
@@ -109,7 +109,7 @@ class AmpRfi (object):
             print 'All data flagged for this!'
             return
         
-        self.suggFlag ()
+        self.suggFlag (noshow=noshow)
 
     def plotRaw (self):
         return omega.quickXY (self.ch, self.y)
@@ -117,7 +117,7 @@ class AmpRfi (object):
     def showRaw (self):
         self.rawPlot = self.plotRaw ().show ('amprfi-raw')
         
-    def suggFlag (self, mfactor=15, boxcar=1):
+    def suggFlag (self, mfactor=15, boxcar=1, noshow=False):
         deltas = self.y[1:] - self.y[:-1]
 
         if boxcar > 1:
@@ -164,7 +164,7 @@ class AmpRfi (object):
             print '!!! Uneven number of edges detected! Try bigger mfactor in suggFlag'
         
         self.toFlagSugg = toFlag
-        self.mergeRegions ()
+        self.mergeRegions (noshow=noshow)
 
     def suggestYCutoff (self, cutoff):
         self.toFlagSugg = [(ch, ch) for ch in self.ch[N.where (self.y > cutoff)]]
@@ -231,10 +231,11 @@ class AmpRfi (object):
 
         return merged
     
-    def mergeRegions (self, pad=4):
+    def mergeRegions (self, pad=4, noshow=False):
         self.pad = pad
         self.toFlag = self._mergeImpl (self.toFlagSugg, pad)
-        self.show ()
+        if not noshow:
+            self.show ()
 
     def plot (self, merged=True):
         import omega.rect
@@ -306,8 +307,8 @@ if __name__ == '__main__':
     vises = [miriad.VisData (x) for x in sys.argv[5:]]
     
     a = AmpRfi (nchan)
-    a.setupNext (vises, flags, freq, half)
-    
+    a.setupNext (vises, flags, freq, half, noshow=True)
+
     ns = {'a': a, 'vises': vises, 'freq': freq, 'half': half, 'fname': flags}
     sys.argv = [sys.argv[0], '-gthread']
     sh = IPython.Shell.start (ns)
