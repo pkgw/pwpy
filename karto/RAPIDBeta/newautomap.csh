@@ -450,7 +450,7 @@ while ($nchan == "")
     endif
 end
 
-set sourceline = (`uvlist vis=$vis[1] options=var | grep "source" | tr ':' ' '`)
+set sourceline = (`uvlist vis=$vis[1] options=var,full | grep "source" | tr ':' ' ' | grep -v \*`)
 set source
 
 while ($source == "")

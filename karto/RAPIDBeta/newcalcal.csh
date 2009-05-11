@@ -155,6 +155,7 @@ set sefd = 0
 set smooth
 set report = 1
 set nogainants
+set copymode
 
 #################################################################
 # Here is the keyword/value pairing code. It basically operates
@@ -208,6 +209,11 @@ else if ("$argv[1]" =~ 'options='*) then
 	else if ($option == "sefd") then
 	    set sefd = 1
 	    set mapopt = "$mapopt,sefd"
+	else if ($option == "copy") then
+	    set copymode = 1
+	else if ($option == "lastcopy") then
+	    set copymode = 2
+	    set outsource = 0
 	else
 	    set badopt = ($badopt $option)
 	endif
@@ -271,6 +277,8 @@ endif
 
 set date1 = `date +%s.%N`
 set dmark = `date +%s`
+
+if ($copymode) goto copymode
 
 foreach file ($vis $tvis)
     if !(-e $file/phoenix) mkdir -p $file/phoenix
@@ -1169,25 +1177,29 @@ if ($polsplit && $#pollist > 1) then # If pols were split and more than one pol 
 	    gpcopy vis=$outfile/$source.1.$dp out=$vis > /dev/null
 	    if (-e $vis/gains) mv $vis/gains $vis/gains.{$dp}p
 	    if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.{$dp}p
+	    if (-e $vis/header) cp $vis/header $vis/header.{$dp}p
 	endif
 	puthd in=$wd/tempcal$dp/interval value=.5 > /dev/null 
 	gpcopy vis=$wd/tempcal$dp out=$vis > /dev/null
     # Move pol-specific gains "out of the way" so that information isnb't overwritten by gpcopy
 	if (-e $vis/gains) mv $vis/gains $vis/gains.$dp 
 	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.$dp
+	if (-e $vis/header) cp $vis/header $vis/header.$dp
     end
 else if ($polsplit) then # if polspilt was used, but only one pol was found
     if (-e $outfile/$source.1.$pollist[1]/gains) then # If the automapping software had "tweaks" for a single pol gains solution, apply those tweaks
 	puthd in=$outfile/$source.1.$pollist[1]/interval value=.5 > /dev/null
 	gpcopy vis=$outfile/$source.1.$pollist[1] out=$vis > /dev/null
-	if (-e $vis/gains) mv $vis/gains $vis/gains.$pollist[1] 
-	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.$pollist[1]
+	if (-e $vis/gains) mv $vis/gains $vis/gains.{$pollist[1]}p 
+	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.{$pollist[1]}p
+	if (-e $vis/header) cp $vis/header $vis/header.{$pollist[1]}p
     endif
     puthd in=$wd/tempcal$pollist[1]/interval value=.5 > /dev/null
     gpcopy vis=$wd/tempcal$pollist[1] out=$vis > /dev/null
     # Move pol-specific gains "out of the way" so that information isn't overwritten by gpcopy
     if (-e $vis/gains) mv $vis/gains $vis/gains.$pollist[1]
     if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.$pollist[1]
+    if (-e $vis/header) cp $vis/header $vis/header.$pollist[1]
 else
     foreach dp (xx yy)
 	if (-e $outfile/$source.1.$dp/gains) then # If the automapping software had "tweaks" for the gains solution, apply those tweaks
@@ -1236,8 +1248,6 @@ if ($outsource && "$tvis[1]" != "") then
     end
 endif
 
-#
-
 foreach file ($vis $tvis)
     if (-e $wd/sefd) cp $wd/sefd $file/sefd
     if (-e $wd/sefd) cp $wd/sefd $file/phoenix/sefd.CAL$dmark
@@ -1271,20 +1281,22 @@ if ($report) then
 	echo $regtimes[$postidx] >> $wd/ret$cycle
 	if (-e $wd/xret$cycle && -e $wd/yret$cycle) then
 	    echo `head -n 1 $wd/xret$cycle` `head -n 1 $wd/yret$cycle ` | awk '{if ($1*1 > $2*1) print $1*1; else print $2*1}' >> $wd/ret$cycle
-	    sed 1d $wd/xret$cycle >> $wd/ret$cycle
+	    awk '{if (NR ==1) sca = $1; else print $1*sca}' $wd/xret$cycle >> $wd/ret$cycle
+	    awk '{if (NR ==1) sca = $1; else print $1*sca}' $wd/yret$cycle >> $wd/ret$cycle
 	    sed 1d $wd/yret$cycle >> $wd/ret$cycle
 	else if (-e $wd/xret$cycle) then
-	    cat $wd/xret$cycle >> $wd/ret$cycle
+	    awk '{if (NR == 1) {sca = $1; print sca} else print $1*sca}' $wd/xret$cycle >> $wd/ret$cycle
 	else if (-e $wd/yret$cycle) then
-	    cat $wd/yret$cycle >> $wd/ret$cycle
+	    awk '{if (NR == 1) {sca = $1; print sca} else print $1*sca}' $wd/yret$cycle >> $wd/ret$cycle
 	endif
 	@ preidx++ idx++ postidx++
     end
 endif
 
-echo "" >> $wd/ret000
-echo "" >> $wd/ret000
-echo "" >> $wd/ret000
+echo "#" >> $wd/ret000
+echo "#" >> $wd/ret000
+echo "#" >> $wd/ret000
+echo "#" >> $wd/ret000
 
 foreach ant1 ($fullxants)
     foreach ant2 ($fullxants)
@@ -1302,7 +1314,8 @@ foreach ant1 ($fullyants)
 end
 
 paste $wd/ret* > $wd/retmap
-
+cp $wd/retmap $vis/retmap
+cp $wd/retmap $vis/phoenix/retmap.CAL$dmark
 set orc = `echo 500 $freq | awk '{print int($1*$2/1.43)}'`
 set tnoise = `imfit in=$outfile/$source.cm region=relcen,arcsec,"box(-$orc,-$orc,$orc,$orc)" object=point | grep residual | awk '{print $9*1000}'`
 set noise = `imstat in=$outfile/$source.rs | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g' | awk '{print $3*1000}'`
@@ -1318,9 +1331,9 @@ echo "================================================================" | tee -i
 echo "Calibration of $cal was successfully completed." | tee -ia $wd/calrpt
 echo "Image noise is $noise mJy, with a dynamic range of "`echo $maxmin[1] $noise | awk '{print $1/$2}'` | tee -ia $wd/calrpt
 echo "(theoretical noise limit is $tnoise mJy) ." | tee -ia $wd/calrpt
-echo "Derived flux is $derflux[1] +/- $derflux[2] Jy" | tee -ia $wd/calrpt
-echo "(flux provided was $calflux)" | tee -ia $wd/calrpt
+echo "Derived flux is $derflux[1] +/- $derflux[2] Jy (Provided value was $calflux)" | tee -ia $wd/calrpt
 echo "Positional offsets are "$derpos[1]","$derpos[2]" +/- "$derpos[3]","$derpos[4]" arcsec." | tee -ia $wd/calrpt
+echo "(flux was $flux, addflux was $addflux, sysflux was $sysflux, plim was $plim)" | tee -ia $wd/calrpt
 if ("$pollist" == "xxyy" || "$xrefant" == "$yrefant") then
     echo "Antenna $refant is the reference antenna for both X and Y pols." | tee -ia $wd/calrpt
 else
@@ -1399,7 +1412,7 @@ paste $wd/xfinalret $wd/yfinalret | tee -ia $wd/calrpt
 echo ""
 
 set idx = 1
-set times = (`sed -n 2p $wd/retmap`)
+set times = (`sed -n 2p $wd/retmap`); shift times
 
 while ($idx <= $#times)
     if ($idx != 1) echo "----------" | tee -ia $wd/calrpt
@@ -1414,6 +1427,122 @@ end
 echo "+++++++++++++++++++++++++++++++++" | tee -ia $wd/calrpt
 cp $wd/calrpt $outfile/calrpt
 echo ""
+
+copymode:
+
+if ($copymode) then
+    if !(-e $vis/retmap) then
+	echo "FATAL ERROR: This calibrator dataset has not been processed with CALCAL yet!"
+	goto fail
+    endif
+    foreach file ($tvis)
+	if !(-e $file/phoenix) mkdir -p $file/phoenix
+	if (! -e $file/phoenix/flags.o && -e $file/flags) cp $file/flags $file/phoenix/flags.o
+	if (! -e $file/phoenix/gains.o && -e $file/flags) cp $file/flags $file/phoenix/gains.o
+	if (! -e $file/phoenix/bandpass.o && -e $file/bandpass) cp $file/bandpass $file/phoenix/bandpass.o
+	if !(-e $file/phoenix/header.o) cp $file/header $file/phoenix/header.o
+	echo "CALCAL $dmark" >> $file/phoenix/history
+    end
+    foreach file ($tvis)
+	echo -n "Copying gains solution to $file..."
+	foreach pol (xx yy xxp yyp)
+	    if (-e $vis/gains.$pol || -e $vis/bandpass.$pol) then
+		if (-e $vis/header) cp $vis/header $vis/tempheader
+		if (-e $vis/gains) cp $vis/gains $vis/tempgains
+		if (-e $vis/bandpass) cp $vis/bandpass $vis/tempbandpass
+		if (-e $vis/header.$pol) cp $vis/header.$pol $vis/header
+		if (-e $vis/gains.$pol) cp $vis/gains.$pol $vis/gains
+		if (-e $vis/bandpass.$pol) cp $vis/bandpass.$pol $vis/bandpass
+		gpcopy vis=$vis out=$file > /dev/null
+		if (-e $vis/tempheader) mv $vis/tempheader $vis/header
+		if (-e $vis/tempgains) mv $vis/tempgains $vis/gains
+		if (-e $vis/tempbandpass) mv $vis/tempbandpass $vis/bandpass
+		if (-e $file/header) cp $file/header $file/header.$pol
+		if (-e $file/gains) mv $file/gains $file/gains.$pol
+		if (-e $file/bandpass) mv $file/bandpass $file/bandpass.$pol
+	    endif
+	end
+	echo "done!"
+    end
+    cp $vis/retmap $wd/retmap
+    awk '{if (NR > 4) print $1}' $wd/retmap > $wd/basemap
+    set fullxants = (`cat $wd/basemap | tr '-' ' ' | awk '{if ($3 == "XX") print $1"\n"$2}' | sort -un`)
+    set fullyants = (`cat $wd/basemap | tr '-' ' ' | awk '{if ($3 == "YY") print $1"\n"$2}' | sort -un`)
+    echo -n "Beginning flagging sequence..."
+    if ($outsource) then
+	set fidx = 1
+	set stime = `sed -n 1p $wd/retmap | awk '{print $2}'`
+	set etime = `sed -n 2p $wd/retmap | awk '{print $2}'`
+	foreach file ($tvis)
+	    set fcycle = `echo $fidx | awk '{print $1+999}' | sed 's/1//'`
+	    uvaver vis=$file out=$wd/tvis{$fcycle}001 select="time($stime,$etime)" options=relax,nocal,nopass,nopol >& /dev/null
+	    if !(-e $wd/tvis{$fcycle}001/visdata) rm -rf wd/tvis{$fcycle}001
+	    @ fidx++
+	end
+    endif
+    set preidx = 1
+    set idx = 2
+    if ($copymode == 2) then
+	set idx = `sed -n 1p $wd/retmap | wc -w`
+	set preidx = `echo $idx | awk '{print $1-1}'`
+    endif
+    while ($idx <= `sed -n 1p $wd/retmap | wc -w`)
+	set ptime = (`sed -n 1p $wd/retmap`)
+	set ptime = $ptime[$idx]
+	set stime = (`sed -n 2p $wd/retmap`)
+	set stime = $stime[$idx]
+	set etime = (`sed -n 3p $wd/retmap`)
+	set etime = $etime[$idx]
+	set pointmax = (`sed -n 4p $wd/retmap`)
+	set pointmax = $pointmax[$idx]
+        echo "awk '{if (NR > 4) print "'$1,$'$idx"/pointmax}' pointmax=$pointmax $wd/retmap" > $wd/source.flag
+	set precycle = `echo $idx | awk '{print $1+999}' | sed 's/1//'`
+        set cycle = `echo $idx | awk '{print $1+1000}' | sed 's/1//'`
+        source $wd/source.flag > $wd/ret$cycle
+	set badbases = (`awk '{if (retlim > 100*$2) print NR}' retlim=$retlim  $wd/retmap`)
+	rm -f $wd/badbaselist
+	foreach badbase ($badbases)
+	    sed -n {$badbase}p $wd/basemap | tr '-' ' ' | awk '{print "ant("$1")("$2"),pol("$3"),time("ptime","etime")"}' ptime=$ptime etime=$etime >> $wd/badbaselist
+	end
+	if (-e $wd/badbaselist) then
+	    grep -i "xx" $wd/badbaselist > $wd/xflags
+	    if !(`wc -l $wd/xflags | awk '{print $1}'`) rm -f $wd/xflags
+	    grep -i "yy" $wd/badbaselist > $wd/yflags
+	    if !(`wc -l $wd/yflags | awk '{print $1}'`) rm -f $wd/yflags
+	    set filelist
+	    set fidx = 1
+	    foreach file ($tvis)
+		set fcycle = `echo $fidx | awk '{print $1+999}' | sed 's/1//'`
+		if ($outsource) then
+		    uvaver vis=$file out=$wd/tvis$fcycle$cycle options=relax,nocal,nopass,nopol select="time($stime,$etime)" >& /dev/null
+		    if !(-e $wd/tvis$fcycle$cycle/visdata) rm -rf $wd/tvis$fcycle$cycle  
+		endif
+		if ($outsource && -e $wd/tvis$fcycle$cycle) set filelist = ($filelist $wd/tvis$fcycle$cycle)
+		if ($outsource && -e $wd/tvis$fcycle$precycle) set filelist = ($filelist $wd/tvis$fcycle$precycle)
+		if !($outsource) set filelist = ($filelist $file)
+		@ fidx++
+	    end
+	    foreach file ($filelist)
+		if (-e $wd/xflags) uvflag vis=$file select=@$wd/xflags flagval=f options=none > /dev/null
+		if (-e $wd/yflags) uvflag vis=$file select=@$wd/xflags flagval=f options=none > /dev/null
+		echo -n "."
+	    end
+	    @ fidx++
+	endif
+	@ idx++
+    end
+    if ($outsource) then
+	set fidx = 1
+	foreach file ($tvis)
+	    set fcycle = `echo $fidx | awk '{print $1+999}' | sed 's/1//'`
+	    uvaver vis="$wd/tvis$fcycle*" out=$wd/tvis$fcycle options=relax,nocal,nopass,nopol >& /dev/null
+	    if (-e $wd/tvis$fcycle/visdata) uvaflag  vis=$file tvis=$wd/tvis$fcycle > /dev/null
+	    @ fidx++
+	end
+    endif
+    echo "done!"
+endif
+
 finish:
 set times = (`date +%s.%N | awk '{print int(($1-date1)/60),int(($1-date1)%60)}' date1=$date1` 0 0)
 echo "Calibration cycle took $times[1] minute(s) and $times[2] second(s)."
