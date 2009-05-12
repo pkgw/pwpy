@@ -7,6 +7,7 @@ SVNID = '$Id$'
 
 runLogger = None
 
+# FIXME: implement probing and controlling of bandwidth settings.
 
 # Some utilities for constructing commandlines. These are actually
 # not used much in this module, but come into play a lot in atactl.py
@@ -274,7 +275,7 @@ _defaultMultiInstrs = ['fx64a:fxa', 'fx64c:fxa']
 
 class MultiHookup (object):
     def __init__ (self, instrs=None):
-        if instr is None: instr = _defaultMultiInstrs
+        if instrs is None: instrs = _defaultMultiInstrs
 
         self.hookups = hs = {}
 
