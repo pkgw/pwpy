@@ -479,7 +479,7 @@ def makeCatalogEphemsOwned (owner, src, durHours, outbase):
 
     a = stdout.split ()
     if len (a) != 5:
-        raise Exception ("Unexpected output from atalistephem: " + stdout)
+        raise Exception ("Unexpected output from atalistcatalog: " + stdout)
     radec = a[3] + ',' + a[4]
 
     account ('generating ephemerides', time.time () - tStart)
@@ -573,10 +573,9 @@ def ensureEphemRADec (raHours, decDeg, ebase, obsDurSeconds):
     if expiry is not None and now + obsDurSeconds + 180 < expiry:
             return _radecTable[key]
 
-    radec = makeRADecEphem (raHours, decDeg, 1.1, ebase)
+    makeRADecEphem (raHours, decDeg, 1.1, ebase)
     _ephemTable[key] = now + 3600
-    _radecTable[key] = radec
-    return radec
+    _radecTable[key] = (raHours, decDeg)
 
 def trackEphem (ants, ebase, wait):
     f = ebase + '.ephem' # Use the ephem in ns, not ms
