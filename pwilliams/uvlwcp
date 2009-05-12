@@ -1,0 +1,36 @@
+#! /bin/bash
+# -*- shell-script -*-
+#
+# Make a LightWeight CoPy of a UV dataset by symlinking
+# visdata and copying other entries. Equivalent to the
+# uvshadow script but lets you specify the destination
+# filename, which are semantics I prefer.
+
+set -e
+
+if [ $# -ne 2 ] ; then
+    echo "Usage: $0 <src> <dest>" >&2
+    exit 1
+fi
+
+if [ ! -f "$1/visdata" ] ; then
+    echo "Error: $1 does not appear to be a UV dataset." >&2
+    exit 1
+fi
+
+if [ -e "$2" ] ; then
+    echo "Error: destination $2 exists." >&2
+    exit 1
+fi
+
+mkdir "$2"
+
+for i in "$1"/* ; do
+    if [ `basename $i` == visdata ] ; then
+	ln -s `cd $1 && pwd`/visdata "$2"/visdata
+    else
+	cp -p $i "$2"
+    fi
+done
+
+exit 0
