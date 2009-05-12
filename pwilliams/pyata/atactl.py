@@ -505,7 +505,7 @@ def makeCatalogEphem (src, durHours, outbase):
     raise Exception ("Can't find source %s owned by anyone in the official catalog!" % src)
 
 def _makeRADecEphem (raHours, decDeg, durHours, start, outfile, args):
-    cmd = "atacatalogephem %f %f %s +%fhours %s >%s" % \
+    cmd = "ataradecephem %f %f %s +%fhours %s >%s" % \
           (raHours, decDeg, start, durHours, args, outfile)
 
     if noopMode:
