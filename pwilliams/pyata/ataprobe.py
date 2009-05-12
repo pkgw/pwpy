@@ -268,3 +268,41 @@ class Hookup (object):
         
         l.sort (key = lambda t: str (t[1][1]) + t[1][0])
         return l
+
+
+_defaultMultiInstrs = ['fx64a:fxa', 'fx64c:fxa']
+
+class MultiHookup (object):
+    def __init__ (self, instrs=None):
+        if instr is None: instr = _defaultMultiInstrs
+
+        self.hookups = hs = {}
+
+        for instr in instrs:
+            hs[instr] = Hookup (instr)
+
+
+    def load (self):
+        for h in self.hookups.itervalues ():
+            h.load ()
+
+
+    def los (self):
+        s = set ()
+        for h in self.hookups.itervalues ():
+            s.update ((h.lo, ))
+        return sorted (s)
+
+
+    def ants (self):
+        s = set ()
+        for h in self.hookups.itervalues ():
+            s.update (h.ants ())
+        return sorted (s)
+
+    def antpols (self):
+        s = set ()
+        for h in self.hookups.itervalues ():
+            s.update (h.antpols ())
+        return sorted (s)
+
