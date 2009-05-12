@@ -504,6 +504,52 @@ def makeCatalogEphem (src, durHours, outbase):
 
     raise Exception ("Can't find source %s owned by anyone in the official catalog!" % src)
 
+def _makeRADecEphem (raHours, decDeg, durHours, start, outfile, args):
+    cmd = "atacatalogephem %f %f %s +%fhours %s >%s" % \
+          (raHours, decDeg, start, durHours, args, outfile)
+
+    if noopMode:
+        log ('WOULD execute: %s' % cmd)
+        log ('Creating outfile so cleanup code can be exercised')
+        print >>file (outfile, 'w'), 'Fake ephemeris file.'
+        return 'ra,dec'
+    
+    log ('executing: %s' % cmd) 
+
+    proc = subprocess.Popen (cmd, shell=True, close_fds=True,
+                             stdin=file (os.devnull, 'r'),
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    for line in proc.stdout:
+        line = line.strip ()
+        log ('output: %s' % line)
+    for line in proc.stderr:
+        line = line.strip ()
+        log ('stderr output: %s' % line)
+    proc.wait ()
+
+    if proc.returncode != 0:
+        log ('process returned error code %d!' % proc.returncode)
+        try:
+            os.unlink (outfile)
+        except:
+            pass
+        raise Exception ("Command failed")
+
+    # Wrap ephem to avoid hitting limits.
+    runAta ('atawrapephem', outfile)
+
+def makeRADecEphem (raHours, decDeg, durHours, outbase):
+    tStart = time.time ()
+
+    _makeRADecEphem (raHours, decDeg, durHours, 'now', outbase + '.ephem', '')
+    t = time.gmtime ()
+    stUTC = time.strftime ('%Y-%m-%dT%H:%M:00.000Z', time.gmtime ())
+    _makeRADecEphem (raHours, decDeg, durHours, stUTC, outbase + '.msephem',
+                     '--utcms --interval 10')
+    
+    account ('generating ephemerides', time.time () - tStart)
+
 _ephemTable = {}
 _radecTable = {}
 
@@ -517,6 +563,19 @@ def ensureEphem (src, ebase, obsDurSeconds):
     radec = makeCatalogEphem (src, 1.1, ebase)
     _ephemTable[src] = now + 3600
     _radecTable[src] = radec
+    return radec
+
+def ensureEphemRADec (raHours, decDeg, ebase, obsDurSeconds):
+    now = time.time ()
+    key = (raHours, decDeg)
+    expiry = _ephemTable.get (key)
+    
+    if expiry is not None and now + obsDurSeconds + 180 < expiry:
+            return _radecTable[key]
+
+    radec = makeRADecEphem (raHours, decDeg, 1.1, ebase)
+    _ephemTable[key] = now + 3600
+    _radecTable[key] = radec
     return radec
 
 def trackEphem (ants, ebase, wait):
