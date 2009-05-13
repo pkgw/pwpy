@@ -55,11 +55,12 @@ echo ""
 echo "CALLING SEQUENCE: newautomap.csh vis=vis (mode=[auto,inter,skip]"
 echo "    crange=crange interval=interval weightmode=[natural,uniform]"
 echo "    imsize=imsize1,imsize2 cellsize=cellsize cleantpye=[clean,"
-echo "    mem] cregion=cregion cleanlim=cleanlim amplim=amplim1,amplim2"
-echo "    ,amplim3 sysflux=sysflux refant=refant selfcalint=selfcalint"
-echo "    selfcaltol=selfcaltol selfcalsigma=selfcalsigma device=device"
-echo "    dregion=dregion outdir=outdir olay=olay options=[autoflag,"
-echo "    noflag],[autoamp,noamp],[autopha,nopha],[autocal,nocal],"
+echo "    mem] cregion=cregion cleanlim=cleanlim model=model"
+echo "    amplim=amplim1,amplim2,amplim3 sysflux=sysflux refant=refant"
+echo "    selfcalint=selfcalint selfcaltol=selfcaltol selfcalsigma="
+echo "    selfcalsigma device=device dregion=dregion outdir=outdir"
+echo "    olay=olay restfreq=restfreq options=[autoflag,noflag]"
+echo "    [autoamp,noamp],[autopha,nopha],[autocal,nocal],sefd,"
 echo "    [drmax,fidmax],[intclean,nointclean],[savedata,savemaps,junk]"
 echo "    ,autolim,autoref,[mfs,nomfs],verbose)"
 echo ""
@@ -112,6 +113,9 @@ echo ""
 echo " cleanlim - Number of iterations that CLEAN is limited to."
 echo "    Default is 2500"
 echo ""
+echo " model - Name of the model to use for calibration. Default is to"
+echo "    use the CLEAN model from the current dataset(s)."
+echo ""
 echo " amplim - Amplitude limits (in Jy) for automated flagging, the"
 echo "    first number specifying the minimum flux, the second number"
 echo "    specifying the maximum flux, and the third number specifying"
@@ -119,6 +123,7 @@ echo "    the maximum flux for a single channel (e.g. amplim=(1,5,10)"
 echo "    will flag integrated spectra with fluxes below 1 Jy or above"
 echo "    5 Jy, and individual channels above 10 Jy). Default is"
 echo "    (0,5000,10000)"
+echo ""
 echo " sysflux - Expected variation (in Jy) of source measurements"
 echo "    due to system noise. Default is 2."
 echo ""
@@ -143,6 +148,9 @@ echo "    is 'source name'-maps."
 echo ""
 echo " olay - Overlay file to be used when making final images. No"
 echo "    default."
+echo ""
+echo " restfreq - The rest frequency (in GHz) for the dataset(s)."
+echo "    No default."
 echo ""
 echo " device - Device to plot results to (e.g. /xw for x-window)."
 echo '    Default is /null.'
@@ -224,6 +232,9 @@ set sysflux = 2
 set verb
 set debug = 0
 set sefd = 0
+set restfreq
+set usemodel
+
 if ($#argv == 0) then
     echo "AUTOMAP: No input files detected!"
     exit 0
@@ -242,6 +253,8 @@ if !( -e $wd) then
     echo "FATAL ERROR: Unable to create working directory, please make sure that you have read/write permissions for this area."
     exit 1
 endif
+
+set date1 = `date +%s.%N`
 
 #################################################################
 # Here is the keyword/value pairing code. It basically operates
@@ -332,6 +345,10 @@ else if ("$argv[1]" =~ 'cellsize='*) then
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'olay='*) then
     set olay = `echo $argv[1] | sed 's/olay=//'`
+    shift argv; if ("$argv" == "") set argv = "finish"
+else if ("$argv[1]" =~ 'restfreq='*) then
+    set restfreq = `echo $argv[1] | sed 's/restfreq=//' | awk '{print $1*1}'`
+    if ("$restfreq" == "0") set restfreq
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'options='*) then
     set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
@@ -424,7 +441,8 @@ set badcal # Debugging var to tell what happened if auto-selfcal fails
 set psci = 0 # Phase auto-selfcal iterations
 set asci = 0 # Amp auto-selfcal iterations
 set fli = 0 # Flagging iterations
-
+set badchans
+set omode = $mode
 set freqline = (`uvlist vis=$vis[1] options=var | grep "freq    :" | tr ':' ' '`) # Set the freq in MHz
 set freq
 while ("$freq" == "")
@@ -608,6 +626,13 @@ foreach file ($vis)
 	    rm -rf $wd/tempmap$idx.{$dp}pol; mv $wd/tempgmap $wd/tempmap$idx.{$dp}pol
 	    echo "done!"
 	endif
+	if (-e $wd/tempmap$idx.{$dp}pol/visdata && "$restfreq" != "") then
+	    echo -n "Correcting for doppler shift..."
+	    puthd in=$wd/tempmap$idx.{$dp}pol/restfreq value=$restfreq >& /dev/null
+	    uvredo vis=$wd/tempmap$idx.{$dp}pol options=velocity out=$wd/tempgmap >& /dev/null
+	    rm -rf $wd/tempmap$idx.{$dp}pol; mv $wd/tempgmap $wd/tempmap$idx.{$dp}pol
+	    echo "done!"
+	endif
 	if (-e $wd/tempmap$idx.{$dp}pol/visdata) then
 	    set vislist = ($vislist $wd/tempmap$idx.{$dp}pol)
 	else
@@ -652,8 +677,8 @@ end
 
 #Grid an invert visabilities.
 echo -n "Gridding and inverting data..."
-invert vis=`echo $vislist | tr ' ' ','` map=$wd/tempmap.map beam=$wd/tempmap.beam cell=$cellsize imsize=$imsize sup=$sup select=$sel $iopt $sopt >& /dev/null 
-
+invert vis=`echo $vislist | tr ' ' ','` map=$wd/tempmap.map beam=$wd/tempmap.beam cell=$cellsize imsize=$imsize sup=$sup select=$sel $iopt $sopt >& $wd/invertlog 
+set tnoise = `grep Theoretical $wd/invertlog | awk '{print $4*1}'`
 
 if !(-e $wd/tempmap.map && -e $wd/tempmap.beam) then
     echo "FATAL ERROR: INVERT has failed to complete (most likely a buffer space issue)"
@@ -683,11 +708,13 @@ endif
 
 if ($intclean) then
     echo "Performing preliminary clean, deriving model for calculations"
-    clean map=$wd/tempmap.map beam=$wd/tempmap.beam out=$wd/tempmap.clean niters=1000 "$cregion" >& /dev/null 
+    clean map=$wd/tempmap.map beam=$wd/tempmap.beam out=$wd/tempmap.clean niters=1000 cutoff=$tnoise "$cregion" >& /dev/null 
     restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd/tempmap.cm >& /dev/null 
     restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd/tempmap.rs mode=residual >& /dev/null 
     set imstats = (`imstat in=$wd/tempmap.rs | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
-
+    set beamsize = `imlist in=$wd/tempmap.cm options=stat | grep Effective | awk '{print $4*1}'`
+    set nalevel = `echo $beamsize $tnoise $imsize | tr ',' ' ' | awk '{if ($4*1 == 0) print .5*$2*(log($3*$3/$1)-3); else print .5*$2*(log($3*$4/$1)-3)}'`
+    set alevel = `echo $nalevel $tnoise $imstats[3] | awk '{print $1*$3/$2}'`
     cd $wd
     rm -f sfind.log
     sfind in=tempmap.cm options=oldsfind,auto,nofit rmsbox=100 xrms=3 labtyp=arcsec >& /dev/null 
@@ -706,26 +733,48 @@ endif
 clean:
 
 # Create clean component map and make residual/cleaned images
-
-clean map=$wd/tempmap.map beam=$wd/tempmap.beam out=$wd/tempmap.clean niters=$niters "$cregion" >& /dev/null 
+clean map=$wd/tempmap.map beam=$wd/tempmap.beam out=$wd/tempmap.clean niters=$niters cutoff=$nalevel "$cregion" >& $wd/cleanlog 
 restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd/tempmap.cm >& /dev/null 
 restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd/tempmap.rs mode=residual >& /dev/null 
 
+set actnitersline = (`imlist in=$wd/tempmap.cm | grep niters | tr ':' ' '`)
+set actniters
+while ("$actniters" == "")
+    if ($#actnitersline < 2) then
+	set actniters = $niters
+    else if ("$actnitersline[1]" == "niters") then
+	set actniters = $actnitersline[2]
+    else
+	shift actnitersline
+    endif
+end
 set imstats = (`imstat in=$wd/tempmap.rs | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
-
+#set alevel = `echo $nalevel $tnoise $imstats[3] | awk '{print $1*$3/$2}'`
+set acheck = `echo $nalevel $tnoise $imstats[3-5] | awk '{if ($4+$5 >= 0) print $2*$4/($1*$3); else print -1*$2*$5/($1*$3)}'`
 cd $wd
+
 rm -f sfind.log; touch sfind.log
 if ($mode != "skip") sfind in=tempmap.rs options=oldsfind,auto,nofit rmsbox=100 xrms=4 labtyp=arcsec >& /dev/null 
 cd ..
 
 #Verify that the residual maps look clean. If not, reclean or advise the user that recleaning needs to be performed
 echo "Currently at $niters cycles..."
+if (`echo $acheck | awk '{if ($1 < .975) print 1; else print 0}'` && "$niters" != "50") then
+    set niters = `echo $niters $acheck | awk '{print int($1*$2)}'`
+    if ($niters < 50) set niters = 50
+    echo "WARNING: Overcleaning detected, rolling back to $niters iterations..."
+    rm -rf $wd/tempmap.clean $wd/tempmap.rs $wd/tempmap.cm
+    goto clean
+endif
+
 if (`grep -v "#" $wd/sfind.log | awk '{if ($7*$6 > 3000*noise) cycles+=2*log((3000*noise)/($6*$7))/log(.9)} END {print int(cycles)*1}' noise=$imstats[3]` > `echo $niters | awk '{print int(.025*$1)}'` && $niters != 25000) then
-    if ($intclean) then
+    if (`echo $actniters $niters | awk '{if ($1*1 != $2*1) print 1; else print 0}'` || `echo $alevel | awk '{if ($1 < 1.025) print 1; else print 0}'`) then
+	echo "Cleaning reached theoretical noise limit!"
+    else if ($intclean) then
 	set niters = `grep -v "#" $wd/sfind.log | awk '{ cycles+=2*log((3000*noise)/$3)/log(.9)} END {print int(cycles)+niters}' noise=$imstats[3] niters=$niters`
-	if ($niters < 100) then
-	    echo "Derived value for $niters was $niters... invoking safegaurd and putting niters at 100."
-	    set niters = 100
+	if ($niters < 50) then
+	    echo "Derived value for $niters was $niters... invoking safegaurd and putting niters at 50."
+	    set niters = 50
 	else if ($niters > 25000) then
 	    echo "Derived value for $niters was $niters... invoking safeguard and putting nitters at 25000"
 	    set niters = 25000
@@ -739,11 +788,12 @@ if (`grep -v "#" $wd/sfind.log | awk '{if ($7*$6 > 3000*noise) cycles+=2*log((30
 	if ($< =~ "y"*) then
 	    echo "Enter niters:"
 	    set niters = $<
+	    rm -rf $wd/tempmap.clean $wd/tempmap.rs $wd/tempmap.cm
 	    goto clean
 	endif
     endif
 else
-    echo "Clean looks good! Moving to restoration and analysis/display"
+    echo "Clean looks good, moving to restoration and analysis/display"
 endif
 
 cd $wd; rm -f sfind.log; touch sfind.log
@@ -756,7 +806,7 @@ cd ..
 set imstats = (`imstat in=$wd/tempmap.rs region=relcen,arcsec,"box(-$arc,-$arc,$arc,$arc)" | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
 set imstats2 = (`imstat in=$wd/tempmap.cm region=relcen,arcsec,"box(-$arc,-$arc,$arc,$arc)" | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
 set range = `echo $imstats[3] $imstats2[4] | awk '{print $2/$1}'`
-set alevel = `echo $imstats[3] $imstats2[5] | awk '{print $2/$1}'`
+
 
 ################################################################# 
 # Below is the automatic calculator for amplitudes. It works by
@@ -904,12 +954,14 @@ auto:
 # This will eventually be expanded to include image fidelity
 
 echo "Dynamic range for this cycle was $range, with an RMS noise of $imstats[3]"
+set noise = `echo $imstats[3] | awk '{print $1*1000}'`
 if (`echo $range $oldrange $sctol | awk '{if (($1/$2) < (1-$3)) print "go"}'` == "go") then
     @ sidx++
     if ($sidx >= 3) goto failsafe
     echo "Bad cycle number $sidx, attempting to recover..."
 else if (`echo $range $oldrange $sctol | awk '{if (($1/$2) < (1+$3)) print "go"}'` == "go" && $autoamp <= $asci && $autopha <= $psci) then
     echo "Maximum dynamic range reached. Plotting results"
+    set sidx = 0
     goto plot
 else if (`echo $range $oldrange $sctol | awk '{if (($1/$2) < (1+$3)) print "go"}'` == "go" && $autoamp && $autopha && $psci != 0) then
     echo "Finished phase selfcal iterations, moving on to amp selfcal"
@@ -1113,34 +1165,55 @@ goto invert
 finish:
 
 # Below this is all reporting code. All of this code will need to be changed...
-
-echo "The following parameters were used for this auto-mapping iteration:" >> $wd/imgrpt
-
-if !($autoflag) echo "Automap was instructed not to flag on amplitudes" >> $wd/imgrpt
-if ($autoflag) echo "Amplitudes below $amplim[1] and above $amplim[2] were flagged" >> $wd/imgrpt
-echo "---------------------------------------" >> $wd/imgrpt
-echo "$flct out of $noflct spectra were flagged with amplitudes outside the selected range" >> $wd/imgrpt
-echo "$psci phase self-cal iterations and $asci amp self-cal interations were attempted" >> $wd/imgrpt
-if ($sidx == 3  && $autoamp && $asci != 0) then
-echo "No amplitude self-cal solution was reached." >> $wd/imgrpt
-else if ($sidx == 3 && $autopha && $psci != 0) then
-echo "No phase self-cal solution was reached." >> $wd/imgrpt
-else if ($sidx == 3 && "$asci$psci" == 00) then
-echo "No self-cal solution was reached." >> $wd/imgrpt
-else if ($asci == 0) then
-echo "A phase self-cal solution was reached." >> $wd/imgrpt
-else if ($asci != 0) then
-echo "Phase and amplitude self-cal solutions were successfully reached."  >> $wd/imgrpt
+set nalevel = `echo $beamsize $tnoise $imsize | tr ',' ' ' | awk '{if ($4*1 == 0) print .5*$2*(log($3*$3/$1)); else print .5*$2*(log($3*$4/$1))}'`
+echo "IMAGING REPORT" > $wd/imgrpt
+echo "================================================================" >> $wd/imgrpt
+echo "Imaging of $source was successfully completed using $omode mode." >> $wd/imgrpt
+echo "Image noise is $noise mJy, with a dynamic range of $range." >> $wd/imgrpt
+echo "(theoretical noise limit is "`echo $tnoise | awk '{print $1*1000}'`" mJy)" >> $wd/imgrpt
+set beampara = (`imfit in=$wd/tempmap.cm object=beam | sed 1,3d | grep Beam | awk '{if ($2 == "Major,") print $6"\n"$7; else print $5}'` 0 0 0)
+echo "Beamsize was $beampara[1] x $beampara[2] arcsecs (PA of $beampara[3] degrees)" >> $wd/imgrpt
+echo "(cellsize is $cellsize arcsec, imsize is $imsize pixels)" >> $wd/imgrpt
+echo "" >> $wd/imgrpt
+echo "Expected noise threshold is "`echo $nalevel $imstats[3] $tnoise | awk '{print 1000*$1*$2/$3}'`" mJy (theoretical "`echo $nalevel | awk '{print $1*1000}'`" mJy)" >> $wd/imgrpt
+echo "Artifact level is "`echo $nalevel $tnoise $imstats[3-5] | awk '{if ($4+$5 >= 0) print int(100*$2*$4/($1*$3)); else print int(-100*$2*$5/($1*$3))}'`"% of expected level. (50 - 200% is nominal)" >> $wd/imgrpt
+echo "Image min/max are "`echo $imstats2[4-5] | awk '{print $2*1000"/"$1*1000}'`" mJy." >> $wd/imgrpt
+#Imstat: 1) Sum 2) Mean 3) RMS 4) Max 5) Min 6) Npoints
+echo ""`wc -l $wd/sfindolay | awk '{print $1}'`" point sources were identified in the image." >> $wd/imgrpt
+echo "" >> $wd/imgrpt
+echo "There were a total of $fli flagging cycles, $psci phase self-cal" >> $wd/imgrpt
+echo "iterations and $asci amplitude selfcal iterations." >> $wd/imgrpt
+if ("$badchans" != "") then
+    echo "WRATH eliminated $#badchans channels with potential RFI (channels" >> $wd/imgrpt
+    echo `echo $badchans | tr ' ' ','`")" >> $wd/imgrpt
 endif
-echo "Dynamic range for this field is $oldrange, with an RMS residual noise of $imstats[3] Jy." >> $wd/imgrpt
-echo "Below is the ImFit report assuming a point source model near the center of the field" >> $wd/imgrpt
-echo " " >> $wd/imgrpt
-imfit in=$wd/tempmap.cm region=relcenter,arcsec,box"(-$orc,-$orc,$orc,$orc)" object=point >> $wd/imgrpt
-echo " " >> $wd/imgrpt
-echo "Below is the ImStat report for the area within the primary beam." >> $wd/imgrpt
-echo " " >> $wd/imgrpt
-imstat in=$wd/tempmap.cm region=relcen,arcsec,box"(-$arc,-$arc,$arc,$arc)" >> $wd/imgrpt
-echo "---------------------------------------------------------">> $wd/imgrpt
+if ($sidx) then
+    if ($psci > 0 && $asci == 0) echo "Imaging was not able to find a proper phase self-cal solution." >> $wd/imgrpt
+    if ($psci > 0 && $asci > 0)  echo "Imaging was not able to find a proper amplitude self-cal solution." >> $wd/imgrpt
+    if ($psci == 0 && $asci == 0) echo "Imaging was not able to find a proper flagging solution." >> $wd/imgrpt
+endif
+if (! $sidx && $psci && ! $asci) echo "A phase self-cal solution was successfully reached." >> $wd/imgrpt
+if (! $sidx && ! $psci && $asci) echo "An amplitude self-cal solution was successfully reached." >> $wd/imgrpt
+if (! $sidx && $psci && $asci) echo "Amplitude and phase self-cal solutions were successfully reached" >> $wd/imgrpt
+if !($autoflag) echo "No amplitude-based flagging was performed." >> $wd/imgrpt
+if ($autoflag) echo "Spectra with amplitudes below $amplim[1] Jy amd above $amplim[2] Jy" >> $wd/imgrpt
+if ($autoflag) echo " (and channels above $amplim[3] Jy) were flagged as 'bad'." >> $wd/imgrpt
+if ($autolim) echo "(flagging limits were automatically determined)" >> $wd/imgrpt
+echo "" >> $wd/imgrpt
+if ("$iopt" =~ *"mfs"*) echo "Image was created using MFS imaging." >> $wd/imgrpt
+if ($sefd) echo "Image used system temperatures for weighting of data" >> $wd/imgrpt
+if ("$sup" == "0") then
+    echo "Image used the 'natural' weighting scheme." >> $wd/imgrpt
+else if ("$sup" == "10000") 
+    echo "Image used the 'uniform' weighting scheme." >> $wd/imgrpt
+else
+    echo "Image used the 'robust' weighting scheme." >> $wd/imgrpt
+endif
+echo -n "The " >> $wd/imgrpt
+if ($intclean) echo -n "auto-" >> $wd/imgrpt
+if ("$cleantype" == "clean") echo "CLEAN mode (with $niters iterations) was used." >> $wd/imgrpt
+if ("$cleantype" == "mem") echo "MEM (maximum entropy) (with $niters iterations) was used." >> $wd/imgrpt
+echo "+++++++++++++++++++++++++++++++++" >> $wd/imgrpt
 
 ################################################################# 
 # After reporting is finished, automap will move the images into
@@ -1203,8 +1276,12 @@ if ($savedata != 2) then
         newautomap.csh vis="$wd/*.S$idx" mode=skip options=nomfs,$switch outdir=$outfile/SLine$idx cleanlim=$niters
     end
     echo "Imaging report now available under $outfile/imgrpt"
-    mv $wd/imgrpt $outfile/imgrpt
+    cp $wd/imgrpt $outfile/imgrpt
 endif
+
+set times = (`date +%s.%N | awk '{print int(($1-date1)/60),int(($1-date1)%60)}' date1=$date1` 0 0)
+
+echo "Imaging took $times[1] minute(s) and $times[2] second(s)."
 
 if !($debug) rm -rf $wd
 exit 0

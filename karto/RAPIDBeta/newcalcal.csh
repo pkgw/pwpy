@@ -144,7 +144,7 @@ set sysflux = 5 # Additional flux from tsys (at three sigma point, say)
 set addflux = 1 # Additional flux in the field, definitely good to keep track o
 set retlim = 20 # Data retention percentage limit for processing.
 set outsource = 1 # Whether or not to split the datasets into smaller chunks
-set mapopt = "options=savedata,autocal" # Mapping options
+set mapopt = "options=savedata" # Mapping options
 set display = 0 # Dispaly results while processing?
 set polsplit = 0 # Split pol before processing (first x, then y)
 set debug = 0 # Save temp data after running?
@@ -206,6 +206,8 @@ else if ("$argv[1]" =~ 'options='*) then
 	    set debug = 1
 	else if ($option == "wrath") then
 	    set wrath = 1
+	else if ($option == "autocal") then
+	    set mapopt = "$mapopt,autocal"
 	else if ($option == "sefd") then
 	    set sefd = 1
 	    set mapopt = "$mapopt,sefd"
