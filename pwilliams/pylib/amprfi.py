@@ -52,6 +52,9 @@ class AmpFlagsAccum (object):
             
             if ant1 == ant2: continue
 
+            # XXX TEMP spectral corruption workaround
+            if ant1 == 21 and ant2 == 29: continue
+            
             #if thepol is None:
             #    thepol = pol
             #elif pol != thepol:
@@ -239,7 +242,7 @@ class AmpRfi (object):
 
     def plot (self, merged=True):
         import omega.rect
-        p = self.plotRaw ()
+        p = omega.rect.RectPlot ()
 
         if merged: set = self.toFlag
         else: set = self.toFlagSugg
@@ -247,6 +250,8 @@ class AmpRfi (object):
         for bound in self.toFlag:
             r = omega.rect.XBand (*bound)
             p.add (r)
+
+        p.addXY (self.ch, self.y)
 
         if self.yBounds is None:
             p.setBounds (0, self.numChans)
