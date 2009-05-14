@@ -603,6 +603,7 @@ def checkIntegTime (hookup):
     cur = ataprobe.getIntegTime (hookup)
     log ('@@ Current integration time: %.2f' % cur)
     _integTime = cur
+    return cur
 
 def setIntegTime (hookup, itime=None):
     global _integTime
@@ -758,7 +759,7 @@ def setFocus (ants, settingInMHz, wait=True):
     if _curFocus is None or _curFocus > s:
         _setFocus (ants, s, True)
         _curFocus = s
-        if wait:
+        if wait and not noopMode:
             log ('Pausing 60s for focus cal to proceed.')
             time.sleep (60)
     elif _curFocus != s:

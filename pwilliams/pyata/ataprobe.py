@@ -57,7 +57,7 @@ def _slurp (args, checkCode=True):
 
     if checkCode:
         if proc.returncode != 0:
-            raise Exception ("Command '%s' failed: %s" % (cmd, stderr))
+            raise Exception ("Command '%s' failed: %s" % (' '.join (args), stderr))
         return stdout.splitlines ()
     else:
         return proc.returncode, stdout.splitlines (), stderr.splitlines ()
@@ -307,3 +307,8 @@ class MultiHookup (object):
             s.update (h.antpols ())
         return sorted (s)
 
+    def ibobInps (self):
+        s = set ()
+        for h in self.hookups.itervalues ():
+            s.update ((t[1] for t in h.apIbobs ()))
+        return sorted (s, key = lambda t: str (t[1]) + t[0])
