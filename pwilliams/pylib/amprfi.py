@@ -52,9 +52,6 @@ class AmpFlagsAccum (object):
             
             if ant1 == ant2: continue
 
-            # XXX TEMP spectral corruption workaround
-            if ant1 == 21 and ant2 == 29: continue
-            
             #if thepol is None:
             #    thepol = pol
             #elif pol != thepol:
