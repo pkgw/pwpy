@@ -2,4 +2,4 @@
 #
 # Display an image
 
-exec mirargmerge -din cgdisp device=1/xs +wedge beamtyp=b,l labtyp=arcsec,arcsec "$@"
+exec mirargmerge -p -din cgdisp device=1/xs +wedge beamtyp=b,l labtyp=arcsec,arcsec "$@"

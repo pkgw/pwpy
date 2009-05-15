@@ -4,9 +4,22 @@
 # Compose default task arguments with user-specified
 # task arguments and either print the commandline or
 # execute the task.
+#
+# Options to this program (used before task name):
+#
+# -n - Print a commandline fit for execution but
+#      do not execute the task itself.
+# -m - If multiple "default" arguments given, execute
+#      the task once for each argument, not once with
+#      all of the arguments concatenated. Incompatible
+#      with -n.
+# -dNAME - The keyword to which "default" arguments
+#      are assigned.
+# -p - Implies "multi" (-m) mode. Prompt for the user
+#      to hit enter between executions of the task.
 
 import os
-from sys import argv, stderr, exit
+from sys import argv, stderr, stdin, exit
 
 mergeOpts = frozenset (('select', 'region'))
 
@@ -18,16 +31,28 @@ if len (argv) == 1:
 
 printOnly = False
 defaultKW = None
+multi = False
+prompt = False
 
 while len (argv) > 1 and argv[1][0] == '-':
     if argv[1] == '-n':
         printOnly = True
+    elif argv[1] == '-m':
+        multi = True
+    elif argv[1] == '-p':
+        prompt = True
     elif argv[1].startswith ('-d'):
         defaultKW = argv[1][2:]
     else:
         print >>stderr, 'Error: unknown mirargmerge argument', argv[1]
         exit (1)
     del argv[1]
+
+if prompt: multi = True
+
+if multi and printOnly:
+    print >>stderr, 'Error: cannot supply both -n and -m/-p.'
+    exit (1)
 
 # Pick up task name.
 
@@ -75,10 +100,14 @@ for arg in argv[2:]:
             exit (1)
         defvals.append (arg)
 
-if defaultKW in args:
-    args[defaultKW] += ',' + ','.join (defvals)
+if multi:
+    if defaultKW in args:
+        defvals = args[defaultKW].split (',') + defvals
 else:
-    args[defaultKW] = ','.join (defvals)
+    if defaultKW in args:
+        args[defaultKW] += ',' + ','.join (defvals)
+    else:
+        args[defaultKW] = ','.join (defvals)
 
 # Generate commandline
 
@@ -92,18 +121,52 @@ if printOnly: argTmpl = '%s=\'%s\''
 else: argTmpl = '%s=%s'
 
 for nv in args.iteritems ():
+    if multi and nv[0] == defaultKW:
+        continue
     cmd.append (argTmpl % nv)
 
 # Do whatever.
 
 if printOnly:
     print ' '.join (cmd)
-else:
+    exit (0)
+
+def myexec (cmd):
     print >>stderr, '+', ' '.join (cmd)
     try:
         os.execvp (cmd[0], cmd)
     except Exception, e:
         print 'Error executing command: %s' % (' '.join (cmd), str (e))
         exit (1)
+    # Shouldn't be reached
+    exit (2)
 
-exit (0)
+if not multi:
+    myexec (cmd)
+
+if len (defvals) < 2:
+    # Got 0 or 1 default values, we can just execute the command.
+    if len (defvals) != 0:
+        cmd.append ('%s=%s' % (defaultKW, defvals[0]))
+    myexec (cmd)
+
+# Got multiple default values, we have to exec several commands.
+# This means we have to fork-n-exec.
+
+first = True
+
+for dv in defvals:
+    thiscmd = cmd + ['%s=%s' % (defaultKW, dv)]
+
+    if prompt and not first:
+        print 'Hit enter to continue: ',
+        stdin.readline ()
+
+    first = False
+
+    pid = os.fork ()
+
+    if pid == 0:
+        myexec (thiscmd)
+    else:
+        os.waitpid (pid, 0)
