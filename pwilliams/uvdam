@@ -1,5 +1,6 @@
 #! /bin/sh
 #
-# Plot phase vs uv distance
+# Plot amplitude vs uv distance
 
-exec mirargmerge uvplt device=1/xs +source,nobase nxy=1,1 axis=uvd,am "$@"
+exec mirargmerge uvplt device=1/xs +source,nobase nxy=1,1 axis=uvd,am \
+    select='pol(xx,yy),-auto' "$@"

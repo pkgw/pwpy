@@ -2,4 +2,5 @@
 #
 # Plot phase vs uv distance
 
-exec mirargmerge uvplt device=1/xs +source,nobase nxy=1,1 axis=uvd,ph "$@"
+exec mirargmerge uvplt device=1/xs +source,nobase nxy=1,1 axis=uvd,ph \
+    select='pol(xx,yy),-auto' "$@"
