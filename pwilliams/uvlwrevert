@@ -1,0 +1,49 @@
+#! /bin/bash
+# -*- shell-script -*-
+#
+# Revert "lightweight copy" datasets (see uvlwcp) to
+# the state found in the datasets they were copied from.
+# This is done by tracing back the symbolic link to
+# the visibility data to the original dataset.
+
+if [ $# -lt 1 ] ; then
+    echo "Usage: $0 <lwvis1> [lwvis2...]" >&2
+    exit 1
+fi
+
+while [ $# -gt 0 ] ; do
+    vis="$1"
+    shift
+
+    src=`readlink $vis/visdata |sed -e 's,/visdata$,,'`
+
+    if [ x"$src" = x ] ; then
+	echo "Error: input $vis does not appear to be a lightweight copy dataset." >&2
+	exit 1
+    fi
+
+    if [ ! -d "$src" ] ; then
+	echo "Error: source dataset $src for input $vis does not exist." >&2
+	exit 1
+    fi
+
+    for f in $vis/* ; do
+	b=`basename "$f"`
+
+	[ $b == visdata ] && continue
+
+	rm -f "$f"
+
+	[ -f "$src/$b" ] && cp -p "$src/$b" "$f"
+    done
+
+    for f in $src/* ; do
+	b=`basename "$f"`
+
+	[ $b == visdata ] && continue
+
+	[ ! -f "$vis/$b" ] && cp -p "$f" "$vis/$b"
+    done
+done
+
+exit 0
