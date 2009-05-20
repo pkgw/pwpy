@@ -22,11 +22,14 @@ class AmpFlagsAccum (object):
 
     def _clear (self):
         self.data = self.flags = self.times = None
+        self.maxnchan = 0
 
     def _accum (self, tup):
         inp, preamble, data, flags, nread = tup
         inttime = inp.getVarFirstFloat ('inttime', 10.0)
-        
+
+        self.maxnchan = max (self.maxnchan, nread)
+
         data = N.abs (data[0:nread] * inttime)
         times = N.zeros (nread) + inttime
 
@@ -67,18 +70,14 @@ class AmpFlagsAccum (object):
         self.y = self.data[w] / self.times[w]
 
 class AmpRfi (object):
-    def __init__ (self, numChans):
-        self.numChans = numChans
-        
-    def setupNext (self, vises, fname, freq, half, noshow=False, **kwargs):
+    def setupNext (self, vises, fname, freq, noshow=False, **kwargs):
         self.vises = vises
         self.fname = fname
         self.freq = freq
-        self.half = half
         
         self.yBounds = None
         
-        print 'Working on freq %04d half %d' % (freq, half)
+        print 'Working on freq %04d' % freq
 
         afa = AmpFlagsAccum ()
         any = False
@@ -104,6 +103,7 @@ class AmpRfi (object):
             print
         
         self.ch, self.y = afa.ch, afa.y
+        self.maxnchan = afa.maxnchan
 
         if self.y.size == 0:
             print 'All data flagged for this!'
@@ -176,8 +176,8 @@ class AmpRfi (object):
             deltas = N.convolve (deltas, N.ones (boxcar) / boxcar, 'same')
         my = self.mfactor * N.median (N.abs (deltas))
         p = omega.quickXY (self.ch[0:-1], deltas, 'Deltas')
-        p.addXY ((0, self.numChans), (my, my), '+MFactor')
-        p.addXY ((0, self.numChans), (-my, -my), '-MFactor')
+        p.addXY ((0, self.maxnchan), (my, my), '+MFactor')
+        p.addXY ((0, self.maxnchan), (-my, -my), '-MFactor')
 
         if ylim is not None:
             p.setBounds (None, None, -ylim, ylim)
@@ -190,7 +190,7 @@ class AmpRfi (object):
 
         for bound in flaglist:
             bmin = max (0, bound[0] - pad)
-            bmax = min (self.numChans - 1, bound[1] + pad)
+            bmax = min (self.maxnchan - 1, bound[1] + pad)
             startIdx = -1
             endIdx = -1
 
@@ -248,12 +248,12 @@ class AmpRfi (object):
             r = omega.rect.XBand (*bound)
             p.add (r)
 
-        p.addXY (self.ch, self.y)
+        p.addXY (self.ch, self.y, None)
 
         if self.yBounds is None:
-            p.setBounds (0, self.numChans)
+            p.setBounds (0, self.maxnchan)
         else:
-            p.setBounds (0, self.numChans, self.yBounds[0], self.yBounds[1])
+            p.setBounds (0, self.maxnchan, self.yBounds[0], self.yBounds[1])
         return p
 
     def show (self):
@@ -282,12 +282,8 @@ class AmpRfi (object):
                 num = bound[1] - bound[0]
                 yield '%d,%d' % (num, start)
 
-        if self.half == 0:
-            print >>f, cstr + 'freq=%04d chan=%s' \
-                  % (self.freq, ';'.join (makeChans ()))
-        else:
-            print >>f, cstr + 'freq=%04d atahalf=%d chan=%s' \
-                  % (self.freq, self.half, ';'.join (makeChans ()))
+        print >>f, cstr + 'freq=%04d chan=%s' \
+              % (self.freq, ';'.join (makeChans ()))
 
         f.close ()
 
@@ -301,17 +297,17 @@ __all__ = ['AmpRfi', 'vglob']
 if __name__ == '__main__':
     import sys, IPython
     
-    if len (sys.argv) < 6:
-        print 'Usage: %s numchans flagfile freq half vis1 ...' % sys.argv[0]
+    if len (sys.argv) < 4:
+        print 'Usage: %s flagfile freq vis1 ...' % sys.argv[0]
         sys.exit (0)
 
-    nchan, flags, freq, half = int (sys.argv[1]), sys.argv[2], int (sys.argv[3]), int (sys.argv[4])
-    vises = [miriad.VisData (x) for x in sys.argv[5:]]
+    flags, freq = sys.argv[1], int (sys.argv[2])
+    vises = [miriad.VisData (x) for x in sys.argv[3:]]
     
-    a = AmpRfi (nchan)
-    a.setupNext (vises, flags, freq, half, noshow=True)
+    a = AmpRfi ()
+    a.setupNext (vises, flags, freq, noshow=True)
 
-    ns = {'a': a, 'vises': vises, 'freq': freq, 'half': half, 'fname': flags}
+    ns = {'a': a, 'vises': vises, 'freq': freq, 'fname': flags}
     sys.argv = [sys.argv[0], '-gthread']
     sh = IPython.Shell.start (ns)
     print 'AmpRfi instance is in variable "a". Exit to write'
