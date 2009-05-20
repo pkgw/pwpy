@@ -75,7 +75,7 @@ class AmpRfi (object):
         self.fname = fname
         self.freq = freq
         
-        self.yBounds = None
+        self._yBounds = None
         
         print 'Working on freq %04d' % freq
 
@@ -250,17 +250,17 @@ class AmpRfi (object):
 
         p.addXY (self.ch, self.y, None)
 
-        if self.yBounds is None:
+        if self._yBounds is None:
             p.setBounds (0, self.maxnchan)
         else:
-            p.setBounds (0, self.maxnchan, self.yBounds[0], self.yBounds[1])
+            p.setBounds (0, self.maxnchan, self._yBounds[0], self._yBounds[1])
         return p
 
     def show (self):
         self.p = self.plot ().show ('amprfi')
 
     def ybounds (self, ymin, ymax):
-        self.yBounds = (ymin, ymax)
+        self._yBounds = (ymin, ymax)
         self.p.setBounds (ymin=ymin, ymax=ymax)
     
     def write (self, extraCond=None):
