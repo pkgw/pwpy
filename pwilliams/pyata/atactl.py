@@ -110,6 +110,8 @@ def initScript (doAnything, logname, realwarn=True, useattens=True):
 
     if doAnything:
         logFile = file (logname, 'a')
+    else:
+        logFile = file (logname, 'w')
 
     _startTime = time.time ()
 
