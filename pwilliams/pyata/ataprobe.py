@@ -70,6 +70,40 @@ def getLAST ():
     if len (lines) != 1: raise Exception ('Expected only one line from atamainsystime')
     return float (lines[0].split (',')[1])
 
+def _checkGeneric (code, stdout):
+    import re
+    
+    isUp = code == 0
+    
+    re_azel = re.compile ('Az, El = \\(([-+0-9.]+), ([-+0-9.]+)\\)')
+    gr_azel = re_azel.match (stdout[2]).groups ()
+    az = float (gr_azel[0])
+    el = float (gr_azel[1])
+
+    # Check for circumpolar
+    if 'always above' in stdout[3]:
+        return (True, az, el, 0., 24.0)
+    
+    re_lst = re.compile ('.*\\(LST ([0-9]+):([0-9]+):([0-9.]+)\\)')
+
+    def getlst (line):
+        gr = re_lst.match (line).groups ()
+        hr, min, sec = int (gr[0]), int (gr[1]), float (gr[2])
+        return 1.0 * hr + min / 60.0 + sec / 3600.0
+
+    curlst = getlst (stdout[2])
+    riselst = getlst (stdout[3])
+    setlst = getlst (stdout[4])
+
+    risesIn = riselst - curlst
+    if risesIn < 0: risesIn += 24.0
+
+    setsIn = setlst - curlst
+    if setsIn < 0: setsIn += 24.0
+
+    return (isUp, az, el, risesIn, setsIn)
+
+
 def check (source):
     """Return information about the current sky position of the specified source.
 
@@ -82,46 +116,40 @@ def check (source):
     setsIn  - Number of hours until the source next sets below 18 deg
     """
 
-    import re
-    
     (code, stdout, stderr) = _slurp (ataArgs ('atacheck', source), False)
 
     # Get rid of warning about ambiguous catalog entries to make
     # our assumptions simpler.
     if 'another entry' in stdout[0]: del stdout[0]
-
-    if len (stdout) != 7 and len (stdout) != 6:
+    if stdout[0].startswith ('AntUtil:'): del stdout[0]
+    
+    if len (stdout) != 6 and len (stdout) != 5:
         raise Exception ('Error checking source "%s" -- probably not in the catalog.' % source)
 
-    isUp = code == 0
+    return _checkGeneric (code, stdout)
+
+
+def checkRADec (raHours, decDeg):
+    """Return information about the current sky position of the specified
+    RA/Dec coordinates.
+
+    Returns: (isUp, az, el, risesIn, setsIn) where the tuple elements are:
     
-    re_azel = re.compile ('Az, El = \\(([-+0-9.]+), ([-+0-9.]+)\\)')
-    gr_azel = re_azel.match (stdout[3]).groups ()
-    az = float (gr_azel[0])
-    el = float (gr_azel[1])
+    isUp    - True if the source is currently up
+    az      - Current azimuth of the source
+    el      - Current elevation of the source
+    risesIn - Number of hours until the source next rises above 18 deg
+    setsIn  - Number of hours until the source next sets below 18 deg
+    """
 
-    # Check for circumpolar
-    if 'always above' in stdout[4]:
-        return (True, az, el, 0., 24.0)
-    
-    re_lst = re.compile ('.*\\(LST ([0-9]+):([0-9]+):([0-9.]+)\\)')
+    (code, stdout, stderr) = _slurp (ataArgs ('atacheck', '--radec',
+                                              '%.6f,%.6f' % (raHours, decDeg)), False)
 
-    def getlst (line):
-        gr = re_lst.match (line).groups ()
-        hr, min, sec = int (gr[0]), int (gr[1]), float (gr[2])
-        return 1.0 * hr + min / 60.0 + sec / 3600.0
+    if len (stdout) != 5:
+        raise Exception ('Error checking Ra/Dec %f,%f' % (raHours, decDeg))
 
-    curlst = getlst (stdout[3])
-    riselst = getlst (stdout[4])
-    setlst = getlst (stdout[5])
+    return _checkGeneric (code, stdout)
 
-    risesIn = riselst - curlst
-    if risesIn < 0: risesIn += 24.0
-
-    setsIn = setlst - curlst
-    if setsIn < 0: setsIn += 24.0
-
-    return (isUp, az, el, risesIn, setsIn)
 
 def getPAMDefaults (ants):
     """Return the default PAM settings for the specified antennas.

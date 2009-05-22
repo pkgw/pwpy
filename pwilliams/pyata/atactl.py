@@ -360,6 +360,22 @@ def isSourceUp (source, integTime, padTime=300):
     
     return True
 
+def isRADecUp (raHours, decDeg, integTime, padTime=300):
+    if noopMode:
+        # FIXME: as above
+        log ('[Skipping isRADecUp check, assuming yes]')
+        return True
+
+    from ataprobe import check
+    (isUp, az, el, risesIn, setsIn) = checkRADec (raHours, decDeg)
+
+    if not isUp: return False
+
+    # Sets too soon?
+    if setsIn * 3600 < integTime + padTime: return False
+    
+    return True
+
 def initAntennas (ants):
     antlist = ','.join (ants)
     log ('@@ Initializing PAMs and LNAs for antennas: %s' % ','.join (ants))
