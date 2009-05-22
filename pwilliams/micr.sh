@@ -13,12 +13,14 @@
 # [vis1].bm - Beam
 # [vis1].cl - Cleaned map
 # [vis1].rm - Restored map
+# [vis1].rr - Restore residuals
 
 vis="$1"
 mp="$1".mp
 bm="$1".bm
 cl="$1".cl
 rm="$1".rm
+rr="$1".rr
 shift
 
 while [ $# -gt 0 ] ; do
@@ -28,7 +30,8 @@ done
 
 set -e -x
 
-rm -rf $mp $bm $cl $rm
+rm -rf $mp $bm $cl $rm $rr
 invert vis=$vis map=$mp beam=$bm select=-auto options=double,mfs,systemp sup=0
-clean map=$mp beam=$bm out=$cl niters=5000
+clean map=$mp beam=$bm out=$cl niters=1500
 restor map=$mp beam=$bm model=$cl out=$rm
+restor map=$mp beam=$bm model=$cl out=$rr mode=resid
