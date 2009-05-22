@@ -366,7 +366,7 @@ def isRADecUp (raHours, decDeg, integTime, padTime=300):
         log ('[Skipping isRADecUp check, assuming yes]')
         return True
 
-    from ataprobe import check
+    from ataprobe import checkRADec
     (isUp, az, el, risesIn, setsIn) = checkRADec (raHours, decDeg)
 
     if not isUp: return False

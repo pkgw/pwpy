@@ -83,7 +83,10 @@ def _checkGeneric (code, stdout):
     # Check for circumpolar
     if 'always above' in stdout[3]:
         return (True, az, el, 0., 24.0)
-    
+
+    if 'always below' in stdout[3]:
+        return (False, az, el, 24.0, 0)
+
     re_lst = re.compile ('.*\\(LST ([0-9]+):([0-9]+):([0-9.]+)\\)')
 
     def getlst (line):
