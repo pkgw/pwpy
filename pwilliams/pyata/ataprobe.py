@@ -145,8 +145,8 @@ def checkRADec (raHours, decDeg):
     (code, stdout, stderr) = _slurp (ataArgs ('atacheck', '--radec',
                                               '%.6f,%.6f' % (raHours, decDeg)), False)
 
-    if len (stdout) != 5:
-        raise Exception ('Error checking Ra/Dec %f,%f' % (raHours, decDeg))
+    if len (stdout) != 6 and len (stdout) != 5:
+        raise Exception ('Error checking Ra/Dec %f,%f: %d' % (raHours, decDeg, len (stdout)))
 
     return _checkGeneric (code, stdout)
 
