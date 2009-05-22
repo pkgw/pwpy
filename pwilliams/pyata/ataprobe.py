@@ -273,6 +273,8 @@ class Hookup (object):
             ants.add (antpol[0:2])
             los.add (lo)
 
+        assert len (ants) > 0, 'No ants! Using an empty subarray?'
+
         self.tab = tab
         self.sants = sorted (ants)
         assert len (los) == 1
