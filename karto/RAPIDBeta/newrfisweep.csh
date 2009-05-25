@@ -201,7 +201,7 @@ set outsource = 1 # Split up file into smaller chunks, or mod files in place?
 set debug = 0 # Save processing data?
 set rescan = 0 # Remake specdata files
 set corrcycle = 4 # Interval for scanning for corruption
-set seedcorr = 1 # Use only the first interval for corruption scanning
+set seedcorr = 0 # Use only the first interval for corruption scanning
 set restart # Restart processing?
 set autoedge = 1 # Use autoedge utility?
 set autoedgechan = 100 # Number of channels on edges to flag
