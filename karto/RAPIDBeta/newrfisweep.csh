@@ -250,7 +250,7 @@ else if ("$argv[1]" =~ 'options='*) then
 	    set rfitype = "mixed"
 	else if ($option == "verbose") then
 	    set display = 2
-	    if !("$device") set device = "device=/xs"
+	    if ("$device" == "") set device = 'device=/xs'
 	else if ($option == "seedcorr") then
 	    set seedcorr = 1
 	else if ($option == "noseedcorr") then
@@ -575,7 +575,7 @@ while ($idx <= $lim)
     # Here is corruption/decorruption cycle
     if (`echo $idx $corrcycle | awk '{if ($2 != 0) print $1%$2; else print 0}'` == 1) then
 	set blim = `echo $idx $corrcycle| awk '{if  ($1 <= int($2/2)) print 1; else print $1-int($2/2)}'`
-	set ulim = `echo $idx $lim $corrcycle | awk '{if  ($1+int($3/2) >= $2) print 1+$2; else print $1+int($3/2)}'`
+	set ulim = `echo $idx $lim $corrcycle | awk '{if  ($1+$3+int($3/2) >= $2) print 1+$2; else print $1+$3+int($3/2)}'`
 	if ($seedcorr) set blim = $idx
 	if ($seedcorr) set ulim = `echo $idx | awk '{print $1+1}'`
 	set corrfilelist
