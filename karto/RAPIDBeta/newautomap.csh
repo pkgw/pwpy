@@ -721,9 +721,9 @@ if ($intclean) then
     cd ..
     # Had to patch here since sfind was having problems... stupid bugger
     set niters = `grep -v "#" $wd/sfind.log | awk '{if ($6*$7 > 3000*noise) cycles+=2*log((3000*noise)/($6*$7))/log(.9)} END {print int(cycles)}' noise=$imstats[3]`
-    if ($niters < 100) then
-	echo "Derived value for niters was $niters... invoking safegaurd and putting niters at 100."
-	set niters = 100
+    if ($niters < 50) then
+	echo "Derived value for niters was $niters... invoking safegaurd and putting niters at 50."
+	set niters = 50
     else if ($niters > 25000) then
 	echo "Derived value for $niters was $niters... invoking safeguard and putting nitters at 25000"
  	set niters = 25000
@@ -771,7 +771,7 @@ if (`grep -v "#" $wd/sfind.log | awk '{if ($7*$6 > 3000*noise) cycles+=2*log((30
     if (`echo $actniters $niters | awk '{if ($1*1 != $2*1) print 1; else print 0}'` || `echo $alevel | awk '{if ($1 < 1.025) print 1; else print 0}'`) then
 	echo "Cleaning reached theoretical noise limit!"
     else if ($intclean) then
-	set niters = `grep -v "#" $wd/sfind.log | awk '{ cycles+=2*log((3000*noise)/$3)/log(.9)} END {print int(cycles)+niters}' noise=$imstats[3] niters=$niters`
+	set niters = `grep -v "#" $wd/sfind.log | awk '{if ($7*$6 > 3000*noise) cycles+=2*log((3000*noise)/($6*$7))/log(.9)} END {print int(cycles)+niters}' noise=$imstats[3] niters=$niters`
 	if ($niters < 50) then
 	    echo "Derived value for $niters was $niters... invoking safegaurd and putting niters at 50."
 	    set niters = 50
