@@ -93,7 +93,10 @@ for arg in argv[2:]:
         aname, aval = arg.split ('=', 1)
         if aname in mergeOpts and aname in args:
             print >>stderr, 'Warning: not merging keyword', aname
-        args[aname] = aval
+        if aval == '':
+            if aname in args: del args[aname]
+        else:
+            args[aname] = aval
     else:
         if defaultKW is None:
             print >>stderr, 'Error: non-keyword argument', arg, 'and no assigned default'
