@@ -17,10 +17,10 @@ def run():
     a = []; a2 = []
     p = []; p2 = []
     for i in range(1,9):
-        a.append(asciidata.AsciiData ('3c138-leak%d.amp.txt' % i))
-        p.append(asciidata.AsciiData ('3c138-leak%d.phase.txt' % i))
-        a2.append(asciidata.AsciiData ('3c138-leak%d.amp.txt' % i))
-        p2.append(asciidata.AsciiData ('3c138-leak%d.phase.txt' % i))
+        a.append(asciidata.AsciiData ('3c138-p0-leak%d.amp.txt' % i))
+        p.append(asciidata.AsciiData ('3c138-p0-leak%d.phase.txt' % i))
+        a2.append(asciidata.AsciiData ('3c138-p1-leak%d.amp.txt' % i))
+        p2.append(asciidata.AsciiData ('3c138-p1-leak%d.phase.txt' % i))
 
     nants = len(a[0][0])
     print '%d antennas...' % (nants)
