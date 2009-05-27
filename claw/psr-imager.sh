@@ -56,9 +56,9 @@ cleanup=1
 set -e -x
 
 # loop to do trial periods
-for ((i=1; i<=10; i++))
+for ((i=1; i<=30; i++))
   do
-  period=`echo 0.25275-0.00002*${i} | bc`
+  period=`echo 0.25370-0.00002*${i} | bc`
   suffix=p${i}
   
 #clean up
