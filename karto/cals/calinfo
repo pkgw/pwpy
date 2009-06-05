@@ -22,6 +22,7 @@ set altname
 set up = 0
 
 if ($#argv == 0) then
+    echo "example: calinfo target=3c147 freq=1.628"
     echo "Documentation to follow..."
     exit 0
 endif

@@ -17,8 +17,16 @@ while (! -e ~/karto/compass.log)
     sleep 10
 end
 
+sleep 10
+
 set list = (`cat ~/karto/compass.log`)
 rm -rf ~/karto/compass.log
+
+if ($#list < 5) then
+    echo "WARNING: Blank compass entry"
+    goto restart
+endif
+
 shift list
 
 set vis = $list[1]
@@ -34,7 +42,9 @@ mkdir -p $histview
 uvaver vis=$vis select="time($times[1],$times[2])" options=relax,nocal,nopass,nopol out=/ataarchive/scratch/obs/compass/caldata
 
 if ($status) then
-    exit 1
+    rm -rf $histview
+    rm -rf /ataarchive/scratch/obs/compass/caldata
+    goto restart
 endif
 
 cd /ataarchive/scratch/obs/compass/
@@ -92,16 +102,15 @@ newcalcal.csh vis=caldata sysflux=$sysflux addflux=$addflux flux=$flux plim=$pli
 
 # Move results to a "display" directory
 
-if !(-e cal-$cal-$mfreq-maps/$cal.cm && (-e cal-$cal-$mfreq-maps/sefd.xx || -e cal-$cal-$mfreq-maps/sefd.yy)) then
+if !(-e cal-$cal-$mfreq-maps/$cal.cm && -e cal-$cal-$mfreq-maps/sefd) then
     echo "WARNING: COMPASS failed to complete!"
     rm -rf cal-$cal-$mfreq-maps caldata
     goto restart
 endif
 
-stat:
-
-sed 1,2d cal-$cal-$mfreq-maps/sefd.xx | tr '[a-z]' '[A-Z]' | awk '{print $1,$2,$7}' > jypk
-sed 1,2d cal-$cal-$mfreq-maps/sefd.yy | tr '[a-z]' '[A-Z]' | awk '{print $1,$2,$7}' >> jypk
+stat: 
+atasefd -i cal-$cal-$mfreq-maps/sefd,$mfreq
+sed 1,2d cal-$cal-$mfreq-maps/sefd | tr '[a-z]' '[A-Z]' | awk '{print $1,$2,$7}' > jypk
 
 set llim = `awk '{print int(10*log($3)/log(10))-2}' jypk | sort -n | head -n 1`
 set ulim = `echo $llim | awk '{print $1+20}'`
