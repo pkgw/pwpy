@@ -1,7 +1,26 @@
 #!/usr/bin/env ruby
 $-w = true if $0 == __FILE__
 
-# Fit gaussian beam pattern to gains from center and offset pointings
+#= gpfit.rb - Fit Gaussian primary beam to gains from hex7 data
+#& dhem
+#: calibration analysis
+#+ gpfit.rb - Fit Gaussian primary beam to gains from hex7 data
+#@ vis
+# Specifies which datasets to use.  Need at least seven.
+#@ options
+# This controls processing and coordinate system options.
+# Possible values are:
+#   "azel"     Beam offsets calculated in an azimuth/elevation frame
+#   "radec"    Beam offsets calculated in an RA/dec frame
+#              (azel and radec are mutually exclusive)
+#   "rect"     Beam offsets output in rectangular form
+#   "polar"    Beam offsets output in polar form
+#              (rect and polar are mutually exclusive)
+#   "absolute" Azimuth or RA term is adjusted by cos(el or dec)
+#   "squint"   Output difference between X and Y pol beam offsets
+#   "verbose"  Output extra informaion (for debugging)
+# If no options are given, gpfit.rb uses options=azel,rect.
+#--
 
 require 'enumerator'
 require 'gauss2d'
