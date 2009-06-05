@@ -155,7 +155,7 @@ set sefd = 0
 set smooth
 set report = 1
 set nogainants
-set copymode
+set copymode = 0
 
 #################################################################
 # Here is the keyword/value pairing code. It basically operates
@@ -179,6 +179,10 @@ else if ("$argv[1]" =~ 'olay='*) then
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'plim='*) then
     set plim = `echo $argv[1] | sed 's/plim=//'`
+    if ("$plim" == "0") then
+	echo "FATAL ERROR: Bad select for plim (0 degree limit)"
+	exit 1
+    endif
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'siglim='*) then
     set siglim = `echo $argv[1] | sed 's/siglim=//'`
@@ -359,6 +363,18 @@ while ("$freq" == "")
     endif
 end
 
+set inttimeline = (`uvlist vis=$vis options=var,full | grep "inttime" | tr ':' ' '`)
+set inttime
+while ("$inttime" == "")
+    if ($inttimeline[1] == "inttime") then
+	set inttime = `echo $inttimeline[2] | awk '{print ($1-.00001)/60}'` 
+    else if ($#inttimeline == 1) then
+	set inttime == `echo 10 | awk '{print ($1-.00001)/60}'` # Default to ATA
+    else
+	shift inttimeline
+    endif
+end
+
 set nantsline = (`uvlist vis=$vis options=var | grep "nants" | tr ':' ' '`)
 set nants
 #Get the number of antennas
@@ -443,14 +459,15 @@ echo -n "Preprocessing data..."
 
 if ($polsplit) then
     set pollist = ("xx" "yy")
-    uvaver vis=$vis select='window(1),pol(xx)' out=$wd/tempcalxx options=relax,nocal,nopass,nopol >& /dev/null
+    uvaver vis=$vis select='window(1),pol(xx)' out=$wd/tempcalxx options=relax,nocal,nopass,nopol interval=$inttime >& /dev/null
     echo -n "."
-    uvaver vis=$vis select='window(1),pol(yy)' out=$wd/tempcalyy options=relax,nocal,nopass,nopol >& /dev/null
+    uvaver vis=$vis select='window(1),pol(yy)' out=$wd/tempcalyy options=relax,nocal,nopass,nopol interval=$inttime >& /dev/null
     echo -n "."
 else
-    uvaver vis=$vis select='window(1),pol(xx,yy)' out=$wd/tempcalxxyy options=relax,nocal,nopass,nopol >& /dev/null
+    uvaver vis=$vis select='window(1),pol(xx,yy)' out=$wd/tempcalxxyy options=relax,nocal,nopass,nopol interval=$inttime >& /dev/null
     echo -n "."
 endif
+
 echo ""
 # Perform some error checking to make sure that "blank" datasets are created
 
@@ -459,9 +476,11 @@ if !(-e $wd/tempcalxxyy || -e $wd/tempcalxx || -e $wd/tempcalyy) then
     goto fail
 else if (! -e $wd/tempcalxx/visdata && -e $wd/tempcalyy/visdata) then
     set pollist = ("yy")
+    set polsplit = 1
     echo "No x-pol data found, continuing..."
 else if (! -e $wd/tempcalyy/visdata && -e $wd/tempcalxx/visdata) then
     set pollist = ("xx")
+    set polsplit = 1
     echo "No y-pol data found, continuing..."
 endif
 
@@ -526,6 +545,7 @@ echo "Starting flagging and calibration."
 
 set xrefant
 set yrefant
+set limtotal
 
 foreach ipol ($pollist) # Work with only one pol at a time
     set idx = 0; set mididx = 1; set postidx = 2
@@ -635,6 +655,8 @@ foreach ipol ($pollist) # Work with only one pol at a time
 #################################################################
 	uvlist vis=$wd/tempcal2 select='-auto' recnum=0 line=chan,1,1,$nchan | sed 1,9d | awk '{if ($1*1 ==0); else if ($8*1 != 0 || $9*1 != 0) print $1,$9,(($8*cos(pi*$9/180)-flux)^2+($8*sin(pi*$9/180))^2)^.5}' flux=$calflux pi=3.141592 | sort -nk3 > $wd/ampinfo 
 	# Gather some basic information about the data limits
+	set curtotal = `wc -l $wd/ampinfo | awk '{print $1*1}'`
+	if ("$limtotal" == "") set limtotal = `echo $curtotal $retlim | awk '{print int((2^int(log(100/$2)/log(2)))*.01*$1*$2)}'`
 	set linecheck = `wc -l $wd/ampinfo | awk '{print int($1*.95)}'`
 	set linelim = `wc -l $wd/ampinfo | awk '{print int($1*exp(-1*siglim))}' siglim=$siglim`
 	set linemax = `wc -l $wd/ampinfo | awk '{print 1+int($1*.05)}'`
@@ -699,7 +721,10 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	set pols = (x y)
 	if ("$retlim" == 0) set pols
 	# If we haven't dropped below the repeat threshold, then repeat.
-	if ((`echo $sflags $linelim $lim | awk '{if ($1 > $2*(nchan^.5)) print "go"; else if ($2 < $3) print "go"}' nchan=$nchan` == "go" || `echo $intcheck $addflux $sysflux | awk '{if ($1/10 > ($2+$3)) print "go"}'` == "go") && $linelim != $linemax) then
+	if ($limtotal > $curtotal) then
+	    set limtotal = `echo $curtotal | awk '{print int($1/2)}'`
+	    echo "WARNING: Data retention has fallen below critical threshold..."
+	else if ((`echo $sflags $linelim $lim | awk '{if ($1 > $2*(nchan^.5)) print "go"; else if ($2 < $3) print "go"}' nchan=$nchan` == "go" || `echo $intcheck $addflux $sysflux | awk '{if ($1/10 > ($2+$3)) print "go"}'` == "go") && $linelim != $linemax) then
 	    echo " "
 	    echo "Flagging complete, continuing cycle $idx of "`echo $#regtimes | awk '{print $1-2}'`"..."
 	    goto jumper
@@ -895,6 +920,11 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	    echo "Culling complete, continuing cycle $idx of "`echo $#regtimes | awk '{print $1-2}'`"..."
 	    echo " "
 	    goto jumper
+	else if ((`echo $sflags $linelim $lim | awk '{if ($1 > $2*(nchan^.5)) print "go"; else if ($2 < $3) print "go"}' nchan=$nchan` == "go" || `echo $intcheck $addflux $sysflux | awk '{if ($1/10 > ($2+$3)) print "go"}'` == "go") && $linelim != $linemax) then
+	    rm -f $wd/ampinfo $wd/amplog
+	    echo "Culling complete, continuing cycle $idx of "`echo $#regtimes | awk '{print $1-2}'`"..."
+	    echo " "
+	    goto jumper	    
 	endif
 #####################
 	if ($report) then
@@ -949,33 +979,53 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	    endif
 	endif
 #####################
-    if ($polsplit && $sefd) then
-        echo -n "Beginning SEFD calculation"
-	uvflag vis=$file options=none flagval=u select=auto >& /dev/null
-	uvcal vis=$file options=nocal,nopass,nopol,fxcal out=$wd/sefdcal >& /dev/null
-	uvflag vis=$wd/sefdcal flagval=f select='amp(0,0.0000000000000001)' options=none >& /dev/null #This is here since uvcal is stupid, and this corresponds to a noise level of 80 dB (SNR of 1:10^8)
-	echo -n ", calculating gains tables..."
-	mfcal vis=$wd/sefdcal refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& $wd/checkmfcal
-	if (`grep "time order" $wd/checkmfcal | wc -l`) then
-	    echo ""
-	    echo "FATAL ERROR: Data not in time order!"
-	    goto fail
+	if ($polsplit && $sefd && ("$xants" != "" || "$yants" != "")) then
+	    echo -n "Beginning SEFD calculation"
+	    uvflag vis=$file options=none flagval=u select=auto >& /dev/null
+	    uvcal vis=$file options=nocal,nopass,nopol,fxcal out=$wd/sefdcal >& /dev/null
+	    uvflag vis=$wd/sefdcal flagval=f select='amp(0,0.0000000000000001)' options=none >& /dev/null #This is here since uvcal is stupid, and this corresponds to a noise level of 80 dB (SNR of 1:10^8)
+	    echo -n ", calculating gains tables..."
+	    mfcal vis=$wd/sefdcal refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& $wd/checkmfcal
+	    if (`grep "time order" $wd/checkmfcal | wc -l`) then
+		echo ""
+		echo "FATAL ERROR: Data not in time order!"
+		goto fail
+	    endif
+	    echo "$freq $regtimes[$mididx] " > $wd/sefd.$ipol.$regtimes[$mididx]
+	    echo " Ant Pol  R-Gain Avg  R-Gain RMS  I-Gain Avg  I-Gain RMS   SEFD (Jy)" >> $wd/sefd.$ipol.$regtimes[$mididx]
+	    echo "====================================================================" >> $wd/sefd.$ipol.$regtimes[$mididx]
+	    
+	    gplist vis=$wd/sefdcal options=all | sed 's/^.\{10\}//g' | grep "Ant" | sort -nk2 | awk '{if (NR == 1 || ant == $2) {ant=$2;n++; re += $5; rs += $5*$5;im += $6;is += $6*$6}; if (ant != $2) {printf "%4s   %1s % .4e % .4e % .4e % .4e % .4e\n",ant,pol,re/n,sqrt((rs-n*(re/n)*(re/n))/n),im/n,sqrt((is-(n*(im/n)*(im/n)))/n),((re*re)+(im*im))/(n^2);ant=$2;n=1;re=$5;rs=$5*$5;im=$6;is=$6*$6}}' pol=`echo $ipol | sed -e 's/xx/x/g' -e 's/yy/y/g'`| awk '{if ($7*1 != 0) print $0}' >> $wd/sefd.$ipol.$regtimes[$mididx]
+	    rm -rf $wd/sefdcal
+	    echo "done!"
+	else if ($sefd && ("$xants" != "" || "$yants" != "")) then
+	    echo -n "Beginning SEFD calculation"
+	    uvflag vis=$file options=none flagval=u select=auto >& /dev/null
+	    if ("$xants" != "") uvcal vis=$file options=nocal,nopass,nopol,fxcal select='pol(xx)' out=$wd/sefdcalx >& /dev/null
+	    if ("$yants" != "")uvcal vis=$file options=nocal,nopass,nopol,fxcal select='pol(xx)' out=$wd/sefdcaly >& /dev/null
+	    uvflag vis="$wd/sefdcal*" flagval=f select='amp(0,0.0000000000000001)' options=none >& /dev/null #This is here since uvcal is stupid, and this corresponds to a noise level of 80 dB (SNR of 1:10^8)
+	    echo -n ", calculating gains tables..."
+	    touch $wd/checkmfcalx; touch $wd/checkmfcaly
+	    if ("$xants" != "") mfcal vis=$wd/sefdcalx refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& $wd/checkmfcalx
+	    if ("$yants" != "") mfcal vis=$wd/sefdcaly refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& $wd/checkmfcaly
+	    if (`grep "time order" $wd/checkmfcalx | wc -l` || `grep "time order" $wd/checkmfcaly | wc -l` ) then
+		echo ""
+		echo "FATAL ERROR: Data not in time order!"
+		goto fail
+	    endif
+	    echo "$freq $regtimes[$mididx] " > $wd/sefd.$ipol.$regtimes[$mididx]
+	    echo " Ant Pol  R-Gain Avg  R-Gain RMS  I-Gain Avg  I-Gain RMS   SEFD (Jy)" >> $wd/sefd.$ipol.$regtimes[$mididx]
+	    echo "====================================================================" >> $wd/sefd.$ipol.$regtimes[$mididx]
+	    if ("$xants" != "") gplist vis=$wd/sefdcalx options=all | sed 's/^.\{10\}//g' | grep "Ant" | sort -nk2 | awk '{if (NR == 1 || ant == $2) {ant=$2;n++; re += $5; rs += $5*$5;im += $6;is += $6*$6}; if (ant != $2) {printf "%4s   %1s % .4e % .4e % .4e % .4e % .4e\n",ant,pol,re/n,sqrt((rs-n*(re/n)*(re/n))/n),im/n,sqrt((is-(n*(im/n)*(im/n)))/n),((re*re)+(im*im))/(n^2);ant=$2;n=1;re=$5;rs=$5*$5;im=$6;is=$6*$6}}' pol=x | awk '{if ($7*1 != 0) print $0}' >> $wd/sefd.$ipol.$regtimes[$mididx]
+	    if ("$yants" != "") gplist vis=$wd/sefdcaly options=all | sed 's/^.\{10\}//g' | grep "Ant" | sort -nk2 | awk '{if (NR == 1 || ant == $2) {ant=$2;n++; re += $5; rs += $5*$5;im += $6;is += $6*$6}; if (ant != $2) {printf "%4s   %1s % .4e % .4e % .4e % .4e % .4e\n",ant,pol,re/n,sqrt((rs-n*(re/n)*(re/n))/n),im/n,sqrt((is-(n*(im/n)*(im/n)))/n),((re*re)+(im*im))/(n^2);ant=$2;n=1;re=$5;rs=$5*$5;im=$6;is=$6*$6}}' pol=y | awk '{if ($7*1 != 0) print $0}' >> $wd/sefd.$ipol.$regtimes[$mididx]
+	    rm -rf $wd/sefdcalx $wd/sefdcaly
+	    echo "done!"	    
 	endif
-	echo "$freq $regtimes[$postidx] " > $wd/sefd.$ipol.$regtimes[$postidx]
-	echo " Ant Pol  R-Gain Avg  R-Gain RMS  I-Gain Avg  I-Gain RMS   SEFD (Jy)" >> $wd/sefd.$ipol.$regtimes[$postidx]
-	echo "====================================================================" >> $wd/sefd.$ipol.$regtimes[$postidx]
-
-	gplist vis=$wd/sefdcal options=all | sed 's/^.\{10\}//g' | grep "Ant" | sort -nk2 | awk '{if (NR == 1 || ant == $2) {ant=$2;n++; re += $5; rs += $5*$5;im += $6;is += $6*$6}; if (ant != $2) {printf "%4s   %1s % .4e % .4e % .4e % .4e % .4e\n",ant,pol,re/n,sqrt((rs-n*(re/n)*(re/n))/n),im/n,sqrt((is-(n*(im/n)*(im/n)))/n),((re*re)+(im*im))/(n^2);ant=$2;n=1;re=$5;rs=$5*$5;im=$6;is=$6*$6}}' pol=`echo $ipol | sed -e 's/xx/x/g' -e 's/yy/y/g'`| awk '{if ($7*1 != 0) print $0}' >> $wd/sefd.$ipol.$regtimes[$postidx]
-	rm -rf $wd/sefdcal
-	echo "done!"
-    endif
-
-
+	set limtotal
     	# If on the last cycle, then use uvaver to pull together all of the datasets. Otherwise, repeat with the next time cycle.
 	if ($postidx >= $#regtimes) then
-	    uvaver vis="$wd/tempcali$ipol*" out=$wd/tempcal2 options=relax > /dev/null
-	    uvaflag vis=$wd/tempcal$ipol tvis=$wd/tempcal2 > /dev/null
-	    rm -rf $wd/tempcal2
+	    rm -rf $wd/tempcal$ipol
+	    uvaver vis="$wd/tempcali$ipol*" out=$wd/tempcal$ipol options=nocal,nopass,nopol > /dev/null
 	    echo "Moving to final cycle!"
 	else
 	    set cycletimes = (`date +%s.%N | awk '{print int(($1-date1)/60),int(($1-date1)%60)}' date1=$cycletime` 0 0)
@@ -983,6 +1033,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	endif
 	echo " "
     end
+
     #Final cycle for a pol, use autoref to find the best ref antenna for the whole dataset
     poljumper:
     if ($autoref) then
@@ -1114,7 +1165,36 @@ foreach ipol ($pollist) # Work with only one pol at a time
 
 	rm -rf $wd/sefdcal
 	echo "done!"
+    else if ($sefd) then
+        echo -n "Beginning SEFD calculation"
+	uvflag vis=$wd/tempcal$ipol options=none flagval=u select=auto >& /dev/null
+	uvcal vis=$wd/tempcal$ipol options=nocal,nopass,nopol,fxcal select='pol(xx)' out=$wd/sefdcalx >& /dev/null
+	uvcal vis=$wd/tempcal$ipol options=nocal,nopass,nopol,fxcal select='pol(xx)' out=$wd/sefdcaly >& /dev/null
+
+	uvflag vis=$wd/sefdcalx,$wd/sefdcaly flagval=f select='amp(0,0.0000000000000001)' options=none >& /dev/null #This is here since uvcal is stupid, and this corresponds to a noise level of 80 dBS (SNR of 1:10^8)
+	echo -n ", calculating gains tables..."
+	mfcal vis=$wd/sefdcalx refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& $wd/checkmfcalx
+	mfcal vis=$wd/sefdcaly refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& $wd/checkmfcaly
+	if (`grep "time order" $wd/checkmfcalx | wc -l` || `grep "time order" $wd/checkmfcaly | wc -l`) then
+	    echo ""
+	    echo "FATAL ERROR: Data not in time order!"
+	    goto fail
+	endif
+	echo "$freq" > $wd/sefd
+	echo " Ant Pol  R-Gain Avg  R-Gain RMS  I-Gain Avg  I-Gain RMS   SEFD (Jy)" > $wd/sefd
+	echo "====================================================================" >> $wd/sefd
+	gplist vis=$wd/sefdcalx options=all | sed 's/^.\{10\}//g' | grep "Ant" | sort -nk2 | awk '{if (NR == 1 || ant == $2) {ant=$2;n++; re += $5; rs += $5*$5;im += $6;is += $6*$6}; if (ant != $2) {printf "%4s   %1s % .4e % .4e % .4e % .4e % .4e\n",ant,pol,re/n,sqrt((rs-n*(re/n)*(re/n))/n),im/n,sqrt((is-(n*(im/n)*(im/n)))/n),((re*re)+(im*im))/(n^2);ant=$2;n=1;re=$5;rs=$5*$5;im=$6;is=$6*$6}}' pol=x | awk '{if ($7*1 != 0) print $0}' >> $wd/sefd
+	gplist vis=$wd/sefdcaly options=all | sed 's/^.\{10\}//g' | grep "Ant" | sort -nk2 | awk '{if (NR == 1 || ant == $2) {ant=$2;n++; re += $5; rs += $5*$5;im += $6;is += $6*$6}; if (ant != $2) {printf "%4s   %1s % .4e % .4e % .4e % .4e % .4e\n",ant,pol,re/n,sqrt((rs-n*(re/n)*(re/n))/n),im/n,sqrt((is-(n*(im/n)*(im/n)))/n),((re*re)+(im*im))/(n^2);ant=$2;n=1;re=$5;rs=$5*$5;im=$6;is=$6*$6}}' pol=y | awk '{if ($7*1 != 0) print $0}' >> $wd/sefd
+	foreach antcheck ($fullxants)
+	    if !(`awk '{if ($1 == antcheck) idx += 1} END {print idx*1}' antcheck=$antcheck $wd/sefd`) set nogainants = ($nogainants {$antcheck}X)
+	end
+	foreach antcheck ($fullyants)
+	    if !(`awk '{if ($1 == antcheck) idx += 1} END {print idx*1}' antcheck=$antcheck $wd/sefd`) set nogainants = ($nogainants {$antcheck}Y)
+	end
+	rm -rf $wd/sefdcalx $wd/sefdcaly
+	echo "done!"
     endif
+
     echo "Final cycle complete!"
     echo ""
 end
@@ -1208,7 +1288,7 @@ else
 	    puthd in=$outfile/$source.1.$dp/interval value=.5 > /dev/null
 	    gpcopy vis=$outfile/$source.1.$dp out=$vis > /dev/null
 	    # Move pol-specific gains "out of the way" so that information isn't overwritten by gpcopy
-	    mv $vis/gains $vis/gains.$dp
+	    mv $vis/gains $vis/gains.{$dp}p
 	endif
     end
     # Copy over any "general" gains solutions (relating to multiple pols)
@@ -1318,7 +1398,7 @@ end
 paste $wd/ret* > $wd/retmap
 cp $wd/retmap $vis/retmap
 cp $wd/retmap $vis/phoenix/retmap.CAL$dmark
-set orc = `echo 500 $freq | awk '{print int($1*$2/1.43)}'`
+set orc = `echo 500 $freq | awk '{print int($1*1.43/$2)}'`
 set tnoise = `imfit in=$outfile/$source.cm region=relcen,arcsec,"box(-$orc,-$orc,$orc,$orc)" object=point | grep residual | awk '{print $9*1000}'`
 set noise = `imstat in=$outfile/$source.rs | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g' | awk '{print $3*1000}'`
 set maxmin = (`imstat in=$outfile/$source.cm | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g' | awk '{print $4*1000,$5*1000}'`)
@@ -1404,7 +1484,7 @@ while ($idx <= $#fullxapos)
     if ($fullyapos[$idx] == "0") then
 	echo "Ant "{$idx}"Y -- N/A                 " >> $wd/yfinalret
     else
-	echo "Ant "{$idx}"X -- "`echo $fullyaret[$idx] $fullyapos[$idx] | awk '{print .1*int(1000*$1/$2)"% ("$1" of "$2")"}'` >> $wd/yfinalret
+	echo "Ant "{$idx}"Y -- "`echo $fullyaret[$idx] $fullyapos[$idx] | awk '{print .1*int(1000*$1/$2)"% ("$1" of "$2")"}'` >> $wd/yfinalret
     endif
     @ idx++
 end
@@ -1435,6 +1515,10 @@ copymode:
 if ($copymode) then
     if !(-e $vis/retmap) then
 	echo "FATAL ERROR: This calibrator dataset has not been processed with CALCAL yet!"
+	goto fail
+    endif
+    if ("$tvis" == "") then
+	echo "FATAL ERROR: No tvis files provided"
 	goto fail
     endif
     foreach file ($tvis)

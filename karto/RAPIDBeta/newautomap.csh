@@ -234,6 +234,8 @@ set debug = 0
 set sefd = 0
 set restfreq
 set usemodel
+set line
+set regain
 
 if ($#argv == 0) then
     echo "AUTOMAP: No input files detected!"
@@ -276,6 +278,9 @@ else if ("$argv[1]" =~ 'amplim='*) then
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'crange='*) then
     set crange = (`echo $argv[1] | sed -e 's/crange=//' -e 's/),/) /' | tr -d ')('`)
+    shift argv; if ("$argv" == "") set argv = "finish"
+else if ("$argv[1]" =~ 'line='*) then
+    set line = "$argv[1]"
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'selfcalint='*) then
     set scint = `echo $argv[1] | sed 's/selfcalint=//'`
@@ -376,6 +381,10 @@ else if ("$argv[1]" =~ 'options='*) then
 	    set scmode = "dr"
 	else if ($option == "fidmax") then
 	    set scmode = "fid"
+	else if ($option == "regain") then
+	    set regain = 1
+	else if ($option == "noregain") then
+	    set regain = 0
 	else if ($option == "intclean") then
 	    set intclean = 1
 	else if ($option == "nointclean") then
@@ -442,6 +451,7 @@ set psci = 0 # Phase auto-selfcal iterations
 set asci = 0 # Amp auto-selfcal iterations
 set fli = 0 # Flagging iterations
 set badchans
+set nalevel = 0
 set omode = $mode
 set freqline = (`uvlist vis=$vis[1] options=var | grep "freq    :" | tr ':' ' '`) # Set the freq in MHz
 set freq
@@ -467,6 +477,10 @@ while ($nchan == "")
 	shift nchanline
     endif
 end
+
+if ("$line" != "") then
+    set nchan = `echo $line | tr ',' ' ' | awk '{print $2}'`
+endif
 
 set sourceline = (`uvlist vis=$vis[1] options=var,full | grep "source" | tr ':' ' ' | grep -v \*`)
 set source
@@ -503,13 +517,13 @@ end
 
 set linecmds
 
-foreach line ($crange)
-    if (`echo $line | tr ',' ' ' | wc -w` == 2) then
-	set linecmds = ($linecmds `echo $line | tr ',' ' ' | awk '{if ($1 < $2) print $2-$1+1","$1; else print "1,"$1}'`)
-    else if (`echo $line | tr ',' ' ' | wc -w` == 3) then
-	set linecmds = ($linecmds `echo $line | tr ',' ' ' | awk '{if ($1 < $2 && ($2-$1+1)/$3 > 1) print int(($2-$1+1)/$3)","$1","$3; else print "1,"$1}'`)
+foreach cline ($crange)
+    if (`echo $cline | tr ',' ' ' | wc -w` == 2) then
+	set linecmds = ($linecmds `echo $cline | tr ',' ' ' | awk '{if ($1 < $2) print $2-$1+1","$1; else print "1,"$1}'`)
+    else if (`echo $cline | tr ',' ' ' | wc -w` == 3) then
+	set linecmds = ($linecmds `echo $cline | tr ',' ' ' | awk '{if ($1 < $2 && ($2-$1+1)/$3 > 1) print int(($2-$1+1)/$3)","$1","$3; else print "1,"$1}'`)
     else
-	set linecmds = ($linecmds "1,"$line)
+	set linecmds = ($linecmds "1,"$cline)
     endif
 end
 
@@ -574,9 +588,9 @@ set idx = 0
 foreach file ($vis)
     echo -n "Splitting $file..."
     @ idx++
-    uvaver vis=$file out=$wd/tempmap$idx.xpol options=relax select="-shadow(7.5),pol(xx),$uselect" interval=$interval >& /dev/null 
+    uvaver vis=$file out=$wd/tempmap$idx.xpol options=relax select="-shadow(7.5),pol(xx),$uselect" interval=$interval $line >& /dev/null 
     echo -n "."
-    uvaver vis=$file out=$wd/tempmap$idx.ypol options=relax select="-shadow(7.5),pol(yy),$uselect" interval=$interval >& /dev/null 
+    uvaver vis=$file out=$wd/tempmap$idx.ypol options=relax select="-shadow(7.5),pol(yy),$uselect" interval=$interval $line >& /dev/null 
     if !(-e $wd/tempmap$idx.xpol/visdata || -e $wd/tempmap$idx.ypol/visdata) then
 	echo "FATAL ERROR: UVAVER has failed! $file shows no viable data!" 
 	goto enderr
@@ -613,6 +627,22 @@ foreach file ($vis)
 	    if (-e $file/gains)  mv $file/gains $file/gains.{$dp$dp}p
 	    if (-e $file/gains.mp) mv $file/gains.mp $file/gains
 	    if (-e $file/bandpass) mv $file/bandpass $file/bandpass.{$dp$dp}p
+	    if (-e $file/bandpass.mp) mv $file/bandpass.mp $file/bandpass
+	    uvaver vis=$wd/tempmap$idx.{$dp}pol out=$wd/tempgmap options=relax >& /dev/null
+	    rm -rf $wd/tempmap$idx.{$dp}pol; mv $wd/tempgmap $wd/tempmap$idx.{$dp}pol
+	endif
+	if ((-e $file/gains.{$dp$dp}pp || -e $file/bandpass.{$dp$dp}pp) && -e $wd/tempmap$idx.{$dp}pol/visdata && ! $regain) then
+	    if (-e $file/gains)  mv $file/gains $file/gains.mp
+	    if (-e $file/gains.{$dp$dp}pp) mv $file/gains.{$dp$dp}pp $file/gains
+	    if (-e $file/bandpass) mv $file/bandpass $file/bandpass.mp
+	    if (-e $file/bandpass.{$dp$dp}pp) mv $file/bandpass.{$dp$dp}pp $file/bandpass
+	    if (-e $file/header) cp $file/header $file/header.mp
+	    if (-e $file/header.{$dp$dp}pp) cp $file/header.{$dp$dp}pp $file/header
+	    gpcopy vis=$file out=$wd/tempmap$idx.{$dp}pol > /dev/null
+	    if (-e $file/header.mp) mv $file/header.mp $file/header
+	    if (-e $file/gains)  mv $file/gains $file/gains.{$dp$dp}pp
+	    if (-e $file/gains.mp) mv $file/gains.mp $file/gains
+	    if (-e $file/bandpass) mv $file/bandpass $file/bandpass.{$dp$dp}pp
 	    if (-e $file/bandpass.mp) mv $file/bandpass.mp $file/bandpass
 	    uvaver vis=$wd/tempmap$idx.{$dp}pol out=$wd/tempgmap options=relax >& /dev/null
 	    rm -rf $wd/tempmap$idx.{$dp}pol; mv $wd/tempgmap $wd/tempmap$idx.{$dp}pol
@@ -711,8 +741,10 @@ if ($intclean) then
     clean map=$wd/tempmap.map beam=$wd/tempmap.beam out=$wd/tempmap.clean niters=1000 cutoff=$tnoise "$cregion" >& /dev/null 
     restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd/tempmap.cm >& /dev/null 
     restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd/tempmap.rs mode=residual >& /dev/null 
+    rm -rf $wd/imlistcm $wd/imlistrs $wd/imlistcm2
+    imlist in=$wd/tempmap.cm options=stat log=$wd/imlistcm >& /dev/null
     set imstats = (`imstat in=$wd/tempmap.rs | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
-    set beamsize = `imlist in=$wd/tempmap.cm options=stat | grep Effective | awk '{print $4*1}'`
+    set beamsize = `grep Effective $wd/imlistcm | awk '{print $4*1}'`
     set nalevel = `echo $beamsize $tnoise $imsize | tr ',' ' ' | awk '{if ($4*1 == 0) print .5*$2*(log($3*$3/$1)-3); else print .5*$2*(log($3*$4/$1)-3)}'`
     set alevel = `echo $nalevel $tnoise $imstats[3] | awk '{print $1*$3/$2}'`
     cd $wd
@@ -737,7 +769,14 @@ clean map=$wd/tempmap.map beam=$wd/tempmap.beam out=$wd/tempmap.clean niters=$ni
 restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd/tempmap.cm >& /dev/null 
 restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd/tempmap.rs mode=residual >& /dev/null 
 
-set actnitersline = (`imlist in=$wd/tempmap.cm | grep niters | tr ':' ' '`)
+rm -rf $wd/imlistcm $wd/imlistcm2
+imlist in=$wd/tempmap.cm options=stat log=$wd/imlistcm >& /dev/null
+imlist in=$wd/tempmap.cm log=$wd/imlistcm2 >& /dev/null
+
+set beamsize = `grep Effective $wd/imlistcm | awk '{print $4*1}'`
+set nalevel = `echo $beamsize $tnoise $imsize | tr ',' ' ' | awk '{if ($4*1 == 0) print .5*$2*(log($3*$3/$1)-3); else print .5*$2*(log($3*$4/$1)-3)}'`
+
+set actnitersline = (`grep niters $wd/imlistcm2 | tr ':' ' '`)
 set actniters
 while ("$actniters" == "")
     if ($#actnitersline < 2) then
@@ -750,21 +789,35 @@ while ("$actniters" == "")
 end
 set imstats = (`imstat in=$wd/tempmap.rs | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
 #set alevel = `echo $nalevel $tnoise $imstats[3] | awk '{print $1*$3/$2}'`
+set alevel = `echo $nalevel $tnoise $imstats[3] | awk '{print $1*$3/$2}'`
 set acheck = `echo $nalevel $tnoise $imstats[3-5] | awk '{if ($4+$5 >= 0) print $2*$4/($1*$3); else print -1*$2*$5/($1*$3)}'`
 cd $wd
 
 rm -f sfind.log; touch sfind.log
-if ($mode != "skip") sfind in=tempmap.rs options=oldsfind,auto,nofit rmsbox=100 xrms=4 labtyp=arcsec >& /dev/null 
+if ($intclean || $mode != "skip") sfind in=tempmap.rs options=oldsfind,auto,nofit rmsbox=100 xrms=4 labtyp=arcsec >& /dev/null 
 cd ..
 
 #Verify that the residual maps look clean. If not, reclean or advise the user that recleaning needs to be performed
 echo "Currently at $niters cycles..."
 if (`echo $acheck | awk '{if ($1 < .975) print 1; else print 0}'` && "$niters" != "50") then
-    set niters = `echo $niters $acheck | awk '{print int($1*$2)}'`
-    if ($niters < 50) set niters = 50
-    echo "WARNING: Overcleaning detected, rolling back to $niters iterations..."
-    rm -rf $wd/tempmap.clean $wd/tempmap.rs $wd/tempmap.cm
-    goto clean
+    if ($intclean) then
+	set niters = `echo $niters $acheck | awk '{print int($1*$2)}'`
+	if ($niters < 50) set niters = 50
+	echo "WARNING: Overcleaning detected, rolling back to $niters iterations..."
+	rm -rf $wd/tempmap.clean $wd/tempmap.rs $wd/tempmap.cm
+	goto clean
+    else if ($mode == "skip" || $mode == "auto") then
+	echo "WARNING: Map potentially overcleaned..."
+    else
+	echo "WARNING: AUTOMAP has potentially found this map to be overcleaned."
+	echo "Would you like to adjust the number of iterations? ([y]es (n)o)"
+       	if ($< =~ "y"*) then
+	    echo "Enter niters:"
+	    set niters = $<
+	    rm -rf $wd/tempmap.clean $wd/tempmap.rs $wd/tempmap.cm
+	    goto clean
+	endif
+    endif
 endif
 
 if (`grep -v "#" $wd/sfind.log | awk '{if ($7*$6 > 3000*noise) cycles+=2*log((3000*noise)/($6*$7))/log(.9)} END {print int(cycles)*1}' noise=$imstats[3]` > `echo $niters | awk '{print int(.025*$1)}'` && $niters != 25000) then
@@ -806,7 +859,7 @@ cd ..
 set imstats = (`imstat in=$wd/tempmap.rs region=relcen,arcsec,"box(-$arc,-$arc,$arc,$arc)" | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
 set imstats2 = (`imstat in=$wd/tempmap.cm region=relcen,arcsec,"box(-$arc,-$arc,$arc,$arc)" | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
 set range = `echo $imstats[3] $imstats2[4] | awk '{print $2/$1}'`
-
+set noise = `echo $imstats[3] | awk '{print $1*1000}'`
 
 ################################################################# 
 # Below is the automatic calculator for amplitudes. It works by
@@ -1164,6 +1217,29 @@ goto invert
 
 finish:
 
+if ($regain) then
+    echo "Copying new gains solutions to vis files..."
+    set idx = 1
+    while ($idx <= $#vis)
+	foreach dp (x y)
+	    if (-e $wd/tempmap$idx.{$dp}pol/gains) then
+		if (-e $vis[$idx]/gains) cp $vis[$idx]/gains $vis[$idx]/gains.mp
+		if (-e $vis[$idx]/header) cp $vis[$idx]/header $vis[$idx]/header.mp
+		gpcopy vis=$wd/tempmap$idx.{$dp}pol out=$vis[1] > /dev/null
+		if (-e $vis[$idx]/gains) then
+		    mv $vis[$idx]/gains $vis[$idx]/gains.{$dp}pp
+		    cp $vis[$idx]/header $vis[$idx]/header.{$dp}pp
+		endif
+		if (-e $vis[$idx]/gains.mp) mv $vis[$idx]/gains.mp $vis[$idx]/gains
+		if (-e $vis[$idx]/header.mp) mv $vis[$idx]/header.mp $vis[$idx]/header
+	    endif
+	end
+	echo "Gains copied to $vis[$idx]..."
+	@ idx++
+    end
+    echo "Copying complete!"
+endif
+
 # Below this is all reporting code. All of this code will need to be changed...
 set nalevel = `echo $beamsize $tnoise $imsize | tr ',' ' ' | awk '{if ($4*1 == 0) print .5*$2*(log($3*$3/$1)); else print .5*$2*(log($3*$4/$1))}'`
 echo "IMAGING REPORT" > $wd/imgrpt
@@ -1171,7 +1247,10 @@ echo "================================================================" >> $wd/i
 echo "Imaging of $source was successfully completed using $omode mode." >> $wd/imgrpt
 echo "Image noise is $noise mJy, with a dynamic range of $range." >> $wd/imgrpt
 echo "(theoretical noise limit is "`echo $tnoise | awk '{print $1*1000}'`" mJy)" >> $wd/imgrpt
-set beampara = (`imfit in=$wd/tempmap.cm object=beam | sed 1,3d | grep Beam | awk '{if ($2 == "Major,") print $6"\n"$7; else print $5}'` 0 0 0)
+
+set beampara = (`prthd in=$wd/tempmap.cm | grep 'Beam Size:' | tr ':' ' ' | awk '{print $3*1,$5*1}'`)
+set beampara = ($beampara `prthd in=$wd/tempmap.cm | grep 'Position angle:' | awk '{print $3*1}'`)
+
 echo "Beamsize was $beampara[1] x $beampara[2] arcsecs (PA of $beampara[3] degrees)" >> $wd/imgrpt
 echo "(cellsize is $cellsize arcsec, imsize is $imsize pixels)" >> $wd/imgrpt
 echo "" >> $wd/imgrpt
