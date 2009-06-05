@@ -954,7 +954,7 @@ set clip = `echo $scsigma $imstats[3] | awk '{print $1*$2}'`
   if ($ans != "") set clip = $ans
   foreach file ($vislist)
     selfcal vis=$file model=$wd/tempmap.clean interval=$scint select=$sel \
-	minants=4 options=noscale,mfs,$scopt clip=$clip refant=$refant
+	minants=4 options=mfs,$scopt clip=$clip refant=$refant
   end
   goto invert
 
@@ -1182,7 +1182,7 @@ echo "Now performing $scopt self-cal on data set...currently at $psci phase cycl
 set clip = `echo $scsigma $imstats[3] | awk '{print $1*$2}'`
 
 foreach file ($vislist)
-    selfcal vis=$file model=$wd/tempmap.clean interval=$scint select=$sel minants=4 options=noscale,mfs,$scopt clip=$clip refant=$refant >& /dev/null
+    selfcal vis=$file model=$wd/tempmap.clean interval=$scint select=$sel minants=4 options=mfs,$scopt clip=$clip refant=$refant >& /dev/null
 end
 
 echo "Restarting cycle!"
