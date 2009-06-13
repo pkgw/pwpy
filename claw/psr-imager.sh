@@ -21,12 +21,12 @@
 #period=0.253065    # nominal period for b0950+08
 #period=0.25304    # period that works for b0950+08-0.15s-4000
 bin=0.10
-ints=6000
+ints=3000
 
 # time for j0332-0.1s:
-#t0h=02
-#t0m=05
-#t0s=02.4
+t0h=02
+t0m=05
+t0s=02.4
 
 # time for b1933-0.1s:
 #t0h=19
@@ -39,16 +39,16 @@ ints=6000
 #t0s=19.7
 
 # time for b0950+09-0.1s-6000
-t0h=01
-t0m=32
-t0s=35.7
+#t0h=01
+#t0m=32
+#t0s=35.7
 
 # output properties:
-phasebins=3
+phasebins=8
 outphases=1  # not yet implemented
 #suffix='tst'
-visroot='fxc-b0950-0.1s-6000'
-imroot='b0950-0.1s'
+visroot='fxc-j0332-0.1s'
+imroot='j0332-0.1s'
 frac='all'   # 'all', '1/3', '2/3', '2/2', etc.
 cleanup=1
 ######################
@@ -56,9 +56,10 @@ cleanup=1
 set -e -x
 
 # loop to do trial periods
-for ((i=1; i<=30; i++))
+for ((i=1; i<=1; i++))
   do
-  period=`echo 0.25370-0.00002*${i} | bc`
+#  period=`echo 0.25370-0.00002*${i} | bc`
+  period=0.7536692
   suffix=p${i}
   
 #clean up

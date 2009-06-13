@@ -17,16 +17,17 @@ def run():
     a = []; a2 = []
     p = []; p2 = []
     for i in range(1,9):
-        a.append(asciidata.AsciiData ('3c138-p0-leak%d.amp.txt' % i))
-        p.append(asciidata.AsciiData ('3c138-p0-leak%d.phase.txt' % i))
-        a2.append(asciidata.AsciiData ('3c138-p1-leak%d.amp.txt' % i))
-        p2.append(asciidata.AsciiData ('3c138-p1-leak%d.phase.txt' % i))
+        a.append(asciidata.AsciiData ('../hex7-polcal/3c138-p0-leak%d.amp.txt' % i))
+        p.append(asciidata.AsciiData ('../hex7-polcal/3c138-p0-leak%d.phase.txt' % i))
+        a2.append(asciidata.AsciiData ('3c138-p0-3140-leakamp%d.txt' % i))
+        p2.append(asciidata.AsciiData ('3c138-p0-3140-leakphase%d.txt' % i))
 
     nants = len(a[0][0])
     print '%d antennas...' % (nants)
     antnum = [1,4,7,10,13,16,19,22,25,28,31,34,37,40,43,2,5,8,11,14,17,20,23,26,29,32,35,38,41,3,6,9,12,15,18,21,24,27,30,33,36,39,42]  # hack for how rows messed up by 'cut'
 
     print numpy.shape(a)
+    print numpy.shape(a2)
 
     # group 3c286
     # original phase and amplitude
