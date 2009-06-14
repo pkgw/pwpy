@@ -1,3 +1,3 @@
 #! /bin/sh
 # mirpymodtask
-exec python2.5 -m `basename $0` "$@"
+exec python -m `basename $0` "$@"

@@ -35,24 +35,22 @@ def run():
     if type == 'xy':
         # real-imag (x-y) plot
         # array of seven vectors in primary beam
-        for nant in range(1):        
-            for freq in range(1):
-                print 'Plotting for freq %d, nant %d' % (freq+1, nant+1)
+        for freq in range(freqs):
+            for nant in range(nants):
                 for loc in range(locs):
-                    index = freq * locs + loc
-#                    index = freq * (locs * nants) + loc * (nants) + nant
-                    if rx[index,nant] == 0:
+                    index = freq * (locs * nants) + loc * (nants) + nant
+                    if rx[index] == 0:
                         break
+                    print 'Plotting for freq %d, nant %d', % (freq+1, nant+1)
                     pylab.figure(freq + freqs*nant)
-                    pylab.arrow(beamx[loc], beamy[loc], rx[index,nant], ix[index,nant], color='blue')
-                    pylab.arrow(beamx[loc], beamy[loc], ry[index,nant], iy[index,nant], color='red')
+                    pylab.plot([beamx[loc], beamx[loc] + rx[index]], [beamy[loc], beamy[loc] + ix[index]],'.-b')
+                    pylab.plot([beamx[loc], beamx[loc] + ry[index]], [beamy[loc], beamy[loc] + iy[index]],'.-r')
 #                    pylab.text(ry[index],iy[index],str(antnum[index]))
-                pylab.axis([-1.2,1.2,-1.2,1.2])
-                pylab.xlabel('X Offset')
-                pylab.ylabel('Y Offset')
-                pylab.title('Leakages across primary beam')
+                    pylab.xlabel('X Offset')
+                    pylab.ylabel('Y Offset')
+                    pylab.title('Leakages across primary beam')
 
-                pylab.show()
+    pylab.show()
 
 if __name__ == '__main__':
     run()
