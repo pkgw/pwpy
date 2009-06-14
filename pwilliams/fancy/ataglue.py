@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python2.5
 """= ataglue.py - Merge together two ATA half-datasets, accounting for single-item errors.
 & pkgw
 : Tools
