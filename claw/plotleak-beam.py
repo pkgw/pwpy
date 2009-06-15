@@ -8,10 +8,11 @@ def run():
     # params
     type = 'xy'
     locs = 7
-    freqs = 8
+    freqs = 1
     antnum = [1,4,7,10,13,16,19,22,25,28,31,34,37,40,43,2,5,8,11,14,17,20,23,26,29,32,35,38,41,3,6,9,12,15,18,21,24,27,30,33,36,39,42]  # hack for how rows messed up by 'cut'
-    beamx = [0.,-1.,+1.,-0.5,+0.5,-0.5,+0.5,]
-    beamy = [0.,0.,0.,-1.,-1.,+1.,+1.]
+    scale = 0.2
+    beamx = numpy.array([0.,-1.,+1.,-0.5,+0.5,-0.5,+0.5,]) * scale
+    beamy = numpy.array([0.,0.,0.,-1.,-1.,+1.,+1.]) * scale
 
     ax = []; ay = []
     px = []; py = []
@@ -36,7 +37,7 @@ def run():
         # real-imag (x-y) plot
         # array of seven vectors in primary beam
         for nant in range(1):        
-            for freq in range(1):
+            for freq in range(freqs):
                 print 'Plotting for freq %d, nant %d' % (freq+1, nant+1)
                 for loc in range(locs):
                     index = freq * locs + loc
@@ -44,10 +45,10 @@ def run():
                     if rx[index,nant] == 0:
                         break
                     pylab.figure(freq + freqs*nant)
-                    pylab.arrow(beamx[loc], beamy[loc], rx[index,nant], ix[index,nant], color='blue')
-                    pylab.arrow(beamx[loc], beamy[loc], ry[index,nant], iy[index,nant], color='red')
+                    pylab.arrow(beamx[loc], beamy[loc], rx[index,nant], ix[index,nant],fill=0)
+                    pylab.arrow(beamx[loc], beamy[loc], ry[index,nant], iy[index,nant],fill=0,linestyle='dashed')
 #                    pylab.text(ry[index],iy[index],str(antnum[index]))
-                pylab.axis([-1.2,1.2,-1.2,1.2])
+                pylab.axis([-1.2*scale,1.2*scale,-1.2*scale,1.2*scale])
                 pylab.xlabel('X Offset')
                 pylab.ylabel('Y Offset')
                 pylab.title('Leakages across primary beam')
