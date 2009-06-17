@@ -109,9 +109,14 @@ def initScript (doAnything, logname, realwarn=True, useattens=True):
             sys.exit (0)
 
     if doAnything:
-        logFile = file (logname, 'a')
+        logFile = file (logname, 'a', 0)
     else:
-        logFile = file (logname, 'w')
+        logFile = file (logname, 'w', 0)
+
+    # We opened the logfile in unbuffered mode. Reopen stdout to remove its
+    # buffering as well.
+
+    sys.stdout = os.fdopen (sys.stdout.fileno (), 'w', 0)
 
     _startTime = time.time ()
 
