@@ -1,0 +1,18 @@
+#!/bin/tcsh
+
+set vis=$1 
+
+set niters=100
+
+# generate some pretty pictures
+rm -r $vis.bm $vis.mp $vis.mod $vis.cm 
+
+invert vis=$vis map=$vis.mp beam=$vis.bm cell=20 imsize=512 sup=0 line=chan,1
+clean map=$vis.mp beam=$vis.bm out=$vis.mod 
+#mosmem map=$vis.mp beam=$vis.bm out=$vis.mod niters=$niters
+restor map=$vis.mp beam=$vis.bm model=$vis.mod out=$vis.cm
+
+# plot pictures
+cgdisp in=$vis.cm region=relcenter,arcsec labtyp=arcmin options=beambl,wedge,mirr csize=1,1 type=pix device=$vis.ps/cps
+cgdisp in=$vis.cm region=relcenter,arcsec labtyp=arcmin options=beambl,wedge,,mirr csize=1,1 type=pix device=/xs
+

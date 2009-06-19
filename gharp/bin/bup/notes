@@ -1,0 +1,26 @@
+
+#choose satellites -- MUST keep a copy of ephemerides!!!!!!!!
+ataephem GPS-BIIR-07--PRN-18-
+ataephem GPS-BIIR-10--PRN-22-
+atawrapephem GPS-BIIR-07--PRN-18-.ephem
+atawrapephem GPS-BIIR-10--PRN-22-.ephem
+
+scanfx.csh 1628 A 3c48 120 fx64c:fxa
+newcalcal.csh vis=fx64c-3C48-1628_2 flux=14.5 plim=15 sysflux=4 device=/xs options=polsplit,sefd
+
+#sort badants
+cat sefd* | sort -nk7
+
+# capture the worst ants into badants
+cat k | awk '{print $2}' | xargs > badants
+
+# convert miriad to ATA numbers
+badants | awk '{print "ataant2mir --opp " $1}' > badants
+
+# excise badants from array
+fxconf.rb satake bfa `cat badants`
+
+#start a good run on GPS
+mosGPS.csh a 1628 GPS-BIIR-07--PRN-18-,GPS-BIIR-10--PRN-22-,GPS-BIIA-10--PRN-32-,GPS-BIIR-06--PRN-14- 120 3c84,2038+513,casa 60 2:30 GPS fx64c:fxa 104
+
+

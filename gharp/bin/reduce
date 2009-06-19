@@ -1,0 +1,16 @@
+#!/bin/tcsh
+
+
+if ($#argv < 2) then
+	echo "Must give a cal-dataset cal-flux"
+	exit(0)
+endif
+
+set cal=$1
+set flux=$2
+
+newrfisweep.csh vis=$cal options=autoedge 'crange=(600,800)' device=/null
+newrfisweep.csh vis=$cal options=autoedge,rescan 'crange=(600,800)' device=/null
+newcalcal.csh vis=$cal flux=$flux plim=15 sysflux=4 device=/null options=polsplit,outsource,sefd
+
+

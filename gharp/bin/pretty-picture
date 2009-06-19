@@ -1,0 +1,23 @@
+#!/bin/tcsh
+
+if ($#argv < 2) then
+        echo "Must give a (set of) input vis-files and an output filename" 
+        exit(0)
+endif
+
+set in=$1 
+set vis=$2 
+
+# generate some pretty pictures
+rm -r $vis.bm $vis.mp $vis.mod $vis.cm $vis.mod
+
+#invert vis=$in map=$vis.mp beam=$vis.bm cell=10 imsize=512 robust=0 line=chan,1,100,925
+invert vis=$in map=$vis.mp beam=$vis.bm cell=10 imsize=512 robust=0 line=chan,1
+clean map=$vis.mp beam=$vis.bm out=$vis.mod gain=0.1
+#mosmem map=$vis.mp beam=$vis.bm out=$vis.mod 
+restor map=$vis.mp beam=$vis.bm model=$vis.mod out=$vis.cm
+
+# plot pictures
+cgdisp in=$vis.cm,$vis.cm region=relcenter,arcsec labtyp=arcmin options=beambl,wedge,mirr csize=1,1 type=contour,pix range=0,0,lin,3 device=/xs # levs1=?? olay=??
+cgdisp in=$vis.cm,$vis.cm region=relcenter,arcsec labtyp=arcmin options=beambl,wedge,mirr csize=1,1 type=contour,pix range=0,0,lin,3 device=$vis.ps/cps # levs1=?? olay=??
+

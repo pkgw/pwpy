@@ -1,0 +1,49 @@
+#!/bin/tcsh
+
+if ($#argv < 2) then
+	echo "Must give a cal-dataset and moon-dataset"
+	exit(0)
+endif
+
+rm -r *-xx
+rm -r *-yy
+rm -r *-aver
+rm -r *-cald
+
+set cal=$1
+set vis=$2
+
+set line=chan,1,1,1024
+
+# THIS PROGRAM ASSUMES YOU"VE ALREADY DONE NEWCALCAL AND ANTENNA FLAGGING
+
+
+# after newcalcal has done its wonderful flagging, uvaver the cal data
+uvaver vis=$cal out=$cal-aver options=nocal line=$line select="pol(xx,yy),-auto"
+uvcat vis=$cal-aver out=$cal-xx select="pol(xx)"
+uvcat vis=$cal-aver out=$cal-yy select="pol(yy)"
+
+# pull in the gains and bandpass from newcalcal results
+cp $cal gains.xx $cal-xx/gains
+cp $cal gains.yy $cal-yy/gains
+cp $cal bandpass.xx  $cal-xx/bandpass
+cp $cal bandpass.yy  $cal-yy/bandpass
+
+# average and break moon data into x and y pols
+uvaver vis=$vis out=$vis-aver options=nocal line=$line select="pol(xx,yy),-auto"
+uvcat vis=$vis-aver out=$vis-xx select="pol(xx)"
+uvcat vis=$vis-aver out=$vis-yy select="pol(yy)"
+
+# selfcal the calibrator and copy to other files
+gpcopy vis=$cal-xx out=$vis-xx
+gpcopy vis=$cal-yy out=$vis-yy
+
+puthd in=$vis-xx/interval value=100
+puthd in=$vis-yy/interval value=100
+puthd in=$cal-xx/interval value=100
+puthd in=$cal-yy/interval value=100
+
+# rejoin the files into one
+uvcat vis=$cal-xx,$cal-yy out=$cal-cald
+uvcat vis=$vis-xx,$vis-yy out=$vis-cald
+

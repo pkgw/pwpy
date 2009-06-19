@@ -1,0 +1,79 @@
+#!/bin/tcsh
+
+if ($#argv < 3) then
+	echo "Must give a cal-dataset and vis-dataset and full sefd file path"
+	exit(0)
+endif
+
+set cal=$1
+set vis=$2
+set sefdpath=$3
+
+rm -rf $cal-aver
+rm -rf $vis-aver
+rm -rf $cal-xx
+rm -rf $cal-yy
+rm -rf $vis-xx
+rm -rf $vis-yy
+rm -rf $cal-xx_tsys
+rm -rf $cal-yy_tsys
+rm -rf $cal-xx-cald
+rm -rf $cal-yy-cald
+rm -rf $vis-xx_tsys
+rm -rf $vis-yy_tsys
+rm -rf $vis-xx-cald
+rm -rf $vis-yy-cald
+rm -rf $vis-cald
+rm -rf $cal-cald
+
+set line=chan,1,100,812
+
+# THIS PROGRAM ASSUMES YOU"VE ALREADY DONE NEWCALCAL AND ANTENNA FLAGGING
+
+# after newcalcal has done its wonderful flagging, uvaver the cal data
+uvaver vis=$cal out=$cal-aver options=nocal interval=0.5 line=$line select="pol(xx,yy),-auto"
+uvcat vis=$cal-aver out=$cal-xx select="pol(xx)"
+uvcat vis=$cal-aver out=$cal-yy select="pol(yy)"
+
+# average and break data into x and y pols
+uvaver vis=$vis out=$vis-aver options=nocal interval=0.05 line=$line select="pol(xx,yy),-auto"
+uvcat vis=$vis-aver out=$vis-xx select="pol(xx)"
+uvcat vis=$vis-aver out=$vis-yy select="pol(yy)"
+
+# put the system temperatures into the polarized data
+# also, flags bad antennas
+ApplySEFD.rb $sefdpath $cal-xx 100
+ApplySEFD.rb $sefdpath $cal-yy 100
+ApplySEFD.rb $sefdpath $vis-xx 100
+ApplySEFD.rb $sefdpath $vis-yy 100
+
+# selfcal the calibrator and copy to other files
+selfcal vis=$cal-yy_tsys select=-auto options=smooth interval=60 refant=1
+selfcal vis=$cal-xx_tsys select=-auto options=smooth interval=60 refant=1
+gpcopy vis=$cal-xx_tsys options=nopass out=$vis-xx_tsys
+gpcopy vis=$cal-yy_tsys options=nopass out=$vis-yy_tsys
+
+puthd in=$vis-xx_tsys/interval value=100
+puthd in=$vis-yy_tsys/interval value=100
+puthd in=$cal-xx_tsys/interval value=100
+puthd in=$cal-yy_tsys/interval value=100
+
+# apply gain corrections
+echo "Note, cannot recombine x's and y's until invert routine."
+uvcat vis=$vis-xx_tsys out=$vis-xx-cald
+uvcat vis=$vis-yy_tsys out=$vis-yy-cald
+uvcat vis=$cal-xx_tsys out=$cal-xx-cald
+uvcat vis=$cal-yy_tsys out=$cal-yy-cald
+
+rm -rf $cal-aver
+rm -rf $vis-aver
+rm -rf $cal-xx
+rm -rf $cal-yy
+rm -rf $vis-xx
+rm -rf $vis-yy
+rm -rf $vis-xx_tsys
+rm -rf $vis-yy_tsys
+#rm -rf $cal-xx_tsys
+#rm -rf $cal-yy_tsys
+
+
