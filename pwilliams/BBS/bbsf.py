@@ -1,15 +1,14 @@
 #! /usr/bin/python
 """bbsf - Broadband spectra observing script, going by frequency.
 
-Usage: bbsf.py MODE INSTRUMENT STOPHOUR
+Usage: bbsf.py MODE INSTR1,INSTR2,... STOPHOUR
 
 MODE is the mode to run the script in: "debug" or "real". No
 other values are accepted. If "debug", the script does not actually
 issue any array-control commands. If "real", the script does
 use the array.
 
-INSTRUMENT is the correlator instrument to use. Use "default" to
-use the embedded default value, which is currently fx64a:fxa.
+INSTR1,INSTR2... is a list of correlator instruments to use.
 
 STOPHOUR is the hour to stop observing, a floating-point number
 between 0 and 24.0. The script stops when the local time passes
@@ -34,10 +33,10 @@ me = 'bbsf'
 class BBSState (State):
     vars = ['ifreq', 'isrc', 'ilist']
 
-    def __init__ (self, freqLists, sources, hookup, obsDurs, dfObsDur):
+    def __init__ (self, freqLists, sources, mhookup, obsDurs, dfObsDur):
         self.freqLists = freqLists
         self.sources = sources
-        self.hookup = hookup
+        self.mhookup = mhookup
         self.obsDurs = obsDurs
         self.dfObsDur = dfObsDur
         self.ifreq = self.isrc = self.ilist = 0
@@ -76,7 +75,7 @@ class BBSState (State):
         if not isSourceUp (src, dur):
             log ('Would observe %s, but not up; skipping' % src)
         else:
-            observe (self.hookup, me, src, freq, dur)
+            observe2 (self.mhookup, me, src, freq, dur)
 
     # Tweak the focus-setting and attemplifier-setting
     # logic: use the same settings for all sky frequencies
@@ -131,12 +130,12 @@ checkUUID ()
 # Settings from the commandline
 
 if len (sys.argv) != 4:
-    print >>sys.stderr, 'Usage: %s [debug|real] instrument stopHour' % sys.argv[0]
-    print >>sys.stderr, 'E.g.: %s debug default 3.0' % sys.argv[0]
+    print >>sys.stderr, 'Usage: %s [debug|real] instrs stopHour' % sys.argv[0]
+    print >>sys.stderr, 'E.g.: %s debug fx64a:fxa,fx64c:fxa 3.0' % sys.argv[0]
     sys.exit (1)
 
 reallyDoIt = parseMode (sys.argv[1])
-h = getHookup (sys.argv[2])
+mh = MultiHookup (sys.argv[2].split (','))
 stopHour = float (sys.argv[3])
 
 # That was all prep. Now let's go!
@@ -144,15 +143,16 @@ stopHour = float (sys.argv[3])
 initScript (reallyDoIt, me + '.log')
 log (SVNID)
 stopTime, durHours = calcStopTime (stopHour)
-h.load ()
-state = BBSState (freqLists, sources, h, obsDurs, defaultObsDur)
+mh.load ()
+state = BBSState (freqLists, sources, mh, obsDurs, defaultObsDur)
 
 # Initial hardware setup.
 
-lockServer ('lo' + h.lo)
-initAntennas (h.ants ())
-checkIntegTime (h)
-fringeKill (h)
+for h in mh.hookups.itervalues ():
+    lockServer ('lo' + h.lo)
+    initAntennas (h.ants ())
+    checkIntegTime (h)
+    fringeKill (h)
 
 # Enter main loop and run until done.
 

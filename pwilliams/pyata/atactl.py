@@ -958,3 +958,130 @@ def observe (hookup, outBase, src, freq, integTimeSeconds):
     finally:
         # Make sure to always kill the frotter.
         fringeStop (hookup)
+
+
+# Quick multi-instrument observation code -- with all instruments
+# observing at the same frequency.
+
+def setupAttens2 (src, freq, mhookup):
+    global _curAttenKey
+    
+    k = makeAttenKey (src, freq)
+
+    s = _attenSettings.get (k)
+    log ('Retrieving or auto-getting attemplifier ' + \
+         'settings for key ' + str (k))
+
+    if _curAttenKey is not None and _curAttenKey == k:
+        log ('Already at right settings.')
+        return
+    
+    if s is not None:
+        setAttens (s)
+    else:
+        _attenSettings[k] = s = {}
+        for h in mhookup.hookups.itervalues ():
+            s.update (autoAttenAll (h))
+
+    _curAttenKey = k
+
+
+def launchCatchers2 (mhookup, src, freq, radec, durationSeconds, outbase, ebase):
+    assert _integTime is not None, 'Unknown integration time'
+    
+    tStart = time.time ()
+    ndumps = int (math.ceil (durationSeconds / _integTime))
+    nsephem = ebase + '.ephem'
+    
+    log ('@@ Launching data catcher: %s at %s MHz on %s' % \
+             (src, freq, ', '.join (mhookup.hookups.iterkeys ())))
+    log ('        atafx output base: %s' % outbase)
+    log ('         Embedding coords: ' + radec)
+    log ('   Ephemeris file (in ns): ' + nsephem)
+    log ('                 Duration: %f s (%d dumps)' % (durationSeconds, ndumps))
+
+    mydir = os.path.dirname (__file__)
+    script = os.path.join (mydir, 'fxlaunch.sh')
+    procs = []
+
+    for instr, hookup in mhookup.iteritems ():
+        outbase2 = outbase + '-' + instr
+        args = ['/bin/sh', script, src, str(freq), radec, str (ndumps),
+                outbase2, ','.join (hookup.antpols ()), hookup.lo, nsephem,
+                str (durationSeconds)]
+    
+        if noopMode:
+            log ('WOULD execute: %s' % (' '.join (args))) 
+        else:
+            log ('executing: %s' % (' '.join (args))) 
+
+        proc = subprocess.Popen (args, shell=False, close_fds=True,
+                                 stdin=file (os.devnull, 'r'),
+                                 stdout=file ('fx-%s.log' % instr, 'a'), 
+                                 stderr=subprocess.STDOUT)
+        procs.append (proc)
+
+    for proc in procs:
+        if proc.wait ():
+            log ('Catcher returned nonzero! %d' % proc.returncode)
+            raise Exception ('Catcher invocation failed.')
+    
+    account ('integrating for %d seconds' % durationSeconds, time.time () - tStart)
+
+
+def observe2 (mhookup, outBase, src, freq, integTimeSeconds):
+    global _lastFreq, _lastSrc, _lastSrcExpire
+
+    # save time in this case
+    assert _integTime is not None, 'Unknown integration time'
+
+    # Start the ants focusing. Don't wait for them, so that
+    # we can do other stuff while they're moving around.
+    setFocus (mhookup.ants (), freq, False)
+
+    f = src + '.ephem'
+    radec = ensureEphem (src, src, integTimeSeconds)
+    now = time.time ()
+    
+    # Start tracking. Same rationale as above.
+    if _lastSrc != src or now >= _lastSrcExpire:
+        trackEphem (mhookup.ants (), src, False)
+        _lastSrc = src
+        _lastSrcExpire = now + 2000 # ensureephem actually gives us 1.1 hours
+        needTrackWait = True
+    else: needTrackWait = False
+
+    if _lastFreq != freq:
+        for lo in mhookup.los ():
+            setSkyFreq (lo, freq)
+        _lastFreq = freq
+
+    if useAttens:
+        setupAttens2 (src, freq, mhookup)
+
+    # Fringe rotation. Start this last to not tickle the ibobs too much --
+    # auto-attening can fail with this going, I think.
+
+    for hookup in mhookup.hookups.itervalues ():
+        if hookup not in _registeredFringeKill:
+            atexit.register (lambda: fringeKill (hookup))
+            _registeredFringeKill.add (hookup)
+
+        fringeStart (hookup, src, freq)
+
+    try:
+        # Wait to finish tracking. This reissues the trackephem command,
+        # but we're already on the way so it doesn't take long to finish.
+        if needTrackWait:
+            trackEphem (mhookup.ants (), src, True)
+
+        # Wait for the ants to reach their focus if they haven't
+        # already.
+        waitForFocus (mhookup.ants ())
+
+        log ('@@ Beginning observations (%s, %s, %d MHz)' % (outBase, src, freq))
+        launchCatchers2 (mhookup, src, freq, radec, integTimeSeconds, outBase, src)
+    finally:
+        # Make sure to always kill the frotters.
+        for hookup in mhookup.hookups.itervalues ():
+            fringeStop (hookup)
