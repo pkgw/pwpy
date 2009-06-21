@@ -148,9 +148,10 @@ state = BBSState (freqLists, sources, mh, obsDurs, defaultObsDur)
 
 # Initial hardware setup.
 
+initAntennas (mh.ants ())
+
 for h in mh.hookups.itervalues ():
     lockServer ('lo' + h.lo)
-    initAntennas (h.ants ())
     checkIntegTime (h)
     fringeKill (h)
 
