@@ -182,13 +182,15 @@ def getScans (archDir, scriptName, scriptRev):
     # Consistency check
 
     prevTEnd = 0
+    prevTStart = 0
 
     for tSt, tEnd, src, freq, vis in scans:
-        if tSt < prevTEnd:
+        if tSt < prevTEnd and not (tSt == prevTStart and tEnd == prevTEnd):
             #print scans
             assert False, 'sequencing! %f %f %s %4f %s' % (tSt, tEnd, src,
                                                            freq, vis)
         prevTEnd = tEnd
+        prevTStart = tSt
 
     return catcherType, catcherRev, scans
 
