@@ -135,7 +135,7 @@ if len (sys.argv) != 4:
     sys.exit (1)
 
 reallyDoIt = parseMode (sys.argv[1])
-mh = MultiHookup (sys.argv[2].split (','))
+mh = ataprobe.MultiHookup (sys.argv[2].split (','))
 stopHour = float (sys.argv[3])
 
 # That was all prep. Now let's go!

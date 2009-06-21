@@ -1004,7 +1004,7 @@ def launchCatchers2 (mhookup, src, freq, radec, durationSeconds, outbase, ebase)
     script = os.path.join (mydir, 'fxlaunch.sh')
     procs = []
 
-    for instr, hookup in mhookup.iteritems ():
+    for instr, hookup in mhookup.hookups.iteritems ():
         outbase2 = outbase + '-' + instr
         args = ['/bin/sh', script, src, str(freq), radec, str (ndumps),
                 outbase2, ','.join (hookup.antpols ()), hookup.lo, nsephem,
@@ -1012,14 +1012,17 @@ def launchCatchers2 (mhookup, src, freq, radec, durationSeconds, outbase, ebase)
     
         if noopMode:
             log ('WOULD execute: %s' % (' '.join (args))) 
-        else:
-            log ('executing: %s' % (' '.join (args))) 
+            continue
+
+        log ('executing: %s' % (' '.join (args))) 
 
         proc = subprocess.Popen (args, shell=False, close_fds=True,
                                  stdin=file (os.devnull, 'r'),
                                  stdout=file ('fx-%s.log' % instr, 'a'), 
                                  stderr=subprocess.STDOUT)
         procs.append (proc)
+
+    # If noop mode, procs is still an empty array
 
     for proc in procs:
         if proc.wait ():
