@@ -179,6 +179,8 @@ class FitBase (object):
         if self._paramNames is None:
             raise Exception ('FitBase implementation %s needs to set _paramNames' \
                              % (self.__class__))
+        
+        self.x = self.y = self.sigmas = None
     
     def setData (self, x, y, sigmas=None):
         self.x = _N.asarray (x)
@@ -230,7 +232,7 @@ class FitBase (object):
         
         raise NotImplementedError ()
 
-    def _fitImpl (self, x, y, sig, guess):
+    def _fitImpl (self, x, y, sig, guess, reckless):
         """Obtain a fit in some way, and set at least the following
         fields:
         
@@ -251,8 +253,8 @@ class FitBase (object):
         
         raise NotImplementedError ()
 
-    def fit (self, guess=None, **kwargs):
-        guess = guess or self.guess ()
+    def fit (self, guess=None, reckless=False, **kwargs):
+        if guess is None: guess = self.guess ()
 
         self.params = None
         self.mfunc = None
@@ -263,8 +265,12 @@ class FitBase (object):
         if self.sigmas is None:
             raise ValueError ('Must assess uncertainties; try fakeSigmas')
 
-        self._fitImpl (self.x, self.y, self.sigmas, guess, **kwargs)
+        self._fitImpl (self.x, self.y, self.sigmas, guess,
+                       reckless, **kwargs)
 
+        if reckless:
+            return self
+        
         if self.params is None:
             raise RuntimeError ('Failed to find best-fit parameters')
         
@@ -297,10 +303,15 @@ class FitBase (object):
         self.params = _N.asarray (params)
         self.uncerts = _N.zeros_like (self.params)
         self.mfunc = self.makeModel (*self.params)
-        self.mdata = self.mfunc (self.x)
-        self.resids = self.y - self.mdata
-        self.rchisq = ((self.resids / self.sigmas)**2).sum () / \
+
+        if self.x is not None:
+            self.mdata = self.mfunc (self.x)
+            self.resids = self.y - self.mdata
+
+        if self.sigmas is not None:
+            self.rchisq = ((self.resids / self.sigmas)**2).sum () / \
                           (self.x.size - len (self.params))
+
         return self
     
     def printParams (self):
@@ -316,7 +327,7 @@ class FitBase (object):
         print '%s: %14g' % ('RChiSq'.rjust (lmax), self.rchisq)
         return self
 
-    def plot (self, dlines=True, smoothModel=True):
+    def plot (self, dlines=True, smoothModel=True, **kwargs):
         import omega
 
         if not smoothModel:
@@ -329,9 +340,9 @@ class FitBase (object):
         vb = omega.layout.VBox (2)
 
         if self.sigmas is not None:
-            vb.pData = omega.quickXYErr (self.x, self.y, self.sigmas, 'Data', lines=dlines)
+            vb.pData = omega.quickXYErr (self.x, self.y, self.sigmas, 'Data', lines=dlines, **kwargs)
         else:
-            vb.pData = omega.quickXY (self.x, self.y, 'Data', lines=dlines)
+            vb.pData = omega.quickXY (self.x, self.y, 'Data', lines=dlines, **kwargs)
 
         vb[0] = vb.pData
         vb[0].addXY (modx, mody, 'Model')
@@ -359,7 +370,7 @@ class LinearFit (FitBase):
     def makeModel (self, a, b):
         return lambda x: a + b * x
 
-    def _fitImpl (self, x, y, sig, guess):
+    def _fitImpl (self, x, y, sig, guess, reckless):
         # Ignore the guess since we can solve this exactly
         # Exact solution math copied out of Numerical Recipes in C
         # 2nd Ed. sec 15.2. (But no code copied)
@@ -429,7 +440,7 @@ class LeastSquaresFit (FitBase):
     
     _fitExport = None
     
-    def _fitImpl (self, x, y, sig, guess, **kwargs):
+    def _fitImpl (self, x, y, sig, guess, reckless, **kwargs):
         """Obtain a fit in some way, and set at least the following
         fields:
         
@@ -448,24 +459,18 @@ class LeastSquaresFit (FitBase):
         pfit, cov, xx, msg, success = leastsq (error, guess, full_output=True,
                                                **kwargs)
 
-        if success < 1 or success > 4:
+        if not reckless and (success < 1 or success > 4):
             raise Exception ('Least square fit failed: ' + msg)
 
-        if cov is None:
+        if not reckless and cov is None:
             print 'No covariance matrix!'
             print 'Fit params:', pfit
             print 'Message:', msg
             print 'Success code:', success
             raise Exception ('No covariance matrix!')
         
-        if len (guess) == 1:
-            # Coerce into arrayness.
-            self.params = _N.asarray ((pfit, ))
-        else:
-            self.params = pfit
-            
+        self.params = _N.atleast_1d (pfit)
         self.uncerts = _N.sqrt (cov.diagonal ())
-
         self.cov = cov
 
         if self._fitExport is not None:
@@ -501,16 +506,65 @@ class ConstrainedMinFit (FitBase):
     def __init__ (self):
         super (ConstrainedMinFit, self).__init__ ()
 
-        self._bounds = [(None, None)] * len (self._paramNames)
+        self._info = [{'parname': self._paramNames[i],
+                       'fixed': False,
+                       'limited': [False, False], 'limits': [0., 0.]}
+                      for i in xrange (0, len (self._paramNames))]
 
-    def setBound (self, pidx, min=None, max=None):
+    def setBounds (self, pidx, min=None, max=None):
         if pidx < 0 or pidx >= len (self._paramNames):
             raise ValueError ('pidx')
-        
-        self._bounds[pidx] = (min, max)
+
+        if min is None:
+            limitsmin = 0.
+            limitedmin = False
+        else:
+            limitsmin = min
+            limitedmin = True
+
+        if max is None:
+            limitsmax = 0.
+            limitedmax = False
+        else:
+            limitsmax = max
+            limitedmax = True
+            
+        t = self._info[pidx]
+        t['limits'] = (limitsmin, limitsmax)
+        t['limited'] = (limitedmin, limitedmax)
+        t['fixed'] = False # this is implicitly called for
         return self
     
-    def _fitImpl (self, x, y, sig, guess, **kwargs):
+    def fix (self, pidx, fixval):
+        if pidx < 0 or pidx >= len (self._paramNames):
+            raise ValueError ('pidx')
+
+        t = self._info[pidx]
+
+        if fixval is None:
+            t['fixed'] = False
+        else:
+            t['fixed'] = True
+            t['value'] = float (fixval)
+
+        return self
+
+
+    def tie (self, pidx, tieexpr):
+        if pidx < 0 or pidx >= len (self._paramNames):
+            raise ValueError ('pidx')
+
+        t = self._info[pidx]
+
+        if tieexpr is None:
+            del t['tied']
+        else:
+            t['tied'] = str (tieexpr)
+
+        return self
+        
+
+    def _fitImpl (self, x, y, sig, guess, reckless, **kwargs):
         from mpfit import mpfit
         
         w = sig ** -1
@@ -524,25 +578,21 @@ class ConstrainedMinFit (FitBase):
             #print 'R:', r
             return 0, _N.ravel (r * w)
 
-        info = [{'value': guess[i], 'parname': self._paramNames[i],
-                 'limited': [False, False], 'limits': [0., 0.]}
-                for i in xrange (0, len (self._paramNames))]
         for i in xrange (0, len (self._paramNames)):
-            bmin, bmax = self._bounds[i]
-
-            if bmin is not None:
-                info[i]['limited'][0] = True
-                info[i]['limits'][0] = bmin
-            if bmax is not None:
-                info[i]['limited'][1] = True
-                info[i]['limits'][1] = bmax
+            if self._info[i]['fixed']:
+                continue
+            self._info[i]['value'] = guess[i]
                 
-        self.mpobj = o = mpfit (error, parinfo=info, quiet=True, **kwargs)
+        self.mpobj = o = mpfit (error, parinfo=self._info, quiet=True, **kwargs)
 
-        if o.status < 0 or o.status == 5:
+        if not reckless and (o.status < 0 or o.status == 5):
             raise Exception ('MPFIT minimization failed: %d, %s' % (o.status,
                                                                     o.errmsg))
 
+        if not reckless and (o.perror is None):
+            raise Exception ('MPFIT failed to find uncerts: %d, %s' % (o.status,
+                                                                       o.errmsg))
+        
         # Coerce into arrayness.
         self.params = _N.atleast_1d (o.params)
         self.uncerts = _N.atleast_1d (o.perror)
@@ -596,14 +646,14 @@ class RealConstrainedMinFit (FitBase):
 
         self._bounds = [(None, None)] * len (self._paramNames)
 
-    def setBound (self, pidx, min=None, max=None):
+    def setBounds (self, pidx, min=None, max=None):
         if pidx < 0 or pidx >= len (self._paramNames):
             raise ValueError ('pidx')
         
         self._bounds[pidx] = (min, max)
         return self
     
-    def _fitImpl (self, x, y, sig, guess, **kwargs):
+    def _fitImpl (self, x, y, sig, guess, reckless, **kwargs):
         """Obtain a fit in some way, and set at least the following
         fields:
         
@@ -638,17 +688,11 @@ class RealConstrainedMinFit (FitBase):
         pfit, c, info = fmin_l_bfgs_b (rchisq, guess, grad, (), approx_grad,
                                        self._bounds, **kwargs)
 
-        if info['warnflag'] != 0:
+        if not reckless and info['warnflag'] != 0:
             raise Exception ('L-BFGS-B minimization failed: %d, %s' % (info['warnflag'],
                                                                        info['task']))
 
-        if len (guess) == 1:
-            # Coerce into arrayness.
-            self.params = _N.asarray ((pfit, ))
-        else:
-            self.params = pfit
-
-        print 'FIXME uncertainties???'
+        self.params = _N.atleast_1d (pfit)
         self.uncerts = _N.zeros_like (self.params)
 
         if self._fitExport is not None:
