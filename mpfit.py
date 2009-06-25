@@ -10,6 +10,9 @@
 # That page also mentions references to cite for the original algorithm
 # and Markwardt's port.
 
+# OpenOpt(.org) collects optimizers in Python and does not seem to be
+# hooked up to mpfit as of yet.
+
 """
 Perform Levenberg-Marquardt least-squares minimization, based on MINPACK-1.
 
