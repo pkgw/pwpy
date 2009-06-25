@@ -255,9 +255,6 @@ import gobject, gtk
 gdk = gtk.gdk
 from gtk import glade
 
-import omega.gtkThread as gtkThread
-import threading
-
 # A lot of this is copied from omega/gtkUtil.py as
 # a temp hack. Should be integrated.
 
@@ -408,95 +405,3 @@ class ArrayWindow (object):
     def onEnlargementChanged (self, spinbutton):
         self.enlargement = spinbutton.get_value_as_int ()
         self.update ()
-
-class ArrayViewer (object):
-    """Instantiating this viewer creates an ArrayWindow object that is
-    displayed via a GTK main loop run asynchronously in another thread. This
-    means that the window is displayed and kept updated without blocking
-    execution of the caller. Deleting the ArrayViewer object destroys
-    the ArrayWindow automatically."""
-    
-    def __init__ (self, array, parent=None, **kwargs):
-        self.window = None
-        self.lock = threading.Lock ()
-        
-        # see omega/gtkUtil:LiveDisplay.__init__ ().
-
-        import weakref
-        sref = weakref.ref (self)
-
-        def clear (obj):
-            instance = sref ()
-
-            if instance != None:
-                instance.lock.acquire ()
-                instance.window = None
-                instance.lock.release ()
-
-        # End obscurity.
-
-        def init ():
-            self.lock.acquire ()
-            self.window = ArrayWindow (array, parent, **kwargs)
-            self.lock.release ()
-            self.window.win.connect ('destroy', clear)
-            self.window.win.show_all ()
-
-        gtkThread.send (init)
-
-    def __del__ (self):
-        if self.window == None: return
-        if gtkThread == None: return # this can get GC'd before us!
-
-        # See omega/gtkUtil:LiveDisplay.__del__ ()
-
-        def doit ():
-            self.lock.acquire ()
-            if self.window != None:
-                self.window.win.destroy ()
-                self.window = None
-            self.lock.release ()
-
-        gtkThread.send (doit)
-
-    lingerInterval = 250
-    
-    def linger (self):
-        """Block the caller until the ArrayWindow window has been
-        closed by the user. Useful for semi-interactive programs to pause
-        while the user examines a plot."""
-
-        from Queue import Queue, Empty
-
-        q = Queue ()
-
-        def check_done ():
-            self.lock.acquire ()
-            haswin = self.window is not None
-            self.lock.release ()
-
-            if haswin:
-                return True
-            q.put (True)
-            return False
-
-        def doit ():
-            gobject.timeout_add (self.lingerInterval, check_done)
-
-        gtkThread.send (doit)
-        q.get ()
-
-def showBlocking (array, parent=None, **kwargs):
-    """Display an ndarray in a window. This function does not exit
-    until the user closes the window! Like the linger () function of
-    ArrayViewer, but doesn't involve threads, and so makes debugging
-    and such a bit easier."""
-
-    if gtkThread._thread is not None and gtkThread._thread.isAlive ():
-        raise Exception ('Can\'t do a showBlocking while the GTK main ' +
-                         'loop is running in another thread. Sorry.')
-    
-    w = ArrayWindow (array, parent, **kwargs)
-    w.win.connect ('destroy', gtk.main_quit)
-    w.win.show_all ()
-    gtk.main ()
