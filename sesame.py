@@ -30,15 +30,19 @@ def _run (source):
     
     for n1 in doc.documentElement.childNodes:
         if n1.nodeType != doc.ELEMENT_NODE: continue
-        if n1.localName != 'Resolver': continue
-
+        if n1.localName != 'Target': continue
+        
         for n2 in n1.childNodes:
             if n2.nodeType != doc.ELEMENT_NODE: continue
-            if n2.localName == 'jradeg':
-                radeg = float (_nodeText (n2))
-            elif n2.localName == 'jdedeg':
-                decdeg = float (_nodeText (n2))
-
+            if n2.localName != 'Resolver': continue
+        
+            for n3 in n2.childNodes:
+                if n3.nodeType != doc.ELEMENT_NODE: continue
+                if n3.localName == 'jradeg':
+                    radeg = float (_nodeText (n3))
+                elif n3.localName == 'jdedeg':
+                    decdeg = float (_nodeText (n3))
+                
     if radeg is None or decdeg is None:
         raise Exception ('Couldn\'t get info for ' + source)
 
