@@ -774,7 +774,7 @@ imlist in=$wd/tempmap.cm options=stat log=$wd/imlistcm >& /dev/null
 imlist in=$wd/tempmap.cm log=$wd/imlistcm2 >& /dev/null
 
 set beamsize = `grep Effective $wd/imlistcm | awk '{print $4*1}'`
-set nalevel = `echo $beamsize $tnoise $imsize | tr ',' ' ' | awk '{if ($4*1 == 0) print .5*$2*(log($3*$3/$1)-3); else print .5*$2*(log($3*$4/$1)-3)}'`
+set nalevel = `echo $beamsize $tnoise $imsize | tr ',' ' ' | awk '{if ($4*1 == 0) print $2*(log($3*$3/$1)-3); else print $2*(log($3*$4/$1)-3)}'` # Theoretical minimum max pixel magnitude
 
 set actnitersline = (`grep niters $wd/imlistcm2 | tr ':' ' '`)
 set actniters
@@ -788,37 +788,18 @@ while ("$actniters" == "")
     endif
 end
 set imstats = (`imstat in=$wd/tempmap.rs | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
-#set alevel = `echo $nalevel $tnoise $imstats[3] | awk '{print $1*$3/$2}'`
-set alevel = `echo $nalevel $tnoise $imstats[3] | awk '{print $1*$3/$2}'`
-set acheck = `echo $nalevel $tnoise $imstats[3-5] | awk '{if ($4+$5 >= 0) print $2*$4/($1*$3); else print -1*$2*$5/($1*$3)}'`
+set alevel = `echo $nalevel $tnoise $imstats[3] | awk '{print $1*$3/$2}'` # Expected minimum max pixel magnitude
+set acheck = `echo $alevel $imstats[4-5] | awk '{if ($4+$5 < 0) print $2/$1; else print -1*$3/$1}'`
+set nacheck = `echo $nalevel $imstats[4-5] | awk '{if ($4+$5 < 0) print $2/$1; else print -1*$3/$1}'`
+#echo $imstats
+#echo $nalevel $alevel $acheck
 cd $wd
-
 rm -f sfind.log; touch sfind.log
 if ($intclean || $mode != "skip") sfind in=tempmap.rs options=oldsfind,auto,nofit rmsbox=100 xrms=4 labtyp=arcsec >& /dev/null 
 cd ..
 
 #Verify that the residual maps look clean. If not, reclean or advise the user that recleaning needs to be performed
 echo "Currently at $niters cycles..."
-if (`echo $acheck | awk '{if ($1 < .975) print 1; else print 0}'` && "$niters" != "50") then
-    if ($intclean) then
-	set niters = `echo $niters $acheck | awk '{print int($1*$2)}'`
-	if ($niters < 50) set niters = 50
-	echo "WARNING: Overcleaning detected, rolling back to $niters iterations..."
-	rm -rf $wd/tempmap.clean $wd/tempmap.rs $wd/tempmap.cm
-	goto clean
-    else if ($mode == "skip" || $mode == "auto") then
-	echo "WARNING: Map potentially overcleaned..."
-    else
-	echo "WARNING: AUTOMAP has potentially found this map to be overcleaned."
-	echo "Would you like to adjust the number of iterations? ([y]es (n)o)"
-       	if ($< =~ "y"*) then
-	    echo "Enter niters:"
-	    set niters = $<
-	    rm -rf $wd/tempmap.clean $wd/tempmap.rs $wd/tempmap.cm
-	    goto clean
-	endif
-    endif
-endif
 
 if (`grep -v "#" $wd/sfind.log | awk '{if ($7*$6 > 3000*noise) cycles+=2*log((3000*noise)/($6*$7))/log(.9)} END {print int(cycles)*1}' noise=$imstats[3]` > `echo $niters | awk '{print int(.025*$1)}'` && $niters != 25000) then
     if (`echo $actniters $niters | awk '{if ($1*1 != $2*1) print 1; else print 0}'` || `echo $alevel | awk '{if ($1 < 1.025) print 1; else print 0}'`) then
@@ -839,6 +820,25 @@ if (`grep -v "#" $wd/sfind.log | awk '{if ($7*$6 > 3000*noise) cycles+=2*log((30
     else
 	echo "Warning! Automap has determined that this map is possibly undercleaned! Would you like to adjust niters? ([y]es (n)o)"
 	if ($< =~ "y"*) then
+	    echo "Enter niters:"
+	    set niters = $<
+	    rm -rf $wd/tempmap.clean $wd/tempmap.rs $wd/tempmap.cm
+	    goto clean
+	endif
+    endif
+else if (`echo $acheck $nacheck | awk '{if ($1 < 1 && $2 < 1) print 1; else print 0}'` && "$niters" != "50") then
+    if ($intclean) then
+	set niters = `echo $niters $acheck | awk '{print int($1*$2)}'`
+	if ($niters < 50) set niters = 50
+	echo "WARNING: Overcleaning detected, rolling back to $niters iterations..."
+	rm -rf $wd/tempmap.clean $wd/tempmap.rs $wd/tempmap.cm
+	goto clean
+    else if ($mode == "skip" || $mode == "auto") then
+	echo "WARNING: Map potentially overcleaned..."
+    else
+	echo "WARNING: AUTOMAP has potentially found this map to be overcleaned."
+	echo "Would you like to adjust the number of iterations? ([y]es (n)o)"
+       	if ($< =~ "y"*) then
 	    echo "Enter niters:"
 	    set niters = $<
 	    rm -rf $wd/tempmap.clean $wd/tempmap.rs $wd/tempmap.cm

@@ -155,10 +155,10 @@ endif
 
 set file #File(s) to be scanned
 set display = 0 # Whether or not to display results
-set corr = "nocorr" # Switch to apply corrections to data
+set corr = "corr" # Switch to apply corrections to data
 set csel # Option to select (or deselect) channel ranges
 set msel #Selection parameter
-set nsig = 3  # Number of sigma out to count channel as bad
+set nsig = 4  # Number of sigma out to count channel as bad
 set tsig = 0 # Number of sigma out to count channel as bad in timefocus
 set edgerfi = 0 # Number of channels around each RFI spike to count as bad
 set corrdisp = 0 #Display correctional information (debugging tool)
@@ -168,6 +168,7 @@ set chanlist #Switch for logfile/channel listing
 set rfitype = "pos" # Ident RFI with counts that are too high, too low, or both?
 set device = "/xs"
 set timefocus # Allows user to "zoom in" to particular time. Useful if trying to catch more intermittent RFI as well as persistent RFI
+set subint = 0 # Number of subintervals to scan for RFI in (mutually exclusive with the "timefocus" feature)
 set npoly = 6 #What order polynomial to apply in correction stage
 set rawdata
 set optlim = 0
@@ -195,7 +196,12 @@ else if ("$argv[1]" =~ 'crange='*) then
     set csel = (`echo "$argv[1]" | sed 's/crange=//g' | sed 's/),/) /g'`)
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'timefocus='*) then
+    set subint = 0
     set timefocus = (`echo "$argv[1]" | sed 's/timefocus=//g' | sed 's/),/) /g'`)
+    shift argv; if ("$argv" == "") set argv = "finish"
+else if ("$argv[1]" =~ 'subint='*) then
+    set timefocus
+    set subint = `echo $argv[1] | sed 's/subint=//g' | awk '{print int($1*1)}'`
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'edgerfi='*) then
     set edgerfi = (`echo "$argv[1]" | sed 's/edgerfi=//g' | awk '{print int($1*1)}'`)
@@ -292,7 +298,7 @@ endif
 if ($chanlist != "") then # Can specified chanlist file be created?
     rm -f $chanlist
     if (-e $chanlist) then
-	echo "FATAL ERROR: Name of chanlist file already exists..."
+	echo "FATAL ERROR: Name of chanlist file already exists and can't be removed..."
 	exit 1
     endif
 else
@@ -307,12 +313,15 @@ if (`echo $nsig | awk '{if ($1*1 < 2) print 1}'`) then
     set nsig = 3
 endif
 
-if !("$tsig") set tsig = `echo $nsig | awk '{print $1+1}'`
+if ("$tsig" == 0 && ("$subint" != "0" || "$timefocus" != "")) then
+    if ("$subint" != "0") set tsig = `echo $nsig $subint | awk '{print $1+log($2)}'`
+    if ("$timefocus" != "") set tsig = `echo $nsig $#timefocus | awk '{print $1+log($2)}'`
+endif
+if ("$tsig" == "0") set tsig = `echo $nsig | awk '{print $1+1}'`
 
 if (`echo $tsig $nsig | awk '{if ($1*1 < 2 || $1 < $2) print 1}'`) then
     echo "Time focus sigma multiplier below minimum threshold (2 sigma or nsig). Setting tsig to $nsig..."
     set tsig = $nsig
-    @ nsig++
 endif
 
 # Check to see that number of coeff for correctional polynomial is reasonable
@@ -426,7 +435,7 @@ foreach neg (`echo "$negcmd"`) #Begin negative selections first
 	    else if (`echo $times | awk '{if ($1 <= 24 && $2 <= 24) print "go"}'` == "go" || `echo $times | tr ':' ' ' | wc -w` > 2) then
 		if (`echo $times | tr ':' ' ' | wc -w` == 6) set times = (`echo $times | tr ':' ' '| awk '{print $1+$2/60+$3/3600,$4+$5/60+$6/3600}'`)
 		if (`echo $times | awk '{if ($1 > $2) print "swap"}'` == swap) then
-		    echo -n ' | '"awk '{if ("'24*($4%1)'" < $times[1] && "'24*($4%1)'" > $times[2]) if ("'24*($5%1)'" < $times[1] && "'24*($5%1)'" > $times[2]) print "'$0'"}'" >> $wd/neg.source
+		    echo -n ' | '"awk '{if ("'24*($5%1)'" < $times[1] && "'24*($4%1)'" > $times[2] && "'24*($4%1)'" < "'24*($5%1)'") print "'$0'"}'" >> $wd/neg.source
 		else
 		    echo -n ' | '"awk '{if ("'24*($4%1)'" < $times[1] && "'24*($5%1)'" < $times[1]) print "'$0'";else if ("'24*($4%1)'" > $times[2] && "'24*($5%1)'" > $times[2]) print "'$0'";else if ("'24*($4%1)'" > $times[2] && "'24*($5%1)'" < $times[1]) print "'$0'"}'" >> $wd/neg.source
 		endif
@@ -491,12 +500,12 @@ foreach pos (`echo "$poscmd"`)
 	    else if (`echo $times | awk '{if ($1 <= 24 || $2 <= 24) print "go"}'` == "go" || `echo $times | tr ':' ' ' | wc -w` > 2) then
 		if (`echo $times | tr ':' ' ' | wc -w` == 6) set times = (`echo $times | tr ':' ' '| awk '{print $1+$2/60+$3/3600,$4+$5/60+$6/3600}'`)
 		if (`echo $times | awk '{if ($1 > $2) print "swap"}'` == swap) then
-		    echo "awk '{if ("'24*($4%1)'" > $times[1] || "'24*($4%1)'" < $times[2]) print "'$0'"; else if ("'24*($5%1)'" > $times[1] || "'24*($5%1)'" < $times[2]) print "'$0'"; else if ("'24*($5%1)'" > $times[1] && "'24*($4%1)'" < $times[2]) print "'$0'"}' $wd/temp.neg" >> $wd/pos.source1
+		    echo "awk '{if ("'24*($4%1)'" >= $times[1] || "'24*($4%1)'" <= $times[2]) print "'$0'"; else if ("'24*($5%1)'" >= $times[1] || "'24*($5%1)'" <= $times[2]) print "'$0'"; else if ("'24*($5%1)'" >= $times[1] && "'24*($4%1)'" <= $times[2]) print "'$0'"}' $wd/temp.neg" >> $wd/pos.source1
 		else
-		    echo "awk '{if ("'24*($4%1)'" > $times[1] && "'24*($4%1)'" < $times[2]) print "'$0'"; else if ("'24*($5%1)'" > $times[1] && "'24*($5%1)'" < $times[2]) print "'$0'"; else if ("'24*($4%1)'" < $times[1] && "'24*($5%1)'" > $times[2]) print "'$0'"}' $wd/temp.neg" >> $wd/pos.source1
+		    echo "awk '{if ("'24*($4%1)'" >= $times[1] && "'24*($4%1)'" <= $times[2]) print "'$0'"; else if ("'24*($5%1)'" >= $times[1] && "'24*($5%1)'" <= $times[2]) print "'$0'"; else if ("'24*($4%1)'" <= $times[1] && "'24*($5%1)'" >= $times[2]) print "'$0'"}' $wd/temp.neg" >> $wd/pos.source1
 		endif
 	    else
-		echo "awk '{if ("'$4'" < $times[1] && "'$5'" > $times[1]) print "'$0'"; else if ("'$4'" < $times[2] && "'$5'" > $times[2]) print "'$0'"; else if ("'$4'" > $times[1] && "'$5'" < $times[2]) print "'$0'"}' $wd/temp.neg" >> $wd/pos.source1
+		echo "awk '{if ("'$4'" <= $times[1] && "'$5'" >= $times[1]) print "'$0'"; else if ("'$4'" <= $times[2] && "'$5'" >= $times[2]) print "'$0'"; else if ("'$4'" >= $times[1] && "'$5'" <= $times[2]) print "'$0'"}' $wd/temp.neg" >> $wd/pos.source1
 	    endif
 	else if ($pos =~ 'pol'*) then #Begin a poll of the pols
 	    set pols = (`echo $pos | tr 'pol(,)' ' ' | tr '[a-z]' '[A-Z]'` )
@@ -586,13 +595,39 @@ set idx = 1
 
 if ($#spec == 0) then
     echo "No spectra found!"
-    goto finish
+    goto fail
 endif
+
+cp $wd/temp.data $wd/specdata
+set badsubchans
+touch $wd/badsubchans
+if ($subint) then
+    set subvals = (`sort -unk4 $wd/temp.data | awk '{if (NR == 1) printf "%s ",$4; else {idx += 1; fin=$4}} END {printf "%s %s\n",fin,idx}'` 0 0 0)
+    if ($subint > $subvals[3]) set subint = $subvals[3]
+    while ($idx < $subint)
+	set subtimes = (`echo $subvals[1-2] $subint $idx | awk '{printf "%5.6f %5.6f\n",$1+((($4-1)/$3)*($2-$1)),$1+(($4/$3)*($2-$1))}'`)
+	newrfi32.csh vis=$wd chanlist=$wd/subchans crange="$csel" select=time"($subtimes[1],$subtimes[2])" nsig=$tsig edgerfi=$edgerfi options=$corr,$rfitype > /dev/null
+	if (-e $wd/subchans) sed 1,2d $wd/subchans | awk '{print $1}' >> $wd/badsubchans
+	@ idx++
+    end
+    set subtimes = ($subtimes[2] $subvals[2])
+    newrfi32.csh vis=$wd chanlist=$wd/subchans crange="$csel" select=time"($subtimes[1],$subtimes[2])" nsig=$tsig options=$corr,$rfitype edgerfi=$edgerfi > /dev/null
+    if (-e $wd/subchans) sed 1,2d $wd/subchans | awk '{print $1}' >> $wd/badsubchans
+    set badsubchans = (`sort -un $wd/badsubchans`)
+endif
+
+foreach timerange (`echo "$timefocus"`)
+    newrfi32.csh vis=$wd select=time"$timerange" chanlist=$wd/subchans crange="$csel"  edgerfi=$edgerfi options=$corr,$rfitype nsig=$tsig > /dev/null
+    if (-e $wd/subchans) sed 1,2d $wd/subchans | awk '{print $1}' >> $wd/badsubchans
+end
+
+set idx = 1
 
 #Arrange data into a file so that wip can read it
 while ($idx <= $chans)
     @ spec[$idx]++
-    echo $idx $spec[$idx] >> $wd/temp.spec
+    echo $idx $spec[$idx] >> $wd/temp.totspec
+    if !("$spec[$idx]" == "1" || " $badsubchans " =~ *" $idx "*) echo $idx $spec[$idx] >> $wd/temp.spec
     @ idx++
 end
 
@@ -635,8 +670,9 @@ cat $wd/old.spec $wd/temp.spec | awk '{print $1,"old"}' | sort -n | uniq -u > $w
 
 if ($corr != "corr") then
     cp $wd/temp.spec $wd/temp.spec2 
+    cp $wd/temp.totspec $wd/temp.totspec2
     goto aftercorr
-    endif
+endif
 
 awk '{print $2}' $wd/temp.spec | sort -n > $wd/temp.power
 
@@ -660,6 +696,7 @@ set delpower = `echo $cenpower | awk '{print int(.5+.5*($1^.5))}'`
 if ($delpower < 3) then #Lower limit for correction to be applied
     echo "Below threshold limits for statistical correction of data, moving on..."
     cp $wd/temp.spec $wd/temp.spec2 
+    cp $wd/temp.totspec $wd/temp.totspec2
     goto aftercorr
 else
     set yvals = (`awk '{print $1-cenpower}' cenpower=$cenpower $wd/temp.power | awk '{if (($1+3*delpower)^2 < delpower^2) SUM0 += 1; else if (($1+1*delpower)^2 < delpower^2) SUM1 += 1; else if (($1-1*delpower)^2 < delpower^2) SUM2 += 1; else if (($1-3*delpower)^2 < delpower^2) SUM3 += 1} END {print SUM0,SUM1,SUM2,SUM3}' delpower=$delpower | awk '{print log($1),log($2),log($3),log($4)}'`)
@@ -709,6 +746,7 @@ if ($corrdisp == "corrdisp") then
 endif
 
 awk '{if ($2 == 1) print $1,$2; else print $1,$2-x1*(($1-censpec)/1000)-x2*(($1-censpec)/1000)^2-x3*(($1-censpec)/1000)^3-x4*(($1-censpec)/1000)^4-x5*(($1-censpec)/1000)^5-x6*(($1-censpec)/1000)^6-x7*(($1-censpec)/1000)^7-x8*(($1-censpec)/1000)^8-x9*(($1-censpec)/1000)^9-x10*(($1-censpec)/1000)^10-x11*(($1-censpec)/1000)^11-x12*(($1-censpec)/1000)^12}' x1=$coeffs[2] x2=$coeffs[3] x3=$coeffs[4] x4=$coeffs[5] x5=$coeffs[6] x6=$coeffs[7] x7=$coeffs[8] x8=$coeffs[9] x9=$coeffs[10] x10=$coeffs[11] x11=$coeffs[12] x12=$coeffs[13] censpec=$censpec $wd/temp.spec | awk '{if ($2 < 1) print $1,1; else print $0}' > $wd/temp.spec2
+awk '{if ($2 == 1) print $1,$2; else print $1,$2-x1*(($1-censpec)/1000)-x2*(($1-censpec)/1000)^2-x3*(($1-censpec)/1000)^3-x4*(($1-censpec)/1000)^4-x5*(($1-censpec)/1000)^5-x6*(($1-censpec)/1000)^6-x7*(($1-censpec)/1000)^7-x8*(($1-censpec)/1000)^8-x9*(($1-censpec)/1000)^9-x10*(($1-censpec)/1000)^10-x11*(($1-censpec)/1000)^11-x12*(($1-censpec)/1000)^12}' x1=$coeffs[2] x2=$coeffs[3] x3=$coeffs[4] x4=$coeffs[5] x5=$coeffs[6] x6=$coeffs[7] x7=$coeffs[8] x8=$coeffs[9] x9=$coeffs[10] x10=$coeffs[11] x11=$coeffs[12] x12=$coeffs[13] censpec=$censpec $wd/temp.totspec | awk '{if ($2 < 1) print $1,1; else print $0}' > $wd/temp.totspec2
 
 #Now that corrections have been applied, recalculate gaussian profile
 aftercorr:
@@ -746,7 +784,8 @@ set sigma = `echo $sigma $cenpower | awk '{if ($1 > $2^.5) print $1;else print $
 # Sort the wheat from the chaff, the good channels from the bad
 awk '{if (($2-finpower)^2 > (nsig^2)*sigma^2) print $1,($2-finpower)/sigma}' finpower=$finpower sigma=$sigma nsig=$nsig $wd/temp.spec2 > $wd/temp.bad
 
-cat $wd/*.spec2 | awk '{if ($2 == "old") print $1,finpower,"0"; else print $0,($2-finpower)/sigma}' finpower=$finpower sigma=$sigma nsig=$nsig | sort -nk1 > $wd/temp.spec3
+awk '{print $0,($2-finpower)/sigma}' finpower=$finpower sigma=$sigma nsig=$nsig $wd/temp.spec2 | sort -nk1 > $wd/temp.spec3
+awk '{print $0,($2-finpower)/sigma}' finpower=$finpower sigma=$sigma nsig=$nsig $wd/temp.totspec2 | sort -nk1 > $wd/temp.totspec3
 
 set idx = 1
 set lim = `wc -l $wd/temp.bad | awk '{print $1}'`
@@ -755,7 +794,7 @@ if ($edgerfi != 0 && $lim != 0) then
     echo "EdgeRFI protection initiated with $edgerfi channel buffer zone..."
     while ($idx <= $lim)
 	set vals = (`sed -n {$idx}p $wd/temp.bad | awk '{print $2; if ($1-edge < 1) print "1"; else print $1-edge; if ($1+edge > chans) print chans; else print $1+edge}' chans=$chans edge=$edgerfi`)
-	sed -n "$vals[2],$vals[3]p" $wd/temp.spec3 | awk '{print $0,prime}' prime=$vals[1] >> $wd/temp.badlist
+	sed -n "$vals[2],$vals[3]p" $wd/temp.totspec3 | awk '{print $0,prime}' prime=$vals[1] >> $wd/temp.badlist
 	@ idx++
     end
     awk '{if ($4 < 0) print $1,$2,$3}' $wd/temp.badlist | sort -unk1 > $wd/temp.bad1
@@ -769,22 +808,35 @@ else
     awk '{if ($3^2 <= (nsig^2)) print $0}' nsig=$nsig $wd/temp.spec3 > $wd/temp.good
     touch $wd/temp.bad1
     touch $wd/temp.bad2
+    touch $wd/temp.bad3
 endif
 #if the display parameter has been invoked...
+touch $wd/temp.bad1
+touch $wd/temp.bad2
+touch $wd/temp.bad3
+
+foreach badsubchan ($badsubchans)
+    sed -n {$badsubchan}p $wd/temp.totspec3 >> $wd/temp.bad3
+end
 
 if ($display) then
-
     echo "device $device" > $wd/temp.wip
     echo "data $wd/temp.spec2" >> $wd/temp.wip
     echo 'xcol 1' >> $wd/temp.wip
     echo 'ycol 2' >> $wd/temp.wip
     echo 'log y' >> $wd/temp.wip
     echo 'lim' >> $wd/temp.wip
+    echo "data $wd/temp.totspec2" >> $wd/temp.wip
+    echo 'xcol 1' >> $wd/temp.wip
+    echo 'ycol 2' >> $wd/temp.wip
+    echo 'log y' >> $wd/temp.wip
     echo 'box cbnst cbnstl' >> $wd/temp.wip
     echo 'conn' >> $wd/temp.wip
     echo 'mtext t 1 .5 .5 RFI counts' >> $wd/temp.wip
     echo 'mtext l 2.5 .5 .5 RFI Count' >> $wd/temp.wip
     echo 'mtext b 2.5 .5 .5 Channel Number' >> $wd/temp.wip
+    echo 'color 7' >> $wd/temp.wip
+    echo 'poi'  >> $wd/temp.wip
     if (`wc -l $wd/temp.bad1 | awk '{print $1}'` > 0) then
 	echo "data $wd/temp.bad1" >> $wd/temp.wip
 	echo 'color 4' >> $wd/temp.wip
@@ -801,6 +853,14 @@ if ($display) then
 	echo 'log y' >> $wd/temp.wip
 	echo 'poi' >> $wd/temp.wip
     endif
+    if (`wc -l $wd/temp.bad3 | awk '{print $1}'` > 0) then
+	echo "data $wd/temp.bad3" >> $wd/temp.wip
+	echo 'color 8' >> $wd/temp.wip
+	echo 'xcol 1' >> $wd/temp.wip
+	echo 'ycol 2' >> $wd/temp.wip
+	echo 'log y' >> $wd/temp.wip
+	echo 'poi' >> $wd/temp.wip
+    endif
     if (`wc -l $wd/temp.good | awk '{print $1}'` > 0) then
 	echo "data $wd/temp.good" >> $wd/temp.wip
 	echo 'color 3' >> $wd/temp.wip
@@ -809,46 +869,49 @@ if ($display) then
 	echo 'log y' >> $wd/temp.wip
 	echo 'poi' >> $wd/temp.wip
     endif
+
     echo 'end' >> $wd/temp.wip
     wip $wd/temp.wip > /dev/null
 endif
 
 if ($rfitype == "pos") then
     set badscore = `cat $wd/temp.bad2 | awk '{if (NR == 1) print $1; else printf "%d\n%d ",$1,$1}' | awk '{if ($2-$1 == 1) C1 += 1; else if ($2-$1 == 2) C2 += 1; else if ($2-$1 == 3) C3 += 1; else if ($2-$1 == 4) C4 += 1} END {print (1*C1)+(1*C2)+(1*C3)+(1*C4)}'`
+    set badchans = (`cat $wd/temp.bad2 | sort -nk1 | awk '{print $1}'`)
 else if ($rfitype == "neg") then
     set badscore = `cat $wd/temp.bad1 | awk '{if (NR == 1) print $1; else printf "%d\n%d ",$1,$1}' | awk '{if ($2-$1 == 1) C1 += 1; else if ($2-$1 == 2) C2 += 1; else if ($2-$1 == 3) C3 += 1; else if ($2-$1 == 4) C4 += 1} END {print (1*C1)+(1*C2)+(1*C3)+(1*C4)}'`
+    set badchans = (`cat $wd/temp.bad1 | sort -nk1 | awk '{print $1}'`)
 else
     set badscore = `cat $wd/temp.bad1 $wd/temp.bad2 | sort -u | awk '{if (NR == 1) print $1; else printf "%d\n%d ",$1,$1}' | awk '{if ($2-$1 == 1) C1 += 1; else if ($2-$1 == 2) C2 += 1; else if ($2-$1 == 3) C3 += 1; else if ($2-$1 == 4) C4 += 1} END {print (1*C1)+(1*C2)+(1*C3)+(1*C4)}'`
+    set badchans = (`cat $wd/temp.bad1 $wd/temp.bad2 | sort -nk1 | awk '{print $1}'`)
 endif
 
 echo `wc -l $wd/temp.bad | awk '{print $1}'` bad channels detected "("`wc -l $wd/temp.bad1 | awk '{print $1}'` low, `wc -l $wd/temp.bad2 | awk '{print $1}'` high", corruption score $badscore"')'
 
-echo `wc -l $wd/temp.bad | awk '{print $1}'` bad channels detected "("`wc -l $wd/temp.bad1 | awk '{print $1}'` low, `wc -l $wd/temp.bad2 | awk '{print $1}'` high", corruption score $badscore"')' > $chanlist
+echo -n `wc -l $wd/temp.bad | awk '{print $1}'` bad channels detected "("`wc -l $wd/temp.bad1 | awk '{print $1}'` low, `wc -l $wd/temp.bad2 | awk '{print $1}'` high", corruption score $badscore" > $chanlist
+
+if ($subint != 0 || "$timefocus" != "") echo `echo $badsubchans | wc -w`" bad channels identified in subintervals"
+
+if ($subint != 0 || "$timefocus" != "") then
+    echo ", $#badsubchans IDed as bad in subintervals)"  >> $chanlist
+else
+    echo ")"  >> $chanlist
+endif
+
 echo "Chan Counts Sigma" >> $chanlist
 if ($rfitype == "pos") then
     cat $wd/temp.bad2 >> $chanlist
+    awk '{print $0,"(subint)"}' $wd/temp.bad3 >> $chanlist
 else if ($rfitype == "neg") then
     cat $wd/temp.bad1 >> $chanlist
+    awk '{print $0,"(subint)"}' $wd/temp.bad3 >> $chanlist
 else 
     cat $wd/temp.bad2 $wd/temp.bad1 >> $chanlist
+    awk '{print $0,"(subint)"}' $wd/temp.bad3 >> $chanlist
 endif
 
-    cp $wd/temp.data $wd/specdata
+# If flagopt commands have been issued, invoke them now
 
-# If timefocus and flagpt commands have been issued, invoke them now
-
-if ($flagopt != "flagopt") then
-    foreach timerange (`echo "$timefocus"`)
-	newrfi32.csh vis=$wd crange="$csel" select=time"$timerange" nsig=$nsig options=$corr,$rfitype chanlist=$wd/focus.list
-	echo "time$timerange focus command issued" >> $chanlist
-	if (-e $wd/focus.list) then
-	    cat $wd/focus.list >> $chanlist
-	else
-	    echo "No data in time focus!"
-	endif
-    end
-    goto finish
-endif
+if ($flagopt != "flagopt") goto finish
 
 if ($edgerfi != 0 && $optlim == 0) set optlim = $chans
 
@@ -857,15 +920,8 @@ echo "MIRIAD optimized line flag commands:" >> $chanlist
 
 grep -iv "o" $chanlist | awk '{print $1}' | sort -un | grep '.' > $wd/optlist
 
-foreach timerange (`echo "$timefocus"`)
-    newrfi32.csh vis=$wd crange="$csel" select=time"$timerange" nsig=$tsig options=$corr,$rfitype npoly=npoly chanlist=$wd/focus.list
-    echo "time$timerange focus command issued" >> $chanlist
-    if (-e $wd/focus.list) then
-        cat $wd/focus.list >> $chanlist
-	grep -iv "o" $wd/focus.list | awk '{print $1}' | grep '.' >> $wd/optlist
-    else
-        echo "No data in time focus!"
-    endif
+foreach badsubchan ($badsubchans)
+    echo $badsubchan >> $wd/optlist
 end
 
 sort -un $wd/optlist > $wd/optlist2
@@ -876,7 +932,6 @@ set optcount = `wc -l $wd/optlist | awk '{print $1}'`
 set optdelta = $optcount
 
 while (`wc -l $wd/optlist | awk '{print $1}'` > 1 && $optlim <= $optdelta)
-#    set rfioptlist = (`cat $wd/optlist`)
     set lim = `wc -l $wd/optlist | awk '{print $1}'`
     set cmax = 2
     set iidx = 1
@@ -931,6 +986,16 @@ endif
 
 finish:
 
+if ("$chanlist" == "$wd/rfi32.log") then
+    echo ""
+    echo "BADCHANS: $badchans"
+    if ("$subint" != "0" || "$timefocus" != "") echo "BADSUBCHANS: $badsubchans"
+endif
+if ("$flagopt" == "flagopt" && "$chanlist" == "$wd/rfi32.log") then
+    echo ""
+    echo "MIRIAD optimized flagging commands"
+    sed 1,2d $chanlist | awk '{if ($1*1 == 0) print $0}' | sed 1,2d
+endif
 if ("$rawdata" != "") then
     mv $wd/temp.data $rawdata
 endif
