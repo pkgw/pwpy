@@ -6,7 +6,7 @@ import glob, string
 
 def main():
     # get files in order
-    files = glob.glob('im-0.2s/*rm')
+    files = glob.glob('itime-bin4/*rm')
     filesort = natsorted(files)
 
     peak = []
