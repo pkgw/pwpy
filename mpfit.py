@@ -939,7 +939,7 @@ Keywords:
       if (len(wh) > 0):
          self.errmsg = 'ERROR: MPMINSTEP is greater than MPMAXSTEP'
          return
-      wh = Numeric.nonzero((qmin!=0.) & (qmax!=0.))
+      wh = Numeric.nonzero((qmin!=0.) | (qmax!=0.))
       qminmax = len(wh > 0)
 
       ## Finish up the free parameters
