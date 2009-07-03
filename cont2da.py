@@ -211,7 +211,8 @@ goright - If True, trace the contour rightward (as looking uphill,
                 break
     else:
         # Did not break out of loop -- too many pts.
-        raise RuntimeError ('Needed too many points to close contour.')
+        #raise RuntimeError ('Needed too many points to close contour.')
+        print 'temp exit before completion.'
 
     # Woohoo! All done.
 
