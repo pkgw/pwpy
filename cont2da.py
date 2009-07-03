@@ -8,12 +8,12 @@ well with poorly-behaved ones.
 import numpy as N
 
 def cont2da (f, df, x0, y0, maxiters=5000, defeta=0.05, netastep=12,
-             vtol1=1e-3, vtol2=1e-8, maxnewt=20):
+             vtol1=1e-3, vtol2=1e-8, maxnewt=20, dorder=7, goright=False):
     """Required arguments:
     
 f  - a function, mapping (x, y) -> z
-df - the derivative: df (x, y) -> [df/dx, df/dy]. If None, the
-     derivative of f is approximated numerically with
+df - the partial derivative: df (x, y) -> [dz/dx, dz/dy]. If None,
+     the derivative of f is approximated numerically with
      scipy.derivative.
 x0 - initial x value. Should be of "typical" size for the problem;
      avoid 0.
@@ -36,6 +36,11 @@ vtol2 - Tolerance for constancy in the value of the function in the
   f(x0,y0) * vtol2. Default 1e-8.
 maxnewt - Maximum number of Newton's method steps to take when
   attempting to hone in on the desired function value. Default 20.
+dorder - Number of function evaluations to perform when evaluating
+  the derivative of f numerically. Must be an odd integer greater
+  than 1. Default 7.
+goright - If True, trace the contour rightward (as looking uphill,
+  rather than leftward (the default).
 """
     
     # Coerce argument types.
@@ -72,8 +77,8 @@ maxnewt - Maximum number of Newton's method steps to take when
         
         def df (x1, y1):
             print 'df %.20g %.20g' % (x1, y1)
-            dx = derivative (lambda x: f (x, y1), x1, derivx, order=7)
-            dy = derivative (lambda y: f (x1, y), y1, derivy, order=7)
+            dx = derivative (lambda x: f (x, y1), x1, derivx, order=dorder)
+            dy = derivative (lambda y: f (x1, y), y1, derivy, order=dorder)
             print '   -> %.20g %.20g' % (dx, dy)
             return [dx, dy]
     
@@ -135,8 +140,12 @@ maxnewt - Maximum number of Newton's method steps to take when
         # the left (arbitrarily) from that direction. We need to
         # figure out how far we can safely move in this direction.
 
-        dx = -dfdy * defeta
-        dy = dfdx * defeta
+        if goright:
+            dx = dfdy * defeta
+            dy = -dfdx * defeta
+        else:
+            dx = -dfdy * defeta
+            dy = dfdx * defeta
         i = 0
 
         while i < netastep:
@@ -176,7 +185,7 @@ maxnewt - Maximum number of Newton's method steps to take when
 
             nx -= dv * dfdx / df2
             ny -= dv * dfdy / df2
-            print 'N:', nx, ny, dfdx/df2, dfdy/df2, dv
+            print 'N:', i, nx, ny, dfdx/df2, dfdy/df2, dv
             nv = f (nx, ny)
 
             if abs (nv/v - 1) < vtol2:
