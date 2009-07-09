@@ -49,12 +49,13 @@ echo "directories are supposed to be automatically deleted after"
 echo "RFISCAN completes, but might remain in the event of a program"
 echo "error. Remnant directories can be safely deleted."
 echo ""
-echo "CALLING SEQUENCE: newrfisweep.csh vis=vis (tvis=tvis"
-echo "    interval=interval nsig=nsig npoly=npoly tsig=tsig csig=csig"
-echo "    cpoly=cpoly crange=crange edgerfi=edgerfi device=device" 
-echo "    corrcycle=corrcycle options=[corr,nocorr],[recover,destory,"
-echo "    ignore],[pos,neg,mixed],rescan,debug,[outsource.insource],"
-echo "    [autoedge,noautoedge],[seedcorr,noseedcorr]),noflag"
+echo "CALLING SEQUENCE: newrfisweep.csh vis=vis (tvis=tvis scans=scans"
+echo "    interval=interval subint=subint nsig=nsig npoly=npoly"
+echo "    tsig=tsig csig=csig cpoly=cpoly crange=crange"
+echo "    edgerfi=edgerfi device=device corrcycle=corrcycle options="
+echo "    [corr,nocorr],[recover,destory,ignore],[pos,neg,mixed],"
+echo "    rescan,debug,[outsource.insource],[autoedge,noautoedge],"
+echo "   [seedcorr,noseedcorr]),noflag"
 echo ""
 echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 echo ""
@@ -72,12 +73,20 @@ echo "    channels to be flagged (i.e. they will be flagged only, not"
 echo "    analyzed. Supports multiple files and wildcard expansion. No"
 echo "    default."
 echo ""
+echo " scans - The number of scans to perform on each time interval."
+echo "    Useful when there is particularly strong RFI that can"
+echo "    dominate the scanner. Default is 1."
+echo ""
 echo " interval - Time period (in minutes) for an individual flagging"
 echo "    cycle. The less constant the RFI believed to be in data, the"
 echo "    shorter this length should be (e.g. at 1430 MHz, RFI changes"
 echo "    drastically, so the interval should be 5-10 minutes. At 2750"
 echo "    MHz, the RFI environment is quiet and unchanging, so the"
 echo "    interval should be 20-30 minutes). Default is 12."
+echo ""
+echo " subint - Number of subintervals to scan. Useful for catching"
+echo "    intermittent RFI or RFI that changes in frequency over time/"
+echo "    position. Default is 3."
 echo ""
 echo " nsig - How far from the 'center' (in sigma) of the band at"
 echo "    which to identify channels as 'bad' for RFI analysis. See"
@@ -185,9 +194,9 @@ set fsel = ("pol(xx)" "pol(yy)")
 set vis # Files to be scanned for RFI and flagged
 set tvis # Files to be flagged for RFI, but NOT scanned!
 set inttime = 12.5 # RFI integration time for the subinterval
-set nsig = 3 # Number of sigma for RFI flagging in wide interval
-set tsig = 4 # Number of sigma for RFI flagging in narrow interval
-set csig = 5 # Number of sigma for corruption ID
+set nsig = 4 # Number of sigma for RFI flagging in wide interval
+set tsig = 0 # Number of sigma for RFI flagging in narrow interval
+set csig = 6 # Number of sigma for corruption ID
 set cpoly = 6 # Order of poly correction for corruption ID
 set npoly = 6 # Order of poly correction for RFI flagging
 set corr = "corr" # Use corrective polynomial for RFI scanning and final spectrum for spectral corruption scanning
@@ -207,6 +216,8 @@ set autoedge = 1 # Use autoedge utility?
 set autoedgechan = 100 # Number of channels on edges to flag
 set device # Display device for stuff
 set flag = 1 # Whether or not to flag
+set subint = 3
+set scans = 1
 
 #Alright, lets see if I can finally properly comment this code...
 #Below is the variable assignment listing, further documentation on this will be available shortly
@@ -271,6 +282,8 @@ else if ("$argv[1]" =~ 'options='*) then
 	    set rescan = 1
 	else if ($option == "noflag") then
 	    set flag = 0
+	else if ($option == "maxsubint") then
+	    set subint = 9999999
 	else
 	    set badopt = ($badopt $option)
 	endif
@@ -281,8 +294,18 @@ else if ("$argv[1]" =~ 'device='*) then
     set display = 1
     set device = "$argv[1]"
     shift argv; if ("$argv" == "") set argv = "finish"
+else if ("$argv[1]" =~ 'scans='*) then
+    set scans = `echo "$argv[1]" | sed 's/scans=//g' | awk '{print int($1*1)}'`
+    if ($scans == 0) then
+	echo "FATAL ERROR: Number of scans not recognized!"
+	exit 1
+    endif
+    shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'interval='*) then
     set inttime = `echo "$argv[1]" | sed 's/interval=//g' | awk '{print $1*1}'`
+    shift argv; if ("$argv" == "") set argv = "finish"
+else if ("$argv[1]" =~ 'subint='*) then
+    set subint = `echo "$argv[1]" | sed 's/subint=//g' | awk '{print int($1*1)}'`
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'npoly='*) then
     set npoly = (`echo "$argv[1]" | sed 's/npoly=//g' | awk '{print 1+int($1*1)}'`)
@@ -622,19 +645,11 @@ while ($idx <= $lim)
     # Improvements made here, no more subcycles, just main cycles
     echo "Beginning cycle $idx (of $lim) scanning..."
     set timesel = "time($starttime,$stoptime)"
-    if ($lim == 1) then
-	set timefocus
-    else if ($idx == 1) then
-	set timefocus = "($mastertime2[$idx],$mastertime2[$postidx]),($mastertime2[$postidx],$mastertime2[$dpostidx])"
-    else if ($idx == $lim) then
-	set timefocus = "($mastertime2[$idx],$mastertime2[$postidx]),($mastertime2[$preidx],$mastertime2[$idx])"
-    else
-	set timefocus = "($mastertime2[$preidx],$mastertime2[$idx]),($mastertime2[$idx],$mastertime2[$postidx]),($mastertime2[$postidx],$mastertime2[$dpostidx])"
-    endif
     if (-e $wd/flagslist) cp $wd/flagslist $wd/flagslist.bu
     
     if ($flaglist[1] != "") then
-	newrfi32.csh vis=$wd/vis options=flagopt,$corr,$rfitype chanlist=$wd/flagslist timefocus="$timefocus" edgerfi=$edgerfi npoly=$npoly nsig=$nsig select="$timesel,$fsel[1] $timesel,$fsel[2]" $csel $device >& /dev/null
+	newrfi32.csh vis=$wd/vis options=flagopt,$corr,$rfitype chanlist=$wd/flagslist subint=$subint edgerfi=$edgerfi npoly=$npoly nsig=$nsig select="$timesel,$fsel[1] $timesel,$fsel[2]" $csel $device >& /dev/null
+#	echo "newrfi32.csh vis=$wd/vis options=flagopt,$corr,$rfitype chanlist=$wd/flagslist subint=$subint edgerfi=$edgerfi npoly=$npoly nsig=$nsig select=$timesel,$fsel[1] $timesel,$fsel[2] $csel $device"
     else
 	echo "No source information found, using the last results..."
 	if (-e $wd/flagslist.bu) cp $wd/flagslist.bu $wd/flagslist
@@ -651,6 +666,35 @@ while ($idx <= $lim)
 	echo -n "."
     end
     echo "."
+    set scanidx = 2
+    if ($vals[5] != "" && $outsource && $flag) then
+	while ($scanidx <= $scans)
+	    echo "Beginning scanning pass $scanidx (of $scans)..."
+	    foreach file (`echo $vals[5] | tr ',' ' '`)
+		if ($autoedge) then
+		    newrfi.csh vis=$wd/$file$cycle interval=1 options=autoedge >& /dev/null
+		else
+		    newrfi.csh vis=$wd/$file$cycle interval=1 >& /dev/null
+		endif
+	    end
+	    set passtwo = `echo "$wd/"$vals[5]"$cycle" | sed "s/,vis/$cycle,$wd\/vis/g" | sed "s/,$cycle/$cycle/"`
+	    newrfi32.csh vis=$passtwo options=flagopt,$corr,$rfitype chanlist=$wd/flagslist subint=$subint edgerfi=$edgerfi npoly=$npoly nsig=$nsig select="$timesel,$fsel[1] $timesel,$fsel[2]" $csel $device >& /dev/null
+	    if !(-e $wd/flagslist) touch $wd/flagslist
+	    if (! -e $wd/flagslist && -e $wd/flagslist.bu) cp $wd/flagslist.bu $wd/flagslist	    
+	    echo "Beginning tier-$scanidx flagging. "`grep line=chan $wd/flagslist | tr ',' ' ' | awk '{SUM += $2} END {print SUM*1}'`" channels to flag in "`grep line=chan $wd/flagslist | wc -l`" iterations."
+	    set starttime = "`julian options=quiet jday=$mastertime[$idx]`"
+	    set stoptime = "`julian options=quiet jday=$mastertime[$postidx]`"
+	    foreach linecmd (`grep "line=chan" $wd/flagslist`)
+		foreach file (`echo $flaglist`)
+		    if ($flag) uvflag $linecmd vis=$file options=none flagval=f select=time"($starttime,$stoptime)" > /dev/null
+		end
+		echo -n "."
+	    end
+	    echo "."
+	    @ scanidx++
+	end
+    endif
+
     @ preidx++ idx++ postidx++ dpostidx++
     echo "Completed cycle. Processing time was "`date +%s | awk '{print int(($1-cycletime)/60)" minute(s) "int(($1-cycletime)%60)" second(s)."}' cycletime=$cycletime`
 end

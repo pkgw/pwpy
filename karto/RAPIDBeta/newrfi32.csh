@@ -602,18 +602,23 @@ cp $wd/temp.data $wd/specdata
 set badsubchans
 touch $wd/badsubchans
 if ($subint) then
-    set subvals = (`sort -unk4 $wd/temp.data | awk '{if (NR == 1) printf "%s ",$4; else {idx += 1; fin=$4}} END {printf "%s %s\n",fin,idx}'` 0 0 0)
-    if ($subint > $subvals[3]) set subint = $subvals[3]
-    while ($idx < $subint)
-	set subtimes = (`echo $subvals[1-2] $subint $idx | awk '{printf "%5.6f %5.6f\n",$1+((($4-1)/$3)*($2-$1)),$1+(($4/$3)*($2-$1))}'`)
-	newrfi32.csh vis=$wd chanlist=$wd/subchans crange="$csel" select=time"($subtimes[1],$subtimes[2])" nsig=$tsig edgerfi=$edgerfi options=$corr,$rfitype > /dev/null
+    if (`sort -unk4 $wd/temp.data | wc -l` <= 1) then
+	echo "WARNING: Not enough datapoints to do subintervals..."
+	set subint = 0
+    else
+	set subvals = (`sort -unk4 $wd/temp.data | awk '{if (NR == 1) printf "%s ",$4; else {idx += 1; fin=$4}} END {printf "%s %s\n",fin,idx}'` 0 0 0)
+	if ($subint > $subvals[3]) set subint = $subvals[3]
+	while ($idx < $subint)
+	    set subtimes = (`echo $subvals[1-2] $subint $idx | awk '{printf "%5.6f %5.6f\n",$1+((($4-1)/$3)*($2-$1)),$1+(($4/$3)*($2-$1))}'`)
+	    newrfi32.csh vis=$wd chanlist=$wd/subchans crange="$csel" select=time"($subtimes[1],$subtimes[2])" nsig=$tsig edgerfi=$edgerfi options=$corr,$rfitype > /dev/null
+	    if (-e $wd/subchans) sed 1,2d $wd/subchans | awk '{print $1}' >> $wd/badsubchans
+	    @ idx++
+	end
+	set subtimes = ($subtimes[2] $subvals[2])
+	newrfi32.csh vis=$wd chanlist=$wd/subchans crange="$csel" select=time"($subtimes[1],$subtimes[2])" nsig=$tsig options=$corr,$rfitype edgerfi=$edgerfi > /dev/null
 	if (-e $wd/subchans) sed 1,2d $wd/subchans | awk '{print $1}' >> $wd/badsubchans
-	@ idx++
-    end
-    set subtimes = ($subtimes[2] $subvals[2])
-    newrfi32.csh vis=$wd chanlist=$wd/subchans crange="$csel" select=time"($subtimes[1],$subtimes[2])" nsig=$tsig options=$corr,$rfitype edgerfi=$edgerfi > /dev/null
-    if (-e $wd/subchans) sed 1,2d $wd/subchans | awk '{print $1}' >> $wd/badsubchans
-    set badsubchans = (`sort -un $wd/badsubchans`)
+	set badsubchans = (`sort -un $wd/badsubchans`)
+    endif
 endif
 
 foreach timerange (`echo "$timefocus"`)
@@ -630,6 +635,11 @@ while ($idx <= $chans)
     if !("$spec[$idx]" == "1" || " $badsubchans " =~ *" $idx "*) echo $idx $spec[$idx] >> $wd/temp.spec
     @ idx++
 end
+
+if (`wc -l $wd/temp.spec | awk '{print int($1*1)}'` < `wc -l $wd/temp.totspec | awk '{print int($1*.1)}'`) then
+    echo "WARNING: Too much data appears to have been culled out, eliminating subint processing"
+    cp $wd/temp.totspec $wd/temp.spec
+endif
 
 rm -f $wd/pos.source
 
@@ -771,7 +781,6 @@ else
 	set lpower = `sed -n {$lchan}p $wd/temp.power`
 	set upower = `sed -n {$uchan}p $wd/temp.power`
 	set sigma = `echo $upower $lpower | awk '{print .5*($1-$2)}'`
-
     else
 	set beta = (`echo $yvals | awk '{print (($2-$1)/delpower)+(alpha*delpower),($3-$2)/delpower,(($4-$3)/delpower)-(alpha*delpower)}' alpha=$alpha delpower=$delpower | awk '{print -1*($1+$2+$3)/(3*alpha)}' alpha=$alpha`)
 	set finpower = `echo $cenpower $beta | awk '{print int(.5+$1+$2)}'`
@@ -787,6 +796,11 @@ awk '{if (($2-finpower)^2 > (nsig^2)*sigma^2) print $1,($2-finpower)/sigma}' fin
 awk '{print $0,($2-finpower)/sigma}' finpower=$finpower sigma=$sigma nsig=$nsig $wd/temp.spec2 | sort -nk1 > $wd/temp.spec3
 awk '{print $0,($2-finpower)/sigma}' finpower=$finpower sigma=$sigma nsig=$nsig $wd/temp.totspec2 | sort -nk1 > $wd/temp.totspec3
 
+touch $wd/temp.bad3
+foreach badsubchan ($badsubchans)
+    sed -n {$badsubchan}p $wd/temp.totspec3 >> $wd/temp.bad3
+end
+
 set idx = 1
 set lim = `wc -l $wd/temp.bad | awk '{print $1}'`
 
@@ -799,7 +813,8 @@ if ($edgerfi != 0 && $lim != 0) then
     end
     awk '{if ($4 < 0) print $1,$2,$3}' $wd/temp.badlist | sort -unk1 > $wd/temp.bad1
     awk '{if ($4 > 0) print $1,$2,$3}' $wd/temp.badlist | sort -unk1 > $wd/temp.bad2
-    cat $wd/temp.bad1 $wd/temp.bad2 $wd/temp.spec3 | sort -nk1 | uniq -u > $wd/temp.good
+    cat $wd/temp.bad1 $wd/temp.bad2 $wd/temp.bad3 | sort -nk1 | awk '{if ($1 == chan) print $0; else chan = $1}' > $wd/temp.2check
+    cat $wd/temp.bad1 $wd/temp.bad2 $wd/temp.2check $wd/temp.spec3 | sort -nk1 | uniq -u > $wd/temp.good
 else if ($lim != 0) then
     awk '{if ($3^2 <= (nsig^2)) print $0}' nsig=$nsig $wd/temp.spec3 > $wd/temp.good
     awk '{if ($3 < (-1*nsig)) print $0}' nsig=$nsig $wd/temp.spec3 > $wd/temp.bad1
@@ -808,16 +823,10 @@ else
     awk '{if ($3^2 <= (nsig^2)) print $0}' nsig=$nsig $wd/temp.spec3 > $wd/temp.good
     touch $wd/temp.bad1
     touch $wd/temp.bad2
-    touch $wd/temp.bad3
 endif
 #if the display parameter has been invoked...
 touch $wd/temp.bad1
 touch $wd/temp.bad2
-touch $wd/temp.bad3
-
-foreach badsubchan ($badsubchans)
-    sed -n {$badsubchan}p $wd/temp.totspec3 >> $wd/temp.bad3
-end
 
 if ($display) then
     echo "device $device" > $wd/temp.wip

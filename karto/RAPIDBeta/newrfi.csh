@@ -158,11 +158,11 @@ if ("$argv[1]" != "finish") goto varassign
 
 
 
-if ("$vis" == "") then #Are there any files?
+if ("$vis[1]" == "") then #Are there any files?
     echo "FATAL ERROR: No input files..."
     exit 1
 else
-    foreach file (`echo $vis`)
+    foreach file ($vis)
 	if (! -e $file/visdata) echo "FATAL ERROR: $file has no visibilities!"
 	if (! -e $file/visdata) exit 1
     end
