@@ -312,6 +312,7 @@ else if ("$argv[1]" =~ 'npoly='*) then
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'cpoly='*) then
     set cpoly = (`echo "$argv[1]" | sed 's/cpoly=//g' | awk '{print 1+int($1*1)}'`)
+    shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'crange='*) then
     set csel = `echo "$argv[1]"`
     shift argv; if ("$argv" == "") set argv = "finish"
