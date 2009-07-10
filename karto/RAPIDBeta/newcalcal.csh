@@ -1365,7 +1365,6 @@ if ($report) then
 	    echo `head -n 1 $wd/xret$cycle` `head -n 1 $wd/yret$cycle ` | awk '{if ($1*1 > $2*1) print $1*1; else print $2*1}' >> $wd/ret$cycle
 	    awk '{if (NR ==1) sca = $1; else print $1*sca}' $wd/xret$cycle >> $wd/ret$cycle
 	    awk '{if (NR ==1) sca = $1; else print $1*sca}' $wd/yret$cycle >> $wd/ret$cycle
-	    sed 1d $wd/yret$cycle >> $wd/ret$cycle
 	else if (-e $wd/xret$cycle) then
 	    awk '{if (NR == 1) {sca = $1; print sca} else print $1*sca}' $wd/xret$cycle >> $wd/ret$cycle
 	else if (-e $wd/yret$cycle) then
@@ -1552,8 +1551,6 @@ if ($copymode) then
     end
     cp $vis/retmap $wd/retmap
     awk '{if (NR > 4) print $1}' $wd/retmap > $wd/basemap
-    set fullxants = (`cat $wd/basemap | tr '-' ' ' | awk '{if ($3 == "XX") print $1"\n"$2}' | sort -un`)
-    set fullyants = (`cat $wd/basemap | tr '-' ' ' | awk '{if ($3 == "YY") print $1"\n"$2}' | sort -un`)
     echo -n "Beginning flagging sequence..."
     if ($outsource) then
 	set fidx = 1
@@ -1585,7 +1582,7 @@ if ($copymode) then
 	set precycle = `echo $idx | awk '{print $1+999}' | sed 's/1//'`
         set cycle = `echo $idx | awk '{print $1+1000}' | sed 's/1//'`
         source $wd/source.flag > $wd/ret$cycle
-	set badbases = (`awk '{if (retlim > 100*$2) print NR}' retlim=$retlim  $wd/retmap`)
+	set badbases = (`awk '{if (retlim > 100*$2) print NR}' retlim=$retlim  $wd/ret$cycle`)
 	rm -f $wd/badbaselist
 	foreach badbase ($badbases)
 	    sed -n {$badbase}p $wd/basemap | tr '-' ' ' | awk '{print "ant("$1")("$2"),pol("$3"),time("ptime","etime")"}' ptime=$ptime etime=$etime >> $wd/badbaselist
