@@ -1,0 +1,15 @@
+device          x11 -bg white -fg black
+fonts           /usr/local/lib/sm/fonts.bin
+history_file    .smhist
+history         200
+temp_dir        /tmp/
++graphcap       /usr/local/lib/sm/graphcap.local
+filecap         /usr/local/lib/sm/filecap
+graphcap        /usr/local/lib/sm/graphcap
+termcap         /usr/local/lib/sm/termcap
+help            /usr/local/lib/sm/help/
+macro           /usr/local/lib/sm/macro/
+term            xterm
+TeX_strings     1
+name scroft
+

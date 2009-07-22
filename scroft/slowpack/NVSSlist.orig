@@ -1,0 +1,5 @@
+INSTALLDIR/CATALOG.FIT     ! Name of FITS file, full path if not in working directory
+1               ! VL table version
+132             ! Width of output in characters
+24              ! Number of lines in interactive "page"
+1000000              ! Number of lines in "page" for file output

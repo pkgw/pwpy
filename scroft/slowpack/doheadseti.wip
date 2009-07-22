@@ -1,0 +1,23 @@
+    define doheader
+    new cd11 cd21 cd12 cd22 
+    new xconvert yconvert 
+    set xconvert 3600.0 / 15.0 
+    set yconvert 3600.0 
+    set cd11 CDELT1 * xconvert / cosd(crval2) 
+#    set cd21 CD2_1 * yconvert 
+    set cd21 0
+#    set cd12 CD1_2 * xconvert / cosd(crval2) 
+    set cd12 0
+    set cd22 CDELT2 * yconvert 
+    set \1 (xconvert * crval1) - (crpix1 * cd11) - (crpix2 * cd12) 
+    set \2 (yconvert * crval2) - (crpix1 * cd21) - (crpix2 * cd22) 
+    transfer \1 cd11 cd12 \2 cd21 cd22 
+    set \11 \1 + (cd11 * (subx1 - 0.5)) + (cd12 * (suby1 - 0.5) ) 
+    set \12 \1 + (cd11 * (subx2 + 0.5)) + (cd12 * (suby2 + 0.5) ) 
+    set \13 \2 + (cd21 * (subx1 - 0.5)) + (cd22 * (suby1 - 0.5) ) 
+    set \14 \2 + (cd21 * (subx2 + 0.5)) + (cd22 * (suby2 + 0.5) ) 
+    limits \11 \12 \13 \14 
+    subimage 1 nx 1 ny 
+    free xconvert yconvert 
+    free cd11 cd21 cd12 cd22 
+    end

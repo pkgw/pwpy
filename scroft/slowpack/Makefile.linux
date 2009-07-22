@@ -1,0 +1,54 @@
+#    Makefile to build NVSSlist on most UNIX systems
+#
+#
+# Define the compiler command:
+#--------------------------------
+#       default:                           FC=f77
+#
+#FC= /opt/SUNWspro/bin/f77     # Solaris
+FC= f77
+#
+# Define compiler flags:
+#--------------------------
+#       default for most compilers:        FFLAGS= -O -u
+#       Cray supercomputers:               FFLAGS=
+#       Silicon Graphics:                  FFLAGS= -u
+#       IBM AIX xlf Fortran:               FFLAGS= -O -u -qcharlen=2880
+#       HP-UX 9000 series (HP-UX 9.04):    FFLAGS= -O -u +e +U77 
+# Linux:
+FFLAGS = -fno-automatic -fno-globals -Wno-globals -O -fexpensive-optimizations -funroll-loops -fstrength-reduce -frerun-cse-after-loop -fforce-mem -fforce-addr -fcaller-saves 
+# 32-bit Linux:
+#FFLAGS = -fno-automatic -fno-globals -Wno-globals -malign-double -O -fexpensive-optimizations -funroll-loops -fstrength-reduce -frerun-cse-after-loop -fforce-mem -fforce-addr -fcaller-saves 
+#
+#FFLAGS= -O -u
+#
+# Define location of fitsio library (libcfitsio.a)
+# default is in the same directory  LIB=.
+LIB=.
+#
+#
+install: 	nvsslist
+
+nvsslist:   NVSSlist.f config.o AIPSsubs.o corerr.o printer.o vltable.o textfile.o
+		$(FC) $(FFLAGS) NVSSlist.f -o NVSSlist config.o AIPSsubs.o corerr.o printer.o vltable.o textfile.o  -L$(LIB) -lcfitsio 
+ 
+config.o: config.f
+		$(FC) -c $(FFLAGS)   config.f
+ 
+AIPSsubs.o: AIPSsubs.f
+		$(FC) -c $(FFLAGS)   AIPSsubs.f
+ 
+corerr.o:   corerr.f
+		$(FC) -c $(FFLAGS)   corerr.f
+ 
+printer.o:  printer.f
+		$(FC) -c $(FFLAGS)   printer.f
+ 
+vltable.o:  vltable.f
+		$(FC) -c $(FFLAGS)   vltable.f
+ 
+textfile.o: textfile.f
+		$(FC) -c $(FFLAGS)   textfile.f
+
+clean:
+		rm -f *.o
