@@ -626,7 +626,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
 		    set refant = $ant
 		endif
 	    end
-	    echo -n "Refant $refant choosen! "
+	    echo -n "Refant $refant chosen! "
 	endif
 # Horray for MFCAL!    
 	mfcal vis=$file refant=$refant options=interpolate minants=4 flux=$flux interval=$int >& $wd/checkmfcal
@@ -1046,7 +1046,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
 		set refant = $ant
 	    endif
 	end
-	echo -n "Refant $refant choosen! "
+	echo -n "Refant $refant chosen! "
     endif
     if ($ipol == "xx") set xrefant = "$refant"
     if ($ipol == "yy") set yrefant = "$refant"
