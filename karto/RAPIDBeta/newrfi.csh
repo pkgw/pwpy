@@ -84,9 +84,7 @@ set date1 = `date +%s.%N`
 set vis #File to be scanned
 set inttime = 5 #Integration time
 set nonormal = 0 #Switch to normalize spectra
-set nocal = "nocal" #Switch to apply gains to data
 set nopass = "nopass" #Switch to apply bandpass corrections to data
-set nopol = "nopol" #Switch to apply polarization corrections to data
 set crosspol = "nocross" #Swtich to exclude XY and YX polarization - should be done if bandpass and pol correction information are not available
 set autoedge = 0
 set autoedgechan = 100
@@ -187,7 +185,7 @@ if ($wd == "") then #Can the program create a temp directory?
 endif
 
 #Preliminary Error checking should be good at this point, preperation of the data can begin, program moves calibrated/normalized data to a temp directory
-set options = ($nocal $nopass $nopol)
+
 echo "Beginning data processing..."
 
 set vislist = (`echo $vis`)
@@ -210,14 +208,14 @@ foreach file ($vislist)
     set filelist = ($filelist $outfile)
     if !($nonormal) then
 	echo "Beginning normalization of data..."
-	uvcal vis=$file options=fxcal,`echo $options | tr ' ' ','` select='pol(xx)' out=$wd/$outfile-xpol >& /dev/null
-	uvcal vis=$file options=fxcal,`echo $options | tr ' ' ','` select='pol(yy)' out=$wd/$outfile-ypol >& /dev/null
+	uvcal vis=$file options=fxcal,nocal,nopass,nopol select='pol(xx)' out=$wd/$outfile-xpol >& /dev/null
+	uvcal vis=$file options=fxcal,nocal,nopass,nopol select='pol(yy)' out=$wd/$outfile-ypol >& /dev/null
     else if ($crosspol != "crosspol") then
-	uvaver vis=$file options=relax,`echo $options | tr ' ' ','` select='pol(xx)' out=$wd/$outfile-xpol > /dev/null
-    	uvaver vis=$file options=relax,`echo $options | tr ' ' ','` select='pol(yy)' out=$wd/$outfile-ypol > /dev/null
+	uvaver vis=$file options=relax,nocal,nopol select='pol(xx)' out=$wd/$outfile-xpol > /dev/null
+    	uvaver vis=$file options=relax,nocal,nopol select='pol(yy)' out=$wd/$outfile-ypol > /dev/null
     else
-	uvaver vis=$file options=relax,`echo $options | tr ' ' ','` select='pol(xx,xy)' out=$wd/$outfile-xpol > /dev/null
-	uvaver vis=$file options=relax,`echo $options | tr ' ' ','` select='pol(yy,yx)' out=$wd/$outfile-ypol > /dev/null
+	uvaver vis=$file options=relax,nocal,nopol select='pol(xx,xy)' out=$wd/$outfile-xpol > /dev/null
+	uvaver vis=$file options=relax,nocal,nopol select='pol(yy,yx)' out=$wd/$outfile-ypol > /dev/null
     endif
     echo "Preliminary processing for $file complete..."
 end

@@ -423,8 +423,8 @@ endif
 
 
 echo "Cal is $source - flux is $calflux Jy - nchan is $nchan - freq is $freq GHz"
-set fullxants = (`uvplt vis=$vis device=/null select='pol(xx),-auto' | tr '-' ' ' | grep "Baseline" | awk '{print $2"\n"$3}' | sort -nu`)
-set fullyants = (`uvplt vis=$vis device=/null select='pol(yy),-auto' | tr '-' ' ' | grep "Baseline" | awk '{print $2"\n"$3}' | sort -nu`)
+set fullxants = (`uvplt vis=$vis device=/null select='pol(xx),-auto' options=nocal,nopass,nopol,all | tr '-' ' ' | grep "Baseline" | awk '{print $2"\n"$3}' | sort -nu`)
+set fullyants = (`uvplt vis=$vis device=/null select='pol(yy),-auto' options=nocal,nopass,nopol,all | tr '-' ' ' | grep "Baseline" | awk '{print $2"\n"$3}' | sort -nu`)
 set fullxret
 set fullyret
 set fullxpos
@@ -1252,6 +1252,8 @@ if (-e $wd/sefd) cp $wd/sefd $outfile/sefd
 
 echo "Copying gains back to original file ($vis)"
 
+rm -rf $vis/gains* $vis/bandpass* $vis/header.* $vis/retmap $vis/sefd
+
 if ($polsplit && $#pollist > 1) then # If pols were split and more than one pol exists
     foreach dp (xx yy)
 	if (-e $outfile/$source.1.$dp/gains) then # If the automapping software had "tweaks" for the gains solution, apply those tweaks
@@ -1530,6 +1532,7 @@ if ($copymode) then
     end
     foreach file ($tvis)
 	echo -n "Copying gains solution to $file..."
+	rm -rf $file/gains $file/gains.xx $file/gains.yy $file/gains.xxp $file/gains.yyp $file/bandpass $file/bandpass.xx $file/bandpass.yy $file/bandpass.xxp $file/bandpass.yyp $file/header.xx $file/header.yy $file/header.xxp $file/header.yyp $file/retmap $file/sefd
 	foreach pol (xx yy xxp yyp)
 	    if (-e $vis/gains.$pol || -e $vis/bandpass.$pol) then
 		if (-e $vis/header) cp $vis/header $vis/tempheader
@@ -1539,14 +1542,18 @@ if ($copymode) then
 		if (-e $vis/gains.$pol) cp $vis/gains.$pol $vis/gains
 		if (-e $vis/bandpass.$pol) cp $vis/bandpass.$pol $vis/bandpass
 		gpcopy vis=$vis out=$file > /dev/null
-		if (-e $vis/tempheader) mv $vis/tempheader $vis/header
-		if (-e $vis/tempgains) mv $vis/tempgains $vis/gains
-		if (-e $vis/tempbandpass) mv $vis/tempbandpass $vis/bandpass
 		if (-e $file/header) cp $file/header $file/header.$pol
 		if (-e $file/gains) mv $file/gains $file/gains.$pol
 		if (-e $file/bandpass) mv $file/bandpass $file/bandpass.$pol
+		rm -rf $vis/header $vis/bandpass $vis/gains
+		if (-e $vis/tempheader) mv $vis/tempheader $vis/header
+		if (-e $vis/tempgains) mv $vis/tempgains $vis/gains
+		if (-e $vis/tempbandpass) mv $vis/tempbandpass $vis/bandpass
 	    endif
 	end
+	if (-e $vis/gains || -e $vis/bandpass) then
+	    gpcopy vis=$vis out=$file > /dev/null
+	endif
 	echo "done!"
     end
     cp $vis/retmap $wd/retmap
