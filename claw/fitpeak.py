@@ -6,7 +6,7 @@ import glob, string
 
 def main():
     # get files in order
-    files = glob.glob('itime-bin4/*rm')
+    files = glob.glob('j0332-0.1s-itime-bin4-sub.rm')
     filesort = natsorted(files)
 
     peak = []
@@ -17,9 +17,9 @@ def main():
     for file in filesort:
         # import image data
         im = miriad.ImData(file)
-        stdout, stderr = mirexec.TaskImFit(in_=im, object='gaussian').snarf()
+        stdout, stderr = mirexec.TaskImFit(in_=im, object='gaussian', region='images(2,2)').snarf()
 
-#        print stdout
+        print stdout
         
         # parse output
         for line in stdout:

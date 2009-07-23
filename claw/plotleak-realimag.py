@@ -8,16 +8,16 @@ import asciidata, pylab, numpy
 
 def run():
     # params for possible customization
-    type = 'xy'
+    type = 'joint'
 
     a = []; a2 = []
     p = []; p2 = []
     for i in range(1,9):
         # specify ascii files output by 'split-cal-leak.csh'
-        a.append(asciidata.AsciiData ('../hex7-polcal/3c138-p0-leak%d.amp.txt' % i))
-        p.append(asciidata.AsciiData ('../hex7-polcal/3c138-p0-leak%d.phase.txt' % i))
-        a2.append(asciidata.AsciiData ('3c138-p0-1430-leakamp%d.txt' % i))
-        p2.append(asciidata.AsciiData ('3c138-p0-1430-leakphase%d.txt' % i))
+        a.append(asciidata.AsciiData ('3C286-p0-4760-leakamp%d.txt' % i))
+        p.append(asciidata.AsciiData ('3C286-p0-4760-leakphase%d.txt' % i))
+        a2.append(asciidata.AsciiData ('3C286-p0-4860-leakamp%d.txt' % i))
+        p2.append(asciidata.AsciiData ('3C286-p0-4860-leakphase%d.txt' % i))
 
     nants = len(a[0][0])
     print '%d antennas...' % (nants)
@@ -103,6 +103,29 @@ def run():
             pylab.title('Leakages')
             pylab.figure(4)
             pylab.plot(ry2[:,i],iy2[:,i],'.-')
+            pylab.text(ry2[0,i],iy2[0,i],str(antnum[i]))
+            pylab.xlabel('Real')
+            pylab.ylabel('Imaginary')
+            pylab.title('Leakages')
+
+    if type == 'joint':
+        # real-imag (x-y) plot
+        # two pols per source
+        for i in range(nants):
+            rxj = numpy.concatenate((rx[:,i],rx2[:,i]))
+            ixj = numpy.concatenate((ix[:,i],ix2[:,i]))
+            ryj = numpy.concatenate((ry[:,i],ry2[:,i]))
+            iyj = numpy.concatenate((iy[:,i],iy2[:,i]))
+            pylab.figure(1)
+            pylab.plot(rxj,ixj,'.-')
+            pylab.text(rx[0,i],ix[0,i],str(antnum[i]))
+            pylab.text(rx2[0,i],ix2[0,i],str(antnum[i]))
+            pylab.xlabel('Real')
+            pylab.ylabel('Imaginary')
+            pylab.title('Leakages')
+            pylab.figure(2)
+            pylab.plot(ryj,iyj,'.-')
+            pylab.text(ry[0,i],iy[0,i],str(antnum[i]))
             pylab.text(ry2[0,i],iy2[0,i],str(antnum[i]))
             pylab.xlabel('Real')
             pylab.ylabel('Imaginary')

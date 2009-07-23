@@ -6,11 +6,12 @@
 # Assumes the data is flagged.  Best to flag aggressively and remove any suspect antpols.
 
 # User parameters
-set src=c286  # source name, assuming 3c source
-set freq=1430  # observing frequency
-set visroot=mosfxc-3${src}.uvaver.uvredo  # file name
+set src=C286  # source name, assuming 3c source
+set freq=4860  # observing frequency
+set visroot=mosfxa-3${src}-CAL-${freq}  # file name
 set point=p0  # suffix for output file name.  originally used to differentiate pointing directions.
 set chans=100  # channels per frequency chunk.  
+#set flux=7.47 # flux of calibrator
 
 # loop over frequency chunks
 foreach piece (1 2 3 4 5 6 7 8)
@@ -29,7 +30,7 @@ foreach piece (1 2 3 4 5 6 7 8)
 
     # now do cal steps.  mfcal for bandpass, gpcal for gains and leakages
     mfcal vis=${visroot}${piece} refant=1 interval=5
-    gpcal vis=${visroot}${piece} refant=1 options=xyref interval=5  # options=xyref critical!  optionally may also use 'qusolve'
+    gpcal vis=${visroot}${piece} refant=1 options=xyref interval=5 # options=xyref critical!  optionally may also use 'qusolve'
 
     # now output the leakages for visualization later
     gpplt vis=${visroot}${piece} options=polarization yaxis=amp log=3${src}-${point}-${freq}-leakamp${piece}.txt
