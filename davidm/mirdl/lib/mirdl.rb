@@ -66,6 +66,7 @@ end
 require 'mirdl/ephem'
 require 'mirdl/key'
 require 'mirdl/select_na'
+require 'mirdl/maskio_na'
 require 'mirdl/uvio_na'
 require 'mirdl/uvdat_na'
 require 'mirdl/gains'
