@@ -351,13 +351,13 @@ if ($display && $quiet != "verb") then
 	    echo "Press ENTER to see corrupted count spectra for antenna $xant-X"
 	    set dummy = $<
 	    set sel = "`echo ' $msel' | sed 's/ / pol(xx),ant('$xant'),/g'`"
-	    newrfi32.csh vis=$wd options=$corr npoly=$npoly select="$sel" $display "$csel"
+	    newrfi32.csh vis=$wd options=$corr npoly=$npoly select="$sel" $device "$csel"
 	end
 	foreach yant (`echo $ybad`)
 	    echo "Press ENTER to see corrupted count spectra for antenna $yant-Y"
 	    set dummy = $<
 	    set sel = "`echo ' $msel' | sed 's/ / pol(yy),ant('$yant'),/g'`"
-	    newrfi32.csh vis=$wd options=$corr npoly=$npoly select="$sel" $display "$csel"
+	    newrfi32.csh vis=$wd options=$corr npoly=$npoly select="$sel" $device "$csel"
 	end
     endif
 else

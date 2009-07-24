@@ -711,7 +711,7 @@ if ($delpower < 3) then #Lower limit for correction to be applied
 else
     set yvals = (`awk '{print $1-cenpower}' cenpower=$cenpower $wd/temp.power | awk '{if (($1+3*delpower)^2 < delpower^2) SUM0 += 1; else if (($1+1*delpower)^2 < delpower^2) SUM1 += 1; else if (($1-1*delpower)^2 < delpower^2) SUM2 += 1; else if (($1-3*delpower)^2 < delpower^2) SUM3 += 1} END {print SUM0,SUM1,SUM2,SUM3}' delpower=$delpower | awk '{print log($1),log($2),log($3),log($4)}'`)
     set alpha = (`echo $yvals | awk '{print ($2-$1)/delpower,($3-$2)/delpower,($4-$3)/delpower}' delpower=$delpower | awk '{print .5*($3-$1)/delpower}' delpower=$delpower`)
-    if (`echo $alpha | awk '{if ($1 > 0) print "nogo"}'` == "nogo") then
+    if (`echo $alpha | awk '{if ($1 >= 0 || $1*1 == "-Inf" || $1 == "NaN" || $1 == "-NaN") print "nogo"}'` == "nogo") then
 	echo "Advanced detection of sigma during calibration cycle failed, switching to forced detection..."
 	set finpower = $cenpower
 	set lchan = `echo $chans | awk '{print 1+int($1*exp(-1))}'`
@@ -773,7 +773,7 @@ else
     set yvals = (`awk '{print $1-cenpower}' cenpower=$cenpower $wd/temp.power | awk '{if (($1+3*delpower)^2 < delpower^2) SUM0 += 1; else if (($1+1*delpower)^2 < delpower^2) SUM1 += 1; else if (($1-1*delpower)^2 < delpower^2) SUM2 += 1; else if (($1-3*delpower)^2 < delpower^2) SUM3 += 1} END {print SUM0,SUM1,SUM2,SUM3}' delpower=$delpower | awk '{print log($1),log($2),log($3),log($4)}'`)
     set alpha = (`echo $yvals | awk '{print ($2-$1)/delpower,($3-$2)/delpower,($4-$3)/delpower}' delpower=$delpower | awk '{print .5*($3-$1)/delpower}' delpower=$delpower`)
 
-    if (`echo $alpha | awk '{if ($1 > 0) print "nogo"}'` == "nogo") then
+    if (`echo $alpha | awk '{if ($1 >= 0 || $1*1 == "-Inf" || $1 == "NaN" || $1 == "-NaN") print "nogo"}'` == "nogo") then
 	echo "Advanced detection of sigma failed, switching to forced detection..."
 	set finpower = $cenpower
 	set lchan = `echo $chans | awk '{print 1+int($1*exp(-1))}'`
