@@ -602,11 +602,11 @@ cp $wd/temp.data $wd/specdata
 set badsubchans
 touch $wd/badsubchans
 if ($subint) then
-    if (`sort -unk4 $wd/temp.data | wc -l` <= 1) then
+    set subvals = (`sort -unk4 $wd/temp.data | awk '{if (NR == 1) printf "%s ",$4; else {idx += 1; fin=$4}} END {printf "%s %s\n",fin,idx}'` 0 0 0)
+    if ($subvals[3] <= 1) then
 	echo "WARNING: Not enough datapoints to do subintervals..."
 	set subint = 0
     else
-	set subvals = (`sort -unk4 $wd/temp.data | awk '{if (NR == 1) printf "%s ",$4; else {idx += 1; fin=$4}} END {printf "%s %s\n",fin,idx}'` 0 0 0)
 	if ($subint > $subvals[3]) set subint = $subvals[3]
 	while ($idx < $subint)
 	    set subtimes = (`echo $subvals[1-2] $subint $idx | awk '{printf "%5.6f %5.6f\n",$1+((($4-1)/$3)*($2-$1)),$1+(($4/$3)*($2-$1))}'`)
