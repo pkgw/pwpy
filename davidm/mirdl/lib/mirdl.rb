@@ -61,8 +61,34 @@ module Mirdl
   H_DBLE  = 5
   H_TXT   = 6
   H_CMPLX = 7
+
+  # POLMAP is a hash that can be used to map polarization codes to strings and
+  # strings (or symbols) to codes.  Code to string always returns uppercase.
+  # String (or symbol) to code accepts string (or symbol) in all uppercase or
+  # all lowercase (NO mixed case).
+  POLMAP = {
+    +1 => 'I',
+    +2 => 'Q',
+    +3 => 'U',
+    +4 => 'V',
+    -1 => 'RR',
+    -2 => 'LL',
+    -3 => 'RL',
+    -4 => 'LR',
+    -5 => 'XX',
+    -6 => 'YY',
+    -7 => 'XY',
+    -8 => 'YX',
+  }
+  POLMAP.merge!(POLMAP.invert)
+  POLMAP.keys.grep(/[A-Z]/).each do |k|
+    POLMAP[k.to_sym] = POLMAP[k]
+    POLMAP[k.downcase] = POLMAP[k]
+    POLMAP[k.downcase.to_sym] = POLMAP[k]
+  end
 end
 
+require 'mirdl/basant'
 require 'mirdl/ephem'
 require 'mirdl/key'
 require 'mirdl/select_na'

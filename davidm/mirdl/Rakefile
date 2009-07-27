@@ -38,6 +38,7 @@ spec = Gem::Specification.new do |s|
     'ext/options.c',
     'ext/options_for.c',
     'lib/mirdl.rb',
+    'lib/mirdl/basant.rb',
     'lib/mirdl/ephem.rb',
     'lib/mirdl/key.rb',
     'lib/mirdl/select_na.rb',
