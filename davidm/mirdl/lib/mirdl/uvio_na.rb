@@ -402,7 +402,7 @@ module Mirdl
 
   # int  uvscan_c   (int tno, Const char *var);
   SYM[:uvscan] = LIBMIR_UVIO['uvscan_c', 'IIS']
-  def uvscan(tno, var)
+  def uvscan(tno, var='')
     r, rs = SYM[:uvscan][tno, var.to_s]
     case r
     when -1: nil # eof
