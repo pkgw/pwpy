@@ -19,9 +19,9 @@ foreach piece (1 2 3 4 5 6 7 8)
     set startfreq = `echo '100 + '${chans}' * ('${piece}'-1)' | bc`
 
     # reorder data to keep pol data in order expected by other tools.  also split in frequency
-    uvaver vis=${apply} out=${apply}.uvaver${piece} line=ch,${chans},${startfreq} interval=0.001 options=nocal,nopass,nopol
+    uvaver vis=${apply} out=${apply}.uvaver${piece} line=ch,${chans},${startfreq} interval=0.001 options=nopol
 
     # now do cal steps.  mfcal for bandpass, gpcal for gains and leakages
-    gpcopy vis=${cal}${piece} out=${apply} options=nocal,nopass
+    gpcopy vis=${cal}${piece} out=${apply}.uvaver${piece} options=nocal,nopass
 
 end
