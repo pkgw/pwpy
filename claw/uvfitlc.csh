@@ -27,8 +27,8 @@ imsize=50
 cleanup=1
 # std naming convention
 outn='time-'${suffix}
-file=${outn}'-time'${imgbin} # select for bin
-fileavg=${outn}'-avg'${imgbin} # select for average about bin
+file=${outn}'-time'${imagebin} # select for bin
+fileavg=${outn}'-avg'${imagebin} # select for average about bin
 
 
 # create pulse bin
