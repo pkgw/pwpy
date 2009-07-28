@@ -81,7 +81,7 @@ VALUE mirdl_keya(int argc, VALUE *argv, VALUE self)
   if(argc==1) {
     keydefptr = "\n"; // Key can't start with newline
   } else {
-    keydefptr = StringValueCStr(keydef);
+    keydefptr = SYMSTR_PTR(keydef);
   }
 
   keya_c(SYMSTR_PTR(keyword), value, keydefptr);
