@@ -41,7 +41,7 @@ Plotter.new(:device => device,
             :ny=>ny,
             :ask=>true)
 # Make text bigger
-pgsch(1.5)
+#pgsch(1.5)
 
 # Loop through all datasets
 while tno = uvDatOpn
@@ -56,12 +56,21 @@ while tno = uvDatOpn
   v = Vis.new(nchan)
   # Keys are jd, values are NArray.int(nchan)
   flag_accumulator = {}
+  jd = 0
+  intsecs = 0
 
   while uvDatRd(v)
-    jd = v.preamble[3]
+    inttime = uvgetvr(tno, :inttime)
+    if inttime != intsecs
+      puts "inttime = #{inttime}"
+      intsecs = inttime
+    end
+    intdays = inttime / (24 * 60 * 60)
+    vjd = v.preamble[3]
+    jd = vjd if vjd > jd + intdays/2.0
     flag_accumulator[jd] ||= NArray.int(nchan)
     flag_accumulator[jd] += (1-v.flags)
-    break if flag_accumulator.keys.length > 4
+    break if flag_accumulator.keys.length > 400
   end
 
   jds = flag_accumulator.keys.sort
@@ -73,7 +82,7 @@ while tno = uvDatOpn
   ymax = jds.length + 0.5
   title = "Flag-o-gram of #{vis}"
 
-  # TODO Setup plot
+  # Setup plot
   plot([xmin, xmax], [ymin, ymax],
        :line=>:none,
        :title=> title,
@@ -82,21 +91,23 @@ while tno = uvDatOpn
        :line_color => Color::WHITE
       )
 
-#  jds.each_with_index do |jd, y|
-#    x = 0
-#    counts = flag_accumulator[jd]
-#    counts.each do |n|
-#      pgsfs(
-#      pgrect(x, x+1, y, y+1)
-#      x += 1
-#    end
-#  end
-
   image = NMatrix.int(nchan,jds.length)
   jds.each_with_index do |jd, y|
+    #puts(((jd+0.5)%1).to_hmsstr(3))
     image[true,y] = flag_accumulator[jd]
   end
-  pgimag(image)
+
+  # Color ramp for indices 16-32
+  pgscir(16, 32)
+  pgctab([0,0.25,0.5,0.75,1],[0,0,0,1,1],[0,1,1,1,0],[1,1,0,0,0])
+  # Make max be black
+  pgscir(16, 33)
+  pgscr(33, 0, 0, 0)
+
+  # Draw image and color wedge
+  zmax = image.max
+  pgimag(image, 0..zmax)
+  pgwedg('RI', 0.5, 3, 0, zmax, 'Flag Counts')
 
   uvDatCls
 end # uvDatOpn
