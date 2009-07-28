@@ -52,6 +52,13 @@ Miriad::Uvio.open(dsname) do |ds|
       puts "calculated u,v,w is [%.3f, %.3f, %.3f] (ns)" % uvw_calc
       puts "visibility u,v,w is [%.3f, %.3f, %.3f] (ns)" % uvw_vis
     end
+    if uvw_calc[2] != uvw_vis[2]
+      ddelay = uvw_calc[2] - uvw_vis[2]
+      printf "delay difference is %.3f (ns)\n", ddelay
+      [0.1,1.4,5,10].each do |ghz|
+        printf "  %.3f wavelengths (%5.1f degrees) at %4.1f GHz\n", ddelay*ghz, ddelay*ghz*360, ghz
+      end
+    end
     puts
   end
 end

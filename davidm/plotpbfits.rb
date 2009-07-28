@@ -47,11 +47,6 @@ OP = OptionParser.new do |op|
 end
 OP.parse!
 
-if ARGV.empty?
-  puts OP.help()
-  exit
-end
-
 range = opts[:range]
 nxy = opts[:nxy]
 

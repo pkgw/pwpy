@@ -65,7 +65,7 @@ def fit_antvar(d, n)
       a[row, ants.index(a2)] = 1
       begin
         b_gain[row] = Math.log(blmean.abs)
-        b_var[ row] = blvar
+        b_var[ row] = Math.log(blvar)
         b_snr[ row] = Math.log(blmean.abs/blvar)
       rescue
         p [bl, blmean, blvar, n[bl].where]
@@ -81,7 +81,7 @@ def fit_antvar(d, n)
   # Repackage x
   h = {}
   ants.each_index do |i|
-    h[ants[i]] = [Math.exp(x_gain[i]), x_var[i], Math.exp(x_snr[i])]
+    h[ants[i]] = [Math.exp(x_gain[i]), Math.exp(x_var[i]), Math.exp(x_snr[i])]
   end
   [h, chisq_gain, chisq_var, chisq_snr]
 end
