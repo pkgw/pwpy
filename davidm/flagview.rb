@@ -10,6 +10,10 @@
 #@ vis
 # Specifies which datasets to use
 #
+#@ select
+# This selects the data to be processed, using the standard uvselect
+# format.  Default is all data.
+#
 #@ axis
 # Specifies X axis.  Valid values are:
 #   "chan" Plot by channel (default)
@@ -23,16 +27,15 @@
 #
 #@ rgbmin
 # Specifies RGB triple for minimum value
-# Default is (0.0,0.0,0.0), i.e. black
+# Default is black (0.0,0.0,0.0)
 #
 #@ rgbmax
 # Specifies RGB triple for maximum value.
-# Default is (0.2,0.0,0.0), i.e. dark red
+# Default is dark red (0.2,0.0,0.0)
 #
 #@ options
 # Possible values are:
 #   "percent"  show percentages rather than absolute counts
-#              (currently for binned plots only)
 #--
 
 require 'mirdl'
@@ -100,28 +103,30 @@ while tno = uvDatOpn
     xmin = 0.5
     xmax = nx + 0.5
     xlabel = 'Channel'
-    zlabel = 'Baseline Flag Counts'
+    zlabel = 'Baselines Flagged'
   when ANTS_MODE
     nx = uvgetvr(tno, :nants)
     xmin = 0.5
     xmax = nx + 0.5
     xlabel = 'Antenna'
-    zlabel = 'Baseline-Channel Flag Counts'
+    zlabel = 'Baseline-Channels Flagged'
   when UVD_MODE
     nx = bins
     xmin = Float::MAX # Set later
     xmax = Float::MIN # Set later
     xlabel = 'UV Distance'
-    zlabel = opts[:percent] ? '% Flagged' : 'Flag Counts'
+    zlabel = 'Baseline-Channels Flagged'
   when UVA_MODE
     nx = bins
     xmin = Float::MAX # Set later
     xmax = Float::MIN # Set later
     xlabel = 'UV Angle'
-    zlabel = opts[:percent] ? '% Flagged' : 'Flag Counts'
+    zlabel = 'Baseline-Channels Flagged'
   else
     raise "unknown mode: '#{mode}'"
   end
+
+  zlabel = "% #{zlabel}" if opts[:percent]
 
   # uvDat et al should not be aware of number of channels since
   # we did not ask it to process line keyword.
@@ -138,11 +143,21 @@ while tno = uvDatOpn
   #
   # Mode:  Key      => Value
   # -----------------------
-  # CHAN:  jd       => NArray(nchan) of accumulated flags
-  # ANTS:  jd       => NArray(nants) of accumulated flags
-  # UVD:  [jd, uvd] => [Integer, Integer] (total flags, total channels)
-  # UVA:  [jd, uva] => [Integer, Integer] (total flags, total channels)
+  # CHAN:  jd       => NArray(nchan) (accumulated flags)
+  # ANTS:  jd       => NArray(nants) (accumulated flags)
+  # UVD:  [jd, uvd] => Integer (accumulated flags)
+  # UVA:  [jd, uva] => Integer (accumulated flags)
   flag_accumulator = {}
+
+  # Keys and values depend on mode
+  #
+  # Mode:  Key      => Value
+  # -----------------------
+  # CHAN:  jd       => Integer (total baselines)
+  # ANTS:  jd       => NArray.int(nants) (total baseline-channels)
+  # UVD:  [jd, uvd] => Integer (total baseline-channels)
+  # UVA:  [jd, uva] => Integer (total baseline-channels)
+  total_accumulator = {}
 
   jd = 0
   jds = []
@@ -166,28 +181,35 @@ while tno = uvDatOpn
     when CHAN_MODE
       flag_accumulator[jd] ||= NArray.int(nchan)
       flag_accumulator[jd] += (1-v.flags)
+      total_accumulator[jd] ||= 0
+      total_accumulator[jd] += 1
     when ANTS_MODE
       a1, a2 = basant(v.preamble[4])
       n = nchan - v.flags.sum
       flag_accumulator[jd] ||= NArray.int(nants)
       flag_accumulator[jd][a1-1] += n
       flag_accumulator[jd][a2-1] += n
+      total_accumulator[jd] ||= NArray.int(nants)
+      total_accumulator[jd][a1-1] += nchan
+      total_accumulator[jd][a2-1] += nchan
     when UVD_MODE
       uvd = Math.hypot(v.preamble[0], v.preamble[1])
       xmin = uvd if uvd < xmin
       xmax = uvd if uvd > xmax
       n = nchan - v.flags.sum
-      flag_accumulator[[jd,uvd]] ||= [0, 0]
-      flag_accumulator[[jd,uvd]][0] += n
-      flag_accumulator[[jd,uvd]][1] += nchan
+      flag_accumulator[[jd,uvd]] ||= 0
+      flag_accumulator[[jd,uvd]] += n
+      total_accumulator[[jd,uvd]] ||= 0
+      total_accumulator[[jd,uvd]] += nchan
     when UVA_MODE
       uva = Math.atan2(v.preamble[0], v.preamble[1]) * 180 / Math::PI
       xmin = uva if uva < xmin
       xmax = uva if uva > xmax
       n = nchan - v.flags.sum
-      flag_accumulator[[jd,uva]] ||= [0, 0]
-      flag_accumulator[[jd,uva]][0] += n
-      flag_accumulator[[jd,uva]][1] += nchan
+      flag_accumulator[[jd,uva]] ||= 0
+      flag_accumulator[[jd,uva]] += n
+      total_accumulator[[jd,uva]] ||= 0
+      total_accumulator[[jd,uva]] += nchan
     end
   end # uvDatRd loop
 
@@ -196,26 +218,28 @@ while tno = uvDatOpn
   case mode
   when CHAN_MODE, ANTS_MODE
     jds = flag_accumulator.keys.sort
-    image = NMatrix.int(nx,jds.length)
+    image = NArray.sfloat(nx,jds.length)
+    total = NArray.int(nx,jds.length)
     jds.each_with_index do |jd, y|
-      #puts(((jd+0.5)%1).to_hmsstr(3))
       image[true,y] = flag_accumulator[jd]
+      total[true,y] = total_accumulator[jd]
     end
   when UVD_MODE, UVA_MODE
     keys = flag_accumulator.keys.sort
-    image = NMatrix.sfloat(nx,jds.length)
-    total = NMatrix.int(nx,jds.length)
+    image = NArray.sfloat(nx,jds.length)
+    total = NArray.int(nx,jds.length)
     dx = (xmax-xmin) / bins.to_f
     keys.each do |jd, x|
       bin = (x == xmax) ? bins-1 : ((x-xmin)/dx).floor
       y = jds.index(jd)
-      image[bin,y] += flag_accumulator[[jd,x]][0]
-      total[bin,y] += flag_accumulator[[jd,x]][1]
+      image[bin,y] += flag_accumulator[[jd,x]]
+      total[bin,y] += total_accumulator[[jd,x]]
     end
-    if opts[:percent]
-      total[total.eq(0)] = 1
-      image.mul!(100).div!(total)
-    end
+  end
+
+  if opts[:percent]
+    total[total.eq(0)] = 1
+    image.mul!(100).div!(total)
   end
 
   # Limits for tics
@@ -235,6 +259,7 @@ while tno = uvDatOpn
        :title=> title,
        :xlabel => xlabel,
        :ylabel => 'Dump',
+       :yrange=>[ymin, ymax],
        :line_color => Color::WHITE
       )
 
@@ -257,7 +282,7 @@ while tno = uvDatOpn
   pgctab(*ramp.transpose)
 
   # Draw image and color wedge
-  zmax = image.max
+  zmax = opts[:percent] ? 100 : image.max
   # Limits for image
   pgswin(0.5, nx + 0.5, ymin, ymax)
   pgimag(image, 0..zmax)
