@@ -2,6 +2,39 @@
 
 # $Id: bsflag.rb 470 2009-03-27 20:00:53Z davidm $
 
+#= flagview.rb - View flag summary in graphical format (aka "flagogram")
+#& dhem
+#: analysis
+#+ flagview.rb - View flag summary in graphical format (aka "flagogram")
+#
+#@ vis
+# Specifies which datasets to use
+#
+#@ axis
+# Specifies X axis.  Valid values are:
+#   "chan" Plot by channel (default)
+#   "ants" Plot by antenna number
+#   "uvd"  Plot by UV distance (binned; see bins keyword)
+#   "uva"  Plot by UV angle (binned; see bins keyword)
+#   
+#@ bins
+#  Number of bins between min and max values (for binned plots only)
+#  Default is 100.
+#
+#@ rgbmin
+# Specifies RGB triple for minimum value
+# Default is (0.0,0.0,0.0), i.e. black
+#
+#@ rgbmax
+# Specifies RGB triple for maximum value.
+# Default is (0.2,0.0,0.0), i.e. dark red
+#
+#@ options
+# Possible values are:
+#   "percent"  show percentages rather than absolute counts
+#              (currently for binned plots only)
+#--
+
 require 'mirdl'
 include Mirdl
 require 'pgplot/plotter'
