@@ -42,13 +42,46 @@ for ((j=0; j<=${timebins}-1; j++))   # iterate over pulse phase, zero based
 do
 
 outn='time-'${suffix}
-file=${outn}'-time'${j}
+file=${outn}'-pulse'${j}
 fileavg=${outn}'-avg'${j}
+fileoff=${outn}'-off'${j}
 touch $file
 touch $fileavg
+touch $fileoff
 
 istart=`echo 'scale=0;'${j}'*'${ints}'*'${binsize}'/('${timebins}'*'${period}')' | bc`
 istop=`echo 'scale=0;('${j}'+1)*'${ints}'*'${binsize}'/('${timebins}'*'${period}')' | bc`
+
+# repeat for average to subtract in each time bin
+# get seconds offset
+t1s=`echo 'scale=5; ('${t0s}' + '${period}' * '${istart}') ' | bc`
+t2s=`echo 'scale=5; ('${t0s}' + '${period}' * '${istop}') ' | bc`
+
+# adjust minutes offset
+t1m=`echo 'scale=0; '${t1s}'/60' | bc`
+t2m=`echo 'scale=0; '${t2s}'/60' | bc`
+t1s=`echo 'scale=5; '${t1s}' - 60 * '${t1m} | bc`
+t2s=`echo 'scale=5; '${t2s}' - 60 * '${t2m} | bc`
+
+# adjust hour offset
+t1h=`echo 'scale=0; '${t1m}'/60' | bc`
+t2h=`echo 'scale=0; '${t2m}'/60' | bc`
+t1m=`echo 'scale=5; '${t1m}' - 60 * '${t1h} | bc`
+t2m=`echo 'scale=5; '${t2m}' - 60 * '${t2h} | bc`
+
+# adjust minutes and second by origin
+t1m=`echo 'scale=0; '${t0m}' + '${t1m} | bc`
+t2m=`echo 'scale=0; '${t0m}' + '${t2m} | bc`
+t1h=`echo 'scale=0; '${t0h}' + '${t1h} | bc`
+t2h=`echo 'scale=0; '${t0h}' + '${t2h} | bc`
+
+# initialize "previous" pulse end to start of observation
+tph=`echo $t1h`
+tpm=`echo $t1m`
+tps=`echo $t1s`
+
+# print average time filter to file
+echo 'time('${t1h}':'${t1m}':'${t1s}','${t2h}':'${t2m}':'${t2s}')'  >> $fileavg
 
 for ((i=${istart}; i<${istop}; i++))   # iterate over pulse number, 0-based
   do
@@ -75,41 +108,19 @@ for ((i=${istart}; i<${istop}; i++))   # iterate over pulse number, 0-based
   t2h=`echo 'scale=0; '${t0h}' + '${t2h} | bc`
 
   # print time filter to file
-  echo 'time('${t1h}':'${t1m}':'${t1s}','${t1h}':'${t2m}':'${t2s}')'  >> $file
+  echo 'time('${t1h}':'${t1m}':'${t1s}','${t2h}':'${t2m}':'${t2s}')'  >> $file
+  echo 'time('${tph}':'${tpm}':'${tps}','${t1h}':'${t1m}':'${t1s}')'  >> $fileoff  # off pulse from previous to start of current
+  tph=`echo $t2h`
+  tpm=`echo $t2m`
+  tps=`echo $t2s`
 done
-
-# repeat for average to subtract in each time bin
-# get seconds offset
-t1s=`echo 'scale=5; ('${t0s}' + '${period}' * '${istart}') ' | bc`
-t2s=`echo 'scale=5; ('${t0s}' + '${period}' * '${istop}') ' | bc`
-
-# adjust minutes offset
-t1m=`echo 'scale=0; '${t1s}'/60' | bc`
-t2m=`echo 'scale=0; '${t2s}'/60' | bc`
-t1s=`echo 'scale=5; '${t1s}' - 60 * '${t1m} | bc`
-t2s=`echo 'scale=5; '${t2s}' - 60 * '${t2m} | bc`
-
-# adjust hour offset
-t1h=`echo 'scale=0; '${t1m}'/60' | bc`
-t2h=`echo 'scale=0; '${t2m}'/60' | bc`
-t1m=`echo 'scale=5; '${t1m}' - 60 * '${t1h} | bc`
-t2m=`echo 'scale=5; '${t2m}' - 60 * '${t2h} | bc`
-
-# adjust minutes and second by origin
-t1m=`echo 'scale=0; '${t0m}' + '${t1m} | bc`
-t2m=`echo 'scale=0; '${t0m}' + '${t2m} | bc`
-t1h=`echo 'scale=0; '${t0h}' + '${t1h} | bc`
-t2h=`echo 'scale=0; '${t0h}' + '${t2h} | bc`
-
-# print time filter to file
-echo 'time('${t1h}':'${t1m}':'${t1s}','${t1h}':'${t2m}':'${t2s}')'  >> $fileavg
 
 # check if file is over miriad select limit of 256 lines.  if so, split
 numlines=`wc ${file} | gawk '{printf "%d \n", $0}' | head -n 1`
 if [ $numlines -ge 256 ]
     then
     echo 'File too long.  Splitting.'
-    split ${file} --lines=255 ${outn}'-time'${j}
+    split ${file} --lines=255 ${file}
     rm -f ${file}
 else
     mv ${file} ${file}aa

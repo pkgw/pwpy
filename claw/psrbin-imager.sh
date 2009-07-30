@@ -61,7 +61,7 @@ set -e -x
   rm -rf ${imroot}-xx-${suffix}-*.* ${imroot}-yy-${suffix}-*.* # remove xx, yy ims for time and avg
   rm -rf ${imroot}-i-${suffix}-*.* ${imroot}-i??-${suffix}-*.*  # i, ixx, iyy
   rm -rf ${imroot}-itime*-${suffix}.* ${imroot}-itime*-${suffix}-sub.* ${imroot}-iavg*-${suffix}*.*   # remove old image cubes
-  rm -f time-${suffix}-time* time-${suffix}-avg*    # remove time filter files
+  rm -f time-${suffix}-pulse* time-${suffix}-avg*    # remove time filter files
 
   psrbin-timeselect.sh ${period} ${binsize} ${phasebins} ${outphases} ${ints} ${t0h} ${t0m} ${t0s} ${suffix} ${timebins} ${imagebin}
 
@@ -72,9 +72,9 @@ set -e -x
   if [ $cleanup -eq 1 ]
       then
       rm -rf ${imroot}-?-${suffix}-*.* 
-      rm -rf ${imroot}-??-${suffix}-time*.* 
+      rm -rf ${imroot}-??-${suffix}-pulse*.* 
       rm -rf ${imroot}-??-${suffix}-avg*.* 
       rm -rf ${imroot}-itime?-${suffix}.* ${imroot}-itimeavg-${suffix}.* 
-      rm -f time-${suffix}-time* time-${suffix}-avg*
+      rm -f time-${suffix}-pulse* time-${suffix}-avg*
   fi
 #done

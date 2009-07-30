@@ -21,7 +21,7 @@ imsize="$4"
 file='time-'${suffix}
 cleansize=`echo 'scale=0; '${imsize}'/8' | bc`    # cleans in box +-cleansize
 
-nsplit=`ls ${file}-time0a? | wc | gawk '{printf "%d \n", $0}' | head -n 1`
+nsplit=`ls ${file}-pulse0a? | wc | gawk '{printf "%d \n", $0}' | head -n 1`
 if [ $nsplit -eq 1 ]
 then
     splitlist='aa'
@@ -102,10 +102,10 @@ for ((i=0; i<=${timebins}-1; i++))
     for split in $splitlist
       do
       # generate short-named symbolic links for files
-      ln -s ${imroot}-xx-${suffix}'-time'${i}${split}'.mp' ${i}${split}xm
-      ln -s ${imroot}-xx-${suffix}'-time'${i}${split}'.bm' ${i}${split}xb
-      ln -s ${imroot}-yy-${suffix}'-time'${i}${split}'.mp' ${i}${split}ym
-      ln -s ${imroot}-yy-${suffix}'-time'${i}${split}'.bm' ${i}${split}yb
+      ln -s ${imroot}-xx-${suffix}'-pulse'${i}${split}'.mp' ${i}${split}xm
+      ln -s ${imroot}-xx-${suffix}'-pulse'${i}${split}'.bm' ${i}${split}xb
+      ln -s ${imroot}-yy-${suffix}'-pulse'${i}${split}'.mp' ${i}${split}ym
+      ln -s ${imroot}-yy-${suffix}'-pulse'${i}${split}'.bm' ${i}${split}yb
 
       expmpxx='+<'${i}${split}'xm>'${expmpxx}
       expbmxx='+<'${i}${split}'xb>'${expbmxx}
@@ -126,20 +126,20 @@ for ((i=0; i<=${timebins}-1; i++))
     expmpyy='('${expmpyy}')/'${nsplit}
     expbmyy='('${expbmyy}')/'${nsplit}
 
-    maths exp=${expmpxx} out=${imroot}'-ixx-'${suffix}'-time'${i}'.mp'
-    maths exp=${expbmxx} out=${imroot}'-ixx-'${suffix}'-time'${i}'.bm'
-    maths exp=${expmpyy} out=${imroot}'-iyy-'${suffix}'-time'${i}'.mp'
-    maths exp=${expbmyy} out=${imroot}'-iyy-'${suffix}'-time'${i}'.bm'
-    maths exp='(<'${imroot}'-ixx-'${suffix}'-time'${i}'.mp>+<'${imroot}'-iyy-'${suffix}'-time'${i}'.mp>)/2' out=${imroot}'-i-'${suffix}'-time'${i}'.mp'
-    maths exp='(<'${imroot}'-ixx-'${suffix}'-time'${i}'.bm>+<'${imroot}'-iyy-'${suffix}'-time'${i}'.bm>)/2' out=${imroot}'-i-'${suffix}'-time'${i}'.bm'
+    maths exp=${expmpxx} out=${imroot}'-ixx-'${suffix}'-pulse'${i}'.mp'
+    maths exp=${expbmxx} out=${imroot}'-ixx-'${suffix}'-pulse'${i}'.bm'
+    maths exp=${expmpyy} out=${imroot}'-iyy-'${suffix}'-pulse'${i}'.mp'
+    maths exp=${expbmyy} out=${imroot}'-iyy-'${suffix}'-pulse'${i}'.bm'
+    maths exp='(<'${imroot}'-ixx-'${suffix}'-pulse'${i}'.mp>+<'${imroot}'-iyy-'${suffix}'-pulse'${i}'.mp>)/2' out=${imroot}'-i-'${suffix}'-pulse'${i}'.mp'
+    maths exp='(<'${imroot}'-ixx-'${suffix}'-pulse'${i}'.bm>+<'${imroot}'-iyy-'${suffix}'-pulse'${i}'.bm>)/2' out=${imroot}'-i-'${suffix}'-pulse'${i}'.bm'
     maths exp='(<'${imroot}'-xx-'${suffix}'-avg'${i}'.mp>+<'${imroot}'-yy-'${suffix}'-avg'${i}'.mp>)/2' out=${imroot}'-i-'${suffix}'-avg'${i}'.mp'
     maths exp='(<'${imroot}'-xx-'${suffix}'-avg'${i}'.bm>+<'${imroot}'-yy-'${suffix}'-avg'${i}'.bm>)/2' out=${imroot}'-i-'${suffix}'-avg'${i}'.bm'
 
     # clean up temp files
-    rm -rf ${imroot}'-ixx-'${suffix}'-time'${i}'.mp'
-    rm -rf ${imroot}'-ixx-'${suffix}'-time'${i}'.bm'
-    rm -rf ${imroot}'-iyy-'${suffix}'-time'${i}'.mp'
-    rm -rf ${imroot}'-iyy-'${suffix}'-time'${i}'.bm'
+    rm -rf ${imroot}'-ixx-'${suffix}'-pulse'${i}'.mp'
+    rm -rf ${imroot}'-ixx-'${suffix}'-pulse'${i}'.bm'
+    rm -rf ${imroot}'-iyy-'${suffix}'-pulse'${i}'.mp'
+    rm -rf ${imroot}'-iyy-'${suffix}'-pulse'${i}'.bm'
 
     for split in $splitlist
     do
@@ -153,22 +153,22 @@ done
 # cat together along third axis  # only does up to 10 images for now.
 if [ $timebins -gt 1 ] && [ $timebins -lt 100 ]
     then
-    imcat in=${imroot}'-i-'${suffix}'-time*.mp' out=${imroot}'-itime-'${suffix}'.mp' options=relax
-    imcat in=${imroot}'-i-'${suffix}'-time*.bm' out=${imroot}'-itime-'${suffix}'.bm' options=relax
+    imcat in=${imroot}'-i-'${suffix}'-pulse*.mp' out=${imroot}'-itime-'${suffix}'.mp' options=relax
+    imcat in=${imroot}'-i-'${suffix}'-pulse*.bm' out=${imroot}'-itime-'${suffix}'.bm' options=relax
     imcat in=${imroot}'-i-'${suffix}'-avg*.mp' out=${imroot}'-iavg-'${suffix}'.mp' options=relax
     imcat in=${imroot}'-i-'${suffix}'-avg*.bm' out=${imroot}'-iavg-'${suffix}'.bm' options=relax
 elif [ $timebins -ge 100 ] && [ $timebins -lt 200 ]
     then
-    imcat in=${imroot}'-i-'${suffix}'-time?.mp' out=${imroot}'-itime1-'${suffix}'.mp' options=relax
-    imcat in=${imroot}'-i-'${suffix}'-time?.bm' out=${imroot}'-itime1-'${suffix}'.bm' options=relax
+    imcat in=${imroot}'-i-'${suffix}'-pulse?.mp' out=${imroot}'-itime1-'${suffix}'.mp' options=relax
+    imcat in=${imroot}'-i-'${suffix}'-pulse?.bm' out=${imroot}'-itime1-'${suffix}'.bm' options=relax
     imcat in=${imroot}'-i-'${suffix}'-avg?.mp' out=${imroot}'-iavg1-'${suffix}'.mp' options=relax
     imcat in=${imroot}'-i-'${suffix}'-avg?.bm' out=${imroot}'-iavg1-'${suffix}'.bm' options=relax
-    imcat in=${imroot}'-i-'${suffix}'-time??.mp' out=${imroot}'-itime2-'${suffix}'.mp' options=relax
-    imcat in=${imroot}'-i-'${suffix}'-time??.bm' out=${imroot}'-itime2-'${suffix}'.bm' options=relax
+    imcat in=${imroot}'-i-'${suffix}'-pulse??.mp' out=${imroot}'-itime2-'${suffix}'.mp' options=relax
+    imcat in=${imroot}'-i-'${suffix}'-pulse??.bm' out=${imroot}'-itime2-'${suffix}'.bm' options=relax
     imcat in=${imroot}'-i-'${suffix}'-avg??.mp' out=${imroot}'-iavg2-'${suffix}'.mp' options=relax
     imcat in=${imroot}'-i-'${suffix}'-avg??.bm' out=${imroot}'-iavg2-'${suffix}'.bm' options=relax
-    imcat in=${imroot}'-i-'${suffix}'-time???.mp' out=${imroot}'-itime3-'${suffix}'.mp' options=relax
-    imcat in=${imroot}'-i-'${suffix}'-time???.bm' out=${imroot}'-itime3-'${suffix}'.bm' options=relax
+    imcat in=${imroot}'-i-'${suffix}'-pulse???.mp' out=${imroot}'-itime3-'${suffix}'.mp' options=relax
+    imcat in=${imroot}'-i-'${suffix}'-pulse???.bm' out=${imroot}'-itime3-'${suffix}'.bm' options=relax
     imcat in=${imroot}'-i-'${suffix}'-avg???.mp' out=${imroot}'-iavg3-'${suffix}'.mp' options=relax
     imcat in=${imroot}'-i-'${suffix}'-avg???.bm' out=${imroot}'-iavg3-'${suffix}'.bm' options=relax
     imcat in=${imroot}'-itime1-'${suffix}'.mp,'${imroot}'-itime2-'${suffix}'.mp,'${imroot}'-itime3-'${suffix}'.mp' out=${imroot}'-itime-'${suffix}'.mp' options=relax
@@ -177,20 +177,20 @@ elif [ $timebins -ge 100 ] && [ $timebins -lt 200 ]
     imcat in=${imroot}'-iavg1-'${suffix}'.bm,'${imroot}'-iavg2-'${suffix}'.bm,'${imroot}'-iavg3-'${suffix}'.bm' out=${imroot}'-iavg-'${suffix}'.bm' options=relax
 elif [ $timebins -ge 200 ]
     then
-    imcat in=${imroot}'-i-'${suffix}'-time?.mp' out=${imroot}'-itime1-'${suffix}'.mp' options=relax
-    imcat in=${imroot}'-i-'${suffix}'-time?.bm' out=${imroot}'-itime1-'${suffix}'.bm' options=relax
+    imcat in=${imroot}'-i-'${suffix}'-pulse?.mp' out=${imroot}'-itime1-'${suffix}'.mp' options=relax
+    imcat in=${imroot}'-i-'${suffix}'-pulse?.bm' out=${imroot}'-itime1-'${suffix}'.bm' options=relax
     imcat in=${imroot}'-i-'${suffix}'-avg?.mp' out=${imroot}'-iavg1-'${suffix}'.mp' options=relax
     imcat in=${imroot}'-i-'${suffix}'-avg?.bm' out=${imroot}'-iavg1-'${suffix}'.bm' options=relax
-    imcat in=${imroot}'-i-'${suffix}'-time??.mp' out=${imroot}'-itime2-'${suffix}'.mp' options=relax
-    imcat in=${imroot}'-i-'${suffix}'-time??.bm' out=${imroot}'-itime2-'${suffix}'.bm' options=relax
+    imcat in=${imroot}'-i-'${suffix}'-pulse??.mp' out=${imroot}'-itime2-'${suffix}'.mp' options=relax
+    imcat in=${imroot}'-i-'${suffix}'-pulse??.bm' out=${imroot}'-itime2-'${suffix}'.bm' options=relax
     imcat in=${imroot}'-i-'${suffix}'-avg??.mp' out=${imroot}'-iavg2-'${suffix}'.mp' options=relax
     imcat in=${imroot}'-i-'${suffix}'-avg??.bm' out=${imroot}'-iavg2-'${suffix}'.bm' options=relax
-    imcat in=${imroot}'-i-'${suffix}'-time1??.mp' out=${imroot}'-itime3-'${suffix}'.mp' options=relax
-    imcat in=${imroot}'-i-'${suffix}'-time1??.bm' out=${imroot}'-itime3-'${suffix}'.bm' options=relax
+    imcat in=${imroot}'-i-'${suffix}'-pulse1??.mp' out=${imroot}'-itime3-'${suffix}'.mp' options=relax
+    imcat in=${imroot}'-i-'${suffix}'-pulse1??.bm' out=${imroot}'-itime3-'${suffix}'.bm' options=relax
     imcat in=${imroot}'-i-'${suffix}'-avg1??.mp' out=${imroot}'-iavg3-'${suffix}'.mp' options=relax
     imcat in=${imroot}'-i-'${suffix}'-avg1??.bm' out=${imroot}'-iavg3-'${suffix}'.bm' options=relax
-    imcat in=${imroot}'-i-'${suffix}'-time2??.mp' out=${imroot}'-itime4-'${suffix}'.mp' options=relax
-    imcat in=${imroot}'-i-'${suffix}'-time2??.bm' out=${imroot}'-itime4-'${suffix}'.bm' options=relax
+    imcat in=${imroot}'-i-'${suffix}'-pulse2??.mp' out=${imroot}'-itime4-'${suffix}'.mp' options=relax
+    imcat in=${imroot}'-i-'${suffix}'-pulse2??.bm' out=${imroot}'-itime4-'${suffix}'.bm' options=relax
     imcat in=${imroot}'-i-'${suffix}'-avg2??.mp' out=${imroot}'-iavg4-'${suffix}'.mp' options=relax
     imcat in=${imroot}'-i-'${suffix}'-avg2??.bm' out=${imroot}'-iavg4-'${suffix}'.bm' options=relax
     imcat in=${imroot}'-itime1-'${suffix}'.mp,'${imroot}'-itime2-'${suffix}'.mp,'${imroot}'-itime3-'${suffix}'.mp,'${imroot}'-itime4-'${suffix}'.mp' out=${imroot}'-itime-'${suffix}'.mp' options=relax
@@ -203,8 +203,8 @@ elif [ $timebins -ge 200 ]
     fi
 elif [ $timebins -eq 1 ]
     then
-    mv ${imroot}'-i-'${suffix}'-time0.mp' ${imroot}'-itime-'${suffix}'.mp'
-    mv ${imroot}'-i-'${suffix}'-time0.bm' ${imroot}'-itime-'${suffix}'.bm'
+    mv ${imroot}'-i-'${suffix}'-pulse0.mp' ${imroot}'-itime-'${suffix}'.mp'
+    mv ${imroot}'-i-'${suffix}'-pulse0.bm' ${imroot}'-itime-'${suffix}'.bm'
     mv ${imroot}'-i-'${suffix}'-avg0.mp' ${imroot}'-iavg-'${suffix}'.mp'
     mv ${imroot}'-i-'${suffix}'-avg0.bm' ${imroot}'-iavg-'${suffix}'.bm'
 else

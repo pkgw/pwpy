@@ -28,7 +28,7 @@ echo
 #set -e -x  # for debugging
 file='time-'${suffix}
 
-nsplit=`ls ${file}-time0a? | wc | gawk '{printf "%d \n", $0}' | head -n 1`
+nsplit=`ls ${file}-pulse0a? | wc | gawk '{printf "%d \n", $0}' | head -n 1`
 if [ $nsplit -eq 1 ]
 then
     splitlist='aa'
@@ -99,12 +99,12 @@ for split in ${splitlist}
 
   for ((i=0; i<=${timebins}-1; i++))
     do
-    mpsmall=${imroot}'-xx-'${suffix}'-time'${i}${split}.mp
-    bmsmall=${imroot}'-xx-'${suffix}'-time'${i}${split}.bm
-    invert vis=${visroot}'-xx' map=$mpsmall beam=$bmsmall select='@'${file}'-time'${i}${split} options=double,mfs sup=0 imsize=${imsize},${imsize}
-    mpsmall=${imroot}'-yy-'${suffix}'-time'${i}${split}.mp
-    bmsmall=${imroot}'-yy-'${suffix}'-time'${i}${split}.bm
-    invert vis=${visroot}'-yy' map=$mpsmall beam=$bmsmall select='@'${file}'-time'${i}${split} options=double,mfs sup=0 imsize=${imsize},${imsize}
+    mpsmall=${imroot}'-xx-'${suffix}'-pulse'${i}${split}.mp
+    bmsmall=${imroot}'-xx-'${suffix}'-pulse'${i}${split}.bm
+    invert vis=${visroot}'-xx' map=$mpsmall beam=$bmsmall select='@'${file}'-pulse'${i}${split} options=double,mfs sup=0 imsize=${imsize},${imsize}
+    mpsmall=${imroot}'-yy-'${suffix}'-pulse'${i}${split}.mp
+    bmsmall=${imroot}'-yy-'${suffix}'-pulse'${i}${split}.bm
+    invert vis=${visroot}'-yy' map=$mpsmall beam=$bmsmall select='@'${file}'-pulse'${i}${split} options=double,mfs sup=0 imsize=${imsize},${imsize}
   done
 
 #  echo
