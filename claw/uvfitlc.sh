@@ -19,7 +19,7 @@ t0s=02.4
 imagebin=4   # zero-based
 phasebins=8
 outphases=0 # not yet implemented
-timebins=10   # how to split in time
+timebins=50   # how to split in time
 suffix='tst'
 visroot='fxc-j0332-0.1s'
 #imroot='j0332-0.1s'
@@ -28,17 +28,30 @@ cleanup=1
 # std naming convention
 outn='time-'${suffix}
 
-if [ ${cleanup} -eq 1 ]; then
+if [ ${cleanup} -ge 1 ]; then
+    echo 'Cleaning up...'
     rm -rf ${visroot}'-pulse'*
     rm -rf ${visroot}'-avg'*
     rm -rf ${visroot}'-diff'*
-    rm -f ${outn}'-time'*
-    rm -f ${outn}'-avg'*
+    if [ ${cleanup} -ge 2 ]; then
+	rm -f ${outn}'-time'*
+	rm -f ${outn}'-avg'*
+    fi
 fi
 
 ## Run search ##
 # create pulse bin
-psrbin-timeselect.sh ${period} ${binsize} ${phasebins} ${outphases} ${ints} ${t0h} ${t0m} ${t0s} ${suffix} ${timebins} ${imagebin}
+if [ ${cleanup} -ge 2 ]; then
+    psrbin-timeselect.sh ${period} ${binsize} ${phasebins} ${outphases} ${ints} ${t0h} ${t0m} ${t0s} ${suffix} ${timebins} ${imagebin}
+
+# need to lengthen number of ints in avg to avoid time overlaps
+    for ((i=1;i<=${timebins};i++)); do
+	imm=`echo 'scale=0; '${i}'-1' | bc`
+	cat ${outn}'-avg'${i} >> ${outn}'-avg'${imm}
+    done
+    cp ${outn}'-avg48' ${outn}'-avg49'  # duplicate ok...
+fi
+
 
 for ((i=0;i<${timebins};i++)); do
     # set file names
@@ -46,9 +59,9 @@ for ((i=0;i<${timebins};i++)); do
     fileavg=${outn}'-avg'${i} # select for average about bin
 	
     # need to average down.  interval must be big enough to avoid overlapping time stamps and small enough to have more than one integration per file
-    uvaver vis=${visroot}'-xx' select='@'${filebin} line=chan,1,1,32 interval=0.1 out=${visroot}'-pulse'${i}
-    uvaver vis=${visroot}'-xx' select='@'${fileavg} line=chan,1,1,32 interval=0.1 out=${visroot}'-avg'${i}
-    uvdiff vis=${visroot}'-pulse'${i},${visroot}'-avg'${i} out=${visroot}'-diff'${i}
+    uvaver vis=${visroot}'-xx' select='@'${filebin} line=chan,1,1,32 interval=0.05 out=${visroot}'-pulse'${i}
+    uvaver vis=${visroot}'-xx' select='@'${fileavg} line=chan,1,1,32 interval=0.05 out=${visroot}'-avg'${i}
+    ./uvdiff vis=${visroot}'-pulse'${i},${visroot}'-avg'${i} out=${visroot}'-diff'${i}
 
     # do fit
     uvfit vis=${visroot}'-diff'${i} object=point
