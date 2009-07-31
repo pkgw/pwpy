@@ -16,16 +16,16 @@
 
 # observation properties:
 #period=0.7136692   # period that fixes b0329 phase shift
-#period=0.7137   # period that makes b0329 pulse more constant with time
+period=0.7137   # period that makes b0329 pulse more constant with time
 #period=0.358738    # period for b1933
-period=0.25310    # period that works for b0950
+#period=0.25310    # period that works for b0950
 binsize=0.1
-ints=6000
+ints=300
 
 # time for j0332-0.1s:
-#t0h=02
-#t0m=05
-#t0s=02.4
+t0h=02
+t0m=05
+t0s=02.4
 
 # time for b1933-0.1s:
 #t0h=19
@@ -33,20 +33,20 @@ ints=6000
 #t0s=25.3
 
 # time for b0950-0.1s-6000
-t0h=01
-t0m=32
-t0s=35.7
+#t0h=01
+#t0m=32
+#t0s=35.7
 
 # output properties:
-imagebin=2   # zero-based
-phasebins=3
+imagebin=3   # zero-based
+phasebins=6
 outphases=1  # not yet implemented
-timebins=10   # how to split in time
+timebins=42   # how to split in time
 suffix='tst'
-visroot='fxc-b0950-0.1s-6000'
-imroot='b0950-0.1s-6000'
+visroot='fxc-j0332-0.1s'
+imroot='j0332-0.1s'
 imsize=50
-cleanup=1
+cleanup=0
 ######################
 
 set -e -x
@@ -72,7 +72,7 @@ set -e -x
   if [ $cleanup -eq 1 ]
       then
       rm -rf ${imroot}-?-${suffix}-*.* 
-      rm -rf ${imroot}-??-${suffix}-pulse*.* 
+      rm -rf ${imroot}-??-${suffix}-time*.* 
       rm -rf ${imroot}-??-${suffix}-avg*.* 
       rm -rf ${imroot}-itime?-${suffix}.* ${imroot}-itimeavg-${suffix}.* 
       rm -f time-${suffix}-pulse* time-${suffix}-avg*
