@@ -10,7 +10,7 @@
 #pulsar properties
 period=0.7137   # period that makes b0329 pulse more constant with time
 binsize=0.1
-ints=300
+ints=3000
 # time for j0332-0.1s:
 t0h=02
 t0m=05
@@ -19,7 +19,7 @@ t0s=02.4
 imagebin=3   # zero-based
 phasebins=6
 outphases=1 # not yet implemented
-timebins=42   # how to split in time
+timebins=420   # how to split in time
 interval=`echo 'scale=5; '${period}'/60/2' | bc`  # set this to half period to assure at least two averaged bins
 suffix='tst'
 visroot='fxc-j0332-0.1s'
