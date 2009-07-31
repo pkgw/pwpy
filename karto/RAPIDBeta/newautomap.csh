@@ -196,7 +196,7 @@ set mode = "auto" # Operating mode (interactive, automated, or no extra processi
 set amplim = (0 5000 10000) # Amplitude limits for flagging of data
 set preamplim
 set uselect # User selection parameters for mapping, i.e. xx or yy. Users should note that shadowed ants are automatically deselected.
-set niters = 2500 # Limit to provide clean, assuming that it's nice and happy
+set niters = 0 # Limit to provide clean, assuming that it's nice and happy
 set wniters = 100 # Limit for wrath cleaning
 set cleantype = clean # Clean operating mode
 set cregion # Cleaning region for thingy
@@ -289,7 +289,7 @@ else if ("$argv[1]" =~ 'selfcaltol='*) then
     set sctol = `echo $argv[1] | sed 's/selfcaltol=//'`
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'select='*) then
-    set uselect = "`echo $argv[1] | sed 's/select=//'`"
+    set uselect = "`echo '$argv[1]' | sed 's/select=//'`"
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'selfcalsigma='*) then
     set scsigma = `echo $argv[1] | sed 's/scsigma=//'`
@@ -342,7 +342,7 @@ else if ("$argv[1]" =~ 'imsize='*) then
     set imsize = `echo $argv[1] | sed 's/imsize=//'`
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'cleanlim='*) then
-    set niters = `echo $argv[1] | sed 's/cleanlim=//'`
+    set niters = `echo $argv[1] | sed 's/cleanlim=//' | awk '{print int($1*1)}'`
     set intclean = 0
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'cellsize='*) then
@@ -588,9 +588,18 @@ set idx = 0
 foreach file ($vis)
     echo -n "Splitting $file..."
     @ idx++
-    uvaver vis=$file out=$wd/tempmap$idx.xpol options=relax select="-shadow(7.5),pol(xx),$uselect" interval=$interval $line >& /dev/null 
-    echo -n "."
-    uvaver vis=$file out=$wd/tempmap$idx.ypol options=relax select="-shadow(7.5),pol(yy),$uselect" interval=$interval $line >& /dev/null 
+    if ("$uselect" != "") then
+	uvaver vis=$file out=$wd/tempselect options=relax interval=$interval $line select="$uselect" >& /dev/null
+	echo -n "."
+	uvaver vis=$wd/tempselect out=$wd/tempmap$idx.xpol options=relax select="-shadow(7.5),pol(xx)" >& /dev/null 
+	echo -n "."
+	uvaver vis=$wd/tempselect out=$wd/tempmap$idx.ypol options=relax select="-shadow(7.5),pol(yy)" >& /dev/null 
+	rm -rf $wd/tempselect
+    else
+	uvaver vis=$file out=$wd/tempmap$idx.xpol options=relax select="-shadow(7.5),pol(xx),$uselect" interval=$interval $line >& /dev/null 
+	echo -n "."
+	uvaver vis=$file out=$wd/tempmap$idx.ypol options=relax select="-shadow(7.5),pol(yy),$uselect" interval=$interval $line >& /dev/null 
+    endif
     if !(-e $wd/tempmap$idx.xpol/visdata || -e $wd/tempmap$idx.ypol/visdata) then
 	echo "FATAL ERROR: UVAVER has failed! $file shows no viable data!" 
 	goto enderr
@@ -736,7 +745,7 @@ endif
 # primary beam.
 ################################################################# 
 
-if ($intclean) then
+if ($intclean && $niters == 0) then
     echo "Performing preliminary clean, deriving model for calculations"
     clean map=$wd/tempmap.map beam=$wd/tempmap.beam out=$wd/tempmap.clean niters=1000 cutoff=$tnoise "$cregion" >& /dev/null 
     restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd/tempmap.cm >& /dev/null 
@@ -752,7 +761,7 @@ if ($intclean) then
     sfind in=tempmap.cm options=oldsfind,auto,nofit rmsbox=100 xrms=3 labtyp=arcsec >& /dev/null 
     cd ..
     # Had to patch here since sfind was having problems... stupid bugger
-    set niters = `grep -v "#" $wd/sfind.log | awk '{if ($6*$7 > 3000*noise) cycles+=2*log((3000*noise)/($6*$7))/log(.9)} END {print int(cycles)}' noise=$imstats[3]`
+    set niters = `grep -v "#" $wd/sfind.log | awk '{if ($6*$7 > 3000*noise) cycles+=2*log((3000*noise)/($6*$7))/log(.9)} END {print int(cycles)}' noise=$tnoise`
     if ($niters < 50) then
 	echo "Derived value for niters was $niters... invoking safegaurd and putting niters at 50."
 	set niters = 50
@@ -762,6 +771,9 @@ if ($intclean) then
     endif
     rm -rf $wd/tempmap.cm $wd/tempmap.rs $wd/tempmap.clean
 endif
+
+if !($niters) set niters = 2500
+
 clean:
 
 # Create clean component map and make residual/cleaned images
@@ -791,8 +803,8 @@ set imstats = (`imstat in=$wd/tempmap.rs | awk '{if (check == 1) print $0; else 
 set alevel = `echo $nalevel $tnoise $imstats[3] | awk '{print $1*$3/$2}'` # Expected minimum max pixel magnitude
 set acheck = `echo $alevel $imstats[4-5] | awk '{if ($4+$5 < 0) print $2/$1; else print -1*$3/$1}'`
 set nacheck = `echo $nalevel $imstats[4-5] | awk '{if ($4+$5 < 0) print $2/$1; else print -1*$3/$1}'`
-#echo $imstats
-#echo $nalevel $alevel $acheck
+
+#echo $tnoise
 cd $wd
 rm -f sfind.log; touch sfind.log
 if ($intclean || $mode != "skip") sfind in=tempmap.rs options=oldsfind,auto,nofit rmsbox=100 xrms=4 labtyp=arcsec >& /dev/null 
@@ -923,15 +935,26 @@ if ($mode == "auto") goto finish
 
 imcomp:
 
-echo "Imaging complete. Would you like to (s)elfcal, baseline (f)lag, (g)eneral flag, (w)rath or e(x)it?"
+echo "Imaging complete. Would you like to (s)elfcal, baseline (f)lag, (g)eneral flag, (w)rath, adjust (n)iters or e(x)it?"
 set yn = $<
 if ($yn == "s") goto selfcal
 if ($yn == "f") goto postflag
 if ($yn == "x") goto finish
 if ($yn == "g") goto postgenflag
 if ($yn == "w") goto wrath
+if ($yn == "n") goto postclean
 echo "$yn is not a recognized selection"
 goto imcomp 
+
+postclean:
+echo "Enter number of iterations for CLEAN:"
+set niters = "$<"
+if (`echo $niters | awk '{print $1*1}'` == 0) then
+    echo "WARNING: Number of iterations not recognized. Moving to default of 2500"
+    set niters = 2500
+endif
+
+goto invert
 
 postgenflag:
 
@@ -1183,6 +1206,7 @@ set clip = `echo $scsigma $imstats[3] | awk '{print $1*$2}'`
 
 foreach file ($vislist)
     selfcal vis=$file model=$wd/tempmap.clean interval=$scint select=$sel minants=4 options=mfs,$scopt clip=$clip refant=$refant >& /dev/null
+    if ($autoamp && ! $autopha) gpedit vis=$file options=amp > /dev/null
 end
 
 echo "Restarting cycle!"

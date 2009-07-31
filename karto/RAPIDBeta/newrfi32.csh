@@ -880,7 +880,7 @@ if ($display) then
     endif
 
     echo 'end' >> $wd/temp.wip
-    wip $wd/temp.wip > /dev/null
+    wip $wd/temp.wip < /dev/null >& /dev/null
 endif
 
 if ($rfitype == "pos") then
