@@ -42,7 +42,7 @@ for ((j=0; j<=${timebins}-1; j++))   # iterate over pulse phase, zero based
 do
 
 outn='time-'${suffix}
-file=${outn}'-time'${j}
+file=${outn}'-on'${j}
 fileavg=${outn}'-avg'${j}
 fileoff=${outn}'-off'${j}
 touch $file

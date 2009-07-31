@@ -28,7 +28,7 @@ echo
 #set -e -x  # for debugging
 file='time-'${suffix}
 
-nsplit=`ls ${file}-time0a? | wc | gawk '{printf "%d \n", $0}' | head -n 1`
+nsplit=`ls ${file}-on0a? | wc | gawk '{printf "%d \n", $0}' | head -n 1`
 if [ $nsplit -eq 1 ]
 then
     splitlist='aa'
@@ -99,24 +99,13 @@ for split in ${splitlist}
 
   for ((i=0; i<=${timebins}-1; i++))
     do
-    mpsmall=${imroot}'-xx-'${suffix}'-time'${i}${split}.mp
-    bmsmall=${imroot}'-xx-'${suffix}'-time'${i}${split}.bm
-    invert vis=${visroot}'-xx' map=$mpsmall beam=$bmsmall select='@'${file}'-time'${i}${split} options=double,mfs sup=0 imsize=${imsize},${imsize}
-    mpsmall=${imroot}'-yy-'${suffix}'-time'${i}${split}.mp
-    bmsmall=${imroot}'-yy-'${suffix}'-time'${i}${split}.bm
-    invert vis=${visroot}'-yy' map=$mpsmall beam=$bmsmall select='@'${file}'-time'${i}${split} options=double,mfs sup=0 imsize=${imsize},${imsize}
+    mpsmall=${imroot}'-xx-'${suffix}'-on'${i}${split}.mp
+    bmsmall=${imroot}'-xx-'${suffix}'-on'${i}${split}.bm
+    invert vis=${visroot}'-xx' map=$mpsmall beam=$bmsmall select='@'${file}'-on'${i}${split} options=double,mfs sup=0 imsize=${imsize},${imsize}
+    mpsmall=${imroot}'-yy-'${suffix}'-on'${i}${split}.mp
+    bmsmall=${imroot}'-yy-'${suffix}'-on'${i}${split}.bm
+    invert vis=${visroot}'-yy' map=$mpsmall beam=$bmsmall select='@'${file}'-on'${i}${split} options=double,mfs sup=0 imsize=${imsize},${imsize}
   done
-
-#  echo
-#  echo '***Dirty image stats***'
-#
-#  for ((i=0; i<=${timebins}-1; i++))
-#    do
-#    echo 'Image '${i}':'
-#    imstat in=${imroot}'-xx-'${suffix}'-time'${i}${split}.mp | tail -n 2
-#    imstat in=${imroot}'-yy-'${suffix}'-time'${i}${split}.mp | tail -n 2
-#  done
-
 done
 
 for ((i=0; i<=${timebins}-1; i++))

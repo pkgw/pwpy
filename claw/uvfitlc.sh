@@ -19,7 +19,7 @@ t0s=02.4
 imagebin=3   # zero-based
 phasebins=6
 outphases=1 # not yet implemented
-timebins=420   # how to split in time
+timebins=42   # how to split in time
 interval=`echo 'scale=5; '${period}'/60/2' | bc`  # set this to half period to assure at least two averaged bins
 suffix='tst'
 visroot='fxc-j0332-0.1s'
@@ -31,12 +31,14 @@ outn='time-'${suffix}
 
 if [ ${cleanup} -ge 1 ]; then
     echo 'Cleaning up...'
-    rm -rf ${visroot}'-pulse'*
+    rm -rf ${visroot}'-time'*
+    rm -rf ${visroot}'-on'*
     rm -rf ${visroot}'-avg'*
     rm -rf ${visroot}'-off'*
     rm -rf ${visroot}'-diff'*
     if [ ${cleanup} -ge 2 ]; then
-	rm -f ${outn}'-pulse'*
+	rm -f ${outn}'-time'*
+	rm -f ${outn}'-on'*
 	rm -f ${outn}'-avg'*
 	rm -f ${outn}'-off'*
     fi
@@ -66,16 +68,16 @@ fi
 
 for ((i=0;i<${timebins};i++)); do
     # set file names
-    filebin=${outn}'-time'${i}'aa' # select for bin.  assumes no splitting
+    filebin=${outn}'-on'${i}'aa' # select for bin.  assumes no splitting
 #    fileavg=${outn}'-avg'${i} # select for average about bin
     fileoff=${outn}'-off'${i} # select for average about bin
 	
     # need to average down.  interval must be big enough to avoid overlapping time stamps and small enough to have more than one integration per file
-    uvaver vis=${visroot}'-xx' select='@'${filebin} line=chan,1,1,32 interval=${interval} out=${visroot}'-time'${i}
+    uvaver vis=${visroot}'-xx' select='@'${filebin} line=chan,1,1,32 interval=${interval} out=${visroot}'-on'${i}
     uvaver vis=${visroot}'-xx' select='@'${fileoff} line=chan,1,1,32 interval=${interval} out=${visroot}'-off'${i}
 #    uvaver vis=${visroot}'-xx' select='@'${fileavg} line=chan,1,1,32 interval=${interval} out=${visroot}'-avg'${i} # old method
-#    ./uvdiff vis=${visroot}'-time'${i},${visroot}'-avg'${i} out=${visroot}'-diff'${i}  # old method
-    ./uvdiff vis=${visroot}'-time'${i},${visroot}'-off'${i} out=${visroot}'-diff'${i}
+#    ./uvdiff vis=${visroot}'-on'${i},${visroot}'-avg'${i} out=${visroot}'-diff'${i}  # old method
+    ./uvdiff vis=${visroot}'-on'${i},${visroot}'-off'${i} out=${visroot}'-diff'${i}
 
     # do fit
     uvfit vis=${visroot}'-diff'${i} object=point

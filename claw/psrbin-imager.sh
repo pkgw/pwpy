@@ -41,7 +41,7 @@ t0s=02.4
 imagebin=3   # zero-based
 phasebins=6
 outphases=1  # not yet implemented
-timebins=420   # how to split in time
+timebins=42   # how to split in time
 suffix='tst'
 visroot='fxc-j0332-0.1s'
 imroot='j0332-0.1s'
@@ -60,8 +60,8 @@ set -e -x
 #clean up
   rm -rf ${imroot}-xx-${suffix}-*.* ${imroot}-yy-${suffix}-*.* # remove xx, yy ims for time and avg
   rm -rf ${imroot}-i-${suffix}-*.* ${imroot}-i??-${suffix}-*.*  # i, ixx, iyy
-  rm -rf ${imroot}-itime*-${suffix}.* ${imroot}-itime*-${suffix}-sub.* ${imroot}-iavg*-${suffix}*.*   # remove old image cubes
-  rm -f time-${suffix}-pulse* time-${suffix}-avg*    # remove time filter files
+  rm -rf ${imroot}-ion*-${suffix}.* ${imroot}-ion*-${suffix}-sub.* ${imroot}-iavg*-${suffix}*.*   # remove old image cubes
+  rm -f time-${suffix}-on* time-${suffix}-avg*    # remove time filter files
 
   psrbin-timeselect.sh ${period} ${binsize} ${phasebins} ${outphases} ${ints} ${t0h} ${t0m} ${t0s} ${suffix} ${timebins} ${imagebin}
 
@@ -72,9 +72,9 @@ set -e -x
   if [ $cleanup -eq 1 ]
       then
       rm -rf ${imroot}-?-${suffix}-*.* 
-      rm -rf ${imroot}-??-${suffix}-time*.* 
+      rm -rf ${imroot}-??-${suffix}-on*.* 
       rm -rf ${imroot}-??-${suffix}-avg*.* 
-      rm -rf ${imroot}-itime?-${suffix}.* ${imroot}-itimeavg-${suffix}.* 
-      rm -f time-${suffix}-pulse* time-${suffix}-avg*
+      rm -rf ${imroot}-ion?-${suffix}.* ${imroot}-iavg?-${suffix}.*
+      rm -f time-${suffix}-on* time-${suffix}-avg* time-${suffix}-off*
   fi
 #done
