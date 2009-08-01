@@ -36,6 +36,8 @@ $donvss = 1; # cull NVSS.txt too
 #$donvss = 0; # skip NVSS.txt culling
 
 # command for MATHS (used to make master gain image)
+# NB - it's possible this argument might get too long; this should 
+# probably be reprogrammed to multiply these one at a time
 $mathcmd = "maths exp='(";
 
 
@@ -51,7 +53,7 @@ foreach $arg (@ARGV) {
 	$inim[$argn] = "$imroot[$argn].cm";
 	$gainim[$argn] = "$imroot[$argn].gain";
 	$regridim[$argn] = "$imroot[$argn].regrid";
-	$regridga[$argn] = "$imroot[$argn].gainregrid";
+	$regridga[$argn] = "grg$argn";
 
 # original output from sfind
 	$sforig[$argn] = "sfind.$imroot[$argn].orig";
@@ -82,7 +84,7 @@ foreach $arg (@ARGV) {
 	    rename("sfind.log","$sforig[$argn]");
 	}
     }
-    $mathcmd = "$mathcmd<$regridga[$epg]>";
+    $mathcmd = "$mathcmd<$regridga[$argn]>";
     $argn++;
     if ($argn < $narg) { $mathcmd = "$mathcmd*" };
 }
