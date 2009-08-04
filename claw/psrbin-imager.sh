@@ -38,7 +38,7 @@ t0s=02.4
 #t0s=35.7
 
 # output properties:
-imagebin=3   # zero-based
+imagebin=1   # zero-based
 phasebins=6
 outphases=1  # not yet implemented
 timebins=42   # how to split in time
