@@ -5,7 +5,7 @@
 # Goal is to find significance of each fit relative to overall distribution
 
 ## User parameters ##
-bgints=3  # size of background region to subtract mean emission
+bgints=2  # size of background region to subtract mean emission
 ints=3000   # number of integrations to use
 binsize=0.1 # size of integration in seconds
 interval=`echo 'scale=5; '${binsize}'*2/60' | bc`  # set this to assure at least two averaged bins
@@ -13,22 +13,31 @@ visstep=10  # number of visibilities per integration.  sadly, needs to be hardwi
 # output properties:
 suffix='tst'
 visroot='fxc-j0332-0.1s'
-outfile='j0332-0.1s-'${suffix}'.txt'
+outroot='j0332-'${suffix}
 cleanup=1
 
 #set -x -e
 
 if [ $cleanup -eq 1 ]
     then
-    rm -f ${outfile}
+    rm -f ${outroot}-*.txt
+    rm -f /tmp/uvfitpulse-${suffix}.txt
     rm -rf ${visroot}'-'${suffix}-on
     rm -rf ${visroot}'-'${suffix}-off
     rm -rf ${visroot}'-'${suffix}-diff
+    rm -rf ${visroot}'-'${suffix}-resid*
 fi
 
-touch ${outfile}
+touch ${outroot}-flux.txt
+touch ${outroot}-x.txt
+touch ${outroot}-y.txt
 
-for ((i=${bgints};i<${ints};i++)); do
+for ((i=${bgints};i<${ints}-${bgints};i++)); do
+    # prep for new loop
+    rm -rf ${visroot}'-'${suffix}-on
+    rm -rf ${visroot}'-'${suffix}-off
+    rm -rf ${visroot}'-'${suffix}-diff
+
     # define visibilities to use
     visbg0=`echo 'scale=0; '${visstep}'*('${i}'-'${bgints}')+1' | bc`     # get neighboring ints in background select
     visbg1=`echo 'scale=0; '${visstep}'*('${i}'+'${bgints}'+1)' | bc`     # get neighboring ints in background select
@@ -40,12 +49,20 @@ for ((i=${bgints};i<${ints};i++)); do
     uvaver vis=${visroot}'-xx' select='vis('${vis0}','${vis1}')' line=chan,1,1,32 interval=${interval} out=${visroot}'-'${suffix}'-on'
 
     # difference integration from mean emission
-    ./uvdiff vis=${visroot}'-'${suffix}'-on',${visroot}'-'${suffix}'-off' out=${visroot}'-'${suffix}'-diff' #select='vis('${vis0}','${vis1}')'
+    ./uvdiff vis=${visroot}'-'${suffix}'-on',${visroot}'-'${suffix}'-off' out=${visroot}'-'${suffix}'-diff'
 
     # uvfit
-    uvfit vis=${visroot}'-'${suffix}'-diff' object=point | grep Flux | awk '{printf("%s +/- 1.00E-02",$0)}' | cut -c32-56 | awk '{printf("int%s %s\n",'"$i"',$0)}' >> ${outfile}  # hack to get iter, flux, and error for every fit
-
-    rm -rf ${visroot}'-'${suffix}-on
-    rm -rf ${visroot}'-'${suffix}-off
-    rm -rf ${visroot}'-'${suffix}-diff
+    uvfit vis=${visroot}'-'${suffix}'-diff' object=point options=residual out=${visroot}-${suffix}-resid${i} >& /tmp/uvfitpulse-${suffix}.txt
+    # confirm that fit retuned good values
+    if [ `grep 'Failed to determine covariance matrix' /tmp/uvfitpulse-${suffix}.txt | wc -l` != 0 ]
+	then
+	continue
+    fi
+    # if good, populate text files, else continue to next iter
+    grep Flux /tmp/uvfitpulse-${suffix}.txt | awk '{printf("%s %s +/- %s\n",'"$i"',$2,$4)}' >> ${outroot}-flux.txt  # hack to get iter, flux, and error for every fit
+#    grep Flux /tmp/uvfitpulse-${suffix}.txt | awk '{printf("%s +/- 1.00E-02",$0)}' | cut -c32-56 | awk '{printf("%s %s\n",'"$i"',$0)}' >> ${outroot}-flux.txt  # hack to get iter, flux, and error for every fit.  old method;  now skips bad iters.
+    x=`grep Offset /tmp/uvfitpulse-${suffix}.txt | awk '{printf("%s\n",$4)}'`
+    y=`grep Offset /tmp/uvfitpulse-${suffix}.txt | awk '{printf("%s\n",$5)}'`
+    grep Positional /tmp/uvfitpulse-${suffix}.txt | awk '{printf("%s %s +/- %s\n",'"$i"','"$x"',$4)}' >> ${outroot}-x.txt
+    grep Positional /tmp/uvfitpulse-${suffix}.txt | awk '{printf("%s %s +/- %s\n",'"$i"','"$y"',$5)}' >> ${outroot}-y.txt
 done
