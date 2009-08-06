@@ -4,9 +4,13 @@
 # Script to find pulses by uv fitting for a point source in visibility data.
 # Goal is to find significance of each fit relative to overall distribution
 
+#timing
+startt=`date +%s`
+
 ## User parameters ##
 bgints=2  # size of background region to subtract mean emission
 ints=3000   # number of integrations to use
+skipint=0
 binsize=0.1 # size of integration in seconds
 interval=`echo 'scale=5; '${binsize}'*2/60' | bc`  # set this to assure at least two averaged bins
 visstep=10  # number of visibilities per integration.  sadly, needs to be hardwired...
@@ -32,7 +36,7 @@ touch ${outroot}-flux.txt
 touch ${outroot}-x.txt
 touch ${outroot}-y.txt
 
-for ((i=${bgints};i<${ints}-${bgints};i++)); do
+for ((i=${bgints}+${skipint};i<${ints}-${bgints}+${skipint};i++)); do
     # prep for new loop
     rm -rf ${visroot}'-'${suffix}-on
     rm -rf ${visroot}'-'${suffix}-off
@@ -52,9 +56,9 @@ for ((i=${bgints};i<${ints}-${bgints};i++)); do
     ./uvdiff vis=${visroot}'-'${suffix}'-on',${visroot}'-'${suffix}'-off' out=${visroot}'-'${suffix}'-diff'
 
     # uvfit
-    uvfit vis=${visroot}'-'${suffix}'-diff' object=point options=residual out=${visroot}-${suffix}-resid${i} >& /tmp/uvfitpulse-${suffix}.txt
+    uvfit vis=${visroot}'-'${suffix}'-diff' object=point >& /tmp/uvfitpulse-${suffix}.txt
     # confirm that fit retuned good values
-    if [ `grep 'Failed to determine covariance matrix' /tmp/uvfitpulse-${suffix}.txt | wc -l` != 0 ]
+    if [ `grep 'Failed to determine covariance matrix' /tmp/uvfitpulse-${suffix}.txt | wc -l` != 0 ] || [ `grep 'Failed to converge' /tmp/uvfitpulse-${suffix}.txt | wc -l` != 0 ]
 	then
 	continue
     fi
@@ -66,3 +70,8 @@ for ((i=${bgints};i<${ints}-${bgints};i++)); do
     grep Positional /tmp/uvfitpulse-${suffix}.txt | awk '{printf("%s %s +/- %s\n",'"$i"','"$x"',$4)}' >> ${outroot}-x.txt
     grep Positional /tmp/uvfitpulse-${suffix}.txt | awk '{printf("%s %s +/- %s\n",'"$i"','"$y"',$5)}' >> ${outroot}-y.txt
 done
+
+stopt=`date +%s`
+echo "Elapsed seconds:"
+echo "scale=2; "${stopt}"-"${startt} | bc
+
