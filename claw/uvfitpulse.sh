@@ -5,7 +5,7 @@
 # Goal is to find significance of each fit relative to overall distribution
 
 ## User parameters ##
-bgints=2  # size of background region to subtract mean emission
+bgints=3  # size of background region to subtract mean emission
 ints=3000   # number of integrations to use
 binsize=0.1 # size of integration in seconds
 interval=`echo 'scale=5; '${binsize}'*2/60' | bc`  # set this to assure at least two averaged bins
@@ -43,7 +43,7 @@ for ((i=${bgints};i<${ints};i++)); do
     ./uvdiff vis=${visroot}'-'${suffix}'-on',${visroot}'-'${suffix}'-off' out=${visroot}'-'${suffix}'-diff' #select='vis('${vis0}','${vis1}')'
 
     # uvfit
-    uvfit vis=${visroot}'-'${suffix}'-diff' object=point | grep Flux | awk '{printf("%s +/- 1.00E-02",$0)}' | cut -c32-56 | awk '{printf("int%s %s\n",'"$i"',$0)}' >> ${outfile}  # hack to get flux and error for every fit
+    uvfit vis=${visroot}'-'${suffix}'-diff' object=point | grep Flux | awk '{printf("%s +/- 1.00E-02",$0)}' | cut -c32-56 | awk '{printf("int%s %s\n",'"$i"',$0)}' >> ${outfile}  # hack to get iter, flux, and error for every fit
 
     rm -rf ${visroot}'-'${suffix}-on
     rm -rf ${visroot}'-'${suffix}-off
