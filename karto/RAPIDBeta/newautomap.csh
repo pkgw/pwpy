@@ -706,7 +706,7 @@ end
 
 invert:
 
-if !($autoflag || $autopha || $autoflag || $wrath || "$mode" == "inter") set mode = skip
+if !($autoflag || $autopha || $autoamp || $autoflag || $wrath || "$mode" == "inter") set mode = skip
 
 #Clear out the garbage from the last run first
 
@@ -745,7 +745,7 @@ endif
 # primary beam.
 ################################################################# 
 
-if ($intclean && $niters == 0) then
+if ($intclean) then
     echo "Performing preliminary clean, deriving model for calculations"
     clean map=$wd/tempmap.map beam=$wd/tempmap.beam out=$wd/tempmap.clean niters=1000 cutoff=$tnoise "$cregion" >& /dev/null 
     restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd/tempmap.cm >& /dev/null 
@@ -761,7 +761,10 @@ if ($intclean && $niters == 0) then
     sfind in=tempmap.cm options=oldsfind,auto,nofit rmsbox=100 xrms=3 labtyp=arcsec >& /dev/null 
     cd ..
     # Had to patch here since sfind was having problems... stupid bugger
+    set niterslim = `imstat in=$wd/tempmap.clean | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g' | awk '{print int(log(3*noise/$1)/log(.9))}' noise=$tnoise`
     set niters = `grep -v "#" $wd/sfind.log | awk '{if ($6*$7 > 3000*noise) cycles+=2*log((3000*noise)/($6*$7))/log(.9)} END {print int(cycles)}' noise=$tnoise`
+    if ($niters < $niterslim) set niters=$niterslim
+
     if ($niters < 50) then
 	echo "Derived value for niters was $niters... invoking safegaurd and putting niters at 50."
 	set niters = 50
