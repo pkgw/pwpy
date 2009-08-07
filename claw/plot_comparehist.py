@@ -1,6 +1,6 @@
 # claw, 4aug09
 #
-# quick and dirty script to plot histograms from flux files
+# quick and dirty script to plot and compare histograms from uvfit output
 
 import pylab,numpy,asciidata
 
