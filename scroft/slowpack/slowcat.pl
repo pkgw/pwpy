@@ -35,11 +35,8 @@ $donvss = 1; # cull NVSS.txt too
 #$docull = 0; # skip catalog culling
 #$donvss = 0; # skip NVSS.txt culling
 
-# command for MATHS (used to make master gain image)
-# NB - it's possible this argument might get too long; this should 
-# probably be reprogrammed to multiply these one at a time
-$mathcmd = "maths exp='(";
-
+system("rm -rf gain.tmp");
+system("rm -rf gain.tmp2");
 
 # Make coverage maps and catalogs
 $narg = @ARGV;
@@ -53,8 +50,8 @@ foreach $arg (@ARGV) {
 	$inim[$argn] = "$imroot[$argn].cm";
 	$gainim[$argn] = "$imroot[$argn].gain";
 	$regridim[$argn] = "$imroot[$argn].regrid";
-	$regridga[$argn] = "grg$argn";
-
+	$regridga[$argn] = "$imroot[$argn].grg";
+	
 # original output from sfind
 	$sforig[$argn] = "sfind.$imroot[$argn].orig";
 # final sfind catalog
@@ -84,19 +81,33 @@ foreach $arg (@ARGV) {
 	    rename("sfind.log","$sforig[$argn]");
 	}
     }
-    $mathcmd = "$mathcmd<$regridga[$argn]>";
+    if ($argn == 1) {
+	$previm = $regridga[0];
+	$currim = $regridga[1];
+	$outim = "gain.tmp2";
+    }
+    if ($argn > 1) {
+	$previm = "gain.tmp";
+	$currim = $regridga[$argn];
+	$outim = "gain.tmp2";
+    }
+    if ($argn > 0) {
+	system("rm -rf $outim");
+	$mathcmd = "maths exp='(<$previm>*<$currim>)' out=$outim";
+	print "$mathcmd\n";
+	system($mathcmd);
+	system("rm -rf gain.tmp");
+	rename("$outim","gain.tmp");
+    }
     $argn++;
-    if ($argn < $narg) { $mathcmd = "$mathcmd*" };
 }
 
 
 # make master gain image
 $gainmos="allim.gain";
 system("rm -rf $gainmos");
-print "Making master gain image $gainmos\n";
-$mathcmd = "$mathcmd)' out=$gainmos";
-print "$mathcmd\n";
-system($mathcmd);
+rename("gain.tmp",$gainmos);
+
 
 if ($docull) {
 # loop through catalogs one epoch at a time

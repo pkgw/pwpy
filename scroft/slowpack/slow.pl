@@ -225,6 +225,7 @@ if ($mkfits) {
 }
 
 if ($mkcats) {
+    system("rm -rf sfind.*.nvss");
     print "\n*** Matching catalogs to NVSS ***\n\n";
     foreach $imroot (@allroot) {
 	print "Matching catalog for $imroot\n";
@@ -236,7 +237,7 @@ if ($mkcats) {
 	   system("INSTALLDIR/matchcolnl.pl sfind.$imroot.slow 1 2 NVSS.slow 1 2 $matchrad");
 	   rename("match.cat","sfind.$imroot.matn");
 	 if ($allmatch) {
-	    system("cp sfind.$imroot.matn","sfind.$imroot.nvss");
+	     system("cat sfind.$imroot.matn | grep -v '\\\*' > sfind.$imroot.nvss");              
          } else {
           if ($negmatch) {
 	      system("awk '{if (\$15 == 0) print}' sfind.$imroot.matn | grep -v '\\\*' > sfind.$imroot.nvss");              
