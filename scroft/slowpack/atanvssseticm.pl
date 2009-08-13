@@ -48,10 +48,19 @@ foreach $seti (@setijid) {
 	$argn = 2 + (($imn - 1) * 2);
 	$pfx = "ATA$imn";
 	$sfx = "_$imn.cm";
-        $tits = $pfx;
-	$flux = $ins[$argn+2];
- # box color
-	$bcol = 1;
+# title string is "ATA1", "ATA2", etc.
+#        $tits = $pfx;
+# get date and format as title string
+	if ($imn < $nim - 1) {
+	    $datestring = `gethd in=$pfx/scl_$imroot$sfx/obstime format=time`;
+	    chomp($datestring);
+	    $obsdate = $datestring;
+	    $obsdate =~ s/\:.+//;
+	    $tits = "$imn $obsdate";
+	    $flux = $ins[$argn+2];
+	    # box color
+	    $bcol = 1;
+	}
     	if ($imn == $nim - 1) {
 	    $pfx = "coadd";
 	    $sfx = "_coadd.cm";
