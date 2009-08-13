@@ -14,7 +14,7 @@ close(SETIJID);
 # output script
 $outf = "atanvssall.wip";
 open(OUT,">$outf");
-print OUT "macro INSTALLDIR/doheadseti.wip\n";
+#print OUT "macro INSTALLDIR/doheadseti.wip\n";
 
 foreach $seti (@setijid) {
     @ins = split(/\s+/,$seti);
@@ -77,7 +77,7 @@ foreach $seti (@setijid) {
 	}
 	$imname = "$pfx/scl_$imroot$sfx";
 	print "$imname $psblock:$psnum\n";
-	print OUT "image $imname\npanel -$num_per_block 1 $psnum\nwinadj 0 nx 0 ny\nheader rd\ndoheader\npalette 0\nhalftone 0 1000\n";
+	print OUT "image $imname\npanel -$num_per_block 1 $psnum\nwinadj 0 nx 0 ny\nheader rd\npalette 0\nhalftone 0 1000\n";
 	if ($psnum == 1) {
 	    print OUT "color $bcol\nbox bcnsthz bcnstvdyz\ncolor 1\nxlabel Right Ascension (J2000)\nmtext L 6.0 0.5 0.5 Declination (J2000)\n";
 #	    print OUT "box bcnsthz bcnstvdyz\nxlabel Right Ascension (J2000)\nmtext L 6.0 0.5 0.5 Declination (J2000)\n";
