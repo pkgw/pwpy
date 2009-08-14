@@ -1,3 +1,4 @@
+
 #
 # script to take "standard" uvfit output and find significant detections
 # major steps:
@@ -10,9 +11,16 @@ import pylab,numpy,asciidata
 
 # user params
 nbins=20  # for histograms
-gaussian = lambda amp,x,x0: amp * numpy.exp(-0.5*(x-x0)**2)  # gaussian SNR distribution for comparison
 tint = 0.1 # integration time in seconds
 period = 0.7137 # assumed pulsar period for finding on and off bins
+shift=0.  # hack to fit shift in off distribution
+precision = 0.01
+
+# useful functions
+gaussian = lambda amp,x,x0,sigma: amp/(sigma*numpy.sqrt(2*numpy.pi)) * numpy.exp(-0.5*((x-x0)/sigma)**2)  # normalized gaussian SNR distribution for comparison.
+fitfunc = lambda p, x, binsize:  gaussian(p[0]*binsize, x, p[1], p[2])
+errfunc = lambda p, x, binsize, y: fitfunc(p, x, binsize) - y
+sigar = numpy.arange(-10, 10, precision)  # range of sigma values to consider
 
 def getdata(fileroot):
     """Read in three files output by uvfitpulse.sh.  Assumes naming convention.
@@ -60,29 +68,75 @@ def snrhist(data, show=1):
     hist = numpy.histogram(data[1]/data[2],nbins)
     binends = numpy.append(hist[1],max(data[1]/data[2]))
     bincenters = [numpy.median([binends[i+1],binends[i]]) for i in range(len(binends)-1)]  # define bin centers
+    binsize=(max(binends)-min(binends))/nbins
 
     if show == 1:
-        gau = gaussian(max(hist[0]),numpy.array(bincenters),bincenters[numpy.where(max(hist[0]) == hist[0])[0][0]])
         pylab.errorbar(bincenters,hist[0],numpy.sqrt(hist[0]),label='data')
-        pylab.plot(bincenters,gau,label='Gaussian')
-        pylab.legend()
         pylab.xlabel('SNR')
         pylab.ylabel('Number per bin')
         pylab.show()
 
     return hist[0],bincenters
 
-def nominalsigma(frac):
-    """Function to return the nominal sigma value based on a fractional rate.  Assumes Gaussian statistics.
+def effectivesigma(p1, frac, show=1):
+    """Converts a normalized rate into effective sigma limit of given Gaussian.
+    Return value represents the effective sigma lower limit for the rate, not observed limit.
+    Expects parameter tuple from fithist and a normalized (max=1) rate.
+    Assumes Gaussian statistics.
     """
-    sigar = numpy.arange(0,100,0.1)  # range of sigma values to consider
 
-    print '\t\t\tNominal sigma should be tested more...'
-    return sigar[numpy.where(frac >= (gaussian(1.,sigar,0.)))[0][0]]
+    fitsum, fitcenter, fitwidth = p1
+    gau = gaussian(precision, sigar, fitcenter, fitwidth)  # amp normalized by bin size so integral (sum) is equal to 1
+    
+    if len(numpy.where(frac >= gau.cumsum())[0]) >= 1:
+        effective_sigma = (-1)*(sigar[numpy.where(frac >= gau.cumsum())[0][-1]])/fitwidth  # need -1, since cumsum sums from bottom...
+    else:
+        effective_sigma = 10./fitwidth
+        print 'Event rate is rarer than %.1f sigma!' % (effective_sigma)
+
+    return effective_sigma
+
+def fithist(hist, show=1):
+    """Fit a gaussian to a histogram, keeping the integral of the histogram equal to its sum.
+    Returns best fit center and width.
+    """
+
+    import scipy.optimize
+
+    fitindex = (range(nbins-5,nbins))
+    fitindex = [0,1,2,3,16,17,18,19] # top five bins look gaussian...
+    binsize = (max(hist[1])-min(hist[1]))/(nbins-1)  # these are bin centers.  must add 1 to get full range of values.
+
+    p0 = [sum(hist[0]), hist[1][numpy.where(max(hist[0]) == hist[0])[0][0]], 1.]  # initial guess of params
+    p1, success = scipy.optimize.leastsq(errfunc, p0[:], args = (numpy.array(hist[1])[fitindex], binsize, numpy.array(hist[0])[fitindex]))
+
+    if success and show == 1:
+        print 'Fit successful!  Results:'
+        print 'Integral of Histogram: %d.  Histogram center: %.1f.  Histogram width:  %.1f' % (p1[0],p1[1],p1[2])
+        pylab.plot(hist[1],fitfunc(p1, numpy.array(hist[1]), binsize), label='Fit')
+        pylab.errorbar(hist[1], hist[0], numpy.sqrt(hist[0]), label='Hist')
+        pylab.legend()
+        pylab.show()
+        
+    return p1
+
+def nominalfrac(p1, sigma, show=1):
+    """Converts observed sigma limit into fractional rate of given Gaussian.
+    Expects parameter tuple from fithist and a sigma level.
+    Returns normalized (integral=1) rate higher than given sigma level.
+    """
+
+    fitsum, fitcenter, fitwidth = p1
+    gau = gaussian(precision, sigar, fitcenter, fitwidth) # define best fit gaussian
+    nominal_frac = ((gau[numpy.where(sigma <= sigar)]).cumsum())[-1]  # sum up event rates for sigma threshold
+
+    return nominal_frac
 
 def snronoff(data, show=1):
-    """Plots the SNR histograms for on and off bins.
-    Note:  Currently assumes 2-bin background for uvfit.
+    """Plots the observed SNR histograms for on and off bins.
+    Fits Gaussian to off hist.
+    Returns on and off histograms.
+    Note:  Currently assumes 2-bin background for uvfit.  Some on subtraction likely for pulsars.
     """
 
     # set bin numbers.  numbers are cast as ints, so expect occasional slips
@@ -90,19 +144,25 @@ def snronoff(data, show=1):
     binon = numpy.where((bins == 3) | (bins == 4))[0]
     binoff = numpy.where((bins == 0) | (bins == 1) | (bins == 2) | (bins == 5) | (bins == 6))[0]
 
-    histon = snrhist(data[:,binon], show=0)
-    histoff = snrhist(data[:,binoff], show=0)
+    histon = snrhist(data[:,binon], show=-1)
+    histoff = snrhist(data[:,binoff], show=-1)
+
+    binsize = (max(histoff[1])-min(histoff[1]))/(nbins-1)  # these are bin centers.  must add 1 to get full range of values.
+    p1 = fithist(histoff, show=show)  # get fit results for hist
     
     print 'Off pulse gives noise distribution...'
-    print '\t%.4f chance (nominal %.1f sigma) of event higher than %.1f sigma' % (1./len(binoff), nominalsigma(1./len(binoff)), max(data[1,binoff]/data[2,binoff]))
-    print '\t%.4f chance (nominal %.1f sigma) of event higher than %.1f sigma' % (float(histoff[0][-1])/len(binoff), nominalsigma(float(histoff[0][-1])/len(binoff)), numpy.mean([histoff[1][-2],histoff[1][-1]]))
-    print '\t%.4f chance (nominal %.1f sigma) of event higher than %.1f sigma' % (float(histoff[0][-2])/len(binoff), nominalsigma(float(histoff[0][-2])/len(binoff)), numpy.mean([histoff[1][-3],histoff[1][-2]]))
+    print '\t%.4f chance (effective %.1f sigma) of event higher than %.1f sigma' % (float(histoff[0][-1])/len(binoff), effectivesigma(p1, float(histoff[0][-1])/len(binoff)), numpy.mean([histoff[1][-2],histoff[1][-1]]))
+    print '\t%.4f chance (effective %.1f sigma) of event higher than %.1f sigma' % (float(sum(histoff[0][[len(histoff[0])-2,len(histoff[0])-1]]))/len(binoff), effectivesigma(p1, float(sum(histoff[0][[len(histoff[0])-2,len(histoff[0])-1]]))/len(binoff)), numpy.mean([histoff[1][-3],histoff[1][-2]]))
+
+    print 'On distribution from fit of off...'
+    print '\t%.4f chance of events higher than %.1f sigma (%.6f expected off)' % (float(sum(histon[0][numpy.where(histon[1] >= histoff[1][-1])]))/len(binon),  numpy.mean([histoff[1][-2],histoff[1][-1]]), nominalfrac(p1, numpy.mean([histoff[1][-2],histoff[1][-1]]), show=-1))
 
     if show == 1:
-        gau = gaussian(max(histoff[0]),numpy.array(histoff[1]),histoff[1][numpy.where(max(histoff[0]) == histoff[0])[0][0]])
-        pylab.errorbar(histoff[1],histoff[0],numpy.sqrt(histoff[0]),label='Off')
-        pylab.errorbar(histon[1],histon[0],numpy.sqrt(histon[0]),label='On')
-        pylab.plot(histoff[1],gau,label='Gaussian')
+        fitsum, fitcenter, fitwidth = p1
+        gau = gaussian(fitsum*binsize, numpy.arange(-10, 10, binsize), fitcenter, fitwidth)
+        pylab.plot(numpy.arange(-10, 10, binsize), gau, label='Gaussian')  # plot fit hist over large range of sigma
+        pylab.errorbar(histoff[1], histoff[0], numpy.sqrt(histoff[0]), label='Off')
+        pylab.errorbar(histon[1], histon[0], numpy.sqrt(histon[0]), label='On')
         pylab.legend()
         pylab.xlabel('SNR')
         pylab.ylabel('Number per bin')
@@ -111,7 +171,7 @@ def snronoff(data, show=1):
     return histon, histoff
 
 def positions(data,threshold1,threshold2=-99):
-    """Plot the positions for all fits with SNR greater than threshold."""
+    """Plot the positions for all fits with observed SNR greater than threshold."""
 
     if threshold2 == -99:
         threshold2 = max(data[1]/data[2])
@@ -122,6 +182,9 @@ def positions(data,threshold1,threshold2=-99):
     y = data[5][good]
     yerr = data[6][good]
 
+    print 'Good integrations:'
+    print data[0][good]
+
     pylab.figure(1)
     pylab.errorbar(x,y,xerr=xerr,yerr=yerr,fmt='.')
     pylab.xlabel('Fit x position (arcsec)')
@@ -129,3 +192,15 @@ def positions(data,threshold1,threshold2=-99):
 
     pylab.show()
 
+def truehist(hist, p1):
+    """Function to make histogram of not observed SNR, but according to best fit histogram of off bins.
+    Takes gaussian fit parameters for off, then scales and plots input hist bins.
+    """
+
+    print 'This needs to be checked...  "Effective sigma" only meaningful where Gaussian model is valid (SNR > 3)?'
+    newhistbins = numpy.array(hist[1])/p1[2]
+    
+    pylab.errorbar(hist[1], hist[0], numpy.sqrt(hist[0]), label='Orig')
+    pylab.errorbar(newhistbins, hist[0], numpy.sqrt(hist[0]), label='New')
+    pylab.legend()
+    pylab.show()
