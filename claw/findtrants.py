@@ -1,4 +1,3 @@
-
 #
 # script to take "standard" uvfit output and find significant detections
 # major steps:
@@ -103,8 +102,8 @@ def fithist(hist, show=1):
 
     import scipy.optimize
 
-    fitindex = (range(nbins-5,nbins))
-    fitindex = [0,1,2,3,16,17,18,19] # top five bins look gaussian...
+    fitindex = (range(nbins/3,nbins))
+#    fitindex = [0,1,2,3,16,17,18,19] # top five bins look gaussian...
     binsize = (max(hist[1])-min(hist[1]))/(nbins-1)  # these are bin centers.  must add 1 to get full range of values.
 
     p0 = [sum(hist[0]), hist[1][numpy.where(max(hist[0]) == hist[0])[0][0]], 1.]  # initial guess of params
@@ -189,7 +188,6 @@ def positions(data,threshold1,threshold2=-99):
     pylab.errorbar(x,y,xerr=xerr,yerr=yerr,fmt='.')
     pylab.xlabel('Fit x position (arcsec)')
     pylab.xlabel('Fit y position (arcsec)')
-
     pylab.show()
 
 def truehist(hist, p1):
@@ -204,3 +202,13 @@ def truehist(hist, p1):
     pylab.errorbar(newhistbins, hist[0], numpy.sqrt(hist[0]), label='New')
     pylab.legend()
     pylab.show()
+
+def comparehists(hist1,hist2,hist3=[0]):
+    scale2 = 1.5
+    pylab.errorbar(hist1[1], hist1[0], numpy.sqrt(hist1[0]), label='1')
+    pylab.errorbar(hist2[1], scale2 * hist2[0], numpy.sqrt(hist2[0]), label='2')
+    if len(hist3) > 1:
+        pylab.errorbar(hist3[1], hist3[0], numpy.sqrt(hist3[0]), label='3')
+    pylab.legend()
+    pylab.show()
+    
