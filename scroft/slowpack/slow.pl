@@ -34,7 +34,6 @@
 #      The default switches should allow SLOW to run in a directory containing nothing butwine  input ATA mosaics.
 #
 # TO DO - option to reject sources that are less than n sigma from sfind catalogs - configurable sfind options?
-# TO DO - implement rejbl
 # TO DO - run sfind on coadd and report fluxes in postage stamps
 
 $nvsscat = 1; # Get NVSS catalog?
@@ -150,7 +149,7 @@ foreach $arg (@ARGV) {
 	$eppost = 0;
     }
     elsif ($arg eq "rejbl") {
-	$rejbl = 1; # CURRENTLY NOT IMPLEMENTED
+	$rejbl = 1;
     }
     elsif ($arg eq "norejbl") {
 	$rejbl = 0;
@@ -348,10 +347,6 @@ if ($eppost) {
         system("regrid in=coadd.cm tin=nvsspostslow out=coaddpostslow axes=1,2");
 	rename("coaddpostslow","$coaddc");
 	system("ln -s $coaddc mathinslow");
-	# NB REGRID REPORTS FRACTION OF BLANKED PIXELS (if this is > 0) SO WE COULD THROW THESE OUT HERE
-#sleepy:test> regrid in=../mos0118g.cm tin="../nvss/J124911p514630_NVSS.cm" out=poo3 axes=1,2
-#Regrid: version 1.0 10-Jul-00
-#Overall fraction of blanked pixels:  48%
 
 # scale coadd image - could use histo here but stats will suffice for images with median ~ 0
 	print "Creating scaled coadd image $coaddcs\n";
@@ -439,34 +434,51 @@ if ($eppost) {
 
 ## create the output J2000 IDs
     system("cat seti.txt | sed s/+/' '/g > tmp.txt ; INSTALLDIR/addjid.pl tmp.txt 1 2 tmp2.txt ; cat tmp2.txt | sed s/+/p/g > setijid.txt");
-#
-#if($rejbl) {
-## more than blcut blank pixels in any of the epochs, and we reject this source
-#   blcut = 200
-#   delete("setijidi.txt",ver-)
-##   copy("setijid.txt","setijido.txt")
-#   rename("setijid.txt","setijidi.txt")
-#   d2="setijidi.txt"
-#   while(fscan(d2,imn,d3) != EOF) {
-## assume this epoch is good unless we discover otherwise
-#      blgood=yes
-#      n=1
-#      d1=list 
-#      while(fscan(d1,im) != EOF) {
-#     print "Checking "//imn//"_"//n//" for blanked pixels"
-#     imstat ("ATA"//n//"/"//imn//"_"//n,format-,fields="npix",lower=-0.00001,upper=0.00001) | scan (blpix)
-##      imstat ("ATA"//n//"/"//imn//"_"//n,format-,fields="npix",lower=-0.00001,upper=0.00001)
-#      if (blpix > blcut) {
-#           blgood=no
-#      }
-#      n = n + 1
-#      }
-#      if (blgood) {
-#         print(imn," ",d3,>> "setijid.txt")
-#      }
-#   }   
-#}
-#
+
+if($rejbl) {
+# only keep sources with a fraction $goodcut or more of good pixels in every epoch  
+    $goodcut = 0.9;
+    unlink("setijidi.txt");
+    if (!-e "setijid.orig") {
+	system("cp setijid.txt setijid.orig");
+    }
+    rename("setijid.txt","setijidi.txt");
+    
+    open(SETIJ,"setijidi.txt");
+    @setij = <SETIJ>;
+    close(SETIJ);
+    
+    open(SETIO,">setijid.txt");
+    
+    foreach $seti (@setij) {
+# loop through sources
+# assume this epoch is good unless we discover otherwise
+	$blgood = 1;
+	$n = 1;
+	foreach $imroot (@allroot) {
+# loop through epochs
+	    $epn = "ATA$n";
+	    @setis = split(/\s+/,$seti);
+	    $imname = $setis[0];
+	    print ("immask in=$epn/scl_${imname}_$n.cm\n");
+	    $imm = `immask in=$epn/scl_${imname}_$n.cm | tail -1`;
+	    @ims = split(/\s+/,$imm);
+	    $good = $ims[1];
+	    $total = $ims[4];
+	    $goodper = $good / $total;
+#	    print "$good $total $goodper";
+	    if ($goodper < $goodcut) {
+		$blgood = 0;
+	    }
+	    $n+=1;
+	}
+        if ($blgood) {
+	    print SETIO "$seti";
+	}
+    }
+    close(SETIO);   
+}
+
 if ($fluxgr) {
     print "\n*** Making graphs of flux vs. epoch ***\n\n";
     system("rm -rf seti");
