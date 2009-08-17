@@ -497,13 +497,41 @@ module Mirdl
   end
   module_function :uvwflgwr
 
+  # For any "object" for which uvinfo_c returns nread values, Mirdl#uvinfo will
+  # return Narray.float(nread), where "nread" is determined by "uvinfo(tno,
+  # :line)[1]".  For objects which return a fixed number of values > 1, a Ruby
+  # Array is returned.  For objects which return one value, a single value
+  # (usually a Float, but sometimes an Integer or subclass thereof) is
+  # returned.
+  #
   # void uvinfo_c   (int tno, Const char *object, double *data);
   SYM[:uvinfo] = LIBMIR_UVIO['uvinfo_c', '0ISp']
-  def uvinfo(tno, object, ndata)
+  def uvinfo(tno, object, deprecated_third_param_given=nil)
+    warn 'Mirdl.uvinfo called with deprecated third parameter' unless deprecated_third_param_given.nil?
+    object = object.to_s
+    ndata = case object
+            # uvinfo_c returns "nread" values
+            when 'velocity', 'felocity', 'restfreq',
+                 'bandwidth', 'frequency', 'sfreq'
+              uvinfo(tno, :line)[1]
+            # uvinfo_c returns 6 values
+            when 'line' then 6
+            # uvinfo_c returns 3 values
+            when 'amprange' then 3
+            # uvinfo returns 1 value
+            when 'visno', 'flags_offset', 'variance' then 1
+            else 1 # unknown
+            end
     data = NArray.float(ndata)
     p = DL::PtrData.new(data.ptr, data.bsize)
     SYM[:uvinfo][tno, object.to_s, p]
-    ndata == 1 ? data[0] : data
+    case object
+    when 'visno', 'variance' then data[0]
+    when 'flags_offset'
+      lo, hi = data.to_s.unpack('L2')
+      (hi << 32) + lo
+    else data
+    end
   end
   module_function :uvinfo
 
