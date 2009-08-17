@@ -5,10 +5,13 @@
 require 'rubygems'
 require 'rake/gempackagetask'
 
+# Get Mirdl::VERSION
+require 'lib/mirdl/version.rb'
+
 spec = Gem::Specification.new do |s|
   # Basics
   s.name = 'mirdl'
-  s.version = '0.0.3'
+  s.version = Mirdl::VERSION
   s.summary = 'Provides Ruby access to MIRIAD subroutine libraries.'
   s.description = <<-EOD
     Provides Ruby access to MIRIAD subroutine libraries
@@ -38,6 +41,7 @@ spec = Gem::Specification.new do |s|
     'ext/options.c',
     'ext/options_for.c',
     'lib/mirdl.rb',
+    'lib/mirdl/version.rb',
     'lib/mirdl/basant.rb',
     'lib/mirdl/ephem.rb',
     'lib/mirdl/key.rb',

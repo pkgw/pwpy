@@ -88,6 +88,7 @@ module Mirdl
   end
 end
 
+require 'mirdl/version'
 require 'mirdl/basant'
 require 'mirdl/ephem'
 require 'mirdl/key'
