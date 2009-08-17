@@ -8,7 +8,7 @@ require 'rake/gempackagetask'
 spec = Gem::Specification.new do |s|
   # Basics
   s.name = 'mirdl'
-  s.version = '0.0.2'
+  s.version = '0.0.3'
   s.summary = 'Provides Ruby access to MIRIAD subroutine libraries.'
   s.description = <<-EOD
     Provides Ruby access to MIRIAD subroutine libraries
