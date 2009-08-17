@@ -64,19 +64,16 @@ class Numeric
   # integers.
   alias :to_hms :to_dms
   # Convert +self+ to "##d##m##.###s" format rounded to +prec+ fractional places.
-  # TODO truncate instead of round if prec < 0?
+  # TODO Might need/want different quantization behavior than sprintf gives.
   def to_dmsstr(prec=3)
     width = prec == 0 ? 2 : prec+3
-    scale = (3600 * 10 ** prec).to_f
-    d,m,s = to_dms
-    "%02dd%02dm%0#{width}.#{prec}fs" % [d,m,s+5*10**(-prec-1)]
+    "%02dd%02dm%0#{width}.#{prec}fs" % to_dms
   end
   # Convert +self+ to "##:##:##.###" format rounded to +prec+ fractional places.
-  # TODO truncate instead of round if prec < 0?
+  # TODO Might need/want different quantization behavior than sprintf gives.
   def to_hmsstr(prec=3)
     width = prec == 0 ? 2 : prec+3
-    h,m,s = to_hms
-    "%02d:%02d:%0#{width}.#{prec}f" % [h,m,s+5*10**(-prec-1)]
+    "%02d:%02d:%0#{width}.#{prec}f" % to_dms
   end
   # Convert +self+ from degrees to radians (i.e. <tt>Math.d2r(self)</tt>).
   def d2r() Math.d2r(self); end
