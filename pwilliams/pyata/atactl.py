@@ -441,15 +441,20 @@ def isTimeUp (stopTime):
 
 # Ephemerides
 
-def _makeCatalogEphemOwned (owner, src, durHours, start, outfile, args):
-    cmd = "atacatalogephem --owner '%s' '%s' %s +%fhours %s >%s" % \
-          (owner, src, start, durHours, args, outfile)
+def _makeCatalogEphemOwned (owner, src, durHours, start, outfile, args, usets=False):
+    if usets:
+        tsarg = '--ts '
+    else:
+        tsarg = ''
+
+    cmd = "ataephem %s--owner '%s' '%s' --starttime %s --duration %f %s >%s" % \
+          (tsarg, owner, src, start, durHours, args, outfile)
 
     if noopMode:
         log ('WOULD execute: %s' % cmd)
         log ('Creating outfile so cleanup code can be exercised')
         print >>file (outfile, 'w'), 'Fake ephemeris file.'
-        return 'ra,dec'
+        return None
     
     log ('executing: %s' % cmd) 
 
@@ -473,19 +478,30 @@ def _makeCatalogEphemOwned (owner, src, durHours, start, outfile, args):
             pass
         raise Exception ("Command failed")
 
-    # Wrap ephem to avoid hitting limits.
-    runAta ('atawrapephem', outfile)
+    if not usets:
+        # Wrap ephem to avoid hitting limits.
+        runAta ('atawrapephem', outfile)
+        trackid = None
+    else:
+        # Extract the track id, wrap that, and return it.
+        for l in file (outfile, 'r'): pass
+        assert l.startswith ('ID:')
+        trackid = int (l[3:])
+        runAta ('atawrapephem', str (trackid))
 
-def makeCatalogEphemsOwned (owner, src, durHours, outbase):
+    return trackid
+
+
+def makeCatalogEphemsOwned (owner, src, durHours, outbase, usets=False):
     tStart = time.time ()
 
-    _makeCatalogEphemOwned (owner, src, durHours, 'now', outbase +
-                            '.ephem', '')
-    t = time.gmtime ()
     stUTC = time.strftime ('%Y-%m-%dT%H:%M:00.000Z', time.gmtime ())
+
+    trackid = _makeCatalogEphemOwned (owner, src, durHours, stUTC, 
+                                      outbase + '.ephem', '', usets)
     _makeCatalogEphemOwned (owner, src, durHours, stUTC,
                             outbase + '.msephem',
-                            '--utcms --interval 10')
+                            '--utcms --interval 10', False)
     
     # Extract the RA and Dec for passing to the FX64 dumper
     cmd = "atalistcatalog -l --owner '%s' --source '%s'" % (owner, src)
@@ -506,9 +522,13 @@ def makeCatalogEphemsOwned (owner, src, durHours, outbase):
     radec = a[3] + ',' + a[4]
 
     account ('generating ephemerides', time.time () - tStart)
+
+    if usets:
+        return radec, trackid
     return radec
 
-def makeCatalogEphem (src, durHours, outbase):
+
+def makeCatalogEphem (src, durHours, outbase, usets=False):
     """Create an ephemeris file for the specified source in the ATA catalog.
 
     The source is looked for under the 'bima' and 'pta' owners in the catalog.
@@ -518,24 +538,29 @@ def makeCatalogEphem (src, durHours, outbase):
     
     for owner in ['bima', 'pta', 'pkgw']:
         try:
-            radec = makeCatalogEphemsOwned (owner, src, durHours, outbase)
+            retval = makeCatalogEphemsOwned (owner, src, durHours, outbase, usets)
             log ('Found catalog ephemeris for source "%s" under owner "%s"' % (src, owner))
             log ('  Saved data for next %f hours into %s.*ephem' % (durHours, outbase))
-            return radec
+            return retval
         except:
             pass
 
     raise Exception ("Can't find source %s owned by anyone in the official catalog!" % src)
 
-def _makeRADecEphem (raHours, decDeg, durHours, start, outfile, args):
-    cmd = "ataradecephem %f %f %s +%fhours %s >%s" % \
-          (raHours, decDeg, start, durHours, args, outfile)
+def _makeRADecEphem (raHours, decDeg, durHours, start, outfile, args, tssrc=None):
+    if tssrc is None:
+        tsarg = ''
+    else:
+        tsarg = '--ts %s ' % tssrc
+
+    cmd = "ataradecephem %s%f %f %s +%fhours %s >%s" % \
+          (tsarg, raHours, decDeg, start, durHours, args, outfile)
 
     if noopMode:
         log ('WOULD execute: %s' % cmd)
         log ('Creating outfile so cleanup code can be exercised')
         print >>file (outfile, 'w'), 'Fake ephemeris file.'
-        return 'ra,dec'
+        return None
     
     log ('executing: %s' % cmd) 
 
@@ -559,36 +584,54 @@ def _makeRADecEphem (raHours, decDeg, durHours, start, outfile, args):
             pass
         raise Exception ("Command failed")
 
-    # Wrap ephem to avoid hitting limits.
-    runAta ('atawrapephem', outfile)
+    if tssrc is None:
+        # Wrap ephem to avoid hitting limits.
+        runAta ('atawrapephem', outfile)
+        trackid = None
+    else:
+        # Extract the track id, wrap that, and return it.
+        for l in file (outfile, 'r'): pass
+        assert l.startswith ('ID:')
+        trackid = int (l[3:])
+        runAta ('atawrapephem', str (trackid))
 
-def makeRADecEphem (raHours, decDeg, durHours, outbase):
+    return trackid
+
+
+def makeRADecEphem (raHours, decDeg, durHours, outbase, tssrc=None):
+    """TSsrc indicates whether to register this ephemeris with the tracking
+    server. If None, don't. If not-None, register it and return the track ID,
+    using the argument value as the source name in the tracking server."""
+
     tStart = time.time ()
 
-    _makeRADecEphem (raHours, decDeg, durHours, 'now', outbase + '.ephem', '')
-    t = time.gmtime ()
     stUTC = time.strftime ('%Y-%m-%dT%H:%M:00.000Z', time.gmtime ())
+    retval = _makeRADecEphem (raHours, decDeg, durHours, stUTC, 
+                              outbase + '.ephem', '', tssrc)
     _makeRADecEphem (raHours, decDeg, durHours, stUTC, outbase + '.msephem',
-                     '--utcms --interval 10')
+                     '--utcms --interval 10', tssrc)
     
     account ('generating ephemerides', time.time () - tStart)
+    return retval
+
 
 _ephemTable = {}
 _radecTable = {}
 
-def ensureEphem (src, ebase, obsDurSeconds):
+def ensureEphem (src, ebase, obsDurSeconds, usets=False):
     now = time.time ()
     expiry = _ephemTable.get (src)
     
     if expiry is not None and now + obsDurSeconds + 180 < expiry:
             return _radecTable[src]
 
-    radec = makeCatalogEphem (src, 1.1, ebase)
+    retval = makeCatalogEphem (src, 1.1, ebase, usets)
     _ephemTable[src] = now + 3600
-    _radecTable[src] = radec
-    return radec
+    _radecTable[src] = retval
+    return retval
 
-def ensureEphemRADec (raHours, decDeg, ebase, obsDurSeconds):
+
+def ensureEphemRADec (raHours, decDeg, ebase, obsDurSeconds, tssrc=None):
     now = time.time ()
     key = (raHours, decDeg)
     expiry = _ephemTable.get (key)
@@ -596,21 +639,33 @@ def ensureEphemRADec (raHours, decDeg, ebase, obsDurSeconds):
     if expiry is not None and now + obsDurSeconds + 180 < expiry:
             return _radecTable[key]
 
-    makeRADecEphem (raHours, decDeg, 1.1, ebase)
+    retval = makeRADecEphem (raHours, decDeg, 1.1, ebase, tssrc)
     _ephemTable[key] = now + 3600
-    _radecTable[key] = (raHours, decDeg)
+    _radecTable[key] = retval
+    return retval
+
 
 def trackEphem (ants, ebase, wait):
-    f = ebase + '.ephem' # Use the ephem in ns, not ms
+    """ebase can be either a string giving the name of an ephemeris file,
+    or an integer giving a track ID that is registered with the tracking
+    server."""
+
     log ('@@ Tracking antennas: %s' % ','.join (ants))
-    log (' ... to ephemeris in file: %s' % f)
+
+    if isistance (ebase, int):
+        log (' ... to ephemeris ID: %d' % ebase)
+        epharg = str (ebase)
+    else:
+        epharg = ebase + '.ephem' # Use the ephem in ns, not ms
+        log (' ... to ephemeris in file: %s' % epharg)
+
     tStart = time.time ()
     # Sort the list of antennas to put 3f,3g,3h next to each other. This gets them
     # moving at nearly the same time and reduces the likelihood of the collision
     # server getting angry at us.
     args = ['atatrackephem']
     if wait: args.append ('-w')
-    args += [','.join (sorted (ants)), f]
+    args += [','.join (sorted (ants)), epharg]
     runAta (*args)
     account ('tracking to sources', time.time () - tStart)
 
@@ -674,6 +729,52 @@ def launchCatcher (hookup, src, freq, radec, durationSeconds, outbase, ebase):
             raise Exception ('Catcher invocation failed.')
     
     account ('integrating for %d seconds' % durationSeconds, time.time () - tStart)
+
+
+# Data catching with the FX catcher server
+
+_noopFXtargid = 0
+
+def registerFXTarget (hookup, filepart, durationSeconds):
+    global _noopFXtargid
+    from ataprobe import _slurp
+
+    log ('@@ Launching catcher server on %s' % (hookup.instr))
+    log ('    output base: %s' % outbase)
+    log ('       Duration: %f s' % durationSeconds)
+
+    cmd = ataArgs ('atafxcatcher', '-obs', filepart, 
+                   '-pols', ','.join (hookup.antpols ()),
+                   '-inst', hookup.instr,
+                   '-duration', durationSeconds)
+
+    if noopMode:
+        log ('WOULD slurp: ' + ' '.join (cmd))
+        targid = _noopFXtargid
+        _noopFXtargid += 1
+    else:
+        out = _slurp (cmd)
+        targid = None
+        for l in out:
+            if not l.startswith ('ID:'):
+                continue
+            targid = int (l[3:])
+            break
+        assert targid is not None, 'No output id from atafxcatcher'
+
+    log ('Got output id %d' % targid)
+    return targid
+
+
+def startFXTrack (targid):
+    runAta ('atafxcatcher', '-starttrack', str (targid))
+
+def endFXTrack (targid):
+    runAta ('atafxcatcher', '-stoptrack', str (targid))
+
+def deleteFXTarget (targid):
+    runAta ('atafxcatcher', '-deletetarget', str (targid))
+
 
 # Focus control
 
