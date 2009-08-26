@@ -754,7 +754,7 @@ if ($intclean) then
     imlist in=$wd/tempmap.cm options=stat log=$wd/imlistcm >& /dev/null
     set imstats = (`imstat in=$wd/tempmap.rs | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
     set beamsize = `grep Effective $wd/imlistcm | awk '{print $4*1}'`
-    set nalevel = `echo $beamsize $tnoise $imsize | tr ',' ' ' | awk '{if ($4*1 == 0) print .5*$2*(log($3*$3/$1)-3); else print .5*$2*(log($3*$4/$1)-3)}'`
+    set nalevel = `echo $beamsize $tnoise $imsize | tr ',' ' ' | awk '{if ($4*1 == 0) print .25*$2*log($3*$3/$1); else print .25*$2*log(($3*$4)/$1)}'`
     set alevel = `echo $nalevel $tnoise $imstats[3] | awk '{print $1*$3/$2}'`
     cd $wd
     rm -f sfind.log
@@ -789,7 +789,7 @@ imlist in=$wd/tempmap.cm options=stat log=$wd/imlistcm >& /dev/null
 imlist in=$wd/tempmap.cm log=$wd/imlistcm2 >& /dev/null
 
 set beamsize = `grep Effective $wd/imlistcm | awk '{print $4*1}'`
-set nalevel = `echo $beamsize $tnoise $imsize | tr ',' ' ' | awk '{if ($4*1 == 0) print $2*(log($3*$3/$1)-3); else print $2*(log($3*$4/$1)-3)}'` # Theoretical minimum max pixel magnitude
+set nalevel = `echo $beamsize $tnoise $imsize | tr ',' ' ' | awk '{if ($4*1 == 0) print $2*(.5*log($3*$3/$1)-2); else print $2*(.5*log(($3*$4)/$1)-2)}'` # Theoretical minimum max pixel magnitude
 
 set actnitersline = (`grep niters $wd/imlistcm2 | tr ':' ' '`)
 set actniters
@@ -804,10 +804,12 @@ while ("$actniters" == "")
 end
 set imstats = (`imstat in=$wd/tempmap.rs | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
 set alevel = `echo $nalevel $tnoise $imstats[3] | awk '{print $1*$3/$2}'` # Expected minimum max pixel magnitude
-set acheck = `echo $alevel $imstats[4-5] | awk '{if ($4+$5 < 0) print $2/$1; else print -1*$3/$1}'`
-set nacheck = `echo $nalevel $imstats[4-5] | awk '{if ($4+$5 < 0) print $2/$1; else print -1*$3/$1}'`
-
-#echo $tnoise
+set acheck = `echo $alevel $imstats[4-5] | awk '{if ($4+$5 < 0) print $1/$2; else print -1*$1/$3}'`
+set nacheck = `echo $nalevel $imstats[4-5] | awk '{if ($4+$5 < 0) print $1/$2; else print -1*$1/$3}'`
+#echo $beamsize $nalevel $alevel
+#echo $nacheck $acheck
+#echo $imstats[4-5]
+#echo $tnoise $imstats[3]
 cd $wd
 rm -f sfind.log; touch sfind.log
 if ($intclean || $mode != "skip") sfind in=tempmap.rs options=oldsfind,auto,nofit rmsbox=100 xrms=4 labtyp=arcsec >& /dev/null 
@@ -841,7 +843,7 @@ if (`grep -v "#" $wd/sfind.log | awk '{if ($7*$6 > 3000*noise) cycles+=2*log((30
 	    goto clean
 	endif
     endif
-else if (`echo $acheck $nacheck | awk '{if ($1 < 1 && $2 < 1) print 1; else print 0}'` && "$niters" != "50") then
+else if (`echo $acheck $nacheck | awk '{if ($1 > 1 && $2 > 1) print 1; else print 0}'` && "$niters" != "50") then
     if ($intclean) then
 	set niters = `echo $niters $acheck | awk '{print int($1*$2)}'`
 	if ($niters < 50) set niters = 50
@@ -1268,7 +1270,7 @@ if ($regain) then
 endif
 
 # Below this is all reporting code. All of this code will need to be changed...
-set nalevel = `echo $beamsize $tnoise $imsize | tr ',' ' ' | awk '{if ($4*1 == 0) print .5*$2*(log($3*$3/$1)); else print .5*$2*(log($3*$4/$1))}'`
+set nalevel = `echo $beamsize $tnoise $imsize | tr ',' ' ' | awk '{if ($4*1 == 0) print .5*$2*(log($3/$1)); else print .5*$2*(log((($3*$4)^.5)/$1))}'`
 echo "IMAGING REPORT" > $wd/imgrpt
 echo "================================================================" >> $wd/imgrpt
 echo "Imaging of $source was successfully completed using $omode mode." >> $wd/imgrpt
