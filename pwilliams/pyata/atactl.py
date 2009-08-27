@@ -447,7 +447,7 @@ def _makeCatalogEphemOwned (owner, src, durHours, start, outfile, args, usets=Fa
     else:
         tsarg = ''
 
-    cmd = "ataephem %s--owner '%s' '%s' --starttime %s --duration %f %s >%s" % \
+    cmd = "ataephem %s--owner '%s' '%s' --starttime %s --duration %f --stdout %s |sed -e 1d >%s" % \
           (tsarg, owner, src, start, durHours, args, outfile)
 
     if noopMode:
@@ -652,7 +652,7 @@ def trackEphem (ants, ebase, wait):
 
     log ('@@ Tracking antennas: %s' % ','.join (ants))
 
-    if isistance (ebase, int):
+    if isinstance (ebase, int):
         log (' ... to ephemeris ID: %d' % ebase)
         epharg = str (ebase)
     else:
@@ -739,9 +739,7 @@ def registerFXTarget (hookup, filepart, durationSeconds):
     global _noopFXtargid
     from ataprobe import _slurp
 
-    log ('@@ Launching catcher server on %s' % (hookup.instr))
-    log ('    output base: %s' % outbase)
-    log ('       Duration: %f s' % durationSeconds)
+    log ('Registering target: %s, %s, %f s' % (hookup.instr, filepart, durationSeconds))
 
     cmd = ataArgs ('atafxcatcher', '-obs', filepart, 
                    '-pols', ','.join (hookup.antpols ()),
