@@ -139,7 +139,7 @@ def myexec (cmd):
     try:
         os.execvp (cmd[0], cmd)
     except Exception, e:
-        print 'Error executing command: %s' % (' '.join (cmd), str (e))
+        print 'Error executing command: %s: %s' % (' '.join (cmd), str (e))
         exit (1)
     # Shouldn't be reached
     exit (2)
