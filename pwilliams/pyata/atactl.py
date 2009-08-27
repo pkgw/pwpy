@@ -754,6 +754,7 @@ def registerFXTarget (hookup, filepart, durationSeconds):
         out = _slurp (cmd)
         targid = None
         for l in out:
+            log ('output: ' + l.strip ())
             if not l.startswith ('ID:'):
                 continue
             targid = int (l[3:])
