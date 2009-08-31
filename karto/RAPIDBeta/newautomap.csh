@@ -310,13 +310,18 @@ else if ("$argv[1]" =~ 'device='*) then
 else if ("$argv[1]" =~ 'outdir='*) then
     set outdir = (`echo "$argv[1]"/ | sed -e 's/outdir=//' | tr '/' ' '`)
     set outdir = `echo $outdir | tr ' ' '/'`
+    rm -rf $outdir
+    if (-e $outdir) then
+	echo "FATAL ERROR: Unable to remove outbound directory. Please make sure that you have read/write permissions for this area."
+	goto enderr
+    endif
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'mode='*) then
     set mode = `echo $argv[1] | sed 's/mode=//'`
 
     if !(" skip inter auto " =~ *" $mode "*) then
 	echo "FATAL ERROR: $argv[1] not recognized!"
-	exit 1
+	goto enderr
     endif
 
     shift argv; if ("$argv" == "") set argv = "finish"
@@ -325,7 +330,7 @@ else if ("$argv[1]" =~ 'weightmode='*) then
 
     if !("natural uniform" =~ *"$wmode"*) then
 	echo "FATAL ERROR: $argv[1] not recognized!"
-	exit 1
+	goto enderr
     endif
 
     if ("natural" =~ *"$wmode"*) set sup = 0
@@ -335,7 +340,7 @@ else if ("$argv[1]" =~ 'cleantype='*) then
     set cleantype = `echo $argv[1] | sed 's/mode=//'`
     if !(" clean mem " =~ *" $cleantype "*) then
 	echo "FATAL ERROR: $argv[1] not recognized!"
-	exit 1
+	goto enderr
     endif
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'imsize='*) then
@@ -422,20 +427,20 @@ else if ("$argv[1]" =~ 'options='*) then
     shift argv; if ("$argv" == "") set argv = "finish"
 else
     echo "FATAL ERROR: $argv[1] not recognized..."
-    exit 1
+    goto enderr
 endif
 
 if ("$argv[1]" != "finish") goto varassign
 
 if ("$vis" == "") then
     echo "FATAL ERROR: No vis file given"
-    exit 1
+    goto enderr
 endif
 
 foreach file ($vis)
     if !(-e $file) then
 	echo "FATAL ERROR: $file does not exist!"
-	exit 1
+	goto enderr
     endif
 end
 
@@ -753,9 +758,17 @@ endif
 
 if ($intclean) then
     echo "Performing preliminary clean, deriving model for calculations"
-    clean map=$wd/tempmap.map beam=$wd/tempmap.beam out=$wd/tempmap.clean niters=1000 cutoff=$tnoise "$cregion" >& /dev/null 
+    clean map=$wd/tempmap.map beam=$wd/tempmap.beam out=$wd/tempmap.clean niters=1000 cutoff=$tnoise options=negstop "$cregion" >& /dev/null
+    if !(-e $wd/tempmap.clean) then
+	echo "FATAL ERROR: Image is not cleanable (likely too much data was culled)."
+	goto enderr
+    endif
     restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd/tempmap.cm >& /dev/null 
     restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd/tempmap.rs mode=residual >& /dev/null 
+    if !(-e $wd/tempmap.cm && -e $wd/tempmap.rs) then
+	echo "FATAL ERROR: Image is not restorable (likely too much data was culled)."
+	goto enderr
+    endif
     rm -rf $wd/imlistcm $wd/imlistrs $wd/imlistcm2
     imlist in=$wd/tempmap.cm options=stat log=$wd/imlistcm >& /dev/null
     set imstats = (`imstat in=$wd/tempmap.rs | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
@@ -767,7 +780,7 @@ if ($intclean) then
     sfind in=tempmap.cm options=oldsfind,auto,nofit rmsbox=100 xrms=3 labtyp=arcsec >& /dev/null 
     cd ..
     # Had to patch here since sfind was having problems... stupid bugger
-    set niterslim = `imstat in=$wd/tempmap.clean | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g' | awk '{print int(log(3*noise/$1)/log(.9))}' noise=$tnoise`
+    set niterslim = `imstat in=$wd/tempmap.clean | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g' | awk '{if ($4 >= $5*-1) print int(log(3*noise/$4)/log(.9)); if ($4 < $5*-1) print int(log(-3*noise/$5)/log(.9))}' noise=$tnoise`
     set niters = `grep -v "#" $wd/sfind.log | awk '{if ($6*$7 > 3000*noise) cycles+=2*log((3000*noise)/($6*$7))/log(.9)} END {print int(cycles)}' noise=$tnoise`
     if ($niters < $niterslim) set niters=$niterslim
 
@@ -787,8 +800,16 @@ clean:
 
 # Create clean component map and make residual/cleaned images
 clean map=$wd/tempmap.map beam=$wd/tempmap.beam out=$wd/tempmap.clean niters=$niters cutoff=$nalevel "$cregion" >& $wd/cleanlog 
+if !(-e $wd/tempmap.clean) then
+    echo "FATAL ERROR: Image is not cleanable (likely too much data was culled)."
+    goto enderr
+endif
 restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd/tempmap.cm >& /dev/null 
 restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd/tempmap.rs mode=residual >& /dev/null 
+if !(-e $wd/tempmap.cm && -e $wd/tempmap.rs) then
+    echo "FATAL ERROR: Image is not restorable (likely too much data was culled)."
+    goto enderr
+endif
 
 rm -rf $wd/imlistcm $wd/imlistcm2
 imlist in=$wd/tempmap.cm options=stat log=$wd/imlistcm >& /dev/null
@@ -1225,7 +1246,7 @@ echo " "
 goto invert
 
 enderr:
-if !($debug) rm -r $wd
+if !($debug) rm -rf $wd
 exit 1
 
 failsafe:
@@ -1356,7 +1377,6 @@ if ("$outdir" == "") then
     end
 else
     set outfile = "$outdir"
-    rm -rf $outfile
 endif
 
 if ($savedata != 2) then
