@@ -589,16 +589,16 @@ foreach file ($vis)
     echo -n "Splitting $file..."
     @ idx++
     if ("$uselect" != "") then
-	uvaver vis=$file out=$wd/tempselect options=relax interval=$interval $line select="$uselect" >& /dev/null
+	uvaver vis=$file out=$wd/tempselect options=relax interval=$interval select="$uselect" >& /dev/null
 	echo -n "."
 	uvaver vis=$wd/tempselect out=$wd/tempmap$idx.xpol options=relax select="-shadow(7.5),pol(xx)" >& /dev/null 
 	echo -n "."
 	uvaver vis=$wd/tempselect out=$wd/tempmap$idx.ypol options=relax select="-shadow(7.5),pol(yy)" >& /dev/null 
 	rm -rf $wd/tempselect
     else
-	uvaver vis=$file out=$wd/tempmap$idx.xpol options=relax select="-shadow(7.5),pol(xx),$uselect" interval=$interval $line >& /dev/null 
+	uvaver vis=$file out=$wd/tempmap$idx.xpol options=relax select="-shadow(7.5),pol(xx),$uselect" interval=$interval >& /dev/null 
 	echo -n "."
-	uvaver vis=$file out=$wd/tempmap$idx.ypol options=relax select="-shadow(7.5),pol(yy),$uselect" interval=$interval $line >& /dev/null 
+	uvaver vis=$file out=$wd/tempmap$idx.ypol options=relax select="-shadow(7.5),pol(yy),$uselect" interval=$interval >& /dev/null 
     endif
     if !(-e $wd/tempmap$idx.xpol/visdata || -e $wd/tempmap$idx.ypol/visdata) then
 	echo "FATAL ERROR: UVAVER has failed! $file shows no viable data!" 
@@ -655,6 +655,12 @@ foreach file ($vis)
 	    if (-e $file/bandpass.mp) mv $file/bandpass.mp $file/bandpass
 	    uvaver vis=$wd/tempmap$idx.{$dp}pol out=$wd/tempgmap options=relax >& /dev/null
 	    rm -rf $wd/tempmap$idx.{$dp}pol; mv $wd/tempgmap $wd/tempmap$idx.{$dp}pol
+	endif
+	if (-e $wd/tempmap$idx.{$dp}pol/visdata && "$line" != "") then
+	    echo -n "Performing line selection on data..."
+	    uvaver vis=$wd/tempmap$idx.{$dp}pol out=$wd/tempgmap $line options=relax >& /dev/null
+	    rm -rf $wd/tempmap$idx.{$dp}pol; mv $wd/tempgmap $wd/tempmap$idx.{$dp}pol	    
+	    echo "done!"
 	endif
 	if (-e $file/sefd && -e $wd/tempmap$idx.{$dp}pol/visdata && $sefd) then
 	    echo -n "Writing tsys values to file..."
@@ -1350,6 +1356,7 @@ if ("$outdir" == "") then
     end
 else
     set outfile = "$outdir"
+    rm -rf $outfile
 endif
 
 if ($savedata != 2) then

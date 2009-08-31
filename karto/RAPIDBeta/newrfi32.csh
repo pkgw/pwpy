@@ -711,7 +711,7 @@ if ($delpower < 3) then #Lower limit for correction to be applied
 else
     set yvals = (`awk '{print $1-cenpower}' cenpower=$cenpower $wd/temp.power | awk '{if (($1+3*delpower)^2 < delpower^2) SUM0 += 1; else if (($1+1*delpower)^2 < delpower^2) SUM1 += 1; else if (($1-1*delpower)^2 < delpower^2) SUM2 += 1; else if (($1-3*delpower)^2 < delpower^2) SUM3 += 1} END {print SUM0,SUM1,SUM2,SUM3}' delpower=$delpower | awk '{print log($1),log($2),log($3),log($4)}'`)
     set alpha = (`echo $yvals | awk '{print ($2-$1)/delpower,($3-$2)/delpower,($4-$3)/delpower}' delpower=$delpower | awk '{print .5*($3-$1)/delpower}' delpower=$delpower`)
-    if (`echo $alpha | awk '{if ($1 >= 0 || $1*1 == "-Inf" || $1 == "NaN" || $1 == "-NaN") print "nogo"}'` == "nogo") then
+    if (`echo $alpha $yvals | awk '{if ($1 >= 0 || $2 ~ Inf || $2 ~ NaN || $3 ~ Inf || $3 ~ NaN || $4 ~ Inf || $4 ~ NaN || $5 ~ Inf || $5 ~ NaN ) print "nogo"}'` == "nogo") then
 	echo "Advanced detection of sigma during calibration cycle failed, switching to forced detection..."
 	set finpower = $cenpower
 	set lchan = `echo $chans | awk '{print 1+int($1*exp(-1))}'`
@@ -719,7 +719,6 @@ else
 	set lpower = `sed -n {$lchan}p $wd/temp.power`
 	set upower = `sed -n {$uchan}p $wd/temp.power`
 	set sigma = `echo $upower $lpower | awk '{print .5*($1-$2)}'`
-
     else
 	set beta = (`echo $yvals | awk '{print (($2-$1)/delpower)+(alpha*delpower),($3-$2)/delpower,(($4-$3)/delpower)-(alpha*delpower)}' alpha=$alpha delpower=$delpower | awk '{print -1*($1+$2+$3)/(3*alpha)}' alpha=$alpha`)
 	set finpower = `echo $cenpower $beta | awk '{print int(.5+$1+$2)}'`
@@ -732,6 +731,11 @@ echo $sigma $cenpower | awk '{if ($1 < $2^.5) print "Enforcing lower limit on si
 set sigma = `echo $sigma $cenpower | awk '{if ($1 > $2^.5) print $1;else print $2^.5}'` 
 
 awk '{if (($2-finpower)^2 < 4*(nsig^2)*sigma^2) print ($1-censpec)/1000,$2,($2-finpower)/sigma}' finpower=$finpower sigma=$sigma censpec=$censpec nsig=$nsig $wd/temp.spec > $wd/temp.good
+
+if (`wc -l $wd/temp.good | awk '{print $1}'` == 0) then
+    echo "WARNING: All data identified as bad, moving on..."
+    goto aftercorr
+endif
 
 if ($corrdisp) then
     echo "Displaying correctional data..."
@@ -773,7 +777,7 @@ else
     set yvals = (`awk '{print $1-cenpower}' cenpower=$cenpower $wd/temp.power | awk '{if (($1+3*delpower)^2 < delpower^2) SUM0 += 1; else if (($1+1*delpower)^2 < delpower^2) SUM1 += 1; else if (($1-1*delpower)^2 < delpower^2) SUM2 += 1; else if (($1-3*delpower)^2 < delpower^2) SUM3 += 1} END {print SUM0,SUM1,SUM2,SUM3}' delpower=$delpower | awk '{print log($1),log($2),log($3),log($4)}'`)
     set alpha = (`echo $yvals | awk '{print ($2-$1)/delpower,($3-$2)/delpower,($4-$3)/delpower}' delpower=$delpower | awk '{print .5*($3-$1)/delpower}' delpower=$delpower`)
 
-    if (`echo $alpha | awk '{if ($1 >= 0 || $1*1 == "-Inf" || $1 == "NaN" || $1 == "-NaN") print "nogo"}'` == "nogo") then
+    if (`echo $alpha $yvals | awk '{if ($1 >= 0 || $2 ~ Inf || $2 ~ NaN || $3 ~ Inf || $3 ~ NaN || $4 ~ Inf || $4 ~ NaN || $5 ~ Inf || $5 ~ NaN ) print "nogo"}'` == "nogo") then
 	echo "Advanced detection of sigma failed, switching to forced detection..."
 	set finpower = $cenpower
 	set lchan = `echo $chans | awk '{print 1+int($1*exp(-1))}'`

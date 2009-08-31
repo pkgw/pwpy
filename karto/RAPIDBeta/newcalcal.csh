@@ -156,6 +156,7 @@ set smooth
 set report = 1
 set nogainants
 set copymode = 0
+set noflag = 0
 
 #################################################################
 # Here is the keyword/value pairing code. It basically operates
@@ -220,6 +221,10 @@ else if ("$argv[1]" =~ 'options='*) then
 	else if ($option == "lastcopy") then
 	    set copymode = 2
 	    set outsource = 0
+	else if ($option == "noflag") then
+	    set noflag = 1
+	else if ($option == "flag") then
+	    set noflag = 0
 	else
 	    set badopt = ($badopt $option)
 	endif
@@ -1514,7 +1519,7 @@ echo ""
 copymode:
 
 if ($copymode) then
-    if !(-e $vis/retmap) then
+    if !(-e $vis/retmap || $noflag) then
 	echo "FATAL ERROR: This calibrator dataset has not been processed with CALCAL yet!"
 	goto fail
     endif
@@ -1533,6 +1538,7 @@ if ($copymode) then
     foreach file ($tvis)
 	echo -n "Copying gains solution to $file..."
 	rm -rf $file/gains $file/gains.xx $file/gains.yy $file/gains.xxp $file/gains.yyp $file/bandpass $file/bandpass.xx $file/bandpass.yy $file/bandpass.xxp $file/bandpass.yyp $file/header.xx $file/header.yy $file/header.xxp $file/header.yyp $file/retmap $file/sefd
+	if (-e $vis/sefd) cp $vis/sefd $file/sefd
 	foreach pol (xx yy xxp yyp)
 	    if (-e $vis/gains.$pol || -e $vis/bandpass.$pol) then
 		if (-e $vis/header) cp $vis/header $vis/tempheader
@@ -1556,6 +1562,7 @@ if ($copymode) then
 	endif
 	echo "done!"
     end
+    if ($noflag) goto finish
     cp $vis/retmap $wd/retmap
     awk '{if (NR > 4) print $1}' $wd/retmap > $wd/basemap
     echo -n "Beginning flagging sequence..."

@@ -413,7 +413,7 @@ foreach file ($filelist)
 
     if ($#odates == 0) then
 	echo "FATAL ERROR: No visibilities found (data has possibly been completely flagged)"
-	goto finish
+	goto fail
     endif
     foreach odate (`echo $odates`)
 	echo -n "-e 's/"`julian date=$odate | grep 'Modified' | awk '{print $1"0/"int($6)"/g"}'`"' " >> $wd/julday.source
