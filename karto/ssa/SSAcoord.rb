@@ -66,7 +66,7 @@ else
   decOff = decOff[0].to_f-decOff[1].to_f/60-decOff[2].to_f/3600
 end
 
-chi = (ARGV[4].to_f)*180/PI
+chi = (ARGV[4].to_f)*(ARGV[7] == "rad" ? 180/PI : 1.0)
 az = ARGV[5].to_f
 el = ARGV[6].to_f
 
