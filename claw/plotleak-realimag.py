@@ -8,7 +8,7 @@ import asciidata, pylab, numpy
 
 def run():
     # params for possible customization
-    type = 'ratio'
+    type = 'overlap'
 
     a = []; a2 = []
     p = []; p2 = []
@@ -88,11 +88,19 @@ def run():
             ratampy = ay2[12:,i]/ay[0:8,i]
             ratphy = py2[12:,i]-py[0:8,i]
             pylab.figure(1)
-            pylab.plot(ratampx, ratphx)
-            pylab.text(ratampx[0],ratphx[0],str(antnum[i]))
+            pylab.subplot(211)
+            pylab.plot(range(8), ratphx)
+            pylab.text(7,ratphx[0],str(antnum[i]))
+            pylab.subplot(212)
+            pylab.plot(range(8), ratampx)
+            pylab.text(7, ratampx[0],str(antnum[i]))
             pylab.figure(2)
-            pylab.plot(ratampy, ratphy)
-            pylab.text(ratampy[0],ratphy[0],str(antnum[i]))
+            pylab.subplot(211)
+            pylab.plot(range(8), ratphy)
+            pylab.text(7,ratphy[0],str(antnum[i]))
+            pylab.subplot(212)
+            pylab.plot(range(8), ratampy)
+            pylab.text(7, ratampy[0],str(antnum[i]))
 
     if type == 'xy':
         # real-imag (x-y) plot
@@ -145,6 +153,33 @@ def run():
             pylab.xlabel('Real')
             pylab.ylabel('Imaginary')
             pylab.title('Leakages')
+
+    if type == 'overlap':
+        # real-imag (x-y) plot
+        # two pols per source
+        for i in range(nants):
+            pylab.figure(1)
+            pylab.plot(rx[12:],ix[12:],'.-')
+            pylab.plot(rx2[0:8],ix2[0:8],'--')
+            pylab.text(rx[0,i],ix[0,i],str(antnum[i]))
+            pylab.text(rx2[0,i],ix2[0,i],str(antnum[i]))
+            pylab.xlabel('Real')
+            pylab.ylabel('Imaginary')
+            pylab.title('Leakages')
+            pylab.figure(2)
+            pylab.plot(ry[12:],iy[12:],'.-')
+            pylab.plot(ry2[0:8],iy2[0:8],'--')
+            pylab.text(ry[0,i],iy[0,i],str(antnum[i]))
+            pylab.text(ry2[0,i],iy2[0,i],str(antnum[i]))
+            pylab.xlabel('Real')
+            pylab.ylabel('Imaginary')
+            pylab.title('Leakages')
+            pylab.figure(3)
+            pylab.plot(ry[12:]-ry2[0:8],iy[12:]-iy2[0:8],'.-')
+            pylab.plot(rx[12:]-rx2[0:8],ix[12:]-ix2[0:8],'--')
+            pylab.xlabel('Real')
+            pylab.ylabel('Imaginary')
+            pylab.title('Leakage Differences')
 
     pylab.show()
 

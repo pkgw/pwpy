@@ -8,7 +8,7 @@
 # User parameters
 set src=c286  # source name, assuming 3c source
 set freq=1480  # observing frequency
-set point=qp6  # suffix for output file name.  originally used to differentiate pointing directions.
+set point=hp0  # suffix for output file name.  originally used to differentiate pointing directions.
 set visroot=hexc-3${src}-${point}-${freq} # file name
 set chans=40  # channels per frequency chunk.  
 #set flux=7.47 # flux of calibrator
@@ -31,10 +31,8 @@ foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)
     # now do cal steps.  mfcal for bandpass, gpcal for gains and leakages
     mfcal vis=${visroot}-${piece} refant=1 interval=5
     gpcal vis=${visroot}-${piece} refant=1 options=xyref interval=5 # options=xyref critical!  optionally may also use 'qusolve'
-    gpcal vis=${visroot}-${piece} refant=1 options=xyref interval=5 # options=xyref critical!  optionally may also use 'qusolve' # do twice to get enough iters
 
     # now output the leakages for visualization later
-
     gpplt vis=${visroot}-${piece} options=polarization yaxis=amp log=3${src}-${point}-${freq}-leakamp${piece}.txt
     gpplt vis=${visroot}-${piece} options=polarization yaxis=phase log=3${src}-${point}-${freq}-leakphase${piece}.txt
 
