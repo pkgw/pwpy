@@ -206,7 +206,7 @@ set autopha = 1 # Automatically selfcal phases in "auto" mode?
 set autoamp = 0 # Automatically selfcal amplitudes in "auto" mode?
 set scint = 5 # Selfcal soln interval
 set sctol = .05 # Selfcal limiting tolerance iterative cycles
-set scsigma = 10 # Sigma clipping limit for selfcal
+set scsigma # Sigma clipping limit for selfcal
 set scmode = "dr" # Selfcal optimiztion (either fidelity or dynamic range)
 set weightmode = "natural" # Weighting mode for the invert step
 set imsize # Size of image (in pixels)
@@ -1234,11 +1234,15 @@ if ($scopt == "amp") @ asci++
 
 echo "Now performing $scopt self-cal on data set...currently at $psci phase cycles and $asci amplitude cycles."
 
-set clip = `echo $scsigma $imstats[3] | awk '{print $1*$2}'`
+if ("$scsigma" == "") then
+    set clip = `echo $beamsize $imstats[3] $imsize | tr ',' ' ' | awk '{if ($4*1 == 0) print $2*(.5*log($3*$3/$1)+2); else print $2*(.5*log(($3*$4)/$1)+2)}'`
+else
+    set clip = `echo $scsigma $imstats[3] | awk '{print $1*$2}'`
+endif
 
 foreach file ($vislist)
     selfcal vis=$file model=$wd/tempmap.clean interval=$scint select=$sel minants=4 options=mfs,$scopt clip=$clip refant=$refant >& /dev/null
-    if ($autoamp && ! $autopha) gpedit vis=$file options=amp > /dev/null
+    if ($autoamp && ! $autopha && -e $file/gains) gpedit vis=$file options=amp > /dev/null
 end
 
 echo "Restarting cycle!"
@@ -1297,7 +1301,7 @@ if ($regain) then
 endif
 
 # Below this is all reporting code. All of this code will need to be changed...
-set nalevel = `echo $beamsize $tnoise $imsize | tr ',' ' ' | awk '{if ($4*1 == 0) print .5*$2*(log($3/$1)); else print .5*$2*(log((($3*$4)^.5)/$1))}'`
+set nalevel = `echo $beamsize $tnoise $imsize | tr ',' ' ' | awk '{if ($4*1 == 0) print .5*$2*(log($3*$3/$1)); else print .5*$2*(log($3*$4/$1))}'`
 echo "IMAGING REPORT" > $wd/imgrpt
 echo "================================================================" >> $wd/imgrpt
 echo "Imaging of $source was successfully completed using $omode mode." >> $wd/imgrpt
