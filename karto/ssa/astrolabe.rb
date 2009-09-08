@@ -57,6 +57,22 @@ include Math
 require 'gsl'
 include GSL
 
+def executeAndLog(command, executeCommand)
+
+  f = File.open(Dir.pwd + "/log.txt",  "a")
+  time = Time.new
+  dateAndCommand = "[" + time.day.to_s + "/" + time.month.to_s + "/" + time.year.to_s + " " + time.hour.to_s + ":" + time.min.to_s + ":" + time.sec.to_s + "] " + command
+  f.puts(dateAndCommand)
+  f.flush
+  f.fsync
+  f.close
+
+  if(executeCommand == true)
+    system(command)
+  end
+
+end
+
 # Spline fit for Az and El of ephem REQUIRES GSL
 # NOTE: This could be converted into a vector operation if neccessary. The bulk of the time is spent reading in the file.
 def ephemSpline(ephemFile,ephemTime) # Input: standardard ATA ephem file, time in UTC seconds
@@ -134,7 +150,9 @@ def grabDumpTimes(file) # Input: filename
 end
 
 #Given an array of times an and integration time, provides an array of start,end (in MIRAID time format) and mid (in UTC seconds) times for a series of time frames
-def deriveFrameTimes(miriadTimeArray,intTime) # Input time array (from grabDumpTimes), integration time
+def deriveFrameTimes(miriadTimeArray,intTime,startTime,endTime) # Input time array (from grabDumpTimes), integration time
+  startTime = startTime.to_f
+  endTime = endTime.to_f
   idx = 1
   utcMidFrameTimes = [] # init the mid-time array
   utcFullFrameTimes = [] # init the full-time array
@@ -142,7 +160,8 @@ def deriveFrameTimes(miriadTimeArray,intTime) # Input time array (from grabDumpT
   while idx < miriadTimeArray.nitems do
     dumpTime = DateTime.strptime(miriadTimeArray[idx].split('.')[0],'%y%b%d:%H:%M:%S') # Convert the time stamp from MIRIAD format to DateTime object
     dumpTimeUTC = Time.at(dumpTime.strftime('%s').to_f,miriadTimeArray[idx].split('.')[1].to_f*100000) # Convert DateTime to UTC seconds
-    if (currentStart.size == 0) # If this is the first cycle, set the first time as the current start time for the time frame
+    if (dumpTimeUTC.to_f < startTime || dumpTimeUTC.to_f > endTime)
+    elsif (currentStart.size == 0) # If this is the first cycle, set the first time as the current start time for the time frame
       currentStart = [dumpTimeUTC]
     elsif (currentStart[-1] + intTime/2.0 < dumpTimeUTC) # If the difference between two dump times exceeds the dump threshold, then dump the average UTC seconds time and mark the current frame as the new start time
       utcMidFrameTimes << currentStart.inject{ |sum, el| sum + el }.to_f / currentStart.size # Averages and adds result to the mid-time array
@@ -152,13 +171,17 @@ def deriveFrameTimes(miriadTimeArray,intTime) # Input time array (from grabDumpT
     end
     idx += 1
   end
-  utcMidFrameTimes << currentStart.inject{ |sum, el| sum + el }.to_f / currentStart.size # dump the remaining elements in the current time frame
+  if currentStart.size > 0
+    utcMidFrameTimes << currentStart.inject{ |sum, el| sum + el }.to_f / currentStart.size # dump the remaining elements in the current time frame
+  end
   utcMidFrameTimes.each do |midTime| # For each time frame, generate a "start" and "end" time, and convert those times into the MIRAID timestamp format
+    midMirTimeArray =  Time.at(midTime).utc.to_s.split(' ')
+    midMirTime = midMirTimeArray[5][2,3] + midMirTimeArray[1].upcase + midMirTimeArray[2] + ':' + midMirTimeArray[3] + '.' + ((midTime)%1*10).round.to_s
     startTimeArray = Time.at(midTime-intTime/2.0).utc.to_s.split(' ')
     startTime = startTimeArray[5][2,3] + startTimeArray[1].upcase + startTimeArray[2] + ':' + startTimeArray[3] + '.' + ((midTime-intTime/2.0)%1*10).round.to_s
     endTimeArray = Time.at(midTime+intTime/2.0).utc.to_s.split(' ')
     endTime = endTimeArray[5][2,3] + endTimeArray[1].upcase + endTimeArray[2] + ':' + endTimeArray[3] + '.' + ((midTime+intTime/2.0)%1*10).round.to_s
-    utcFullFrameTimes << [startTime,endTime,midTime.to_s]
+    utcFullFrameTimes << [startTime,endTime,midTime.to_s,midMirTime]
   end
   return utcFullFrameTimes #return Array[start time (MIRIAD format), end time (MIRAD format), mid time (UTC seconds)
 end
@@ -230,6 +253,16 @@ def getChi(miriadFile)
   end
 end
 
+def getEVector(miriadFile)
+  eVector = "0"
+  if File.exist?(miriadFile + "/visdata")
+    if `uvlist vis=#{miriadFile} options=var,full`["evector"]
+      eVector = `uvcheck vis=#{miriadFile} var=evector | grep Average | tr '=' ' ' | awk '{print $2*1}'`.chomp
+    end
+    return eVector
+  end
+end
+
 # Rotates the RADec offset found by imfit and rotates it to the ephem position
 def rotateRADectoAzEl(raCenter,decCenter,raOff,decOff,antChi,antAz,antEl)
   raCenter = raCenter.split(pattern=":") # if in HH:MM:SS format, convert
@@ -268,40 +301,69 @@ def rotateRADectoAzEl(raCenter,decCenter,raOff,decOff,antChi,antAz,antEl)
 end
 
 # Here is where the main script starts
-
+executeAndLog(">>Start astrolabe.rb", false);
 visFile = ARGV[0]
 lineSelection = ARGV[1]
 ephemFile = ARGV[2]
 resultsFile = ARGV[3]
 wd = `mktemp -d SSA2XXXXX`.chomp
 
+ephemStart = IO.readlines(ephemFile)[0].split[0].to_f
+ephemEnd = IO.readlines(ephemFile)[-1].split[0].to_f
+
+ephemStart /= 10**((log(ephemStart)/log(10)).floor-9)
+ephemEnd /= 10**((log(ephemEnd)/log(10)).floor-9)
+
 puts "Calculating frame times..."
+executeAndLog("Calculating frame times...", false);
 dumpTimes = grabDumpTimes(visFile) # Grab the dump times
 puts "Calculating frame widths..."
-frameTimes = deriveFrameTimes(dumpTimes,10) # Calculate what the time ranges should be for each image frame
+frameTimes = deriveFrameTimes(dumpTimes,10,ephemStart,ephemEnd) # Calculate what the time ranges should be for each image frame
+executeAndLog("Calculating frame widths...", false);
+
+if frameTimes.nitems == 0
+  puts "FATAL ERROR: #{ephemFile} times do match up with those in #{visFile}"
+  `rm -rf #{wd}`
+  exit
+end
 
 puts "Extracting relevant data..." # Excise the relevant data (i.e. only those channels that we are interested in)
+executeAndLog("Extracting relevant data...", false);
 extractCheck = `newautomap.csh vis="#{visFile}" mode=skip outdir=#{wd}/data options=savedata,sefd interval=0 cleanlim=50 #{lineSelection}`
+
+if File.exist?(wd + "/data") == false
+  puts "FATAL ERROR: #{visFile} has no usable data for the channel range specified"
+  `rm -rf #{wd}`
+  exit
+end
 
 sourceName = extractCheck.split(' ')[1].chop.chop.chop # Second "word" that newautomap spits out is the source name
 extractFiles = `du #{wd}/data/#{sourceName}.1.* | awk '{printf "%s,",$2}'` # Look for files matching what newautomap would produce
 
 idx = 1
-File.open(wd + "/results", 'a') {|f| f.write("Time(UTCSec) ActualAz ActualEl EphemAz EphemEl OffsetXEl OffsetEl Chi FitErrRA FitErrDec\n")}
+File.open(wd + "/results", 'a') {|f| f.write("Time(UTCSec) ActualAz ActualEl EphemAz EphemEl OffsetXEl OffsetEl Chi FitErrRA FitErrDec MirTime\n")}
 frameTimes.each do |currentFrame| # For each time frame, use newautomap to image
   startTimeStamp = Time.now.to_i
   print "Imaging frame #{idx} of #{frameTimes.nitems}..."
+  executeAndLog("Imaging frame #{idx} of #{frameTimes.nitems}...", false);
+
   STDOUT.flush
   imageCheck = imageFrame(extractFiles,currentFrame,wd)
   if File.exist?(wd + "/maps/" + sourceName + ".cm") # Check to see that imaging was successfully completed
     posFit = fitImage("#{wd}/maps/#{sourceName}.cm") # Fit a point source on the image
-    fieldRADec = getRADec(wd + "/maps/" + sourceName + ".cm") # get the RADec of the image
-    fieldChi = getChi(`du #{wd}/maps/#{sourceName}.*.* | head -n 1 | awk '{printf "%s",$2}'`) # Get Chi from the visibilities
-    antAzEl = ephemSpline(ephemFile,currentFrame[2]) # Calculate the azel at that time
-    # raCenter,decCenter,raOff,decOff,antChi,antAz,antEl
-    sourceAzEl = rotateRADectoAzEl(fieldRADec[0],fieldRADec[1],posFit[0],posFit[1],fieldChi,antAzEl[0],antAzEl[1]) # Caluclate the total offsets
-    puts "success! Done in #{Time.now.to_i - startTimeStamp} sec, offset is #{(sourceAzEl[0]*3600.0).round}\" x #{(sourceAzEl[1]*3600).round}\""
-    File.open(wd + "/results", 'a') {|f| f.write("#{currentFrame[2]} #{sourceAzEl[2]} #{sourceAzEl[3]} #{antAzEl[0]} #{antAzEl[1]} #{sourceAzEl[0]} #{sourceAzEl[1]} #{fieldChi} #{posFit[2]} #{posFit[3]}\n")} # write results to file
+    if (posFit[0] == "0" || posFit[1] == "0" || posFit[2] == "0" || posFit[3] == "0")    
+      puts "FAILED! (Bad fit)"
+    else
+      fieldRADec = getRADec(wd + "/maps/" + sourceName + ".cm") # get the RADec of the image
+      fieldChi = getChi(`du #{wd}/maps/#{sourceName}.*.* | head -n 1 | awk '{printf "%s",$2}'`) # Get Chi from the visibilities
+      fieldEVector = getEVector(`du #{wd}/maps/#{sourceName}.*.* | head -n 1 | awk '{printf "%s",$2}'`)
+      antAzEl = ephemSpline(ephemFile,currentFrame[2]) # Calculate the azel at that time
+      fieldChi = fieldChi.to_f - fieldEVector.to_f
+      # raCenter,decCenter,raOff,decOff,antChi,antAz,antEl
+      sourceAzEl = rotateRADectoAzEl(fieldRADec[0],fieldRADec[1],posFit[0],posFit[1],fieldChi,antAzEl[0],antAzEl[1]) # Caluclate the total offsets
+      puts "success! Done in #{Time.now.to_i - startTimeStamp} sec, offset is #{(sourceAzEl[0]*3600.0).round}\" x #{(sourceAzEl[1]*3600).round}\""
+      File.open(wd + "/results", 'a') {|f| f.write("#{currentFrame[2]} #{sourceAzEl[2]} #{sourceAzEl[3]} #{antAzEl[0]} #{antAzEl[1]} #{sourceAzEl[0]} #{sourceAzEl[1]} #{fieldChi} #{posFit[2]} #{posFit[3]} #{currentFrame[3]}\n")} # write results to file
+    end
   else
     puts "FAILED! (No image)" # If no image, go on to the next time frame
   end
@@ -313,6 +375,8 @@ FileUtils::mv(wd + "/results", resultsFile)
 puts "Done!"
 puts ""
 puts "Imaging of #{sourceName} successfully completed, results have been written to #{resultsFile}."
+
+executeAndLog(">>Finish astrolabe.rb", false);
 
 `rm -rf #{wd}`
   
