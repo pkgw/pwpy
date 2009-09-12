@@ -7,9 +7,11 @@
 
 # User parameters
 set src=c286  # source name, assuming 3c source
-set freq=1480  # observing frequency
-set point=hp0  # suffix for output file name.  originally used to differentiate pointing directions.
-set visroot=hexc-3${src}-${point}-${freq} # file name
+set freq=1430  # observing frequency
+set point=$1  # suffix for output file name.  originally used to differentiate pointing directions.
+#set point=hp0  # suffix for output file name.  originally used to differentiate pointing directions.
+set root=$2
+set visroot=${root}-3${src}-${point}-${freq} # file name
 set chans=40  # channels per frequency chunk.  
 #set flux=7.47 # flux of calibrator
 
@@ -33,21 +35,21 @@ foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)
     gpcal vis=${visroot}-${piece} refant=1 options=xyref interval=5 # options=xyref critical!  optionally may also use 'qusolve'
 
     # now output the leakages for visualization later
-    gpplt vis=${visroot}-${piece} options=polarization yaxis=amp log=3${src}-${point}-${freq}-leakamp${piece}.txt
-    gpplt vis=${visroot}-${piece} options=polarization yaxis=phase log=3${src}-${point}-${freq}-leakphase${piece}.txt
+    gpplt vis=${visroot}-${piece} options=polarization yaxis=amp log=${visroot}-leakamp${piece}.txt
+    gpplt vis=${visroot}-${piece} options=polarization yaxis=phase log=${visroot}-leakphase${piece}.txt
 
     # rationalize leakage files for easy plotting by python script
-    tail -n15 3${src}-${point}-${freq}-leakamp${piece}.txt > tmp
+    tail -n15 ${visroot}-leakamp${piece}.txt > tmp
     cut -c1-28 tmp > tmp2
     cut -c29-56 tmp >> tmp2
     cut -c57- tmp >> tmp2
-    mv tmp2 3${src}-${point}-${freq}-leakamp${piece}.txt
+    mv tmp2 ${visroot}-leakamp${piece}.txt
     rm -f tmp
 
-    tail -n15 3${src}-${point}-${freq}-leakphase${piece}.txt > tmp
+    tail -n15 ${visroot}-leakphase${piece}.txt > tmp
     cut -c1-28 tmp > tmp2
     cut -c29-56 tmp >> tmp2
     cut -c57- tmp >> tmp2
-    mv tmp2 3${src}-${point}-${freq}-leakphase${piece}.txt
+    mv tmp2 ${visroot}-leakphase${piece}.txt
     rm -f tmp
 end

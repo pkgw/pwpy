@@ -6,15 +6,16 @@ import asciidata, pylab, numpy
 
 def run():
     # params
-    type = 'freqdiff'  # 'pol' groups by pol, 'freq' groups by freq, 'freqdiff' groups by freq and differences to center
+    type = 'freq'  # 'pol' groups by pol, 'freq' groups by freq, 'freqdiff' groups by freq and differences to center
     locs = 7
     freqs = 8  # ignores higher
     antnum = [1,4,7,10,13,16,19,22,25,28,31,34,37,40,43,2,5,8,11,14,17,20,23,26,29,32,35,38,41,3,6,9,12,15,18,21,24,27,30,33,36,39,42]  # hack for how rows messed up by 'cut'
     scale = 0.4
     beamra = numpy.array([0.,1.,0.5,-0.5,-1.,-0.5,+0.5,]) * scale
     beamdec = numpy.array([0.,0.,numpy.sqrt(3)/2.,numpy.sqrt(3)/2.,0.,-numpy.sqrt(3)/2.,-numpy.sqrt(3)/2.]) * scale
-    prefix = '3c286'
-    obsfreq = '1480'
+    prefix = 'hexa-3c286'
+    prefix2 = 'hexc-3c286'
+    obsfreq = '1430'
     hpqp = 1
 
     ax = []; ay = []
@@ -29,10 +30,10 @@ def run():
             ay.append(asciidata.AsciiData ('%s-hp%d-%s-leakamp%d.txt' % (prefix, loc, obsfreq, freq+1)).columns[1])
             py.append(asciidata.AsciiData ('%s-hp%d-%s-leakphase%d.txt' % (prefix, loc, obsfreq, freq+1)).columns[1])
             if hpqp:
-                axq.append(asciidata.AsciiData ('%s-qp%d-%s-leakamp%d.txt' % (prefix, loc, obsfreq, freq+1)).columns[0])
-                pxq.append(asciidata.AsciiData ('%s-qp%d-%s-leakphase%d.txt' % (prefix, loc, obsfreq, freq+1)).columns[0])
-                ayq.append(asciidata.AsciiData ('%s-qp%d-%s-leakamp%d.txt' % (prefix, loc, obsfreq, freq+1)).columns[1])
-                pyq.append(asciidata.AsciiData ('%s-qp%d-%s-leakphase%d.txt' % (prefix, loc, obsfreq, freq+1)).columns[1])
+                axq.append(asciidata.AsciiData ('%s-qp%d-%s-leakamp%d.txt' % (prefix2, loc, obsfreq, freq+1)).columns[0])
+                pxq.append(asciidata.AsciiData ('%s-qp%d-%s-leakphase%d.txt' % (prefix2, loc, obsfreq, freq+1)).columns[0])
+                ayq.append(asciidata.AsciiData ('%s-qp%d-%s-leakamp%d.txt' % (prefix2, loc, obsfreq, freq+1)).columns[1])
+                pyq.append(asciidata.AsciiData ('%s-qp%d-%s-leakphase%d.txt' % (prefix2, loc, obsfreq, freq+1)).columns[1])
 
     nants = len(ax[0])
     print '%d antennas...' % (nants)
