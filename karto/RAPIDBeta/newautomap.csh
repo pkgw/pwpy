@@ -591,6 +591,7 @@ set vislist
 set idx = 0
 
 foreach file ($vis)
+    convertgains.csh $file # Convert file to new gains system
     echo -n "Splitting $file..."
     @ idx++
     if ("$uselect" != "") then
@@ -611,53 +612,20 @@ foreach file ($vis)
     endif
     echo ""
     foreach dp (x y)
-	if ((-e $file/gains.$dp$dp || -e $file/bandpass.$dp$dp) && -e $wd/tempmap$idx.{$dp}pol/visdata) then
+	if (-e $file/gains.$dp$dp && -e $wd/tempmap$idx.{$dp}pol/visdata) then
 	    echo -n "Applying diff $dp$dp gains..."
-	    if (-e $file/gains)  mv $file/gains $file/gains.mp
-	    if (-e $file/gains.$dp$dp) mv $file/gains.$dp$dp $file/gains
-	    if (-e $file/bandpass) mv $file/bandpass $file/bandpass.mp
-	    if (-e $file/bandpass.$dp$dp) mv $file/bandpass.$dp$dp $file/bandpass
-	    if (-e $file/header) cp $file/header $file/header.mp
-	    if (-e $file/header.$dp$dp) cp $file/header.$dp$dp $file/header
-	    gpcopy vis=$file out=$wd/tempmap$idx.{$dp}pol > /dev/null
-	    if (-e $file/header.mp) mv $file/header.mp $file/header
-	    if (-e $file/gains)  mv $file/gains $file/gains.$dp$dp
-	    if (-e $file/gains.mp) mv $file/gains.mp $file/gains
-	    if (-e $file/bandpass) mv $file/bandpass $file/bandpass.$dp$dp
-	    if (-e $file/bandpass.mp) mv $file/bandpass.mp $file/bandpass
+	    gpcopy vis=$file/gains.$dp$dp out=$wd/tempmap$idx.{$dp}pol > /dev/null
 	    uvaver vis=$wd/tempmap$idx.{$dp}pol out=$wd/tempgmap options=relax >& /dev/null
 	    rm -rf $wd/tempmap$idx.{$dp}pol; mv $wd/tempgmap $wd/tempmap$idx.{$dp}pol
 	    echo ""
 	endif
-	if ((-e $file/gains.{$dp$dp}p || -e $file/bandpass.{$dp$dp}p) && -e $wd/tempmap$idx.{$dp}pol/visdata) then
-	    if (-e $file/gains)  mv $file/gains $file/gains.mp
-	    if (-e $file/gains.{$dp$dp}p) mv $file/gains.{$dp$dp}p $file/gains
-	    if (-e $file/bandpass) mv $file/bandpass $file/bandpass.mp
-	    if (-e $file/bandpass.{$dp$dp}p) mv $file/bandpass.{$dp$dp}p $file/bandpass
-	    if (-e $file/header) cp $file/header $file/header.mp
-	    if (-e $file/header.{$dp$dp}p) cp $file/header.{$dp$dp}p $file/header
-	    gpcopy vis=$file out=$wd/tempmap$idx.{$dp}pol > /dev/null
-	    if (-e $file/header.mp) mv $file/header.mp $file/header
-	    if (-e $file/gains)  mv $file/gains $file/gains.{$dp$dp}p
-	    if (-e $file/gains.mp) mv $file/gains.mp $file/gains
-	    if (-e $file/bandpass) mv $file/bandpass $file/bandpass.{$dp$dp}p
-	    if (-e $file/bandpass.mp) mv $file/bandpass.mp $file/bandpass
+	if (-e $file/gains.{$dp$dp}p && -e $wd/tempmap$idx.{$dp}pol/visdata) then
+	    gpcopy vis=$file/gains.{$dp$dp}p out=$wd/tempmap$idx.{$dp}pol > /dev/null
 	    uvaver vis=$wd/tempmap$idx.{$dp}pol out=$wd/tempgmap options=relax >& /dev/null
 	    rm -rf $wd/tempmap$idx.{$dp}pol; mv $wd/tempgmap $wd/tempmap$idx.{$dp}pol
 	endif
-	if ((-e $file/gains.{$dp$dp}pp || -e $file/bandpass.{$dp$dp}pp) && -e $wd/tempmap$idx.{$dp}pol/visdata && ! $regain) then
-	    if (-e $file/gains)  mv $file/gains $file/gains.mp
-	    if (-e $file/gains.{$dp$dp}pp) mv $file/gains.{$dp$dp}pp $file/gains
-	    if (-e $file/bandpass) mv $file/bandpass $file/bandpass.mp
-	    if (-e $file/bandpass.{$dp$dp}pp) mv $file/bandpass.{$dp$dp}pp $file/bandpass
-	    if (-e $file/header) cp $file/header $file/header.mp
-	    if (-e $file/header.{$dp$dp}pp) cp $file/header.{$dp$dp}pp $file/header
-	    gpcopy vis=$file out=$wd/tempmap$idx.{$dp}pol > /dev/null
-	    if (-e $file/header.mp) mv $file/header.mp $file/header
-	    if (-e $file/gains)  mv $file/gains $file/gains.{$dp$dp}pp
-	    if (-e $file/gains.mp) mv $file/gains.mp $file/gains
-	    if (-e $file/bandpass) mv $file/bandpass $file/bandpass.{$dp$dp}pp
-	    if (-e $file/bandpass.mp) mv $file/bandpass.mp $file/bandpass
+	if (-e $file/gains.{$dp$dp}pp && -e $wd/tempmap$idx.{$dp}pol/visdata && ! $regain) then
+	    gpcopy vis=$file/gains.{$dp$dp}pp out=$wd/tempmap$idx.{$dp}pol > /dev/null
 	    uvaver vis=$wd/tempmap$idx.{$dp}pol out=$wd/tempgmap options=relax >& /dev/null
 	    rm -rf $wd/tempmap$idx.{$dp}pol; mv $wd/tempgmap $wd/tempmap$idx.{$dp}pol
 	endif
@@ -1283,15 +1251,7 @@ if ($regain) then
     while ($idx <= $#vis)
 	foreach dp (x y)
 	    if (-e $wd/tempmap$idx.{$dp}pol/gains) then
-		if (-e $vis[$idx]/gains) cp $vis[$idx]/gains $vis[$idx]/gains.mp
-		if (-e $vis[$idx]/header) cp $vis[$idx]/header $vis[$idx]/header.mp
-		gpcopy vis=$wd/tempmap$idx.{$dp}pol out=$vis[1] > /dev/null
-		if (-e $vis[$idx]/gains) then
-		    mv $vis[$idx]/gains $vis[$idx]/gains.{$dp}pp
-		    cp $vis[$idx]/header $vis[$idx]/header.{$dp}pp
-		endif
-		if (-e $vis[$idx]/gains.mp) mv $vis[$idx]/gains.mp $vis[$idx]/gains
-		if (-e $vis[$idx]/header.mp) mv $vis[$idx]/header.mp $vis[$idx]/header
+		gpcopy vis=$wd/tempmap$idx.{$dp}pol out=$vis[$idx]/gains.{$dp$dp}pp mode=create > /dev/null
 	    endif
 	end
 	echo "Gains copied to $vis[$idx]..."

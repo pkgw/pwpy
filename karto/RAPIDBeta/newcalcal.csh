@@ -292,6 +292,7 @@ set dmark = `date +%s`
 if ($copymode) goto copymode
 
 foreach file ($vis $tvis)
+    convertgains.csh $file
     if !(-e $file/phoenix) mkdir -p $file/phoenix
     if (! -e $file/phoenix/flags.o && -e $file/flags) cp $file/flags $file/phoenix/flags.o
     if (! -e $file/phoenix/gains.o && -e $file/flags) cp $file/flags $file/phoenix/gains.o
@@ -1257,45 +1258,29 @@ if (-e $wd/sefd) cp $wd/sefd $outfile/sefd
 
 echo "Copying gains back to original file ($vis)"
 
-rm -rf $vis/gains* $vis/bandpass* $vis/header.* $vis/retmap $vis/sefd
+rm -rf $vis/gains $vis/bandpass $vis/gains.xx $vis/gains.xxp $vis/gains.yy $vis/gains.yyp $vis/retmap $vis/sefd $vis/header.xx $vis/header.xxp $vis/header.yy $vis/header.yyp
 
 if ($polsplit && $#pollist > 1) then # If pols were split and more than one pol exists
     foreach dp (xx yy)
+	puthd in=$wd/tempcal$dp/interval value=.5 > /dev/null
+	gpcopy vis=$wd/tempcal$dp out=$vis/gains.$dp mode=create > /dev/null
 	if (-e $outfile/$source.1.$dp/gains) then # If the automapping software had "tweaks" for the gains solution, apply those tweaks
 	    puthd in=$outfile/$source.1.$dp/interval value=.5 > /dev/null
-	    gpcopy vis=$outfile/$source.1.$dp out=$vis > /dev/null
-	    if (-e $vis/gains) mv $vis/gains $vis/gains.{$dp}p
-	    if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.{$dp}p
-	    if (-e $vis/header) cp $vis/header $vis/header.{$dp}p
+	    gpcopy vis=$outfile/$source.1.$dp out=$vis/gains.$dp mode=apply > /dev/null
 	endif
-	puthd in=$wd/tempcal$dp/interval value=.5 > /dev/null 
-	gpcopy vis=$wd/tempcal$dp out=$vis > /dev/null
-    # Move pol-specific gains "out of the way" so that information isnb't overwritten by gpcopy
-	if (-e $vis/gains) mv $vis/gains $vis/gains.$dp 
-	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.$dp
-	if (-e $vis/header) cp $vis/header $vis/header.$dp
     end
 else if ($polsplit) then # if polspilt was used, but only one pol was found
+    puthd in=$wd/tempcal$pollist[1]/interval value=.5 > /dev/null
+    gpcopy vis=$wd/tempcal$pollist[1] out=$vis/gains.$pollist[1] mode=create > /dev/null
     if (-e $outfile/$source.1.$pollist[1]/gains) then # If the automapping software had "tweaks" for a single pol gains solution, apply those tweaks
 	puthd in=$outfile/$source.1.$pollist[1]/interval value=.5 > /dev/null
-	gpcopy vis=$outfile/$source.1.$pollist[1] out=$vis > /dev/null
-	if (-e $vis/gains) mv $vis/gains $vis/gains.{$pollist[1]}p 
-	if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.{$pollist[1]}p
-	if (-e $vis/header) cp $vis/header $vis/header.{$pollist[1]}p
+	gpcopy vis=$outfile/$source.1.$pollist[1] out=$vis/gains.$pollist[1] mode=apply > /dev/null
     endif
-    puthd in=$wd/tempcal$pollist[1]/interval value=.5 > /dev/null
-    gpcopy vis=$wd/tempcal$pollist[1] out=$vis > /dev/null
-    # Move pol-specific gains "out of the way" so that information isn't overwritten by gpcopy
-    if (-e $vis/gains) mv $vis/gains $vis/gains.$pollist[1]
-    if (-e $vis/bandpass) mv $vis/bandpass $vis/bandpass.$pollist[1]
-    if (-e $vis/header) cp $vis/header $vis/header.$pollist[1]
 else
     foreach dp (xx yy)
 	if (-e $outfile/$source.1.$dp/gains) then # If the automapping software had "tweaks" for the gains solution, apply those tweaks
 	    puthd in=$outfile/$source.1.$dp/interval value=.5 > /dev/null
-	    gpcopy vis=$outfile/$source.1.$dp out=$vis > /dev/null
-	    # Move pol-specific gains "out of the way" so that information isn't overwritten by gpcopy
-	    mv $vis/gains $vis/gains.{$dp}p
+	    gpcopy vis=$outfile/$source.1.$dp out=$vis/gains.{$dp}p mode=create > /dev/null
 	endif
     end
     # Copy over any "general" gains solutions (relating to multiple pols)
@@ -1306,21 +1291,16 @@ endif
 # Repeat the gains copying process for each source file, first copying any pol-specific solutions first, then copying "general" (multi-pol) solutions
 foreach tfile ($tvis)
     echo "Copying gains to $tfile"
+    rm -rf $tfile/gains $tfile/gains.xx $tfile/gains.yy $tfile/gains.xxp $tfile/gains.yyp $tfile/bandpass $tfile/retmap $tfile/sefd
     foreach dp (xx yy)
-	if (-e $wd/tempcal$dp/gains || -e $wd/tempcal$dp/bandpass) then
-	    gpcopy vis=$wd/tempcal$dp out=$tfile > /dev/null
-	    if (-e $tfile/gains) mv $tfile/gains $tfile/gains.$dp
-	    if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/bandpass.$dp
-	    cp $tfile/header $tfile/header.$dp
+	if (-e $vis/gains.$dp) then
+	    gpcopy vis=$vis/gains.$dp out=$tfile/gains.$dp mode=create > /dev/null
 	endif
-	if (-e $vis/gains.{$dp}p || -e $vis/bandpass.{$dp}p) then
-	    gpcopy vis=$outfile/$source.1.$dp out=$tfile > /dev/null
-	    if (-e $tfile/bandpass) mv $tfile/bandpass $tfile/bandpass.{$dp}p
-	    if (-e $tfile/gains) mv $tfile/gains $tfile/gains.{$dp}p
-	    cp $tfile/header $tfile/header.{$dp}p
+	if (-e $vis/gains.{$dp}p) then
+	    gpcopy vis=$vis/gains.{$dp}p out=$tfile/gains.{$dp}p mode=create > /dev/null
 	endif
     end
-    if (-e $vis/gains) then
+    if (-e $vis/gains || -e $vis/bandpass) then
 	gpcopy vis=$vis out=$tfile > /dev/null
     endif
 end
@@ -1342,19 +1322,11 @@ foreach file ($vis $tvis)
     if (-e $wd/sefd) cp $wd/sefd $file/phoenix/sefd.CAL$dmark
     if (-e $file/gains) cp $file/gains $file/phoenix/gains.CAL$dmark
     if (-e $file/bandpass) cp $file/bandpass $file/phoenix/bandpass.CAL$dmark
-    if (-e $file/gains.xx) cp $file/gains.xx $file/phoenix/gains.xx.CAL$dmark
-    if (-e $file/bandpass.xx) cp $file/bandpass.xx $file/phoenix/bandpass.xx.CAL$dmark
-    if (-e $file/gains.xxp) cp $file/gains.xxp $file/phoenix/gains.xxp.CAL$dmark
-    if (-e $file/bandpass.xxp) cp $file/bandpass.xxp $file/phoenix/bandpass.xxp.CAL$dmark
-    if (-e $file/gains.yy) cp $file/gains.yy $file/phoenix/gains.yy.CAL$dmark
-    if (-e $file/bandpass.yy) cp $file/bandpass.yy $file/phoenix/bandpass.yy.CAL$dmark
-    if (-e $file/gains.yyp) cp $file/gains.yyp $file/phoenix/gains.yyp.CAL$dmark
-    if (-e $file/bandpass.yyp) cp $file/bandpass.yyp $file/phoenix/bandpass.yyp.CAL$dmark
     if (-e $file/header) cp $file/header $file/phoenix/header.CAL$dmark
-    if (-e $file/header.xx) cp $file/header.xx $file/phoenix/header.xx.CAL$dmark
-    if (-e $file/header.xxp) cp $file/header.xxp $file/phoenix/header.xxp.CAL$dmark
-    if (-e $file/header.yy) cp $file/header.yy $file/phoenix/header.yy.CAL$dmark
-    if (-e $file/header.yyp) cp $file/header.yyp $file/phoenix/header.yyp.CAL$dmark
+    if (-e $file/gains.xx) cp -r $file/gains.xx $file/phoenix/gains.xx.CAL$dmark
+    if (-e $file/gains.xxp) cp -r $file/gains.xxp $file/phoenix/gains.xxp.CAL$dmark
+    if (-e $file/gains.yy) cp -r $file/gains.yy $file/phoenix/gains.yy.CAL$dmark
+    if (-e $file/gains.yyp) cp -r $file/gains.yyp $file/phoenix/gains.yyp.CAL$dmark
 end
 
 foreach file ($tvis)
@@ -1518,6 +1490,8 @@ echo ""
 
 copymode:
 
+convertgains.csh $vis # Convert files to new gains system
+
 if ($copymode) then
     if !(-e $vis/retmap || $noflag) then
 	echo "FATAL ERROR: This calibrator dataset has not been processed with CALCAL yet!"
@@ -1536,25 +1510,13 @@ if ($copymode) then
 	echo "CALCAL $dmark" >> $file/phoenix/history
     end
     foreach file ($tvis)
+	convertgains.csh $file # Convert files to new gains system
 	echo -n "Copying gains solution to $file..."
-	rm -rf $file/gains $file/gains.xx $file/gains.yy $file/gains.xxp $file/gains.yyp $file/bandpass $file/bandpass.xx $file/bandpass.yy $file/bandpass.xxp $file/bandpass.yyp $file/header.xx $file/header.yy $file/header.xxp $file/header.yyp $file/retmap $file/sefd
+	rm -rf $file/gains $file/gains.xx $file/gains.yy $file/gains.xxp $file/gains.yyp $file/bandpass $file/retmap $file/sefd
 	if (-e $vis/sefd) cp $vis/sefd $file/sefd
 	foreach pol (xx yy xxp yyp)
-	    if (-e $vis/gains.$pol || -e $vis/bandpass.$pol) then
-		if (-e $vis/header) cp $vis/header $vis/tempheader
-		if (-e $vis/gains) cp $vis/gains $vis/tempgains
-		if (-e $vis/bandpass) cp $vis/bandpass $vis/tempbandpass
-		if (-e $vis/header.$pol) cp $vis/header.$pol $vis/header
-		if (-e $vis/gains.$pol) cp $vis/gains.$pol $vis/gains
-		if (-e $vis/bandpass.$pol) cp $vis/bandpass.$pol $vis/bandpass
-		gpcopy vis=$vis out=$file > /dev/null
-		if (-e $file/header) cp $file/header $file/header.$pol
-		if (-e $file/gains) mv $file/gains $file/gains.$pol
-		if (-e $file/bandpass) mv $file/bandpass $file/bandpass.$pol
-		rm -rf $vis/header $vis/bandpass $vis/gains
-		if (-e $vis/tempheader) mv $vis/tempheader $vis/header
-		if (-e $vis/tempgains) mv $vis/tempgains $vis/gains
-		if (-e $vis/tempbandpass) mv $vis/tempbandpass $vis/bandpass
+	    if (-e $vis/gains.$pol) then
+		gpcopy vis=$vis/gains.$pol out=$file/gains.$pol mode=create > /dev/null
 	    endif
 	end
 	if (-e $vis/gains || -e $vis/bandpass) then
