@@ -13,6 +13,8 @@ set clim = (-200 200) # "Acceptable closure range for baselines
 set debug = 0 # Switch to prevent temp directory from being deleted
 set stime
 set etime
+set printstats
+set caloptions
 
 if ($#argv == 0) then
       #################################################################
@@ -70,6 +72,7 @@ echo "    'good' range is anything between zero and that value. Default"
 echo "    is -200 to 200."
 echo " options=debug"
 echo "    debug - Don't delete temporary files created by EPRMS."
+echo "    printstats - Print full baselines statistics."
 exit 0
 endif
 
@@ -110,6 +113,14 @@ else if ("$argv[1]" =~ 'options='*) then
     foreach option (`echo $options`)
 	if ($option == debug) then
 	    set debug = 1
+	else if ($option == printstats) then
+	    set printstats = 1
+	else if ($option == nocal) then
+	    set caloptions = "$caloptions,nocal"
+	else if ($option == nopass) then
+	    set caloptions = "$caloptions,nopass"
+	else if ($option == nopol) then
+	    set caloptions = "$caloptions,nopol"
 	else
 	    set badopt = ($badopt $option)
 	endif
@@ -130,6 +141,14 @@ if ("$argv[1]" != "finish") goto varassign
 # to be parsed later.
 #################################################################
 
+if ($vis == "") then
+    echo "FATAL ERROR: No vis file specified!"
+    exit 1
+else if (! -e $vis/visdata) then
+    echo "FATAL ERROR: Visibility data not found!"
+    exit 1
+endif
+
 set wd = `mktemp -d "eprmsXXXX"`
 
 #################################################################
@@ -146,8 +165,8 @@ set timerange
 if ("$stime" != "") set timerange = "time($stime,$etime),"
 #    log phase vs time for given scan and pol for all baselines
 # The wrap option is used to catch baselines what might have and average around -180 or 180
-uvplt vis=$vis device=/null axis=time,pha options=log,2pass,unwrap log=$wd/xphalog select="window(1),pol(xx),""$timerange""-auto" >& /dev/null 
-uvplt vis=$vis device=/null axis=time,pha options=log,2pass,unwrap log=$wd/yphalog select="window(1),pol(yy),""$timerange""-auto" >& /dev/null
+uvplt vis=$vis device=/null axis=time,pha options=log,2pass,unwrap$caloptions log=$wd/xphalog select="window(1),pol(xx),""$timerange""-auto" >& /dev/null 
+uvplt vis=$vis device=/null axis=time,pha options=log,2pass,unwrap$caloptions log=$wd/yphalog select="window(1),pol(yy),""$timerange""-auto" >& /dev/null
 
 # Sort out the baseline information from what UVPLT reports
 if (-e $wd/xphalog) then
@@ -171,7 +190,8 @@ else
 endif
 
 #    get phase vs time data from uvplt log file
-
+touch $wd/baselist2
+if ($printstats) echo "Ant1 Ant2 Pol P-Avg P-RMS Npoints"
 foreach pol ($pols)
     set idx = 1
     set plidx = 1
@@ -184,8 +204,12 @@ foreach pol ($pols)
 	set basestats = (`sed -n {$plidx},{$puidx}p $wd/{$pol}pha | awk '{n++; if (n==1) {sx=$2; sxx=$2*$2} else {sx=sx+$2; sxx=sxx+($2*$2)} if (n==nct) {m=sx/n; r=sqrt((sxx-n*m*m)/n); print m, r}}' nct=$baseinfo[3]`)
 	set plidx = `echo $plidx $baseinfo[3] | awk '{print $1+$2}'`
 	@ idx++
-	# Evaluate the baseline stats to see whether or not it's bad
-	echo $basestats $baseinfo $pol | awk '{if ($1 > uclim || $1 < lclim || $2 > uplim || $2 < lplim) print $3"-"$4}' uclim=$clim[2] uplim=$plim[2] lclim=$clim[1] lplim=$plim[1] >> $wd/baselist2
+	if ($printstats) then
+	    echo $baseinfo[1-2] $pol$pol $basestats $baseinfo[3]
+	else
+	    # Evaluate the baseline stats to see whether or not it's bad
+	    echo $basestats $baseinfo $pol | awk '{if ($1 > uclim || $1 < lclim || $2 > uplim || $2 < lplim) print $3"-"$4}' uclim=$clim[2] uplim=$plim[2] lclim=$clim[1] lplim=$plim[1] >> $wd/baselist2
+	endif
     end
     set antlist = (`sed 's/-/ /g' $wd/baselist2 | awk '{printf "%s\n%s\n",$1,$2}' | sort -n | uniq`)
     # The following groups together the bad baselines to minimize the neccessary select commands needed to "grab" them
@@ -215,6 +239,8 @@ foreach pol ($pols)
 	mv $wd/baselist3 $wd/baselist2
     end
 end
+
+finish:
 
 fail:
 
