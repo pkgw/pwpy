@@ -1,0 +1,165 @@
+=== Drawing primitives
+
+PGLINE -- draw a polyline (curve defined by line-segments)
+PGPOLY -- draw a polygon, using fill-area attributes
+
+PGPT1  -- draw one graph marker
+PGPT   -- draw several graph markers
+PGPNTS -- draw several graph markers, not all the same
+
+PGARRO -- draw an arrow
+PGCIRC -- draw a circle, using fill-area attributes
+PGRECT -- draw a rectangle, using fill-area attributes
+
+PGMOVE -- move pen (change current pen position)
+PGDRAW -- draw a line from the current pen position to a point
+
+=== Axis
+PGAXIS -- draw an axis
+PGBOX  -- draw labeled frame around viewport
+PGTICK -- draw a single tick mark on an axis
+PGTBOX -- draw frame and write (DD) HH MM SS.S labelling
+
+=== Text
+PGLAB  -- write labels for x-axis, y-axis, and top of plot
+
+PGTEXT -- write text (horizontal, left-justified)
+PGMTXT -- write text at position relative to viewport
+PGPTXT -- write text at arbitrary position and angle
+
+PGETXT -- erase text from graphics display
+PGIDEN -- write username, date, and time at bottom of plot
+PGLEN  -- find length of a string in a variety of units
+PGQTXT -- find bounding box of text string
+
+=== Histgram
+PGBIN  -- histogram of binned data
+PGHIST -- histogram of unbinned data
+
+=== Error bar
+PGERR1 -- horizontal or vertical error bar
+PGERRB -- horizontal or vertical error bar
+PGERRX -- horizontal error bar
+PGERRY -- vertical error bar
+
+=== 2D drawing
+PGCONT -- contour map of a 2D data array (contour-following)
+PGCONS -- contour map of a 2D data array (fast algorithm)
+PGCONB -- contour map of a 2D data array, with blanking
+PGCONF -- fill between two contours
+PGCONL -- label contour map of a 2D data array 
+PGCONX -- contour map of a 2D data array (non rectangular) (not implemented in Ruby/PGPLOT)
+
+PGIMAG -- color image from a 2D data array
+PGCTAB -- install the color table to be used by PGIMAG
+PGGRAY -- gray-scale map of a 2D data array
+PGPIXL -- draw pixels
+
+PGVECT -- vector map of a 2D data array, with blanking
+
+PGWEDG -- annotate an image plot with a wedge
+PGHI2D -- cross-sections through a 2D data array
+
+=== Cursor
+PGBAND -- read cursor position, with anchor
+PGCURS -- read cursor position
+PGLCUR -- draw a line using the cursor
+PGNCUR -- mark a set of points using the cursor
+PGOLIN -- mark a set of points using the cursor
+
+=== Control
+PGOPEN -- open a graphics device
+PGBEG  -- open a graphics device
+PGCLOS -- close the selected graphics device
+PGEND  -- close all open graphics devices
+
+PGENV  -- set window and viewport and draw labeled frame
+
+PGASK  -- control new page prompting
+PGPAGE -- advance to new page
+PGERAS -- erase all graphics from current page
+PGBBUF -- begin batch of output (buffer)
+PGEBUF -- end batch of output (buffer)
+PGPANL -- switch to a different panel on the view surface
+PGPAP  -- change the size of the view surface 
+PGRNGE -- choose axis limits
+PGSAVE -- save PGPLOT attributes
+PGUNSA -- restore PGPLOT attributes
+PGSCRL -- scroll window
+PGSUBP -- subdivide view surface into panels
+PGUPDT -- update display
+
+=== Set attributes
+PGSAH  -- set arrow-head style
+PGSCF  -- set character font
+PGSCH  -- set character height
+PGSCI  -- set color index
+PGSCIR -- set color index range
+PGSCLP -- enable or disable clipping at edge of viewport
+PGSCR  -- set color representation
+PGSCRN -- set color representation by name
+PGSFS  -- set fill-area style
+PGSHLS -- set color representation using HLS system
+PGSHS  -- set hatching style
+PGSITF -- set image transfer function
+PGSLCT -- select an open graphics device
+PGSLS  -- set line style
+PGSLW  -- set line width
+PGSTBG -- set text background color index
+PGSVP  -- set viewport (normalized device coordinates)
+PGSWIN -- set window
+PGVSIZ -- set viewport (inches)
+PGVSTD -- set standard (default) viewport
+PGWNAD -- set window and adjust viewport to same aspect ratio
+
+=== Inquire attributes
+PGLDEV -- list available device types on standard output
+PGQAH  -- inquire arrow-head style
+PGQCF  -- inquire character font
+PGQCH  -- inquire character height
+PGQCI  -- inquire color index
+PGQCIR -- inquire color index range
+PGQCLP -- inquire clipping status
+PGQCOL -- inquire color capability
+PGQCR  -- inquire color representation
+PGQCS  -- inquire character height in a variety of units
+PGQDT  -- inquire name of nth available device type
+PGQFS  -- inquire fill-area style
+PGQHS  -- inquire hatching style
+PGQID  -- inquire current device identifier
+PGQINF -- inquire PGPLOT general information
+PGQITF -- inquire image transfer function
+PGQLS  -- inquire line style
+PGQLW  -- inquire line width
+PGQNDT -- inquire number of available device types
+PGQPOS -- inquire current pen position
+PGQTBG -- inquire text background color index
+PGQVP  -- inquire viewport size and position
+PGQVSZ -- inquire size of view surface
+PGQWIN -- inquire window boundary coordinates
+
+==== Hereafter not implemented in Ruby/PGPLOT
+
+=== Utility
+PGNUMB -- convert a number into a plottable character string
+PGRND  -- find the smallest `round' number greater than x
+
+=== Drawing function
+PGFUNT -- function defined by X = F(T), Y = G(T)
+PGFUNX -- function defined by Y = F(X)
+PGFUNY -- function defined by X = F(Y)
+
+=== Alias
+PGADVANCE -- non-standard alias for PGPAGE
+PGBEGIN  -- non-standard alias for PGBEG
+PGCURSE  -- non-standard alias for PGCURS
+PGLABEL  -- non-standard alias for PGLAB
+PGMTEXT  -- non-standard alias for PGMTXT
+PGNCURSE -- non-standard alias for PGNCUR
+PGPAPER  -- non-standard alias for PGPAP
+PGPOINT  -- non-standard alias for PGPT
+PGPTEXT  -- non-standard alias for PGPTXT
+PGVPORT  -- non-standard alias for PGSVP
+PGVSIZE  -- non-standard alias for PGVSIZ
+PGVSTAND -- non-standard alias for PGVSTD
+PGWINDOW -- non-standard alias for PGSWIN

@@ -1,0 +1,1266 @@
+/*
+   rb_pgplot.c : Ruby/PGPLOT extension library
+
+   Copyright (c) 2000,2001 Masahiro TANAKA <masa@ir.isas.ac.jp>
+
+   This program is free software.
+   You can distribute/modify this program
+   under the same terms as Ruby itself.
+   NO WARRANTY.
+*/
+#include <stdio.h>
+#include <cpgplot.h>
+#include <ruby.h>
+#include "narray.h"
+
+#define min(a,b) (((a)<(b))?(a):(b))
+#define rb_pgplot_fltary(obj)	na_cast_object(obj,NA_SFLOAT)
+#define rb_pgplot_intary(obj)	na_cast_object(obj,NA_LINT)
+#define rb_pgplot_newary(rank,shape)	na_make_object(NA_SFLOAT,rank,shape,cNArray)
+
+#define NA_PTR_FLT(dta) (float*)(((struct NARRAY*)DATA_PTR(dta))->ptr)
+#define NA_PTR_INT(dta) (int*)(((struct NARRAY*)DATA_PTR(dta))->ptr)
+#ifndef NA_RANK
+#define NA_RANK(dta)   (((struct NARRAY*)DATA_PTR(dta))->rank)
+#endif
+#ifndef NA_TYPE
+#define NA_TYPE(dta)   (((struct NARRAY*)DATA_PTR(dta))->type)
+#endif
+#ifndef NA_TOTAL
+#define NA_TOTAL(dta)  (((struct NARRAY*)DATA_PTR(dta))->total)
+#endif
+#ifndef NA_SHAPE0
+#define NA_SHAPE0(dta) (((struct NARRAY*)DATA_PTR(dta))->shape[0])
+#endif
+#ifndef NA_SHAPE1
+#define NA_SHAPE1(dta) (((struct NARRAY*)DATA_PTR(dta))->shape[1])
+#endif
+
+static VALUE mPgplot;
+static VALUE cPgCursor;
+static VALUE ePgCursorError;
+static ID id_beg, id_end, id_x, id_y, id_char;
+
+#ifdef GNU_FORTRAN
+ void MAIN__() {} /* Ruby has no 'MAIN__'! ; How should I handle this??? */
+#endif
+
+/* Search Minimum and Maximum values of array */
+static void
+  rb_pgplot_minmax(VALUE na, float range[])
+{
+  int i;
+  float *ptr = NA_PTR_FLT(na);
+
+  range[0] = range[1] = *ptr;
+  ptr++;
+  for (i=NA_TOTAL(na)-1; i>0; i--,ptr++) {
+    if (*ptr<range[0]) range[0] = *ptr; /* min */
+    if (*ptr>range[1]) range[1] = *ptr; /* max */
+  }
+}
+
+
+/* PGASK -- control new page prompting
+   pgask [true|false]
+*/
+static VALUE
+  rb_pgplot_pgask( int argc, VALUE *argv, VALUE self)
+{
+  VALUE vflag;
+
+  rb_scan_args(argc, argv, "01", &vflag);
+
+  if (RTEST(vflag))
+    cpgask(1);
+  else
+    cpgask(0);
+  return Qnil;
+}
+
+
+/* PGOPEN -- open a graphics device
+   stat = pgopen [device]
+ */
+static VALUE
+  rb_pgplot_pgopen( int argc, VALUE *argv, VALUE self )
+{
+  VALUE vdev;
+  char *dev="?";
+
+  rb_scan_args(argc,argv, "01", &vdev);
+  if (vdev!=Qnil) dev = STR2CSTR(vdev);
+
+  return INT2NUM(cpgopen(dev));
+}
+
+
+/* PGBEG -- open a graphics device */
+static VALUE
+  rb_pgplot_pgbeg( int argc, VALUE *argv, VALUE self )
+{
+  VALUE  vdev, vnxs, vnys;
+  int    nxsub=1, nysub=1;
+  char  *dev="?";
+
+  rb_scan_args(argc, argv, "03", &vdev,&vnxs,&vnys);
+  if (vdev!=Qnil) dev  = STR2CSTR(vdev);
+  if (vnxs!=Qnil) nxsub = NUM2INT(vnxs);
+  if (vnys!=Qnil) nysub = NUM2INT(vnys);
+
+  if (cpgbeg(0, dev, nxsub, nysub) != 1)
+    return Qnil;
+  else
+    return Qtrue;
+}
+
+
+/* PGENV -- set window and viewport and draw labeled frame
+   pgenv xmin,xmax,ymin,ymax [, just [, axis]]
+     xmin: the left of the viewport.
+     xmax: the right of the viewport.
+     ymin: the bottom of the viewport.
+     ymax: the top of the viewport
+     just: if just=1, the x and y axes is scaled equally,
+           otherwise scaled independently.
+     axis: controls of axes.
+*/ 
+static VALUE
+  rb_pgplot_pgenv( int argc, VALUE *argv, VALUE self )
+{
+  VALUE x0, x1, y0, y1, vjust, vaxis;
+  int   just=0, axis=0;
+
+  rb_scan_args(argc, argv, "42", &x0,&x1,&y0,&y1,&vjust,&vaxis);
+  if (vjust!=Qnil) just = NUM2INT(vjust);
+  if (vaxis!=Qnil) axis = NUM2INT(vaxis);
+
+  cpgenv( NUM2DBL(x0), NUM2DBL(x1), NUM2DBL(y0), NUM2DBL(y1), just, axis );
+  return Qtrue;
+}
+
+
+/* PGLINE -- draw a polyline (curve defined by line-segments)
+   pgline xarray, yarray
+*/
+static VALUE
+  rb_pgplot_pgline(VALUE obj, VALUE v1, VALUE v2)
+{
+  VALUE x, y;
+
+  x = rb_pgplot_fltary( v1 );
+  y = rb_pgplot_fltary( v2 );
+
+  cpgline( min(NA_TOTAL(x),NA_TOTAL(y)), NA_PTR_FLT(x), NA_PTR_FLT(y) );
+
+  return Qtrue;
+}
+
+/* PGPOLY -- draw a polygon, using fill-area attributes
+   pgpoly xarray, yarray
+*/
+static VALUE
+  rb_pgplot_pgpoly(VALUE obj, VALUE v1, VALUE v2)
+{
+  VALUE x, y;
+
+  x = rb_pgplot_fltary( v1 );
+  y = rb_pgplot_fltary( v2 );
+
+  cpgpoly( min(NA_TOTAL(x),NA_TOTAL(y)), NA_PTR_FLT(x), NA_PTR_FLT(y) );
+
+  return Qtrue;
+}
+
+
+/* PGPT -- draw several graph markers
+   pgpt xarray, yarray [,symbol]
+*/
+static VALUE
+  rb_pgplot_pgpt( int argc, VALUE *argv, VALUE self )
+{
+  VALUE vx, vy, vsym;
+  VALUE x, y;
+  int sym=0;
+
+  rb_scan_args(argc,argv, "21", &vx,&vy,&vsym);
+  if (vsym!=Qnil) sym = NUM2INT(vsym);
+
+  x = rb_pgplot_fltary( vx );
+  y = rb_pgplot_fltary( vy );
+
+  cpgpt( min(NA_TOTAL(x),NA_TOTAL(y)), NA_PTR_FLT(x), NA_PTR_FLT(y), sym );
+
+  return Qtrue;
+}
+
+/* PGPNTS -- draw several graph markers, not all the same
+   pgpnts xarray, yarray, symarray
+*/
+static VALUE
+  rb_pgplot_pgpnts( VALUE obj, VALUE vx, VALUE vy, VALUE vs )
+{
+  VALUE x, y, s;
+
+  x = rb_pgplot_fltary( vx );
+  y = rb_pgplot_fltary( vy );
+  s = rb_pgplot_intary( vs );
+
+  cpgpnts( min(NA_TOTAL(x),NA_TOTAL(y)), NA_PTR_FLT(x), NA_PTR_FLT(y),
+	   NA_PTR_INT(s), NA_TOTAL(s) );
+
+  return Qtrue;
+}
+
+/* PGBIN -- histogram of binned data
+   pgbin xarray, yarray [,center]
+   x      : abscissae of bins.
+   y      : data values of bins.
+   center : if true, the X values denote the center of the bin;
+            if false, the X values denote the lower edge (in X) of the bin.
+*/
+static VALUE
+  rb_pgplot_pgbin( int argc, VALUE *argv, VALUE self )
+{
+  VALUE vx, vy, vcent;
+  VALUE x, y;
+  int cent;
+
+  rb_scan_args(argc,argv, "21", &vx,&vy,&vcent);
+  if (RTEST(vcent)) cent=1; else cent=0;
+
+  x = rb_pgplot_fltary( vx );
+  y = rb_pgplot_fltary( vy );
+
+  cpgbin( min(NA_TOTAL(x),NA_TOTAL(y)), NA_PTR_FLT(x), NA_PTR_FLT(y), cent );
+
+  return Qtrue;
+}
+
+/* PGHIST -- histogram of unbinned data
+   pghist, data, nbin [,range, flag]
+   data   : the data values. NBIN may not exceed 200.
+   nbin   : the number of bins to use
+   range  : the range for the histogram.
+   flag   : = 0 PGENV is called automatically
+	    = 1 the histogram is plotted in the current window.
+	    = 2,3 with a filled area style.
+	    = 4,5 simple line.
+*/
+static VALUE
+  rb_pgplot_pghist( int argc, VALUE *argv, VALUE self )
+{
+  VALUE vdat,vnbin,vrange,vflag;
+  VALUE na_dat;
+  int flag=0;
+  float range[2];
+
+  rb_scan_args(argc,argv, "22", &vdat,&vnbin,&vrange,&vflag);
+  na_dat = rb_pgplot_fltary( vdat );
+
+  /* Data Range */
+  if (vrange!=Qnil) {
+    range[0] = NUM2DBL(rb_ivar_get(vrange, id_beg));
+    range[1] = NUM2DBL(rb_ivar_get(vrange, id_end));
+  } else {
+    rb_pgplot_minmax(na_dat,range);
+  }
+  /* PGFLAG */
+  if (vflag!=Qnil) flag = NUM2INT(vflag);
+
+  cpghist( NA_TOTAL(na_dat), NA_PTR_FLT(na_dat),
+	   range[0], range[1], NUM2INT(vnbin), flag );
+  return Qtrue;
+}
+
+
+/* Collection of Error bars
+*/
+static void
+  rb_pgplot_errorbar( int argc, VALUE *argv, int callid, int dir )
+{
+  VALUE v1,v2,v3,vt;
+  VALUE a1,a2,a3;
+  int size;
+  float tlen=1;
+
+  rb_scan_args(argc,argv, "31", &v1,&v2,&v3,&vt);
+  a1 = rb_pgplot_fltary( v1 );
+  a2 = rb_pgplot_fltary( v2 );
+  a3 = rb_pgplot_fltary( v3 );
+  size = min(NA_TOTAL(a1),NA_TOTAL(a2));
+  size = min(size,NA_TOTAL(a3));
+  if (vt!=Qnil) tlen = NUM2DBL(vt);
+
+  if (callid==1)
+    cpgerrx( size,
+	     NA_PTR_FLT(a1), NA_PTR_FLT(a2), NA_PTR_FLT(a3),
+	     tlen );
+  else if (callid==2)
+    cpgerry( size,
+	     NA_PTR_FLT(a1), NA_PTR_FLT(a2), NA_PTR_FLT(a3),
+	     tlen );
+  else
+    cpgerrb( dir, size,
+	     NA_PTR_FLT(a1), NA_PTR_FLT(a2), NA_PTR_FLT(a3),
+	     tlen );
+}
+
+/* PGERRB -- horizontal or vertical error bar
+   pgerrb, dir, x, y, err [,tlen]
+
+   dir : direction to plot the error bar relative to the data point. 
+         One-sided error bar:
+           DIR is 1 for +X (X to X+E);
+                  2 for +Y (Y to Y+E);
+                  3 for -X (X to X-E);
+                  4 for -Y (Y to Y-E).
+         Two-sided error bar:
+           DIR is 5 for +/-X (X-E to X+E); 
+                  6 for +/-Y (Y-E to Y+E).
+   x   : world x-coordinates of the data.
+   y   : world y-coordinates of the data.
+   err : value of error bar distance to be added to the
+         data position in world coordinates.
+   tlen: length of terminals to be drawn at the ends of the error bar,
+	 as a multiple of the default length.
+*/
+static VALUE
+  rb_pgplot_pgerrb( int argc, VALUE *argv, VALUE self )
+{
+  rb_pgplot_errorbar( argc-1, argv+1, 0, NUM2INT(argv[0]) );
+  return Qtrue;
+}
+
+/* PGERRX -- horizontal error bar
+   pgerrx, x1, x2, y [,tlen]
+
+   x1 : world x-coordinates of lower end of the error bars.
+   x2 : world x-coordinates of upper end of the error bars.
+*/
+static VALUE
+  rb_pgplot_pgerrx( int argc, VALUE *argv, VALUE self )
+{
+  rb_pgplot_errorbar( argc, argv, 1, 0 );
+  return Qtrue;
+}
+
+/* PGERRY -- vertical error bar
+   pgerry, x, y1, y2 [,tlen]
+
+   y1 : world y-coordinates of top end of the error bars.
+   y2 : world y-coordinates of bottom end of the error bars.
+*/
+static VALUE
+  rb_pgplot_pgerry( int argc, VALUE *argv, VALUE self )
+{
+  rb_pgplot_errorbar( argc, argv, 2, 0 );
+  return Qtrue;
+}
+
+
+static float *
+  rb_pgplot_transform( VALUE val_tr )
+{
+  static float tr_default[6] = {0.0, 1.0, 0.0, 0.0, 0.0, 1.0};
+  static float tr[6] = {0.0, 1.0, 0.0, 0.0, 0.0, 1.0};
+  VALUE na_tr;
+
+  /* Transform */
+  if (val_tr!=Qnil) {
+    na_tr = rb_pgplot_fltary( val_tr );
+    if (NA_TOTAL(na_tr) != 6)
+      rb_raise(rb_eArgError, "TR argument must be 6-elm (N)Array");
+    MEMCPY(tr, NA_PTR_FLT(na_tr), float, 6);
+    return tr;
+  } else {
+    return tr_default;
+  }
+}
+
+static void
+  rb_pgplot_find_range(VALUE na, VALUE vrange, float range[])
+{
+  /* if Range class is set, extrant begin&end */
+  if (vrange!=Qnil) {
+    range[0] = NUM2DBL(rb_ivar_get(vrange, id_beg));
+    range[1] = NUM2DBL(rb_ivar_get(vrange, id_end));
+  } else {
+  /* if Range is not set, search min&max of array */
+    rb_pgplot_minmax(na,range);
+  }
+}
+
+/* contour routine collection */
+static void
+  rb_pgplot_contour( int argc, VALUE *argv, int callid )
+{
+  VALUE vmap, vtr, vcont, vblank, vtmp;
+  VALUE na_map, na_cont;
+  float blank=0, *tr;
+
+  rb_scan_args(argc, argv, "22", &vmap, &vcont, &vtr, &vblank );
+
+  if (callid==2) { /* for PGCONB */
+    /* Exchange */
+    vtmp=vblank; vblank=vtr; vtr=vtmp;
+    /* Blanking */
+    if (vblank!=Qnil) blank=NUM2DBL(vblank);
+  }
+
+  /* Map Data */
+  na_map = rb_pgplot_fltary( vmap );
+  if (NA_RANK(na_map) != 2)
+    rb_raise(rb_eArgError, "Image must be 2-D (N)Array");
+  /* Contour levels */
+  na_cont = rb_pgplot_fltary( vcont );
+
+  /* Transform */
+  tr = rb_pgplot_transform( vtr );
+  /* Show Contour */
+  if (callid==1)
+    cpgcons( NA_PTR_FLT(na_map), NA_SHAPE0(na_map), NA_SHAPE1(na_map),
+	     1, NA_SHAPE0(na_map), 1, NA_SHAPE1(na_map),
+	     NA_PTR_FLT(na_cont), NA_TOTAL(na_cont), tr );
+  else if (callid==2)
+    cpgconb( NA_PTR_FLT(na_map), NA_SHAPE0(na_map), NA_SHAPE1(na_map),
+	     1, NA_SHAPE0(na_map), 1, NA_SHAPE1(na_map),
+	     NA_PTR_FLT(na_cont), NA_TOTAL(na_cont), tr, blank );
+  else
+    cpgcont( NA_PTR_FLT(na_map), NA_SHAPE0(na_map), NA_SHAPE1(na_map),
+	     1, NA_SHAPE0(na_map), 1, NA_SHAPE1(na_map),
+	     NA_PTR_FLT(na_cont), NA_TOTAL(na_cont), tr );
+}
+
+/* PGCONT -- contour map of a 2D data array (contour-following)
+   pgcont, map, cont [,tr]
+   map   : 2-D array of map data
+   cont  : array of contour levels
+   tr    : transformation matrix between array grid and world coordinates.
+*/
+static VALUE
+  rb_pgplot_pgcont( int argc, VALUE *argv, VALUE self )
+{
+  rb_pgplot_contour( argc, argv, 0 );
+  return Qtrue;
+}
+/* PGCONS -- contour map of a 2D data array (fast algorithm)
+   pgcons, map, cont [,tr]
+   map   : 2-D array of map data
+   cont  : array of contour levels
+   tr    : transformation matrix
+*/
+static VALUE
+  rb_pgplot_pgcons( int argc, VALUE *argv, VALUE self )
+{
+  rb_pgplot_contour( argc, argv, 1 );
+  return Qtrue;
+}
+/* PGCONB -- contour map of a 2D data array, with blanking
+   pgconb, map, cont [, blank, tr]
+   map   : 2-D array of map data
+   cont  : array of contour levels
+   tr    : transformation matrix
+   blank : elements of array A that are equal to this value are blanked.
+*/
+static VALUE
+  rb_pgplot_pgconb( int argc, VALUE *argv, VALUE self )
+{
+  rb_pgplot_contour( argc, argv, 2 );
+  return Qtrue;
+}
+
+/* PGCONF -- fill between two contours
+   pgconf, map, cont_range [,tr]
+   map        : 2-D array of map data
+   cont_range : range of two contour levels
+   tr         : transformation matrix
+*/
+static VALUE
+  rb_pgplot_pgconf( int argc, VALUE *argv, VALUE self )
+{
+  VALUE vmap, vtr, vcont;
+  VALUE na_map;
+  float crange[2], *tr;
+
+  rb_scan_args(argc, argv, "21", &vmap, &vcont, &vtr );
+
+  /* Map Data */
+  na_map = rb_pgplot_fltary( vmap );
+  if (NA_RANK(na_map) != 2)
+    rb_raise(rb_eArgError, "Image must be 2-D (N)Array");
+  /* Contour range */
+  rb_pgplot_find_range( na_map, vcont, crange );
+  /* Transform */
+  tr = rb_pgplot_transform( vtr );
+  /* Show Contour */
+  cpgconf( NA_PTR_FLT(na_map), NA_SHAPE0(na_map), NA_SHAPE1(na_map),
+	   1, NA_SHAPE0(na_map), 1, NA_SHAPE1(na_map),
+	   crange[0], crange[1], tr );
+  return Qtrue;
+}
+
+/* PGCONL -- label contour map of a 2D data array 
+   pgconl, map, cont, label [,intval, minint, tr]
+   map    : 2-D array of map data 
+   cont   : contour level tobe labeld
+   label  : label string
+   intval : spacing along the contour between labels, in grid cells.
+   minint : contours that cross less than MININT cells will not be labelled.
+   tr     : transformation matrix
+*/
+static VALUE
+  rb_pgplot_pgconl( int argc, VALUE *argv, VALUE self )
+{
+  VALUE vmap, vcnt, vlab, vint, vmin, vtr;
+  VALUE na_map;
+  float *tr;
+  int intval=20, minint=10; /* recomended default */
+
+  rb_scan_args(argc, argv, "33", &vmap,&vcnt,&vlab,&vint,&vmin,&vtr );
+
+  /* Map Data */
+  na_map = rb_pgplot_fltary( vmap );
+  if (NA_RANK(na_map) != 2)
+    rb_raise(rb_eArgError, "Image must be 2-D (N)Array");
+  /* spacing of labels */
+  if (vint!=Qnil) intval = NUM2INT(vint);
+  if (vmin!=Qnil) minint = NUM2INT(vmin);
+  /* Transform */
+  tr = rb_pgplot_transform( vtr );
+  /* Show Contour */
+  cpgconl( NA_PTR_FLT(na_map), NA_SHAPE0(na_map), NA_SHAPE1(na_map),
+	   1, NA_SHAPE0(na_map), 1, NA_SHAPE1(na_map),
+	   NUM2DBL(vcnt), tr, STR2CSTR(vlab), intval, minint);
+  return Qtrue;
+}
+
+
+/* PGVECT -- vector map of a 2D data array, with blanking
+   pgvect, x, y [, scale, pos, tr, blank ]
+
+   x     : horizontal component data array.
+   y     : vertical component data array.
+   scale : scale factor for vector lengths, if 0.0, C will be
+           set so that the longest vector is equal to the
+           smaller of TR(2)+TR(3) and TR(5)+TR(6).
+   pos   : vector positioning code.
+           <0 vector head positioned on coordinates
+           >0 vector base positioned on coordinates
+           =0 vector centered on the coordinates
+   tr    : transformation matrix
+   blank : elements of arrays A or B that are exactly equal to
+           this value are ignored (blanked).
+*/
+static VALUE
+  rb_pgplot_pgvect( int argc, VALUE *argv, VALUE self )
+{
+  VALUE vx,vy,vscl,vpos,vtr,vblank;
+  VALUE na_x, na_y;
+  int pos=0;
+  float scale=0, blank=0, *tr;
+
+  rb_scan_args(argc, argv, "24", &vx,&vy,&vscl,&vpos,&vtr,&vblank);
+
+  /* Vector Data */
+  na_x = rb_pgplot_fltary( vx );
+  na_y = rb_pgplot_fltary( vy );
+  if (NA_RANK(na_x) != 2 || NA_RANK(na_y) != 2 )
+    rb_raise(rb_eArgError, "Vector arrays must be 2-D (N)Array");
+  if (NA_SHAPE0(na_x) != NA_SHAPE0(na_y) || NA_SHAPE1(na_x) != NA_SHAPE1(na_y) )
+    rb_raise(rb_eArgError, "Vector array sizes must be same");
+  /* Options */
+  if (vscl!=Qnil) scale = NUM2DBL(vscl);
+  if (vpos!=Qnil) pos = NUM2INT(vpos);
+  if (vblank!=Qnil) blank = NUM2DBL(vblank);
+  /* Transform */
+  tr = rb_pgplot_transform( vtr );
+  /* Show Contour */
+  cpgvect( NA_PTR_FLT(na_x), NA_PTR_FLT(na_y),
+	   NA_SHAPE0(na_x), NA_SHAPE1(na_x),
+	   1, NA_SHAPE0(na_x), 1, NA_SHAPE1(na_x),
+	   scale, pos, tr, blank );
+  return Qtrue;
+}
+
+/*
+static void
+  rb_pgplot_palett()
+{
+  float gl[2]={0.,1.};
+  float gr[2]={0.,1.};
+  float gg[2]={0.,1.};
+  float gb[2]={0.,1.};
+  float contra=1.0, bright=0.5;
+  cpgctab(gl, gr, gg, gb, 2, contra, bright);
+}
+*/
+
+/* collection of PGIMAG and PGGRAY
+*/
+static VALUE
+  rb_pgplot_mapimage( int argc, VALUE *argv, VALUE self, int callid )
+{
+  VALUE vimage, vtr, vrange;
+  VALUE na;
+  float range[2], *tr;
+
+  rb_scan_args(argc,argv, "12", &vimage, &vrange, &vtr );
+
+  /* Image */
+  na = rb_pgplot_fltary( vimage );
+  if (NA_RANK(na) != 2)
+    rb_raise(rb_eArgError, "Image must be 2-D (N)Array");
+  /* Transform */
+  tr = rb_pgplot_transform( vtr );
+  /* Range */
+  rb_pgplot_find_range(na, vrange, range);
+  /* Show Image */
+  /*rb_pgplot_palett();*/
+  if (callid==0)
+    cpgimag( NA_PTR_FLT(na), NA_SHAPE0(na), NA_SHAPE1(na),
+	     1, NA_SHAPE0(na), 1, NA_SHAPE1(na),
+	     range[0], range[1], tr );
+  else
+    cpggray( NA_PTR_FLT(na), NA_SHAPE0(na), NA_SHAPE1(na),
+	     1, NA_SHAPE0(na), 1, NA_SHAPE1(na),
+	     range[0], range[1], tr );    
+  return Qtrue;
+}
+
+
+/* PGIMAG -- color image from a 2D data array
+   pgimag, array [,range ,tr]
+   range : range of array value to be drawn
+   TR    : transformation matrix.
+*/
+static VALUE
+  rb_pgplot_pgimag( int argc, VALUE *argv, VALUE self )
+{
+  rb_pgplot_mapimage( argc, argv, self, 0 );
+  return Qtrue;
+}
+/* PGGRAY -- gray-scale map of a 2D data array
+   pggray, array [, range, tr]
+   range : range of array value to be drawn
+   TR    : transformation matrix.
+*/
+static VALUE
+  rb_pgplot_pggray( int argc, VALUE *argv, VALUE self )
+{
+  rb_pgplot_mapimage( argc, argv, self, 1 );
+  return Qtrue;
+}
+
+/* PGCTAB -- install the color table to be used by PGIMAG
+   pgctab, l,r,g,b [,contra,bright]
+   l       : An array of NC normalized ramp-intensity levels
+             corresponding to the RGB primary color intensities
+             in R(),G(),B(). Colors on the ramp are linearly
+             interpolated from neighbouring levels.
+             Levels must be sorted in increasing order.
+              0.0 places a color at the beginning of the ramp.
+              1.0 places a color at the end of the ramp.
+             Colors outside these limits are legal, but will
+             not be visible if CONTRA=1.0 and BRIGHT=0.5.
+   r,g,b   : array of normalized red,green,blue intensities.
+   contra  : The contrast of the color ramp (normally 1.0).
+             Negative values reverse the direction of the ramp.
+   bright  : The brightness of the color ramp. This is normally 0.5
+             but can sensibly hold any value between 0.0 and 1.0.
+*/
+
+static VALUE
+  rb_pgplot_pgctab( int argc, VALUE *argv, VALUE self )
+{
+  VALUE vl, vr, vg, vb, vcnt, vbrt;
+  VALUE l, r, g, b;
+  float contra=1.0, bright=0.5;
+  int n;
+
+  rb_scan_args(argc,argv, "42", &vl,&vr,&vg,&vb,&vcnt,&vbrt);
+
+  l = rb_pgplot_fltary( vl );
+  r = rb_pgplot_fltary( vr );
+  g = rb_pgplot_fltary( vg );
+  b = rb_pgplot_fltary( vb );
+
+  /* Optional Args */
+  if (vcnt!=Qnil) contra = NUM2INT(vcnt);
+  if (vbrt!=Qnil) bright = NUM2INT(vbrt);
+
+  n = min(NA_TOTAL(l),NA_TOTAL(r));
+  n = min(NA_TOTAL(g),n);
+  n = min(NA_TOTAL(b),n);
+  cpgctab( NA_PTR_FLT(l), NA_PTR_FLT(r), NA_PTR_FLT(g), NA_PTR_FLT(b),
+	   n, contra, bright);
+  return Qtrue;
+}
+
+
+/* PGWEDG -- annotate an image plot with a wedge
+   pgwedg side, disp, width, fg, bg, label
+   side : The first character must be one of the characters
+          'B', 'L', 'T', or 'R' signifying the Bottom, Left,
+	  Top, or Right edge of the viewport.
+	  The second character should be 'I' to use PGIMAG
+	  to draw the wedge, or 'G' to use PGGRAY.
+   disp : the displacement of the wedge from the specified
+	  edge of the viewport, measured outwards from the
+	  viewport in units of the character height. Use a
+	  negative value to write inside the viewport, a
+	  positive value to write outside.
+   width : The total width of the wedge including annotation,
+          in units of the character height.
+   fg   : The value which is to appear with shade
+	  1 ("foreground"). Use the values of FG and BG
+          that were supplied to PGGRAY or PGIMAG.
+   bg   : the value which is to appear with shade
+                   0 ("background").
+   label : Optional units label.
+*/
+
+
+/*
+  PGPIXL -- draw pixels
+  pgpixl, array [,x1,x2,y1,y2]
+
+  x1, y1 : world coordinates of one corner of the output region
+  x2, y2 : world coordinates of the opposite corner of the output region
+*/
+
+static VALUE
+  rb_pgplot_pgpixl( int argc, VALUE *argv, VALUE self )
+{
+  VALUE na;
+  float x1, x2, y1, y2;
+
+  if (argc<1)
+    rb_raise(rb_eArgError, "wrong # of arguments (%d for 1 or 5)", argc);
+  na = rb_pgplot_intary(argv[0]);
+
+  if (NA_RANK(na) != 2)
+    rb_raise(rb_eArgError, "Image must be 2-D (N)Array");
+
+  if (argc==5) {
+    x1 = NUM2DBL(argv[1]);
+    x2 = NUM2DBL(argv[2]);
+    y1 = NUM2DBL(argv[3]);
+    y2 = NUM2DBL(argv[4]);
+  } else if (argc==1) {
+    x1 = 0;
+    x2 = NA_SHAPE0(na);
+    y1 = 0;
+    y2 = NA_SHAPE1(na);
+  } else
+    rb_raise(rb_eArgError, "wrong # of arguments (%d for 1 or 5)", argc);
+
+  cpgpixl( NA_PTR_INT(na), NA_SHAPE0(na), NA_SHAPE1(na),
+	   1, NA_SHAPE0(na), 1, NA_SHAPE1(na),
+	   x1, x2, y1, y2 );
+  return Qtrue;
+}
+
+
+
+/* PGQINF -- inquire PGPLOT general information
+   value = pgqinf item
+   item  : character string defining the information
+   value : character string containing the requested information.
+*/
+static VALUE
+  rb_pgplot_pgqinf( VALUE obj, VALUE vitem )
+{
+  int   value_len=20;
+  char *item, *value;
+
+  item  = STR2CSTR(vitem);
+  value = ALLOCA_N(char,value_len);
+  cpgqinf( item, value, &value_len );
+
+  return rb_str_new(value,value_len);
+}
+
+/* PGQDT -- inquire name of nth available device type
+   type, descr, inter = pgqdt [,ndev]
+   ndev  : the number of the device type (1..maximum).
+   type  : receives the character device-type code of the
+           Nth device type.
+   descr : receives a description of the device type.
+   inter : receives 1 if the device type is an interactive
+           one, 0 otherwise.
+*/
+static VALUE
+  rb_pgplot_pgqdt( int argc, VALUE *argv, VALUE self )
+{
+  VALUE vdev;
+  int   ndev=1, type_len=9, descr_len=65, inter;
+  char *type, *descr;
+
+  type  = ALLOCA_N(char,type_len);
+  descr = ALLOCA_N(char,descr_len);
+  rb_scan_args(argc, argv, "01", &vdev);
+  if (vdev!=Qnil) ndev = NUM2INT(vdev);
+  cpgqdt( ndev, type, &type_len, descr, &descr_len, &inter );
+
+  return rb_ary_new3( 3, rb_str_new(type,type_len),
+		      rb_str_new(descr,descr_len),
+		      INT2NUM(inter) );
+}
+
+
+/* PGQTXT -- find bounding box of text string
+   xbox, ybox = pgqtxt(x,y,angle,fjust,text)
+*/
+static VALUE
+  rb_pgplot_pgqtxt(VALUE obj, VALUE x, VALUE y,
+		   VALUE ang, VALUE fjust, VALUE text)
+{
+  VALUE vx,vy;
+  int i;
+  float xbox[4], ybox[4];
+  char *txt = STR2CSTR(text);
+
+  cpgqtxt( NUM2DBL(x),NUM2DBL(y),NUM2DBL(ang),NUM2DBL(fjust),txt,
+	   xbox, ybox );
+  vx = rb_ary_new2(4);
+  vy = rb_ary_new2(4);
+  for (i=0;i<4;i++) {
+    rb_ary_push(vx, rb_float_new(xbox[i]));
+    rb_ary_push(vy, rb_float_new(ybox[i]));
+  }
+  return rb_ary_new3(2,vx,vy);
+}
+
+
+/* Construct PgCursor-class instance */
+static void pgcursor_init(VALUE obj, VALUE x, VALUE y, VALUE ch)
+{
+  rb_ivar_set(obj, id_x, x);
+  rb_ivar_set(obj, id_y, y);
+  rb_ivar_set(obj, id_char, ch);
+}
+
+static VALUE pgcursor_initialize(int argc, VALUE *argv, VALUE obj)
+{
+  VALUE x, y, ch;
+
+  rb_scan_args(argc,argv, "21", &x,&y,&ch);
+  pgcursor_init(obj,x,y,ch);
+  return Qnil;
+}
+
+static VALUE pgcursor_new(VALUE x, VALUE y, VALUE ch)
+{
+  VALUE obj;
+
+  obj = rb_obj_alloc(cPgCursor);
+  pgcursor_init(obj,x,y,ch);
+  return obj;
+}
+
+static VALUE pgcursor_to_ary(VALUE obj)
+{
+  return rb_ary_new3( 3, rb_ivar_get(obj, id_x),
+		         rb_ivar_get(obj, id_y),
+		         rb_ivar_get(obj, id_char) );
+}
+
+
+/*
+  PGCURS -- read cursor position
+  result = pgcurs([x,y])
+
+  PgCursorError is raised if some error occurs.
+
+  result : instance of PgCursor-class.  Attrs are;
+  x    : the world x-coordinate of the cursor.
+  y    : the world y-coordinate of the cursor.
+  char : the character typed by the user;
+	 nil if the device has no cursor or if some other error occurs.
+*/
+static VALUE
+  rb_pgplot_pgcurs( int argc, VALUE *argv, VALUE self )
+{
+  float x, y, x2, y2;
+  char  ch[2] = " ";
+
+  switch (argc) {
+  case 0:
+    cpgqwin(&x,&x2,&y,&y2);
+    x = (x+x2)/2;
+    y = (y+y2)/2;
+    break;
+  case 2:
+    x = NUM2DBL(argv[0]);
+    y = NUM2DBL(argv[1]);
+    break;
+  default:
+    rb_raise(rb_eArgError, "wrong # of arguments (%d for 0 or 2)", argc);
+  }
+
+  if (!cpgcurs(&x, &y, ch))
+    rb_raise(ePgCursorError, "failure in getting cursor position");
+
+  return pgcursor_new( rb_float_new(x), rb_float_new(y),
+		       (ch==0) ? Qnil : rb_str_new(ch,1) );
+}
+
+/*
+  PGBAND -- read cursor position, with anchor
+  result = pgband( mode, [xref, yref, [x, y, [posn]]] )
+
+  PgCursorError is raised if some error occurs.
+
+  result : instance of PgCursor-class.  see pgcurs.
+*/
+static VALUE
+  rb_pgplot_pgband( int argc, VALUE *argv, VALUE self )
+{
+  int   mode=0, posn=0;
+  float x, y, xr, yr;
+  char  ch[2] = " ";
+
+  if (argc<5) {
+    cpgqwin(&x,&xr,&y,&yr);
+    xr = x = (x+xr)/2;
+    yr = y = (y+yr)/2;
+  }
+  switch (argc) {
+  case 6:
+    if (RTEST(argv[5])) {
+      if (argv[5]==Qtrue)
+	posn = 1;
+      else
+	posn = NUM2INT(argv[5]);
+    }
+  case 5:
+    x  = NUM2DBL(argv[3]);
+    y  = NUM2DBL(argv[4]);
+  case 3:
+    xr = NUM2DBL(argv[1]);
+    yr = NUM2DBL(argv[2]);
+  case 1:
+    mode = NUM2INT(argv[0]);
+    break;
+  default:
+    rb_raise(rb_eArgError, "wrong # of arguments (%d for 1/3/5)", argc);
+  }
+
+  if (!cpgband(mode, posn, xr, yr, &x, &y, ch))
+    rb_raise(ePgCursorError, "failure in getting cursor position");
+
+  return pgcursor_new( rb_float_new(x), rb_float_new(y),
+		       (ch==0) ? Qnil : rb_str_new(ch,1) );
+}
+
+
+/*
+  PGOLIN -- mark a set of points using the cursor
+  result = pgolin( x, y, [sym, [npt]] )
+
+  x   : NArray.sfloat of x-coordinates.
+  y   : NArray.sfloat of y-coordinates.
+  sym : code number of symbol to use for marking entered points (see PGPT).
+  npt : number of points entered; should be zero on first call.
+
+  result: number of points entered.
+*/
+static VALUE
+  rb_pgplot_pgolin( int argc, VALUE *argv, VALUE self )
+{
+  VALUE x, y, vsym, vnpt;
+  int sym=0, npt=0;
+
+  rb_scan_args(argc,argv, "22", &x,&y,&vsym,&vnpt);
+  if (vsym!=Qnil) sym = NUM2INT(vsym);
+  if (vnpt!=Qnil) npt = NUM2INT(vnpt);
+
+  if (NA_TYPE(x)!=NA_SFLOAT || NA_TYPE(y)!=NA_SFLOAT)
+    rb_raise(rb_eArgError, "Array must NArray.sfloat");
+
+  cpgolin( min(NA_TOTAL(x),NA_TOTAL(y)), &npt, 
+	   NA_PTR_FLT(x), NA_PTR_FLT(y), sym );
+
+  return INT2NUM(npt);
+}
+
+/*
+  PGNCUR -- mark a set of points using the cursor
+  result = pgncur( x, y, [sym, [npt]] )
+
+  x   : NArray.sfloat of x-coordinates.
+  y   : NArray.sfloat of y-coordinates.
+  sym : code number of symbol to use for marking entered points (see PGPT).
+  npt : number of points entered; should be zero on first call.
+
+  result: number of points entered.
+*/
+static VALUE
+  rb_pgplot_pgncur( int argc, VALUE *argv, VALUE self )
+{
+  VALUE x, y, vsym, vnpt;
+  int sym=0, npt=0;
+
+  rb_scan_args(argc,argv, "22", &x,&y,&vsym,&vnpt);
+  if (vsym!=Qnil) sym = NUM2INT(vsym);
+  if (vnpt!=Qnil) npt = NUM2INT(vnpt);
+
+  if (NA_TYPE(x)!=NA_SFLOAT || NA_TYPE(y)!=NA_SFLOAT)
+    rb_raise(rb_eArgError, "Array must NArray.sfloat");
+
+  cpgncur( min(NA_TOTAL(x),NA_TOTAL(y)), &npt, 
+	   NA_PTR_FLT(x), NA_PTR_FLT(y), sym );
+
+  return INT2NUM(npt);
+}
+
+/*
+  PGLCUR -- PGLCUR -- draw a line using the cursor
+  result = pglcur( x, y, [npt] )
+
+  x   : NArray.sfloat of x-coordinates.
+  y   : NArray.sfloat of y-coordinates.
+  npt : number of points entered; should be zero on first call.
+
+  result: number of points entered.
+*/
+static VALUE
+  rb_pgplot_pglcur( int argc, VALUE *argv, VALUE self )
+{
+  VALUE x, y, vnpt;
+  int npt=0;
+
+  rb_scan_args(argc,argv, "21", &x,&y,&vnpt);
+  if (vnpt!=Qnil) npt = NUM2INT(vnpt);
+
+  if (NA_TYPE(x)!=NA_SFLOAT || NA_TYPE(y)!=NA_SFLOAT)
+    rb_raise(rb_eArgError, "Array must NArray.sfloat");
+
+  cpglcur( min(NA_TOTAL(x),NA_TOTAL(y)), &npt, 
+	   NA_PTR_FLT(x), NA_PTR_FLT(y) );
+
+  return INT2NUM(npt);
+}
+
+
+void rb_scan_kw_args __((VALUE, ...));
+
+/* PGTICK -- draw a single tick mark on an axis
+   pgtick( x1, y1, x2, y2, v, [str], {"tickl", "tickr", "disp", "orient"})
+
+   Example:
+   pgtick( 0,0,0,1, 0.5, "half", "tickr"=>1, "disp"=>2, "orient"=>90 )
+
+    Draw and label single tick mark on a graph axis. The tick mark is
+    a short line perpendicular to the direction of the axis (which is not
+    drawn by this routine). The optional text label is drawn with its
+    baseline parallel to the axis and reading in the same direction as
+    the axis (from point 1 to point 2). Current line and text attributes
+    are used.
+   
+    Arguments:
+     X1, Y1  : world coordinates of one endpoint of the axis.
+     X2, Y2  : world coordinates of the other endpoint of the axis.
+     V       : draw the tick mark at fraction V (0<=V<=1) along
+   	       the line from (X1,Y1) to (X2,Y2).
+     STR     : text of label (may be blank).
+    Keyword Arguments:
+     TICKL   : length of tick mark drawn to left of axis
+   	       (as seen looking from first endpoint to second), in
+   	       units of the character height.
+     TICKR   : length of major tick marks drawn to right of axis,
+   	       in units of the character height.
+     DISP    : displacement of label text to
+   	       right of axis, in units of the character height.
+     ORIENT  : orientation of label text, in degrees; angle between
+   	       baseline of text and direction of axis (0-360 deg)
+*/
+
+static VALUE
+  rb_pgplot_pgtick( int argc, VALUE *argv, VALUE self )
+{
+  char *str="";
+  VALUE val=Qnil;
+  VALUE x1, y1, x2, y2, v, vstr;
+  VALUE tickl, tickr, disp, orient;
+
+  if (argc>0 && TYPE(argv[argc-1]) == T_HASH)
+    val = argv[--argc];
+  rb_scan_kw_args( val, "tickl", &tickl, "tickr", &tickr,
+		   "disp", &disp, "orient", &orient, 0);
+  rb_scan_args(argc,argv, "51", &x1,&y1, &x2,&y2, &v, &vstr);
+
+  if (tickl ==Qnil)  tickl = INT2FIX(0);
+  if (tickr ==Qnil)  tickr = INT2FIX(0);
+  if (disp  ==Qnil)  disp  = INT2FIX(1);
+  if (orient==Qnil)  orient= INT2FIX(0);
+  if (vstr  !=Qnil)  str   = STR2CSTR(vstr);
+
+  cpgtick( NUM2DBL(x1),NUM2DBL(y1),NUM2DBL(x2),NUM2DBL(y2),
+	   NUM2DBL(v), NUM2DBL(tickl),NUM2DBL(tickr),
+	   NUM2DBL(disp), NUM2DBL(orient), str );
+  return Qnil;
+}
+
+
+/*
+  PGAXIS -- draw an axis
+
+  pgaxis( x1, y1, x2, y2, v1, v2,
+          {opt, step, nsub, tickl, tickr, frac, disp, orient} )
+  Example:
+   pgaxis( 1, 1, 9, 5, 0, 3, "tickl"=>1, "opt"=>"NL2" )
+
+    Draw a labelled graph axis from world-coordinate position (X1,Y1) to
+    (X2,Y2).
+   
+    Normally, this routine draws a standard LINEAR axis with equal
+    subdivisions.   The quantity described by the axis runs from V1 to V2;
+    this may be, but need not be, the same as X or Y. 
+   
+    If the 'L' option is specified, the routine draws a LOGARITHMIC axis.
+    In this case, the quantity described by the axis runs from 10**V1 to
+    10**V2. A logarithmic axis always has major, labeled, tick marks 
+    spaced by one or more decades. If the major tick marks are spaced
+    by one decade (as specified by the STEP argument), then minor
+    tick marks are placed at 2, 3, .., 9 times each power of 10;
+    otherwise minor tick marks are spaced by one decade. If the axis
+    spans less than two decades, numeric labels are placed at 1, 2, and
+    5 times each power of ten.
+   
+    If the axis spans less than one decade, or if it spans many decades,
+    it is preferable to use a linear axis labeled with the logarithm of
+    the quantity of interest.
+   
+    Arguments:
+     x1, y1  : world coordinates of one endpoint of the axis.
+     x2, y2  : world coordinates of the other endpoint of the axis.
+     v1      : axis value at first endpoint.
+     v2      : axis value at second endpoint.
+
+    Keyword Argnuments:
+     opt     : a string containing single-letter codes for
+ 	       various options. The options currently
+ 	       recognized are:
+ 	       L : draw a logarithmic axis
+ 	       N : write numeric labels
+ 	       1 : force decimal labelling, instead of automatic
+ 	    	   choice (see PGNUMB).
+ 	       2 : force exponential labelling, instead of
+ 	    	   automatic.
+     step    : major tick marks are drawn at axis value 0.0 plus
+ 	       or minus integer multiples of STEP. If STEP=0.0,
+ 	       a value is chosen automatically.
+     nsub    : minor tick marks are drawn to divide the major
+ 	       divisions into NSUB equal subdivisions (ignored if
+ 	       STEP=0.0). If NSUB <= 1, no minor tick marks are
+ 	       drawn. NSUB is ignored for a logarithmic axis.
+     tickl   : length of major tick marks drawn to left of axis
+ 	       (as seen looking from first endpoint to second), in
+ 	       units of the character height.
+     tickr   : length of major tick marks drawn to right of axis,
+ 	       in units of the character height.
+     frac    : length of minor tick marks, as fraction of major.
+     disp    : displacement of baseline of tick labels to
+ 	       right of axis, in units of the character height.
+     orient  : orientation of label text, in degrees; angle between
+ 		       baseline of text and direction of axis (0-360
+*/
+
+static VALUE
+  rb_pgplot_pgaxis( int argc, VALUE *argv, VALUE self )
+{
+  char *opt="";
+  float frac=0.5;
+  VALUE val=Qnil;
+  VALUE x1, y1, x2, y2, v1, v2;
+  VALUE vopt, step, nsub, tickl, tickr, vfrac, disp, orient;
+
+  if (argc>0 && TYPE(argv[argc-1]) == T_HASH)
+    val = argv[--argc];
+
+  rb_scan_kw_args( val, 
+		   "opt",&vopt, "step",&step, "nsub",&nsub,
+		   "tickl",&tickl, "tickr",&tickr,
+		   "frac",&vfrac, "disp",&disp, "orient",&orient, 0);
+  rb_scan_args(argc,argv, "60", &x1,&y1, &x2,&y2, &v1,&v2);
+
+  if (step  ==Qnil)  step  = INT2FIX(0);
+  if (nsub  ==Qnil)  nsub  = INT2FIX(0);
+  if (tickl ==Qnil)  tickl = INT2FIX(0);
+  if (tickr ==Qnil)  tickr = INT2FIX(0);
+  if (disp  ==Qnil)  disp  = INT2FIX(1);
+  if (orient==Qnil)  orient= INT2FIX(0);
+  if (vopt  !=Qnil)  opt   = STR2CSTR(vopt);
+  if (vfrac !=Qnil)  frac  = NUM2DBL(vfrac);
+
+  cpgaxis( opt, NUM2DBL(x1),NUM2DBL(y1),NUM2DBL(x2),NUM2DBL(y2),
+	   NUM2DBL(v1),NUM2DBL(v2),NUM2DBL(step),NUM2INT(nsub),
+	   NUM2DBL(tickl),NUM2DBL(tickr), frac,
+	   NUM2DBL(disp), NUM2DBL(orient) );
+  return Qnil;
+}
+
+
+/*--- auto-generated funcs will be placed here ---*/
+
+
+void
+  Init_pgplot()
+{
+  mPgplot = rb_define_module("Pgplot");
+
+  /* The C application programming interface */
+  rb_define_module_function(mPgplot, "pgopen", rb_pgplot_pgopen,-1);
+  rb_define_module_function(mPgplot, "pgbeg",  rb_pgplot_pgbeg, -1);
+  rb_define_module_function(mPgplot, "pgenv",  rb_pgplot_pgenv, -1);
+  rb_define_module_function(mPgplot, "pgask",  rb_pgplot_pgask, -1);
+  rb_define_module_function(mPgplot, "pgline", rb_pgplot_pgline, 2);
+  rb_define_module_function(mPgplot, "pgpoly", rb_pgplot_pgpoly, 2);
+  rb_define_module_function(mPgplot, "pgpt",   rb_pgplot_pgpt,  -1);
+  rb_define_module_function(mPgplot, "pgpnts", rb_pgplot_pgpnts, 3);
+  rb_define_module_function(mPgplot, "pgbin",  rb_pgplot_pgbin, -1);
+  rb_define_module_function(mPgplot, "pghist", rb_pgplot_pghist, -1);
+  rb_define_module_function(mPgplot, "pgerrb", rb_pgplot_pgerrb, -1);
+  rb_define_module_function(mPgplot, "pgerrx", rb_pgplot_pgerrx, -1);
+  rb_define_module_function(mPgplot, "pgerry", rb_pgplot_pgerry, -1);
+  rb_define_module_function(mPgplot, "pgcont", rb_pgplot_pgcont, -1);
+  rb_define_module_function(mPgplot, "pgcons", rb_pgplot_pgcons, -1);
+  rb_define_module_function(mPgplot, "pgconb", rb_pgplot_pgconb, -1);
+  rb_define_module_function(mPgplot, "pgconf", rb_pgplot_pgconf, -1);
+  rb_define_module_function(mPgplot, "pgconl", rb_pgplot_pgconl, -1);
+  rb_define_module_function(mPgplot, "pgvect", rb_pgplot_pgvect, -1);
+  rb_define_module_function(mPgplot, "pgimag", rb_pgplot_pgimag, -1);
+  rb_define_module_function(mPgplot, "pggray", rb_pgplot_pggray, -1);
+  rb_define_module_function(mPgplot, "pgctab", rb_pgplot_pgctab, -1);
+  rb_define_module_function(mPgplot, "pgpixl", rb_pgplot_pgpixl, -1);
+  rb_define_module_function(mPgplot, "pgqinf", rb_pgplot_pgqinf, 1);
+  rb_define_module_function(mPgplot, "pgqdt",  rb_pgplot_pgqdt, -1);
+  rb_define_module_function(mPgplot, "pgqtxt", rb_pgplot_pgqtxt, 5);
+  rb_define_module_function(mPgplot, "pgcurs", rb_pgplot_pgcurs, -1);
+  rb_define_module_function(mPgplot, "pgband", rb_pgplot_pgband, -1);
+  rb_define_module_function(mPgplot, "pgolin", rb_pgplot_pgolin, -1);
+  rb_define_module_function(mPgplot, "pgncur", rb_pgplot_pgncur, -1);
+  rb_define_module_function(mPgplot, "pglcur", rb_pgplot_pglcur, -1);
+  rb_define_module_function(mPgplot, "pgtick", rb_pgplot_pgtick, -1);
+  rb_define_module_function(mPgplot, "pgaxis", rb_pgplot_pgaxis, -1);
+
+  /*--- auto-generated defs will be placed here ---*/
+
+  rb_set_end_proc((void(*)(VALUE))(cpgend), Qnil);
+  id_beg = rb_intern("begin");
+  id_end = rb_intern("end");
+  id_x = rb_intern("@x");
+  id_y = rb_intern("@y");
+  id_char = rb_intern("@char");
+
+  /*--- PgCursor ---*/
+  cPgCursor = rb_define_class_under(mPgplot, "PgCursor", rb_cObject);
+  rb_define_method(cPgCursor, "initialize", pgcursor_initialize, -1);
+  rb_define_method(cPgCursor, "to_ary", pgcursor_to_ary, 0);
+  rb_attr(cPgCursor, rb_intern("x"), 1, 0, Qtrue);
+  rb_attr(cPgCursor, rb_intern("y"), 1, 0, Qtrue);
+  rb_attr(cPgCursor, rb_intern("char"), 1, 0, Qtrue);
+  ePgCursorError = rb_define_class("PgCursorError", rb_eStandardError);
+}

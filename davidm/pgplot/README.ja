@@ -1,0 +1,90 @@
+      Ruby/PGPLOT ver 0.1.3 by Masahiro TANAKA  2006-12-13
+
+= 概要
+
+  * PGPLOTをRubyから使うための拡張ライブラリ。
+
+= 必要なもの
+
+  * PGPLOT ver 5.2.x
+     (http://astro.caltech.edu/~tjp/pgplot/)
+  * PGPLOTのドライバが使うライブラリ (必要に応じて):
+    ** X11ライブラリ
+    ** PNGライブラリ
+    ** GrWinグラフィクスライブラリ for MS-Windows (Cygwinでのみ動作確認)
+     (http://spdg1.sci.shizuoka.ac.jp/grwinlib/)
+  * Ruby ver 1.8.x
+  * NArray ver 0.5.9
+     (http://www.ruby-lang.org/en/raa-list.rhtml?name=NArray)
+
+= インストール方法
+
+  * PGPLOT をインストール
+
+    - FORTRAN77が必要です (gfortranでもOK)。
+    - C言語インタフェースライブラリ(cpgplot)を作成する必要があります。
+
+  * Ruby, NArray をインストール
+
+  * Ruby/PGPLOT をインストール
+
+    - ソースを展開
+
+    - コンパイル・インストール:
+      ruby extconf.rb [オプション(下記参照)]
+      make
+      make site-install
+      (または make install)
+
+    - ruby extconf.rb のオプション:
+       --with-pgplot-include=path : cpgplot.hのディレクトリ。
+       --with-pgplot-lib=path	  : PGPLOTライブラリのディレクトリ。
+       --with-x11-dir=path	  : X11のpath
+       --with-grwin : for using GrWin (cygwin/mingw).
+       --with-sunws : PGPLOTをSun WorkShopのf77を使って
+		      コンパイルした場合。指定しない時はg77。
+     例:
+       ruby extconf.rb --with-x11-dir=/usr/X11R6 \
+	--with-pgplot-include=/usr/local/pgplot \
+	--with-pgplot-lib=/usr/local/pgplot
+
+= 使用方法
+
+  * PGPLOTの環境変数設定(csh)
+
+      setenv PGPLOT_DIR  /usr/local/lib/pgplot/ # pgxwin_server, rgb.txt
+      setenv PGPLOT_FONT ${PGPLOT_DIR}/grfont.dat
+      setenv PGPLOT_DEV  /xwin
+
+  * 拡張ライブラリをロードするには:
+
+      require "pgplot"
+
+  * モジュール名は`Pgplot'です。モジュール名を省略したいときは:
+
+      include Pgplot
+
+  * Pgplotモジュールのメソッドは、PGPLOTの関数と同じ名前(小文字)です。
+    プロットを開始するには:
+
+      pgbeg('/xwin')
+
+    詳細は PGPLOTのマニュアルを参照して下さい。
+    引数は必ずしもFORTRAN版と同じではありません。
+    引数が違う関数のリストは、"FuncUsage"というファイルにあります。
+
+= 動作確認
+
+  * Ruby 1.8.5 (2006-08-25) [i686-linux]
+  * NArray 0.5.9
+  * gcc/gfortran 4.1.1 20060525 (Red Hat 4.1.1-1)
+
+= 配布条件
+
+  Ruby本体と同じです。
+  無保証です。
+
+= 謝辞
+
+  PGPLOTを開発し、Ruby版pgdemoの配布許可を下さった Tim Pearson氏
+  に感謝します。Ruby開発に携わった皆様に感謝します。

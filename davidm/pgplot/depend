@@ -1,0 +1,4 @@
+rb_pgplot.c: rb_pgplot.c.in cogen.rb
+	$(RUBY) cogen.rb
+
+rb_pgplot.o: rb_pgplot.c $(hdrdir)/ruby.h

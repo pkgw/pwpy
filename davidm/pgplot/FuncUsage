@@ -1,0 +1,40 @@
+  stat = pgopen([device])
+  stat = pgbeg([device, [nxsub, [nysub]]])
+
+  pgask  [true|false]
+  pgenv  xmin,xmax,ymin,ymax [,just, axis]
+
+  pgline xarray, yarray
+  pgpt   xarray, yarray [,symbol]
+  pgpnts xarray, yarray, symarray
+
+  pgbin  xarray, yarray [,center]
+  pghist data, nbin [,range, flag]
+
+  pgerrb dir, x, y, err [,tlen]
+  pgerrx x1, x2, y [,tlen]
+  pgerry x, y1, y2 [,tlen]
+
+  pgcont map, cont [,tr]
+  pgcons map, cont [,tr]
+  pgconb map, cont [,blank, tr]
+  pgconf map, cont_range [,tr]
+  pgconl map, cont, label [,intval, minint, tr]
+
+  pgimag array [,range, tr]
+  pggray array [,range, tr]
+  pgctab l, r,g,b [,contra,bright]
+  pgpixl, array [,x1,x2,y1,y2]
+  pgvect x, y [,scale, pos, tr, blank]
+
+  value = pgqinf(item)
+  type, descr, inter = pgqdt([ndev])
+
+  curs = pgband( mode, [ xref, yref, [x, y, [posn]]])
+  n = pgolin( x, y, [sym, [npt]] )
+  n = pgncur( x, y, [sym, [npt]] )
+  n = pglcur( x, y, [npt] )
+
+  pgtick x1, y1, x2, y2, v, [str], {"tickl", "tickr", "disp", "orient"}
+  pgaxis x1, y1, x2, y2, v1, v2,
+         {"opt", "step", "nsub", "tickl", "tickr", "frac", "disp", "orient"}
