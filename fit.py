@@ -183,8 +183,8 @@ class FitBase (object):
         self.x = self.y = self.sigmas = None
     
     def setData (self, x, y, sigmas=None):
-        self.x = _N.asarray (x)
-        self.y = _N.asarray (y)
+        self.x = _N.asarray (x, dtype=_N.float)
+        self.y = _N.asarray (y, dtype=_N.float)
 
         if sigmas is None:
             self.sigmas = None
@@ -327,7 +327,8 @@ class FitBase (object):
         print '%s: %14g' % ('RChiSq'.rjust (lmax), self.rchisq)
         return self
 
-    def plot (self, dlines=True, smoothModel=True, **kwargs):
+    def plot (self, dlines=True, smoothModel=True, xmin=None, xmax=None,
+              ymin=None, ymax=None, **kwargs):
         import omega
 
         if not smoothModel:
@@ -347,7 +348,8 @@ class FitBase (object):
         vb[0] = vb.pData
         vb[0].addXY (modx, mody, 'Model')
         vb[0].setYLabel ('Y')
-        vb[0].nudgeBounds (False, True)
+        vb[0].rebound (False, True)
+        vb[0].setBounds (xmin, xmax, ymin, ymax)
         
         vb[1] = vb.pResid = omega.RectPlot ()
         vb[1].defaultField.xaxis = vb[1].defaultField.xaxis
@@ -356,7 +358,8 @@ class FitBase (object):
         else:
             vb[1].addXY (self.x, self.resids, 'Resid.', lines=False)
         vb[1].setLabels ('X', 'Residuals')
-        vb[1].nudgeBounds (False, True)
+        vb[1].rebound (False, True)
+        vb[1].setBounds (xmin, xmax) # ignore Y values since residuals are on different scale
         
         vb.setWeight (0, 3)
         return vb
@@ -592,7 +595,10 @@ class ConstrainedMinFit (FitBase):
         if not reckless and (o.perror is None):
             raise Exception ('MPFIT failed to find uncerts: %d, %s' % (o.status,
                                                                        o.errmsg))
-        
+
+        if not reckless and _N.any (~_N.isfinite (o.params)):
+            raise Exception ('MPFIT converged on infinite parameters')
+
         # Coerce into arrayness.
         self.params = _N.atleast_1d (o.params)
         self.uncerts = _N.atleast_1d (o.perror)
