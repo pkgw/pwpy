@@ -1,0 +1,50 @@
+#
+# $Id: Rakefile 622 2009-08-17 18:34:10Z davidm $
+#
+
+require 'rubygems'
+require 'rake/gempackagetask'
+
+spec = Gem::Specification.new do |s|
+  # Basics
+  s.name = 'coord'
+  s.version = '0.0.1'
+  s.summary = 'Makes Arrays feel more like algebraic vectors'
+  s.description = s.summary
+  #s.platform = Gem::Platform::Ruby
+  s.required_ruby_version = '>= 1.8.1'
+  #s.add_dependency('narray', '>= 0.5.9')
+
+  # About
+  s.authors = 'David MacMahon'
+  s.email = 'davidm@astro.berkeley.edu'
+  s.homepage = 'http://coord.rubyforge.org/'
+  s.rubyforge_project = 'coord' 
+
+  # Files, Libraries, and Extensions
+  s.files = FileList[
+    'Rakefile',
+    'lib/coord.rb'
+  ]
+  s.require_paths = ['lib']
+  #s.autorequire = nil
+  #s.bindir = 'bin'
+  #s.executables = []
+  #s.default_executable = nil
+
+  # C compilation
+  #s.extensions = %w[ ext/extconf.rb ]
+
+  # Documentation TODO
+  #s.rdoc_options = []
+  s.has_rdoc = true
+  #s.extra_rdoc_files = []
+
+  # Testing TODO
+  #s.test_files = [test/test_coord.rb]
+end
+
+Rake::GemPackageTask.new(spec) do |pkg|
+  pkg.need_zip = true
+  pkg.need_tar = true
+end
