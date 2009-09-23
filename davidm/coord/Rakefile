@@ -9,8 +9,12 @@ spec = Gem::Specification.new do |s|
   # Basics
   s.name = 'coord'
   s.version = '0.0.1'
-  s.summary = 'Makes Arrays feel more like algebraic vectors'
-  s.description = s.summary
+  s.summary = 'Makes Arrays feel more like geometric vectors'
+  s.description = <<-EOD
+  Defines module Coord with methods for manipulation of geometric vectors. The
+  Coord module is included in the Array class, so all methods of Coord are
+  available to instances of Array.
+  EOD
   #s.platform = Gem::Platform::Ruby
   s.required_ruby_version = '>= 1.8.1'
   #s.add_dependency('narray', '>= 0.5.9')
