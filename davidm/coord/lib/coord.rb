@@ -152,6 +152,60 @@ module Coord
       [r*Math.cos(az), r*Math.sin(az), z]
     end
   end
+
+  # Rotates self around axis by +theta+ radians
+  # +axis+ = 0 -> rotate around X axis
+  # +axis+ = 1 -> rotate around Y axis
+  # +axis+ = 2 -> rotate around Z axis
+  def rot(theta, axis)
+    i, j = [0, 1, 2] - [axis]
+    c = Math.cos(theta)
+    s = Math.sin(theta)
+    s = -s if axis == 1
+    a = self[i]*c - self[j]*s
+    b = self[i]*s + self[j]*c
+    r = []
+    r[i] = a
+    r[j] = b
+    r[axis] = self[axis]
+    r
+  end
+
+  # In-pace versino of rot (modifies self)
+  def rot!(theta, axis)
+    self[0,3] = rot(theta, axis)
+  end
+
+  # Rotates self counter-clockwise around X axis by +theta+ radians
+  def rotx(theta)
+    rot(theta, 0)
+  end
+
+  # In-place version of rotx (modifies self)
+  def rotx!(theta)
+    rot!(theta, 0)
+  end
+
+  # Rotates self counter-clockwise around Y axis by +theta+ radians
+  def roty(theta)
+    rot(theta, 1)
+  end
+
+  # In-place version of roty (modifies self)
+  def roty!(theta)
+    rot!(theta, 1)
+  end
+
+  # Rotates self counter-clockwise around Z axis by +theta+ radians
+  def rotz(theta)
+    rot(theta, 2)
+  end
+
+  # In-place version of rotz (modifies self)
+  def rotz!(theta)
+    rot!(theta, 2)
+  end
+
 end
 
 class Array
