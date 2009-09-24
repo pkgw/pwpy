@@ -8,10 +8,11 @@
 # User parameters
 set src=c286  # source name, assuming 3c source
 set freq=1430  # observing frequency
-set point=$1  # suffix for output file name.  originally used to differentiate pointing directions.
+#set point=$1  # suffix for output file name.  originally used to differentiate pointing directions.
 #set point=hp0  # suffix for output file name.  originally used to differentiate pointing directions.
-set root=$2
-set visroot=${root}-3${src}-${point}-${freq} # file name
+set root=mosfxc
+set visroot=${root}-3${src}-${freq} # file name
+#set visroot=${root}-3${src}-${point}-${freq} # file name
 set chans=40  # channels per frequency chunk.  
 #set flux=7.47 # flux of calibrator
 

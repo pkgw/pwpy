@@ -22,7 +22,7 @@ q = numpy.array(f.columns[1])
 u = numpy.array(f.columns[2])
 err = numpy.array(f.columns[3])
 
-pola = numpy.arctan2(q,u)
+pola = 0.5*numpy.arctan2(q,u)
 dpola = numpy.array([pola[i+1]-pola[i] for i in range(len(pola)-1)])
 dlsq = numpy.array([(3e-1/nu[i+1])**2-(3e-1/nu[i])**2 for i in range(len(nu)-1)])
 lsq = numpy.array([3e-1/numpy.mean([nu[i],nu[i+1]])**2 for i in range(len(nu)-1)])
@@ -65,7 +65,7 @@ if len(sys.argv) == 3:
     u = numpy.array(f.columns[2])
     err = numpy.array(f.columns[3])
 
-    pola = numpy.arctan2(q,u)
+    pola = 0.5*numpy.arctan2(q,u)
     dpola = numpy.array([pola[i+1]-pola[i] for i in range(len(pola)-1)])
     dlsq = numpy.array([(3e-1/nu[i+1])**2-(3e-1/nu[i])**2 for i in range(len(nu)-1)])
     lsq = numpy.array([3e-1/numpy.mean([nu[i],nu[i+1]])**2 for i in range(len(nu)-1)])
