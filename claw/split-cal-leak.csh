@@ -16,6 +16,8 @@ set visroot=${root}-3${src}-${freq} # file name
 set chans=40  # channels per frequency chunk.  
 #set flux=7.47 # flux of calibrator
 
+uvaver vis=${visroot} out=${visroot}-tmp interval=0.001 options=nocal,nopass,nopol
+
 # loop over frequency chunks
 foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)
 #foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32)
@@ -24,7 +26,7 @@ foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)
     set startfreq = `echo '100 + '${chans}' * ('${piece}'-1)' | bc`
 
     # reorder data to keep pol data in order expected by other tools.  also split in frequency
-    uvaver vis=${visroot} out=${visroot}-${piece} line=ch,${chans},${startfreq} interval=0.001 options=nocal,nopass,nopol
+    uvaver vis=${visroot}-tmp out=${visroot}-${piece} line=ch,${chans},${startfreq} interval=0.001 options=nocal,nopass,nopol
 
     # these are a few obsolete steps
     #puthd in=${visroot}${piece}/evector value=1.570796
