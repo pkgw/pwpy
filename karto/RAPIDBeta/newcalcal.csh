@@ -733,7 +733,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	else if ((`echo $sflags $linelim $lim | awk '{if ($1 > $2*(nchan^.5)) print "go"; else if ($2 < $3) print "go"}' nchan=$nchan` == "go" || `echo $intcheck $addflux $sysflux | awk '{if ($1/10 > ($2+$3)) print "go"}'` == "go") && $linelim != $linemax) then
 	    echo " "
 	    echo "Flagging complete, continuing cycle $idx of "`echo $#regtimes | awk '{print $1-2}'`"..."
-	    goto jumper
+    goto jumper
 	endif
 	
 	# Gather information on the number of datapoints for each baseline
@@ -1042,6 +1042,33 @@ foreach ipol ($pollist) # Work with only one pol at a time
 
     #Final cycle for a pol, use autoref to find the best ref antenna for the whole dataset
     poljumper:
+    if ($ipol == "xxyy") then
+	if (! `awk '{if ($1 > 0 && $1 <= 1) idx +=1} END {print idx*1}' $wd/xret* $wd/yret*`) then
+	    echo "FATAL ERROR: All data has been culled!"
+	    goto fail
+	endif
+    else if ($ipol == "xx") then
+	if (! `awk '{if ($1 > 0 && $1 <= 1) idx +=1} END {print idx*1}' $wd/xret*`) then
+	    echo "WARNING: All $ipol data has been culled, calibration for that pol has failed. Moving on..."
+	    set pollist = (`echo $pollist | sed "s/$ipol//g"`)
+	    if ("$pollist" == "") then
+		echo "FATAL ERROR: All data has been culled!"
+		goto fail
+	    endif
+	    goto skippol
+	endif
+    else if ($ipol == "yy") then
+	if (! `awk '{if ($1 > 0 && $1 <= 1) idx +=1} END {print idx*1}' $wd/yret*`) then
+	    echo "WARNING: All $ipol data has been culled, calibration for that pol has failed. Moving on..."
+	    set pollist = (`echo $pollist | sed "s/$ipol//g"`)
+	    if ("$pollist" == "") then
+		echo "FATAL ERROR: All data has been culled!"
+		goto fail
+	    endif	
+	    goto skippol
+	endif
+    endif
+
     if ($autoref) then
 	uvplt vis=$wd/tempcal$ipol options=2pass select='-auto' axis=ti,pha device=/null | grep "Baseline" | awk '{print $2,$3,$5}' | tr -d '-' > $wd/refantstat
 	set antstat = 0
@@ -1200,7 +1227,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	rm -rf $wd/sefdcalx $wd/sefdcaly
 	echo "done!"
     endif
-
+    skippol:
     echo "Final cycle complete!"
     echo ""
 end
