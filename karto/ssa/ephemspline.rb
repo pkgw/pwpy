@@ -25,5 +25,5 @@ end
 
 ephemFile = ARGV[0]
 ephemTime = ARGV[1].split(',')
-ephemFit = ephemspline(ephemFile,ephemTime)
-puts ephemFit
+ephemFit = ephemspline(ephemFile,ephemTime).flatten!
+puts "#{ephemFit[0]} #{ephemFit[1]}"
