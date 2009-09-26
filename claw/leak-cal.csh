@@ -1,32 +1,32 @@
-#!/usr/tcsh
-#
+#!/usr/bin/tcsh
 # claw, 19jun09
+#
 # Script to calibrate ATA data with frequency dependent gains and leakages.
 # Also outputs leakages for plotting by 'plotleak-realimag.py', in mmm code repository.
 # Assumes the data is flagged.  Best to flag aggressively and remove any suspect antpols.
 
 # User parameters
-set src=c286  # source name, assuming 3c source
+set src=3c286  # source name, assuming 3c source
 set freq=1430  # observing frequency
 #set point=$1  # suffix for output file name.  originally used to differentiate pointing directions.
 #set point=hp0  # suffix for output file name.  originally used to differentiate pointing directions.
-set root=mosfxc
-set visroot=${root}-3${src}-${freq} # file name
-#set visroot=${root}-3${src}-${point}-${freq} # file name
+set root=mosfxa
+set visroot=${root}-${src}-${freq}-100 # file name
 set chans=40  # channels per frequency chunk.  
-#set flux=7.47 # flux of calibrator
 
-uvaver vis=${visroot} out=${visroot}-tmp interval=0.001 options=nocal,nopass,nopol
+# put data in time, stokes order
+rm -rf tmp-${visroot}-tmp
+uvaver vis=${visroot} out=tmp-${visroot}-tmp interval=0.001 options=nocal,nopass,nopol
 
 # loop over frequency chunks
 foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)
 #foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32)
 
     # define first channel number of frequency chunk
-    set startfreq = `echo '100 + '${chans}' * ('${piece}'-1)' | bc`
+    set startchan = `echo '100 + '${chans}' * ('${piece}'-1)' | bc`
 
     # reorder data to keep pol data in order expected by other tools.  also split in frequency
-    uvaver vis=${visroot}-tmp out=${visroot}-${piece} line=ch,${chans},${startfreq} interval=0.001 options=nocal,nopass,nopol
+    uvaver vis=tmp-${visroot}-tmp out=${visroot}-${piece} line=ch,${chans},${startchan} interval=0.001 options=nocal,nopass,nopol
 
     # these are a few obsolete steps
     #puthd in=${visroot}${piece}/evector value=1.570796
@@ -56,3 +56,6 @@ foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)
     mv tmp2 ${visroot}-leakphase${piece}.txt
     rm -f tmp
 end
+
+# clean up
+rm -rf tmp-${visroot}-tmp
