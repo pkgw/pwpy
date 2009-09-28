@@ -137,7 +137,7 @@ module Coord
 
   # Polar to rectangular conversion.
   # For length < 3, treats self as [r, th] and returns [x, y].
-  # For length <= 3, treats self as [r, az, el] and returns [x, y, y].
+  # For length <= 3, treats self as [r, az, el] and returns [x, y, z].
   def p2r
     if length < 3
       r  = self[0] || 0
@@ -147,9 +147,31 @@ module Coord
       r  = self[0]
       az = self[1]
       el = self[2]
+      rxy = r * Math.cos(el)
+      x = rxy * Math.cos(az)
+      y = rxy * Math.sin(az)
       z = r * Math.sin(el)
-      r *= Math.cos(el)
-      [r*Math.cos(az), r*Math.sin(az), z]
+      [x, y, z]
+    end
+  end
+
+  # Rectangular to polar conversion.
+  # For length < 3, treats self as [x, y] and returns [r, th].
+  # For length <= 3, treats self as [x, y, z] and returns [r, az, el].
+  def r2p
+    if length < 3
+      x = self[0] || 0
+      y = self[1] || 0
+      [Math.hypot(x,y), Math.atan2(y,x)]
+    else
+      x = self[0]
+      y = self[1]
+      z = self[2]
+      rxy = Math.hypot(x,y)
+      az = Math.atan2(y,x)
+      el = Math.atan2(z,rxy)
+      r = Math.hypot(rxy,z)
+      [r, az, el]
     end
   end
 
