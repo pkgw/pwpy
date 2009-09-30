@@ -14,18 +14,26 @@ endif
 set freq = 1430
 set diam = 6
 set imsize = 256
+set nchan = 20
 set boxlo = `echo $imsize'/2 - 10' | bc`
 set boxhi = `echo $imsize'/2 + 10' | bc`
 set imgparams = "sup=0 cell=20 fwhm=200"
+set visall = `ls -df $source-? $source-?? | awk '{printf("%s,",$1)}' ; echo`
 
-#  Make images
+#  clean up
 \rm -fr $source.?{cln,map,cmp}
-\rm -fr $source.?cln.imsub
+\rm -fr $source.?{cln,map,cmp}.imsub
 \rm -fr $source.beam
+\rm -fr $source-?.?{cln,map,cmp}
+\rm -fr $source-?.?{cln,map,cmp}.imsub
+\rm -fr $source-?.beam
+\rm -fr $source-??.?{cln,map,cmp}
+\rm -fr $source-??.?{cln,map,cmp}.imsub
+\rm -fr $source-??.beam
 
 #   Make one map
-invert vis=$source-1 map=$source.imap,$source.qmap,$source.umap,$source.vmap beam=$source.beam imsize=$imsize \
-stokes=i,q,u,v options=mfs,double "select=-shadow($diam)" $imgparams | tail -2
+invert vis=$source-\? map=$source.imap,$source.qmap,$source.umap,$source.vmap beam=$source.beam imsize=$imsize \
+stokes=i,q,u,v options=mfs,double "select=-shadow($diam)" $imgparams
 set rms = `gethd in=$source.imap/rms`
 set icut = `echo "4.5*$rms" | bc -l`
 clean map=$source.imap beam=$source.beam out=$source.icmp niters=1000 cutoff=$icut | tail -2
@@ -92,10 +100,8 @@ else
 endif
 
 #  Make channel maps
-\rm -fr $source-*.?{cln,map,cmp}
-\rm -fr $source-*.?{cln,map,cmp}.imsub
 set n=1
-while ($n <= 20)
+while ($n <= $nchan)
 
   invert vis=$source-$n map=$source-$n.imap,$source-$n.qmap,$source-$n.umap,$source-$n.vmap \
   beam=$source-$n.beam imsize=$imsize "select=-shadow($diam)" $imgparams  \

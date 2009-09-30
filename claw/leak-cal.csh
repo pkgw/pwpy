@@ -6,12 +6,7 @@
 # Assumes the data is flagged.  Best to flag aggressively and remove any suspect antpols.
 
 # User parameters
-set src=3c286  # source name, assuming 3c source
-set freq=1430  # observing frequency
-#set point=$1  # suffix for output file name.  originally used to differentiate pointing directions.
-#set point=hp0  # suffix for output file name.  originally used to differentiate pointing directions.
-set root=mosfxa
-set visroot=${root}-${src}-${freq}-100 # file name
+set visroot=$1
 set chans=40  # channels per frequency chunk.  
 
 # put data in time, stokes order
@@ -19,8 +14,8 @@ rm -rf tmp-${visroot}-tmp
 uvaver vis=${visroot} out=tmp-${visroot}-tmp interval=0.001 options=nocal,nopass,nopol
 
 # loop over frequency chunks
+#foreach piece (1 2 3 4 5 6 7 8)
 foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)
-#foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32)
 
     # define first channel number of frequency chunk
     set startchan = `echo '100 + '${chans}' * ('${piece}'-1)' | bc`

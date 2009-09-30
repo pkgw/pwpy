@@ -22,8 +22,8 @@ rm -rf tmp-${apply}-tmp
 uvaver vis=${apply} out=tmp-${apply}-tmp interval=0.001 options=nocal,nopass,nopol
 
 # loop over frequency chunks
+#foreach piece (1 2 3 4 5 6 7 8)
 foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)
-#foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32)
 
     # define first channel number of frequency chunk
     set startchan = `echo '100 + '${chans}' * ('${piece}'-1)' | bc`

@@ -16,6 +16,7 @@ set srctot = 1002
 
 set filename = log.qu.$id.x
 set b0 = 0
+set shortsource = `echo $source | sed '{s/[a-Z-]*//g}' | cut -c-13`
 
 echo $id
 \rm $filename
@@ -23,7 +24,7 @@ echo $id
 # Get peak position
 set x0 = `histo in=$source.icln | grep 'Maximum value' | sed s/\(/" "/g | sed s/\,/" "/g | awk '{print $5}'`
 set y0 = `histo in=$source.icln | grep 'Maximum value' | sed s/\(/" "/g | sed s/\,/" "/g | awk '{print $6}'`
-set p0 = `histo in=$source.icln | grep 'Maximum value' | awk '{print $3}'`
+set p0 = `histo in=$source.pcln | grep 'Maximum value' | awk '{print $3}'`
 
 set xmin = `echo "$x0-$b0" | bc -l`
 set xmax = `echo "$x0+$b0" | bc -l`
@@ -38,7 +39,7 @@ set rms = `gethd in=$source.vmap/rms`
 
 
 echo $x0 $y0
-echo \#$id $srctot $p0 $rms $source > $filename
+echo $id $srctot $p0 $rms $shortsource > $filename
 
 
 #  Make channel maps
