@@ -16,30 +16,102 @@ set inst1lo = "b"
 set inst2lo = "a"
 set inst1freq = 0
 set inst2freq = 0
-set targetfile
 set inttime = 10
 set npcals = 1
 set nscals = 1
 set necals = 1
-set pcaltime = 60
-set scaltime = 60
-set ecaltime = 60
+set pcaltime = 120
+set scaltime = 120
+set ecaltime = 120
 set sattime = 120
 set ellim = (16.5 88)
-set stoptime
-set targetfile = $1
-set primarycal = (`echo $2 | tr ',' ' '`)
-set secondarycal = (`echo $3 | tr ',' ' '`)
-set extendedcal = (`echo $4 | tr ',' ' '`)
-set stoptime = "$5"
-echo "Stoptime is "`date -d "$stoptime"`"!"
-set stoptime = `date -d "$stoptime" +%s | awk '{print $1*1}'`
-echo "($stoptime UTC seconds)"
+set stoptime = 0
+set targetfile
+set primarycal
+set secondarycal
+set extendedcal
 set noinit = 0
 set genswitch = "`cat ~/bin/genswitch`"
+set pamboost = 28.5
+set bitsel = 11
+set onecycle = 0
+
+if ($#argv == 0) then
+    exit 0
+endif
+
+varassign:
+
+if ("$argv[1]" =~ 'primarycal='*) then
+    set primarycal = (`echo $argv[1] | sed 's/primarycal=//' | tr ',' ' '`)
+    shift argv; if ("$argv" == "") set argv = "finish"
+else if ("$argv[1]" =~ 'secondarycal='*) then
+    set secondarycal = (`echo $argv[1] | sed 's/secondarycal=//' | tr ',' ' '`)
+    shift argv; if ("$argv" == "") set argv = "finish"
+else if ("$argv[1]" =~ 'extendedcal='*) then
+    set extendedcal = (`echo $argv[1] | sed 's/extendedcal=//' | tr ',' ' '`)
+    shift argv; if ("$argv" == "") set argv = "finish"
+else if ("$argv[1]" =~ 'targetfile='*) then
+    set targetfile = `echo $argv[1] | sed 's/targetfile=//'`
+    shift argv; if ("$argv" == "") set argv = "finish"
+else if ("$argv[1]" =~ 'stoptime='*) then
+    set stoptime = "`echo $argv[1] | sed 's/stoptime=//'`"
+    set stoptime = `date -d "$stoptime" +%s | awk '{print $1*1}'`
+    shift argv; if ("$argv" == "") set argv = "finish"
+else if ("$argv[1]" =~ 'sattime='*) then
+    set sattime = `echo $argv[1] | sed 's/sattime=//' | awk '{print int($1*1)}'`
+    if ($sattime <= 0) then
+	echo "FATAL ERROR: Bad sattime parameter"
+	exit 1
+    endif
+    shift argv; if ("$argv" == "") set argv = "finish"
+else if ("$argv[1]" =~ 'pamboost='*) then
+    set pamboost = `echo $argv[1] | sed 's/pamboost=//' | awk '{print $1*1}'`
+    shift argv; if ("$argv" == "") set argv = "finish"
+else if ("$argv[1]" =~ 'bitsel='*) then
+    set bitsel = `echo $argv[1] | sed 's/bitsel=//' | awk '{print int($1*1)}'`
+    if ($bitsel <= 0) then
+	echo "FATAL ERROR: Bad bitsel parameter"
+	exit 1
+    endif
+    shift argv; if ("$argv" == "") set argv = "finish"
+else if ("$argv[1]" =~ 'npcals='*) then
+    set npcals = `echo $argv[1] | sed 's/npcals=//' | awk '{print $1*1}'`
+    shift argv; if ("$argv" == "") set argv = "finish"
+else if ("$argv[1]" =~ 'nscals='*) then
+    set nscals = `echo $argv[1] | sed 's/nscals=//' | awk '{print $1*1}'`
+    shift argv; if ("$argv" == "") set argv = "finish"
+else if ("$argv[1]" =~ 'necals='*) then
+    set necals = `echo $argv[1] | sed 's/necals=//' | awk '{print $1*1}'`
+    shift argv; if ("$argv" == "") set argv = "finish"
+else if ("$argv[1]" =~ 'options='*) then
+    set options = `echo "$argv[1]" | sed 's/options=//g' | tr ',' ' ' | tr '[A-Z]' '[a-z]'`
+    set badopt
+    foreach option (`echo $options`)
+        if ($option == "noinit") then
+	    set noinit = 1
+	else if ($option == "onecycle") then
+	    set onecycle = 1
+        else
+            set badopt = ($badopt $option)
+        endif
+    end
+    if ("$badopt" != "") echo 'options='`echo $badopt | tr ' ' ','`' not recognized!'
+    shift argv; if ("$argv" == "") set argv = "finish"
+else
+    echo "FATAL ERROR: $argv[1] not recognized..."
+    exit 1
+endif
+
+if ("$argv[1]" != "finish") goto varassign
 
 if ($stoptime < `date +%s`) then
     echo "FATAL ERROR: Stoptime has passed!"
+    exit 1
+endif
+
+if ("$targetfile" == "") then
+    echo "FATAL ERROR: No sat list provided!"
     exit 1
 endif
 
@@ -48,10 +120,13 @@ if (! -e $targetfile) then
     exit 1
 endif
 
+echo "($stoptime UTC seconds is stoptime)"
+
 initblock:
 
 echo -n "Collecting antennnas for observing..."
 # Get the antennas and antpols for our observation
+fxconf.rb satake $subarray `slist.csh none`
 set ants = (`fxconf.rb sals | grep $subarray | sed s/$subarray//`)
 set inst1antpols = (`fxconf.rb hookup_tab ${inst1}:${subarray} | awk '{if ($1 == "|") print $8}' | sed 's/\([0-9][a-z][a-z]\)\([a-z][0-9]\)/\1/g'`)
 set inst2antpols = (`fxconf.rb hookup_tab ${inst2}:${subarray} | awk '{if ($1 == "|") print $8}' | sed 's/\([0-9][a-z][a-z]\)\([a-z][0-9]\)/\1/g'`)
@@ -128,6 +203,8 @@ ataephem --notof --utcms --interval 10 sun >> ephem.log
 
 # Start observing the primary calibrators
 primarycalobs:
+pamsboost.csh pams.$subarray 0 > /dev/null
+bitsel.csh 8
 set calcount = 0
 foreach caltarget ($primarycal)
     if ($npcals > $calcount) then
@@ -325,7 +402,17 @@ foreach caltarget ($extendedcal)
 end
 
 # Start observing satellites
+
+if ($onecycle == 2) then
+    goto finish
+else if ($onecycle == 1) then
+    set onecycle = 2
+endif
+
 satobs:
+
+pamsboost.csh pams.$subarray $pamboost > pams.$subarray.prime
+bitsel.csh $bitsel
 set satidx = 1
 while ($satidx <= `wc -l $targetfile | awk '{print $1}'`)
     set vals = (`sed -n ${satidx}p $targetfile`)
@@ -357,10 +444,10 @@ while ($satidx <= `wc -l $targetfile | awk '{print $1}'`)
     frotnear.csh ${inst1}:${subarray} $sat.ephem $inst1freq $PWD start; sleep $inttime &
     frotnear.csh ${inst2}:${subarray} $sat.ephem $inst2freq $PWD start; sleep $inttime &
 
-    if (! -e ssa-$inst1-$caltarget-$inst1freq) then
+    if (! -e ssa-$inst1-$sat-$inst1freq) then
 	echo "sat,ssa-$inst1-$sat-$inst1freq,$inst1,$sat,$inst1freq" >> ssa.manifest
     endif
-    if (! -e ssa-$inst2-$caltarget-$inst2freq) then
+    if (! -e ssa-$inst2-$sat-$inst2freq) then
 	echo "sat,ssa-$inst2-$sat-$inst2freq,$inst2,$sat,$inst2freq" >> ssa.manifest
     endif
 
@@ -408,8 +495,13 @@ goto primarycalobs
 finish:
 frotnear.csh ${inst1}:${subarray} sun.ephem $inst1freq $PWD kill
 frotnear.csh ${inst2}:${subarray} sun.ephem $inst2freq $PWD kill
-
+park.csh `slist.csh`
+fxconf.rb satake none `slist.csh`
+exit 0
 
 fail:
 frotnear.csh ${inst1}:${subarray} sun.ephem $inst1freq $PWD kill
 frotnear.csh ${inst2}:${subarray} sun.ephem $inst2freq $PWD kill
+park.csh `slist.csh`
+fxconf.rb satake none `slist.csh`
+exit 0
