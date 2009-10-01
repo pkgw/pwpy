@@ -1148,14 +1148,18 @@ foreach ipol ($pollist) # Work with only one pol at a time
         newautomap.csh vis=$wd/tempcal$ipol options=noflag,nocal,wrath,junk >& $wd/wrathlog
         set rfilist = (`grep WRATHCHAN $wd/wrathlog`)
         shift rfilist
-        echo -n "$#rfilist polluted image planes found, beginning removal."
-        set rfilist = `echo $rfilist | tr ' ' ','`
-        set rfiflags = (`newoptfchan.csh chanlist=$rfilist`)
-        foreach rfiline ($rfiflags)
-	    echo -n "."
-	    uvflag vis=$wd/tempcal$ipol flagval=f options=none $rfiline > /dev/null
-	end
-        echo "."
+	if ($#rfilist == 0) then
+	    echo "No polluted image planes found! Moving on..."
+	else
+	    echo -n "$#rfilist polluted image planes found, beginning removal."
+	    set rfilist = `echo $rfilist | tr ' ' ','`
+	    set rfiflags = (`newoptfchan.csh chanlist=$rfilist`)
+	    foreach rfiline ($rfiflags)
+		echo -n "."
+		uvflag vis=$wd/tempcal$ipol flagval=f options=none $rfiline > /dev/null
+	    end
+	    echo "."
+        endif
         echo "WRATH cleaning complete!"
 	set wrathcycle = 0
     endif
@@ -1403,14 +1407,28 @@ end
 paste $wd/ret* > $wd/retmap
 cp $wd/retmap $vis/retmap
 cp $wd/retmap $vis/phoenix/retmap.CAL$dmark
+
+
 set orc = `echo 500 $freq | awk '{print int($1*1.43/$2)}'`
+set arc = `echo 4500 | awk '{print int($1*1430/freq)}' freq=$freq`
+
+set derflux = (`imfit in=$outfile/$source.cm region=relcen,arcsec,"box(-$orc,-$orc,$orc,$orc)" object=point | grep Peak | awk '{print $3,$5}'`)
+
+while ($#derflux < 2 && $orc < $arc)
+    set orc = `echo $orc | awk '{print int($1*1.1)+1}'`
+    set derflux = (`imfit in=$outfile/$source.cm region=relcen,arcsec,"box(-$orc,-$orc,$orc,$orc)" object=point | grep Peak | awk '{print $3,$5}'`)
+end
+
 set tnoise = `imfit in=$outfile/$source.cm region=relcen,arcsec,"box(-$orc,-$orc,$orc,$orc)" object=point | grep residual | awk '{print $9*1000}'`
 set noise = `imstat in=$outfile/$source.rs | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g' | awk '{print $3*1000}'`
 set maxmin = (`imstat in=$outfile/$source.cm | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | tr '*' ' ' | sed 's/\([0-9][0-9]\)-/\1 -/g' | awk '{print $4*1000,$5*1000}'`)
-set derflux = (`imfit in=$outfile/$source.cm region=relcen,arcsec,"box(-$orc,-$orc,$orc,$orc)" object=point | grep Peak | awk '{print $3,$5}'`)
 set derpos = (`imfit in=$outfile/$source.cm region=relcen,arcsec,"box(-$orc,-$orc,$orc,$orc)" object=point | grep Offset | awk '{print $4,$5}'`)
 set derpos = ($derpos `imfit in=$outfile/$source.cm region=relcen,arcsec,"box(-$orc,-$orc,$orc,$orc)" object=point | grep errors | awk '{print $4,$5}'`)
 
+if ($arc < $orc) then
+    set derflux = ($derflux UNK)
+    set derpos = ($derpos UNK UNK)
+endif
 report:
 echo "" 
 echo "CALIBRATION REPORT" | tee -ia $wd/calrpt

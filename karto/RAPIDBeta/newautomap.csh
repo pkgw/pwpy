@@ -233,9 +233,10 @@ set verb
 set debug = 0
 set sefd = 0
 set restfreq
-set usemodel
 set line
 set regain
+set calmodel
+set scclip
 
 if ($#argv == 0) then
     echo "AUTOMAP: No input files detected!"
@@ -294,6 +295,9 @@ else if ("$argv[1]" =~ 'select='*) then
 else if ("$argv[1]" =~ 'selfcalsigma='*) then
     set scsigma = `echo $argv[1] | sed 's/scsigma=//'`
     shift argv; if ("$argv" == "") set argv = "finish"
+else if ("$argv[1]" =~ 'selfcalclip='*) then
+    set scclip = `echo $argv[1] | sed 's/selfcalclip=//'`
+    shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'sysflux='*) then
     set sysflux = `echo $argv[1] | sed 's/sysflux=//'`
     shift argv; if ("$argv" == "") set argv = "finish"
@@ -302,6 +306,9 @@ else if ("$argv[1]" =~ 'interval='*) then
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'refant='*) then
     set refant = `echo $argv[1] | sed 's/refant=//'`
+    shift argv; if ("$argv" == "") set argv = "finish"
+else if ("$argv[1]" =~ 'calmodel='*) then
+    set calmodel = `echo $argv[1] | sed 's/calmodel=//'`
     shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'device='*) then
     set display = 1
@@ -449,7 +456,7 @@ end
 # capture about the observation (i.e. frequency, num of channels
 # , etc.
 #################################################################
-
+if ("$calmodel" == "") set calmodel = "$wd/tempmap.clean"
 if ($imsize == "") set imsize = 512
 set badcal # Debugging var to tell what happened if auto-selfcal fails
 set psci = 0 # Phase auto-selfcal iterations
@@ -460,6 +467,7 @@ set nalevel = 0
 set omode = $mode
 set freqline = (`uvlist vis=$vis[1] options=var | grep "freq    :" | tr ':' ' '`) # Set the freq in MHz
 set freq
+
 while ("$freq" == "")
     if ($freqline[1] == "freq") then
 	set freq = `echo $freqline[2] | awk '{print $1*1000}'` 
@@ -680,7 +688,12 @@ foreach file ($vislist)
 end
 
 foreach chan (`echo $crange`)
+    if (`echo $chan | tr ',' ' ' | wc -w` == 3) then
+	set chanprime = `echo $chan | tr ',' ' ' | awk '{print int($1*$3)","$2}'`
+	uvflag vis=`echo $vislist | tr ' ' ','` line=chan,$chanprime flagval=f options=none > /dev/null 
+    else
 	uvflag vis=`echo $vislist | tr ' ' ','` line=chan,$chan flagval=f options=none > /dev/null 
+    endif
 end
 
 invert:
@@ -976,7 +989,8 @@ set clip = `echo $scsigma $imstats[3] | awk '{print $1*$2}'`
   echo "Clip level? [default=$clip]: "; set ans=$<
   if ($ans != "") set clip = $ans
   foreach file ($vislist)
-    selfcal vis=$file model=$wd/tempmap.clean interval=$scint select=$sel \
+    echo $calmodel
+    selfcal vis=$file model=$calmodel interval=$scint select=$sel \
 	minants=4 options=mfs,$scopt clip=$clip refant=$refant
   end
   goto invert
@@ -1202,10 +1216,12 @@ if ($scopt == "amp") @ asci++
 
 echo "Now performing $scopt self-cal on data set...currently at $psci phase cycles and $asci amplitude cycles."
 
-if ("$scsigma" == "") then
+if ("$scsigma" == "" && "$scclip" == "") then
     set clip = `echo $beamsize $imstats[3] $imsize | tr ',' ' ' | awk '{if ($4*1 == 0) print $2*(.5*log($3*$3/$1)+2); else print $2*(.5*log(($3*$4)/$1)+2)}'`
-else
+else if ("$scsigma" != "") then
     set clip = `echo $scsigma $imstats[3] | awk '{print $1*$2}'`
+else
+    set clip = $scclip
 endif
 
 foreach file ($vislist)
