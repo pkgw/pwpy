@@ -30,9 +30,23 @@ set visall = `ls -df $source-? $source-?? | awk '{printf("%s,",$1)}' ; echo`
 \rm -fr $source-??.?{cln,map,cmp}
 \rm -fr $source-??.?{cln,map,cmp}.imsub
 \rm -fr $source-??.beam
+\rm -f t?vs
+\rm -f t??vs
+
+# need to check that bins have data.  also need short file names for invert
+set n = 1
+foreach f (`ls -df ${source}-? ${source}-??`)
+    set records = `uvindex vis=$f | grep 'Total number of records' | awk '{printf("%d\n",$6)}'`
+    if ( $records > 0 ) then
+	ln -s $f t${n}vs
+    else
+	echo 'No records in '$f'. Skipping.'
+    endif
+    @ n = ($n + 1)
+end
 
 #   Make one map
-invert vis=$source-\? map=$source.imap,$source.qmap,$source.umap,$source.vmap beam=$source.beam imsize=$imsize \
+invert vis=t\*vs map=$source.imap,$source.qmap,$source.umap,$source.vmap beam=$source.beam imsize=$imsize \
 stokes=i,q,u,v options=mfs,double "select=-shadow($diam)" $imgparams
 set rms = `gethd in=$source.imap/rms`
 set icut = `echo "4.5*$rms" | bc -l`
@@ -102,8 +116,9 @@ endif
 #  Make channel maps
 set n=1
 while ($n <= $nchan)
-
-  invert vis=$source-$n map=$source-$n.imap,$source-$n.qmap,$source-$n.umap,$source-$n.vmap \
+ echo 'Imaging bin '$n
+ if ( -e t${n}vs ) then
+  invert vis=t${n}vs map=$source-$n.imap,$source-$n.qmap,$source-$n.umap,$source-$n.vmap \
   beam=$source-$n.beam imsize=$imsize "select=-shadow($diam)" $imgparams  \
        stokes=i,q,u,v options=double,mfs | tail -2
   set rms = `gethd in=$source-$n.imap/rms`
@@ -124,6 +139,11 @@ while ($n <= $nchan)
 #  \rm -r $source-$n.[qu]cln
   imsub in=$source-$n.pcln out=$source-$n.pcln.imsub "region=abspix,box("$boxlo","$boxlo","$boxhi","$boxhi")"
   imsub in=$source-$n.vmap out=$source-$n.vmap.imsub "region=abspix,box("$boxlo","$boxlo","$boxhi","$boxhi")"
- 
-  @ n = ($n + 1)
+ endif
+ @ n = ($n + 1)
 end
+
+# clean up working visibility files
+\rm -f t?vs
+\rm -f t??vs
+ 

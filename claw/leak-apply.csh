@@ -17,9 +17,8 @@ endif
 set chans=40  # channels per frequency chunk.  
 set refant=1
 
-# put data in time, stokes order
 rm -rf tmp-${apply}-tmp
-uvaver vis=${apply} out=tmp-${apply}-tmp interval=0.001 options=nocal,nopass,nopol
+uvaver vis=${apply} out=tmp-${apply}-tmp interval=0.001 options=nopol,nocal,nopass
 
 # loop over frequency chunks
 #foreach piece (1 2 3 4 5 6 7 8)
@@ -36,5 +35,4 @@ foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)
 
 end
 
-# clean up
 rm -rf tmp-${apply}-tmp

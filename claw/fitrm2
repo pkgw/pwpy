@@ -1,0 +1,5 @@
+#!/usr/bin/env tcsh
+
+# wrapper to take input for fitrm
+cp $1 log
+fitrm
