@@ -353,6 +353,9 @@ else if ("$argv[1]" =~ 'cleantype='*) then
 else if ("$argv[1]" =~ 'imsize='*) then
     set imsize = `echo $argv[1] | sed 's/imsize=//'`
     shift argv; if ("$argv" == "") set argv = "finish"
+else if ("$argv[1]" =~ 'cregion='*) then
+    set cregion = "$argv[1]"
+    shift argv; if ("$argv" == "") set argv = "finish"
 else if ("$argv[1]" =~ 'cleanlim='*) then
     set niters = `echo $argv[1] | sed 's/cleanlim=//' | awk '{print int($1*1)}'`
     set intclean = 0
