@@ -2,10 +2,10 @@
 
 onintr enderr
 
-set datapath = `which calsdata`
+set datapath = `which calinfo | sed 's/\(.*\)calinfo/\1/'`calsdata
 
 if ($#datapath > 1) then
-    echo "FATAL ERROR: Calibrator data not found..."
+    echo "FATAL ERROR: Calibrator data not found in the same directory as calinfo..."
     exit 1
 endif
 
