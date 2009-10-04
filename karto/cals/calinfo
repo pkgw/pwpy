@@ -2,7 +2,13 @@
 
 onintr enderr
 
-set datapath = "/home/obs/mmm/karto/cals"
+set datapath = `which calsdata`
+
+if ($#datapath > 1) then
+    echo "FATAL ERROR: Calibrator data not found..."
+    exit 1
+endif
+
 set target
 set debug = 0
 set freq
@@ -125,7 +131,7 @@ if ("$target" == "") then
 endif
 
 
-awk '{if ($1 == target || $2 == target) print $0}' target=$target $datapath/calsdata | sort -nk7 > $wd/calinfo
+awk '{if ($1 == target || $2 == target) print $0}' target=$target $datapath | sort -nk7 > $wd/calinfo
 
 if !(`wc -l $wd/calinfo | awk '{print $1}'`) then
     echo "FATAL ERROR: Target not found."
@@ -201,9 +207,9 @@ if ("$freq" == "") then
 endif
 
 if ("$flux[2]" == 0) then
-    set cals = (`awk '{print $1,$2,$3,$4,$5,$7}' $datapath/calsdata | awk '{if (cos(distlim) <= (sin($4*pi/180)*sin(dec)+cos($4*pi/180)*cos(dec)*cos(ra-($3*pi/12))) && $5 >= f1) print $1}' ra=$ra dec=$dec pi=$pi distlim=$distlim f1=$flux[1] | sort -u`)
+    set cals = (`awk '{print $1,$2,$3,$4,$5,$7}' $datapath | awk '{if (cos(distlim) <= (sin($4*pi/180)*sin(dec)+cos($4*pi/180)*cos(dec)*cos(ra-($3*pi/12))) && $5 >= f1) print $1}' ra=$ra dec=$dec pi=$pi distlim=$distlim f1=$flux[1] | sort -u`)
 else
-    set cals = (`awk '{print $1,$2,$3,$4,$5,$7}' $datapath/calsdata | awk '{if (cos(distlim) <= (sin($4*pi/180)*sin(dec)+cos($4*pi/180)*cos(dec)*cos(ra-($3*pi/12))) && $5 >= f1 && $5 <= f2) print $1}' ra=$ra dec=$dec pi=$pi distlim=$distlim f1=$flux[1] f2=$flux[2] | sort -u`)
+    set cals = (`awk '{print $1,$2,$3,$4,$5,$7}' $datapath | awk '{if (cos(distlim) <= (sin($4*pi/180)*sin(dec)+cos($4*pi/180)*cos(dec)*cos(ra-($3*pi/12))) && $5 >= f1 && $5 <= f2) print $1}' ra=$ra dec=$dec pi=$pi distlim=$distlim f1=$flux[1] f2=$flux[2] | sort -u`)
 endif
 
 if ("$cals[1]" == "") then
@@ -252,16 +258,16 @@ set ra = `echo $ra | awk '{print $1*180/pi}' pi=$pi`
 set dec = `echo $dec | awk '{print $1*180/pi}' pi=$pi`
 
 if ("$target" == "") then
-    set target = `awk '{if ($2 == altname) print $1}' altname=$altname $datapath/calsdata | head -n 1`
+    set target = `awk '{if ($2 == altname) print $1}' altname=$altname $datapath | head -n 1`
     if ("$target" == "") then
 	set target = $altname
-	set altname = `awk '{if ($1 == target) print $2}' target=$target $datapath/calsdata | head -n 1`
+	set altname = `awk '{if ($1 == target) print $2}' target=$target $datapath | head -n 1`
     endif
 else if ("$altname" == "") then
-    set altname = `awk '{if ($1 == target) print $2}' target=$target $datapath/calsdata | head -n 1`
+    set altname = `awk '{if ($1 == target) print $2}' target=$target $datapath | head -n 1`
     if ("$altname" == "") then
 	set altname = $target
-	set target = `awk '{if ($2 == altname) print $1}' altname=$altname $datapath/calsdata | head -n 1`
+	set target = `awk '{if ($2 == altname) print $1}' altname=$altname $datapath | head -n 1`
     endif
 endif
 
@@ -271,8 +277,8 @@ if ("$altname" == "" || "$target" == "") then
 endif
 
 if ("$ra" == 0 && "$dec" == 0)  then
-    set ra = `awk '{if ($1 == target) print $3}' target=$target $datapath/calsdata | head -n 1`
-    set dec = `awk '{if ($1 == target) print $4}' target=$target $datapath/calsdata | head -n 1`
+    set ra = `awk '{if ($1 == target) print $3}' target=$target $datapath | head -n 1`
+    set dec = `awk '{if ($1 == target) print $4}' target=$target $datapath | head -n 1`
 endif
 
 if ("$ra" == "" && "$dec" == "")  then
@@ -280,11 +286,11 @@ if ("$ra" == "" && "$dec" == "")  then
     goto enderr
 endif
 
-if ("$flux[1]" == "0") set flux = `awk '{if ($1 == target && $7 == freq) print $5}' target=$target freq=$freq $datapath/calsdata | head -n 1`
+if ("$flux[1]" == "0") set flux = `awk '{if ($1 == target && $7 == freq) print $5}' target=$target freq=$freq $datapath | head -n 1`
 
-if ("$calgrade" == "") set calgrade = `awk '{if ($1 == target && $7 == freq) print $6}' target=$target freq=$freq $datapath/calsdata | head -n 1`
+if ("$calgrade" == "") set calgrade = `awk '{if ($1 == target && $7 == freq) print $6}' target=$target freq=$freq $datapath | head -n 1`
 
-if ("$addflux" == "") set addflux = `awk '{if ($1 == target && $7 == freq) print $8}' target=$target freq=$freq $datapath/calsdata | head -n 1`
+if ("$addflux" == "") set addflux = `awk '{if ($1 == target && $7 == freq) print $8}' target=$target freq=$freq $datapath | head -n 1`
 
 if ("$flux[1]" == "" || "$addflux" == "")then
     echo "FATAL ERROR: Target flux not specified"
@@ -293,18 +299,18 @@ endif
 
 if ("$calgrade" == "") set calgrade = "U"
 
-if (`awk '{if (target == $1 || altname == $2 || target == $2 || altname == $1) print $0}' target=$target altname=$altname $datapath/calsdata | awk '{if (((($7-freq)^2)^.5)/freq < 0.258925) idx += 1} END {if (idx >= 1) print 1; else print 0}' target=$target altname=$altname freq=$freq`) then
+if (`awk '{if (target == $1 || altname == $2 || target == $2 || altname == $1) print $0}' target=$target altname=$altname $datapath | awk '{if (((($7-freq)^2)^.5)/freq < 0.258925) idx += 1} END {if (idx >= 1) print 1; else print 0}' target=$target altname=$altname freq=$freq`) then
     echo "WARNING: Cals database already contains info for this target at a frequency within 1 dB of the frequency that you specified. Would you like to [o]verwrite, (i)gnore, or (c)ancel?"
     set yn = $<
     if ("$yn" == "" || "$yn" == o) then
-	awk '{if ((target != $1 && altname != $1 && target != $2 && altname != $2) || ((($7-freq)^2)^.5)/freq >= 0.258925 ) print $0}' target=$target altname=$altname freq=$freq $datapath/calsdata > $datapath/calsdata.new
-	mv $datapath/calsdata.new $datapath/calsdata
+	awk '{if ((target != $1 && altname != $1 && target != $2 && altname != $2) || ((($7-freq)^2)^.5)/freq >= 0.258925 ) print $0}' target=$target altname=$altname freq=$freq $datapath > $datapath.new
+	mv $datapath.new $datapathcals
     else if ("$yn" != "i") then
 	goto finish
     endif
 endif
 
-echo $target $altname $ra $dec $flux[1] $calgrade $freq $addflux `date +%m%d%y:%H:%M` >> $datapath/calsdata
+echo $target $altname $ra $dec $flux[1] $calgrade $freq $addflux `date +%m%d%y:%H:%M` >> $datapath
 
 goto finish
 
