@@ -998,10 +998,9 @@ foreach ipol ($pollist) # Work with only one pol at a time
 		goto fail
 	    endif
 	    echo "$freq $regtimes[$mididx] " > $wd/sefd.$ipol.$regtimes[$mididx]
-	    echo " Ant Pol  R-Gain Avg  R-Gain RMS  I-Gain Avg  I-Gain RMS   SEFD (Jy)" >> $wd/sefd.$ipol.$regtimes[$mididx]
+	    echo " Ant Pol  Avg-SEFD  SEFD-RMS    Avg-Pha  Pha-RMS SEFD(Jy)" >> $wd/sefd.$ipol.$regtimes[$mididx]
 	    echo "====================================================================" >> $wd/sefd.$ipol.$regtimes[$mididx]
-	    
-	    gplist vis=$wd/sefdcal options=all | sed 's/^.\{10\}//g' | grep "Ant" | sort -nk2 | awk '{if (NR == 1 || ant == $2) {ant=$2;n++; re += $5; rs += $5*$5;im += $6;is += $6*$6}; if (ant != $2) {printf "%4s   %1s % .4e % .4e % .4e % .4e % .4e\n",ant,pol,re/n,sqrt((rs-n*(re/n)*(re/n))/n),im/n,sqrt((is-(n*(im/n)*(im/n)))/n),((re*re)+(im*im))/(n^2);ant=$2;n=1;re=$5;rs=$5*$5;im=$6;is=$6*$6}}' pol=`echo $ipol | sed -e 's/xx/x/g' -e 's/yy/y/g'`| awk '{if ($7*1 != 0) print $0}' >> $wd/sefd.$ipol.$regtimes[$mididx]
+	    gplist vis=$wd/sefdcal options=all | sed 's/^.\{10\}//g' | grep "Ant" | sort -nk2 | awk '{ if ($5*1 != 0 && $6*1 != 0) print $2,($5^2+$6^2)^.5,atan2($6,$5)*180/3.14159265}' | awk '{if (NR == 1 || ant == $1) {ant=$1;n++; am += $2; as += $2*$2;ph += $3;ps += $3*$3}; if (ant != $1) {printf "%4s  %1s   %.3e %.3e  %8s  %.4f  %.4e\n",ant,pol,am/n,sqrt(((as-n*(am/n)*(am/n))^2)^.5/n),ph/n,sqrt(((ps-(n*(ph/n)*(ph/n)))^2)^.5/n),am/n;ant=$1;n=1;am=$2;as=$2*$2;ph=$3;ps=$3*$3}}' pol=`echo $ipol | sed -e 's/xx/x/g' -e 's/yy/y/g'` >> $wd/sefd.$ipol.$regtimes[$mididx]
 	    rm -rf $wd/sefdcal
 	    echo "done!"
 	else if ($sefd && ("$xants" != "" || "$yants" != "")) then
@@ -1020,10 +1019,10 @@ foreach ipol ($pollist) # Work with only one pol at a time
 		goto fail
 	    endif
 	    echo "$freq $regtimes[$mididx] " > $wd/sefd.$ipol.$regtimes[$mididx]
-	    echo " Ant Pol  R-Gain Avg  R-Gain RMS  I-Gain Avg  I-Gain RMS   SEFD (Jy)" >> $wd/sefd.$ipol.$regtimes[$mididx]
+	    echo " Ant Pol  Avg-SEFD  SEFD-RMS    Avg-Pha  Pha-RMS SEFD(Jy)" >> $wd/sefd.$ipol.$regtimes[$mididx]
 	    echo "====================================================================" >> $wd/sefd.$ipol.$regtimes[$mididx]
-	    if ("$xants" != "") gplist vis=$wd/sefdcalx options=all | sed 's/^.\{10\}//g' | grep "Ant" | sort -nk2 | awk '{if (NR == 1 || ant == $2) {ant=$2;n++; re += $5; rs += $5*$5;im += $6;is += $6*$6}; if (ant != $2) {printf "%4s   %1s % .4e % .4e % .4e % .4e % .4e\n",ant,pol,re/n,sqrt((rs-n*(re/n)*(re/n))/n),im/n,sqrt((is-(n*(im/n)*(im/n)))/n),((re*re)+(im*im))/(n^2);ant=$2;n=1;re=$5;rs=$5*$5;im=$6;is=$6*$6}}' pol=x | awk '{if ($7*1 != 0) print $0}' >> $wd/sefd.$ipol.$regtimes[$mididx]
-	    if ("$yants" != "") gplist vis=$wd/sefdcaly options=all | sed 's/^.\{10\}//g' | grep "Ant" | sort -nk2 | awk '{if (NR == 1 || ant == $2) {ant=$2;n++; re += $5; rs += $5*$5;im += $6;is += $6*$6}; if (ant != $2) {printf "%4s   %1s % .4e % .4e % .4e % .4e % .4e\n",ant,pol,re/n,sqrt((rs-n*(re/n)*(re/n))/n),im/n,sqrt((is-(n*(im/n)*(im/n)))/n),((re*re)+(im*im))/(n^2);ant=$2;n=1;re=$5;rs=$5*$5;im=$6;is=$6*$6}}' pol=y | awk '{if ($7*1 != 0) print $0}' >> $wd/sefd.$ipol.$regtimes[$mididx]
+	    if ("$xants" != "") gplist vis=$wd/sefdcalx options=all | sed 's/^.\{10\}//g' | grep "Ant" | sort -nk2 | awk '{ if ($5*1 != 0 && $6*1 != 0) print $2,($5^2+$6^2)^.5,atan2($6,$5)*180/3.14159265}' | awk '{if (NR == 1 || ant == $1) {ant=$1;n++; am += $2; as += $2*$2;ph += $3;ps += $3*$3}; if (ant != $1) {printf "%4s  %1s   %.3e %.3e  %8s  %.4f  %.4e\n",ant,pol,am/n,sqrt(((as-n*(am/n)*(am/n))^2)^.5/n),ph/n,sqrt(((ps-(n*(ph/n)*(ph/n)))^2)^.5/n),am/n;ant=$1;n=1;am=$2;as=$2*$2;ph=$3;ps=$3*$3}}' pol=x >> $wd/sefd.$ipol.$regtimes[$mididx]
+	    if ("$yants" != "") gplist vis=$wd/sefdcaly options=all | sed 's/^.\{10\}//g' | grep "Ant" | sort -nk2 | awk '{ if ($5*1 != 0 && $6*1 != 0) print $2,($5^2+$6^2)^.5,atan2($6,$5)*180/3.14159265}' | awk '{if (NR == 1 || ant == $1) {ant=$1;n++; am += $2; as += $2*$2;ph += $3;ps += $3*$3}; if (ant != $1) {printf "%4s  %1s   %.3e %.3e  %8s  %.4f  %.4e\n",ant,pol,am/n,sqrt(((as-n*(am/n)*(am/n))^2)^.5/n),ph/n,sqrt(((ps-(n*(ph/n)*(ph/n)))^2)^.5/n),am/n;ant=$1;n=1;am=$2;as=$2*$2;ph=$3;ps=$3*$3}}' pol=y >> $wd/sefd.$ipol.$regtimes[$mididx]
 	    rm -rf $wd/sefdcalx $wd/sefdcaly
 	    echo "done!"	    
 	endif
@@ -1185,11 +1184,10 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	    goto fail
 	endif
 	echo "$freq" > $wd/sefd.$ipol
-	echo " Ant Pol  R-Gain Avg  R-Gain RMS  I-Gain Avg  I-Gain RMS   SEFD (Jy)" > $wd/sefd.$ipol
+	echo " Ant Pol  Avg-SEFD  SEFD-RMS    Avg-Pha  Pha-RMS SEFD(Jy)" > $wd/sefd.$ipol
 	echo "====================================================================" >> $wd/sefd.$ipol
 
-	gplist vis=$wd/sefdcal options=all | sed 's/^.\{10\}//g' | grep "Ant" | sort -nk2 | awk '{if (NR == 1 || ant == $2) {ant=$2;n++; re += $5; rs += $5*$5;im += $6;is += $6*$6}; if (ant != $2) {printf "%4s   %1s % .4e % .4e % .4e % .4e % .4e\n",ant,pol,re/n,sqrt((rs-n*(re/n)*(re/n))/n),im/n,sqrt((is-(n*(im/n)*(im/n)))/n),((re*re)+(im*im))/(n^2);ant=$2;n=1;re=$5;rs=$5*$5;im=$6;is=$6*$6}}' pol=`echo $ipol | sed -e 's/xx/x/g' -e 's/yy/y/g'` | awk '{if ($7*1 != 0) print $0}' >> $wd/sefd.$ipol
-
+	gplist vis=$wd/sefdcal options=all | sed 's/^.\{10\}//g' | grep "Ant" | sort -nk2 | awk '{ if ($5*1 != 0 && $6*1 != 0) print $2,($5^2+$6^2)^.5,atan2($6,$5)*180/3.14159265}' | awk '{if (NR == 1 || ant == $1) {ant=$1;n++; am += $2; as += $2*$2;ph += $3;ps += $3*$3}; if (ant != $1) {printf "%4s  %1s   %.3e %.3e  %8s  %.4f  %.4e\n",ant,pol,am/n,sqrt(((as-n*(am/n)*(am/n))^2)^.5/n),ph/n,sqrt(((ps-(n*(ph/n)*(ph/n)))^2)^.5/n),am/n;ant=$1;n=1;am=$2;as=$2*$2;ph=$3;ps=$3*$3}}' pol=`echo $ipol | sed -e 's/xx/x/g' -e 's/yy/y/g'` >> $wd/sefd.$ipol
 	if ($ipol == xx) then
 	    foreach antcheck ($fullxants)
 		if !(`awk '{if ($1 == antcheck) idx += 1} END {print idx*1}' antcheck=$antcheck $wd/sefd.$ipol`) set nogainants = ($nogainants {$antcheck}X)
@@ -1218,10 +1216,10 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	    goto fail
 	endif
 	echo "$freq" > $wd/sefd
-	echo " Ant Pol  R-Gain Avg  R-Gain RMS  I-Gain Avg  I-Gain RMS   SEFD (Jy)" > $wd/sefd
+	echo " Ant Pol  Avg-SEFD  SEFD-RMS    Avg-Pha  Pha-RMS SEFD(Jy)" > $wd/sefd
 	echo "====================================================================" >> $wd/sefd
-	gplist vis=$wd/sefdcalx options=all | sed 's/^.\{10\}//g' | grep "Ant" | sort -nk2 | awk '{if (NR == 1 || ant == $2) {ant=$2;n++; re += $5; rs += $5*$5;im += $6;is += $6*$6}; if (ant != $2) {printf "%4s   %1s % .4e % .4e % .4e % .4e % .4e\n",ant,pol,re/n,sqrt((rs-n*(re/n)*(re/n))/n),im/n,sqrt((is-(n*(im/n)*(im/n)))/n),((re*re)+(im*im))/(n^2);ant=$2;n=1;re=$5;rs=$5*$5;im=$6;is=$6*$6}}' pol=x | awk '{if ($7*1 != 0) print $0}' >> $wd/sefd
-	gplist vis=$wd/sefdcaly options=all | sed 's/^.\{10\}//g' | grep "Ant" | sort -nk2 | awk '{if (NR == 1 || ant == $2) {ant=$2;n++; re += $5; rs += $5*$5;im += $6;is += $6*$6}; if (ant != $2) {printf "%4s   %1s % .4e % .4e % .4e % .4e % .4e\n",ant,pol,re/n,sqrt((rs-n*(re/n)*(re/n))/n),im/n,sqrt((is-(n*(im/n)*(im/n)))/n),((re*re)+(im*im))/(n^2);ant=$2;n=1;re=$5;rs=$5*$5;im=$6;is=$6*$6}}' pol=y | awk '{if ($7*1 != 0) print $0}' >> $wd/sefd
+	if (-e $wd/sefdcalx/gains) gplist vis=$wd/sefdcalx options=all | sed 's/^.\{10\}//g' | grep "Ant" | sort -nk2 | awk '{ if ($5*1 != 0 && $6*1 != 0) print $2,($5^2+$6^2)^.5,atan2($6,$5)*180/3.14159265}' | awk '{if (NR == 1 || ant == $1) {ant=$1;n++; am += $2; as += $2*$2;ph += $3;ps += $3*$3}; if (ant != $1) {printf "%4s  %1s   %.3e %.3e  %8s  %.4f  %.4e\n",ant,pol,am/n,sqrt(((as-n*(am/n)*(am/n))^2)^.5/n),ph/n,sqrt(((ps-(n*(ph/n)*(ph/n)))^2)^.5/n),am/n;ant=$1;n=1;am=$2;as=$2*$2;ph=$3;ps=$3*$3}}' pol=x >> $wd/sefd
+	if (-e $wd/sefdcaly/gains) gplist vis=$wd/sefdcaly options=all | sed 's/^.\{10\}//g' | grep "Ant" | sort -nk2 | awk '{ if ($5*1 != 0 && $6*1 != 0) print $2,($5^2+$6^2)^.5,atan2($6,$5)*180/3.14159265}' | awk '{if (NR == 1 || ant == $1) {ant=$1;n++; am += $2; as += $2*$2;ph += $3;ps += $3*$3}; if (ant != $1) {printf "%4s  %1s   %.3e %.3e  %8s  %.4f  %.4e\n",ant,pol,am/n,sqrt(((as-n*(am/n)*(am/n))^2)^.5/n),ph/n,sqrt(((ps-(n*(ph/n)*(ph/n)))^2)^.5/n),am/n;ant=$1;n=1;am=$2;as=$2*$2;ph=$3;ps=$3*$3}}' pol=y >> $wd/sefd
 	foreach antcheck ($fullxants)
 	    if !(`awk '{if ($1 == antcheck) idx += 1} END {print idx*1}' antcheck=$antcheck $wd/sefd`) set nogainants = ($nogainants {$antcheck}X)
 	end
