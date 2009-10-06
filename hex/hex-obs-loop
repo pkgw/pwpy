@@ -1,0 +1,230 @@
+#! /bin/tcsh -f
+#
+# Conduct a sequence of hex7-like observations, looping until
+# time expires
+#
+# Change history:
+#
+# 2009/09/23 PKGW Initial version, copied from hex-obs-single
+
+# uncomment to debug the commands being run by this script
+set echo = 1
+set me = hex-obs-loop:
+set inttime = 10
+
+
+# Args
+
+if ($#argv > 3) then
+    set flt = ($argv)
+else
+    echo "Enter: inst1     inst2     dur(sec) stophour [r]"
+    echo "E.g.:  fx64a:fxa fx64c:fxa 60       23.5"
+    set flt = ($<)
+endif
+
+set inst1 = $flt[1]
+set inst2 = $flt[2]
+set dur = $flt[3]
+set stophr = $flt[4]
+
+set restart = 0
+
+if ($#flt > 4) then
+    if ($flt[5] == r) set restart = 1
+endif
+
+if (`echo $inst1 | grep ':'` == '') then
+    echo "Error: must include first instrument and group separated by a colon. Exiting!"
+    exit 1
+endif
+
+if (`echo $inst2 | grep ':'` == '') then
+    echo "Error: must include second instrument and group separated by a colon. Exiting!"
+    exit 1
+endif
+
+# Get observation settings from stdin and verify them
+
+set srcs = ()
+set hexmodes = ()
+set freq1s = ()
+set bw1s = ()
+set freq2s = ()
+set bw2s = ()
+
+set tmp = ($<)
+
+while ($#tmp > 0)
+    if ($#tmp != 6) then
+	echo "Error: unexpected stdin input, expected 'src hexmode freq1 bw1 freq2 bw2'"
+	exit 1
+    endif
+
+    set srcs = ($srcs $tmp[1])
+    set hexmodes = ($hexmodes $tmp[2])
+    set freq1s = ($freq1s $tmp[3])
+    set bw1s = ($bw1s $tmp[4])
+    set freq2s = ($freq2s $tmp[5])
+    set bw2s = ($bw2s $tmp[6])
+
+    set tmp = ($<)
+end
+
+if ($#srcs == 0) then
+    echo "Error: input sequence of 'src hexmode freq1 bw1 freq2 bw2' on stdin"
+    exit 1
+endif
+
+foreach hexmode ($hexmodes)
+    if (! -x `which hex-coords-$hexmode`) then
+	echo "Error: unknown hex pattern $hexmode (no command hex-coords-$hexmode)"
+	exit 1
+    endif
+end
+
+set n = $#srcs
+
+# Init variables.
+
+set pfx = hex-loop
+set log = $pfx-main.log
+echo "$me starting at `date`" |& tee -ia $log
+echo "$me args: $flt" |& tee -ia $log
+
+set i = 1
+echo "$me observing setups:" |& tee -ia $log
+while ($i <= $n)
+    echo "    " $srcs[$i] $hexmodes[$i] $freq1s[$i] $bw1s[$i] $freq2s[$i] $bw2s[$i] |& tee -ia $log
+    @ i = $i + 1
+end
+
+set lo1 = `fxconf.rb hookup $inst1 |grep LO |cut -c1`
+set lo2 = `fxconf.rb hookup $inst2 |grep LO |cut -c1`
+set alist = `slist.csh $inst1` # assume $inst2 uses same ants
+
+set begin = `date +"%H %M" | awk '{print $1 + ($2 / 60) - 0.1}'`
+
+
+# Setup
+
+onintr fail
+
+if ($restart) then
+    echo "$me skipping hardware init by request" |& tee -ia $log
+    goto skipinit
+endif
+
+/hcro/ata/scripts/notify-obs-blog.csh $pfx "Instruments: $inst1 $inst2" \
+    "Scan Duration: $dur s" "Start time: `date`" "Directory: `pwd`"
+
+hex-lib-hwsetup $inst1 $freq1s[1] $bw1s[1] $inst2 $freq2s[1] $bw2s[1] \
+    $inttime $pfx $log
+if ($status) goto fail
+
+
+# Run observations
+
+skipinit:
+
+set i = 1
+set prevbw1 = $bw1s[1]
+set prevbw2 = $bw2s[1]
+
+while (1)
+    set src = $srcs[$i]
+    set hexmode = $hexmodes[$i]
+    set freq1 = $freq1s[$i]
+    set bw1 = $bw1s[$i]
+    set freq2 = $freq2s[$i]
+    set bw2 = $bw2s[$i]
+
+    echo "$me considering setup $i = $src $hexmode $freq1 $bw1 $freq2 $bw2" |& tee -ia $log
+
+    set subpfx = hex-$src-$hexmode
+    set coords = $subpfx-coords.txt
+
+    # Optionally generate coords file for this observation
+
+    if (! -f $coords) then
+	set radec = (`radec.csh $src`)
+	echo "$me generating coords in mode $hexmode for $src = $radec[4] $radec[5]" |& tee -ia $log
+	hex-coords-$hexmode $freq1 $radec[4] $radec[5] >$coords
+    endif
+
+    # Do we have enough time to execute this observation? Rule of thumb is that
+    # a 7-point hex with 60s integrations takes 20 minutes, with at least 40s 
+    # per pointing of correlator overhead, and more due to the actual pointing.
+    # Approximate that timing here
+
+    set tmp = (`cat $coords`)
+    @ npnt = $#tmp / 2
+    set shortstop = `echo $stophr $dur $npnt |awk '{print $1 - 0.05 - ($2 + 80) * $3 / 3600}'`
+
+    if (`stopnow.csh $begin $shortstop` == stop) then
+	echo "$me not enough time to run next observation, finishing up"
+	break
+    endif
+
+    # Set up the hardware for this setup: focus, bw, and LOs
+
+    set highfreq = `echo $freq1 $freq2 | awk '{if($1>=$2) print $1; else print $2}'`
+    echo "$me setting focus to $highfreq" |& tee -ia $log
+    atasetfocus $alist $highfreq
+
+    echo "$me setting sky freqs: $lo1 $freq1 / $lo2 $freq2" |& tee -ia $log
+    ataunlockserver lo$lo1 $pfx |& tee -ia $log
+    atasetskyfreq $lo1 $freq1 |& tee -ia $log
+    atalockserver lo$lo1 $pfx |& tee -ia $log
+    ataunlockserver lo$lo2 $pfx |& tee -ia $log
+    atasetskyfreq $lo2 $freq2 |& tee -ia $log
+    atalockserver lo$lo2 $pfx |& tee -ia $log
+
+    if ($bw1 != $prevbw1) then
+	echo "$me setting bandwidth on $inst1 to $bw1" |& tee -ia $log
+	bw.csh $inst1 $bw1
+	set prevbw1 = $bw1
+    endif
+
+    if ($bw2 != $prevbw2) then
+	echo "$me setting bandwidth on $inst2 to $bw2" |& tee -ia $log
+	bw.csh $inst2 $bw2
+	set prevbw2 = $bw2
+    endif
+
+    echo "$me waiting for focus completion" |& tee -ia $log
+    waitfocus $alist $highfreq
+    echo "$me focus setup at `date`" >>$subpfx-focus.txt
+    atagetfocus $alist >>$subpfx-focus.txt
+
+    # Check time left again
+
+    if (`stopnow.csh $begin $shortstop` == stop) then
+	echo "$me darn, hardware setup took too long, no time for obs"
+	break
+    endif
+
+    # We can finally run the observation
+    hex-obs-nosetup $inst1 $inst2 $coords $subpfx $src $dur $stophr
+    if ($status) goto fail
+
+    @ i = $i + 1
+
+    if ($i > $n) set i = 1
+end
+    
+# Cleanup
+
+echo "$me unlocking LOs" |& tee -ia $log
+ataunlockserver lo$lo1 $pfx
+ataunlockserver lo$lo2 $pfx
+echo "$me ended successfully at `date`" |& tee -ia $log
+exit 0
+
+fail:
+
+echo "$me unlocking LOs" |& tee -ia $log
+ataunlockserver lo$lo1 $pfx
+ataunlockserver lo$lo2 $pfx
+echo "$me ended in failure at `date`" |& tee -ia $log
+exit 1

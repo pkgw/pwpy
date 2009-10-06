@@ -1,0 +1,214 @@
+#! /usr/bin/env python
+# -*- python -*-
+#
+# Fit two-dimensional Gaussians to the relative antpol gains, giving
+# a measurement of the primary beamshape of each antenna/feed pairing.
+#
+# This code is heavily derived from that in mmm/davidm/gpfit.rb . I
+# couldn't find an installation of the required Ruby libraries on the
+# HCRO network, so I've ported the algorithm to Python and made changes
+# to have it fit into the hexobs processing model.
+
+import sys
+from os.path import join
+import numpy as N
+from mpfit import mpfit
+from miriad import *
+from mirtask import util
+
+pretty = '-p' in sys.argv
+if pretty: sys.argv.remove ('-p')
+
+if len (sys.argv) != 2:
+    print >>sys.stderr, 'Usage: hex-lib-gaussfit [analysisdir]'
+    sys.exit (1)
+
+analysisdir = sys.argv[1]
+sinfofn = join (analysisdir, 'data-sinfo.txt')
+ofsfn = join (analysisdir, 'data-offsets.txt')
+gainsfn = join (analysisdir, 'data-relgains.txt')
+
+
+# Load data
+
+source = ghz = flux = None
+
+for l in file (sinfofn, 'r'):
+    a = l.strip ().split ()
+
+    if a[0] == 'source':
+        source = a[1]
+    elif a[0] == 'freq':
+        ghz = float (a[1]) * 1e-3
+    elif a[0] == 'flux':
+        flux = float (a[1])
+
+assert source is not None
+assert ghz is not None
+assert flux is not None
+
+offsets = [map (float, l.strip ().split ()) for l in file (ofsfn, 'r')]
+offsets = N.asarray (offsets)
+npts = offsets.shape[0]
+
+if npts < 6:
+    print >>sys.stderr, 'Error: need at least 6 points to run a 2D Gaussian fit, ' \
+          'only have', npts
+    sys.exit (1)
+
+gains = {}
+
+for l in file (gainsfn, 'r'):
+    a = l.strip ().split ()
+
+    if len (a) != 2 * npts + 2:
+        print >>sys.stderr, 'Error: unexpected number of entries in', gainsfn, ':', \
+              len (a), 'not', 2 * npts + 2
+        sys.exit (1)
+
+    ant = int (a[0])
+    pol = a[1]
+    key = (ant, pol)
+
+    if key in gains:
+        print >>sys.stderr, 'Error: duplicate entry in', gainsfn
+        sys.exit (1)
+
+    amps = map (float, a[2:npts + 2])
+    phs = map (float, a[npts + 2:2 * npts + 2])
+
+    if amps[0] == 0:
+        continue # No gain solution for this antpol
+
+    # TODO: do something with the phases
+    gains[key] = N.asarray (amps)
+
+
+# The fits
+
+_parinfo = [{'parname': 'amp',
+             'limited': [True, False],
+             'limits': [0., 0.],
+             'value': 1.0},
+            {'parname': 'x0',
+             'limited': [False, False],
+             'limits': [0., 0.],
+             'value': 0.0},
+            {'parname': 'y0',
+             'limited': [False, False],
+             'limits': [0., 0.],
+             'value': 0.0},
+            {'parname': 'xw',
+             'limited': [True, False],
+             'limits': [0., 0.],
+             'value': 0.0},
+            {'parname': 'yw',
+             'limited': [True, False],
+             'limits': [0., 0.],
+             'value': 0.0}]
+            
+def fit (sigma, xs, ys, amps, **kwargs):
+    _parinfo[3]['value'] = sigma
+    _parinfo[4]['value'] = sigma
+    
+    # FIXME: should just use fit.py but I worry that it will fall down
+    # for two-dimensional 'x' coordinates.
+
+    def f (params, fjac=None):
+        a, x0, y0, xw, yw = params
+        model = a * N.exp (-0.5 * (((xs - x0) / xw)**2 + ((ys - y0) / yw)**2))
+        return 0, amps - model
+
+    o = mpfit (f, parinfo=_parinfo, quiet=True, **kwargs)
+
+    if o.status <= 0 or o.status >= 5:
+        raise Exception ('MPFIT failed: %d, %s' % (o.status, o.errmsg))
+    if o.perror is None:
+        raise Exception ('MPFIT failed to find uncerts: %d, %s' % (o.status, o.errmsg))
+
+    resids = f (o.params)[1]
+
+    return o.params, o.perror, resids, o.fnorm
+
+# TODO: fit in both RA/Dec and Az/El coordinates
+xs = offsets[:,2]
+ys = offsets[:,3]
+
+hwhm = 1.75 / ghz * N.pi / 180
+sigma = hwhm / N.sqrt (2 * N.log (2))
+
+fitdata = {}
+class Fit (object): pass
+
+for ((ant, pol), gamps) in gains.iteritems ():
+    f = Fit ()
+    fitdata[(ant, pol)] = f
+
+    f.amps = gamps**-2 # gain -> sensitivity
+    f.ant = ant
+    f.pol = pol
+
+    try:
+        params, uncerts, resids, chisq = fit (hwhm, xs, ys, f.amps)
+        f.failed = False
+        f.params = params
+        f.uncerts = uncerts
+        f.resids = resids
+        f.chisq = chisq
+    except Exception:
+        import traceback
+        traceback.print_exc ()
+        print >>sys.stderr, 'The fit for antpol', ant, pol, 'failed.'
+        f.failed = True
+
+
+# Print out results
+
+print >>sys.stderr, 'Modeled HWHM:', hwhm * 180 / N.pi
+
+t = N.asarray ([x[0] for x in gains.itervalues ()])
+uscale = N.sqrt (((1./t - 1.)**2).mean ())
+print >>sys.stderr, 'Central-pointing-RMS-based uncert scale:', uscale
+
+t = N.asarray ([f.chisq for f in fitdata.itervalues () if not f.failed])
+uscale = N.sqrt (N.median (t))
+print >>sys.stderr, 'Median-chisq-based uncert scale:', uscale
+
+skey = sorted (fitdata.iterkeys ())
+_conv = N.sqrt (2 * N.log (2)) * 180 / N.pi # sigma -> HWHM, rad -> deg
+_scale = N.asarray ([1, 206265, 206265, _conv, _conv])
+
+for key in skey:
+    f = fitdata[key]
+
+    if pretty:
+        print 'Antpol', f.ant, f.pol, ':'
+
+        if f.failed:
+            print '   Failed'
+            continue
+
+        u = lambda i: '%.2f%%' % (f.uncerts[i] / N.abs (f.params[i]) * 100 * uscale)
+        vals = f.params * _scale
+    
+        print '   Amp:', vals[0], '+-', u (0)
+        print '   Offsets:', vals[1], 'arcsec;', vals[2], 'arcsec'
+        print '      uncerts:', u (1), ';', u (2)
+        print '   Widths:', vals[3], 'deg;', vals[4], 'deg'
+        print '      uncerts:', u (3), ';', u (4)
+        print '   --Amps:', f.amps
+        print '   Resids:', f.resids
+        print '   Chisq:', f.chisq / uscale**2
+        print
+    else:
+        print f.ant, f.pol,
+
+        if f.failed:
+            print 0
+            continue
+
+        vals = f.params * _scale
+        us = f.uncerts * _scale
+
+        print 1, f.chisq,
+        print vals[0], us[0], vals[1], us[1], vals[2], us[2], vals[3], us[3], vals[4], us[4]

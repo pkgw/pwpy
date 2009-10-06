@@ -1,0 +1,100 @@
+#! /usr/bin/env python
+# -*- python -*-
+#
+# Plot the 2D gaussian fits to the primary beam shapes.
+
+import sys
+from os.path import join
+import omega as O
+import numpy as N
+
+if len (sys.argv) < 2:
+    analysisdir = '.'
+else:
+    analysisdir = sys.argv[1]
+
+
+# Load in data
+
+data = {}
+chisqs = []
+
+for l in file (join (analysisdir, 'data-gaussfits.txt')):
+    a = l.split ()
+    ant = int (a[0])
+    pol = a[1]
+
+    if a[2] == '0':
+        # Fit failed
+        continue
+
+    d = N.asarray ([float (x) for x in a[3:]])
+
+    chisqs.append (d[0])
+
+    if ant not in data:
+        data[ant] = {}
+
+    data[ant][pol] = d
+
+
+# Compute uncertainty normalization and convert to consistent units
+
+uscale = N.sqrt (N.median (N.asarray (chisqs)))
+print 'Median-chisq-based uncert scale:', uscale
+chimin = 1
+
+for pdata in data.itervalues ():
+    for d in pdata.itervalues ():
+        d[7:11] *= 3600 # deg. to arcsec
+
+        d[0] /= uscale**2  # normalize uncert units
+        d[2::2] *= uscale
+
+        chimin = min (chimin, d[0])
+
+# Display
+    
+pg = O.quickPager (sys.argv[1:])
+rad = N.linspace (0, 2 * N.pi, 100)
+hwhm = 1.75 / 1.430 * 3600
+
+for ant in sorted (data.iterkeys ()):
+    pdata = data[ant]
+
+    print 'Antenna', ant
+
+    p = O.RectPlot ()
+
+    # Theory
+    p.addXY (N.cos (rad) * hwhm, N.sin (rad) * hwhm, 'PB Model')
+
+    # Fit results
+    for pol in 'xy':
+        if pol not in pdata: continue
+
+        d = pdata[pol]
+        amp, x0, y0, xhwhm, yhwhm = d[1::2]
+
+        print '   ', pol, 'chisq:', d[0], '=', d[0] / chimin, '* chimin'
+
+        x = x0 + N.cos (rad) * xhwhm
+        y = y0 + N.sin (rad) * yhwhm
+
+        p.addXY (x, y, 'Pol ' + pol)
+
+    # Center on 0, 0
+    b = N.abs (p.defaultField.xaxis.min)
+    b = max (b, N.abs (p.defaultField.xaxis.max))
+    b = max (b, N.abs (p.defaultField.yaxis.min))
+    b = max (b, N.abs (p.defaultField.yaxis.max))
+    p.setBounds (-b, b, -b, b)
+
+    # Add a little central crosshair
+    b /= 10
+    psn = p.addXY ([-b, b], [0, 0], None, rebound=False).primaryStyleNum
+    p.addXY ([0, 0], [-b, b], None, rebound=False).primaryStyleNum = psn
+    
+    pg.send (p)
+
+pg.done ()

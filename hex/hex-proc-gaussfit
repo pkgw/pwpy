@@ -1,0 +1,15 @@
+#! /bin/tcsh -f
+#
+# Run a 2D gaussian fit on the relative antenna gains, recording the results.
+
+# Set up Python environment for reading source and freq
+eval `~pkwill/sw/usepwsw_impl.sh -c`
+setenv PYTHONPATH ~pkwill/sw/pylib:$PYTHONPATH
+
+if ($#argv < 2) then
+    set analysisdir = .
+else
+    set analysisdir = "$1"
+endif
+
+hex-lib-gaussfit $analysisdir >$analysisdir/data-gaussfits.txt

@@ -1,0 +1,94 @@
+#! /usr/bin/env python
+# -*- python -*-
+#
+# Read an imgrpt file and extract useful information out of it.
+# Then output the information in a format that's more friendly
+# to parsing by other computer programs
+
+import sys
+from math import pi
+
+
+def load (f):
+    noise = None # Jy
+    dynrange = None # no units
+    thnoise = None # Jy
+    beam = None # arcsec
+    pa = None # radians
+    cell = None # arcsec
+    imsize = None # pixels
+    immin = None # Jy
+    immax = None # Jy
+
+    for l in f:
+        a = l.strip ().split ()
+
+        if l.startswith ('Image noise'):
+            noise = float (a[3]) * 1e-3 # convert to Jy
+            dynrange = float (a[10][:-1])
+        elif l.startswith ('(theoretical noise'):
+            thnoise = float (a[4]) * 1e-3 # to Jy
+        elif l.startswith ('Beamsize'):
+            beam = [float (a[2]), float (a[4])]
+            pa = float (a[8]) * pi / 180 # to radians
+        elif l.startswith ('(cellsize'):
+            cell = float (a[2])
+            imsize = int (a[6])
+        elif l.startswith ('Image min/max'):
+            s = a[3].split ('/')
+            immin = float (s[0]) * 1e-3 # to Jy
+            immax = float (s[1]) * 1e-3 # to Jy
+
+    def check (v, desc):
+        if v is None:
+            raise Exception ('Failed to extract %s from image report!' % desc)
+
+    check (noise, 'noise')
+    check (dynrange, 'dynamic range')
+    check (thnoise, 'theoretical noise')
+    check (beam, 'beam size')
+    check (pa, 'beam position angle')
+    check (cell, 'cell size')
+    check (imsize, 'image size')
+    check (immin, 'minimum value')
+    check (immax, 'maximum value')
+
+    return noise, dynrange, thnoise, beam, pa, cell, imsize, immin, immax
+
+
+def write (tup, f):
+    noise, dynrange, thnoise, beam, pa, cell, imsize, immin, immax = tup
+
+    def writeone (v, name):
+        print >>f, '%s %.6f' % (name, v)
+
+    writeone (noise, 'noise')
+    writeone (dynrange, 'dynrange')
+    writeone (thnoise, 'thnoise')
+    writeone (beam[0], 'beammaj')
+    writeone (beam[1], 'beammin')
+    writeone (pa, 'beampa')
+    writeone (cell, 'cell')
+    writeone (imsize, 'imsize')
+    writeone (immin, 'immax')
+    writeone (immax, 'immin')
+
+
+if __name__ == '__main__':
+    try:
+        tup = load (sys.stdin)
+    except Exception:
+        import traceback
+        traceback.print_exc ()
+        print >>sys.stderr, 'Error parsing image report. Exiting.'
+        sys.exit (1)
+
+    try:
+        write (tup, sys.stdout)
+    except Exception:
+        import traceback
+        traceback.print_exc ()
+        print >>sys.stderr, 'Error writing image parameters. Exiting.'
+        sys.exit (1)
+
+    sys.exit (0)

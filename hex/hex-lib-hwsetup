@@ -1,0 +1,98 @@
+#! /bin/tcsh -f
+#
+# Set up the correlator hardware for a hex7-type observation.
+# This code actually has nothing hex-centric in it, but it's
+# used by the hex observing code. This is a low-level command
+# that shouldn't typically be invoked by users directly.
+#
+# Change history:
+#
+# 2009/09/19 PKGW Initial version, based on mosfx2b.csh
+
+# uncomment to debug the commands being run by this script
+#set echo = 1
+set me = hex-lib-hwsetup:
+
+# Args
+
+if ($#argv != 9) then
+    echo "Error: need 9 arguments; not intended for end-user use."
+    exit 1
+endif
+
+set inst1 = $argv[1]
+set freq1 = $argv[2]
+set bw1 = $argv[3]
+set inst2 = $argv[4]
+set freq2 = $argv[5]
+set bw2 = $argv[6]
+set inttime = $argv[7]
+set pfx = $argv[8]
+set log = $argv[9]
+
+
+# A few variables
+
+set lo1 = `fxconf.rb hookup $inst1 |grep LO |cut -c1`
+set lo2 = `fxconf.rb hookup $inst2 |grep LO |cut -c1`
+set alist = `slist.csh $inst1` # assume $inst2 uses same ants
+
+
+# Do it
+
+onintr fail
+
+fxconf.rb hookup_tab $inst1 >$pfx-`echo $inst1 |sed -e s/:/_/`-hookup.tab
+fxconf.rb hookup_tab $inst2 >$pfx-`echo $inst2 |sed -e s/:/_/`-hookup.tab
+
+echo "$me setting sky freqs: $lo1 $freq1 / $lo2 $freq2" |& tee -ia $log
+atasetskyfreq $lo1 $freq1 |& tee -ia $log
+atalockserver lo$lo1 $pfx |& tee -ia $log
+atasetskyfreq $lo2 $freq2 |& tee -ia $log
+atalockserver lo$lo2 $pfx |& tee -ia $log
+
+echo "$me launching fx software: $inst1 / $inst2" |& tee -ia $log
+fxlaunch $inst1 |& tee -ia $log
+fxlaunch $inst2 |& tee -ia $log
+
+set highfreq = `echo $freq1 $freq2 | awk '{if($1>=$2) print $1; else print $2}'`
+echo "$me setting focus to $highfreq" |& tee -ia $log
+atasetfocus $alist $highfreq
+
+echo "$me setting PAMs to defaults on $alist" |& tee -ia $log
+atasetpams $alist |& tee -ia $log
+
+echo "$me setting bandwidths: $bw1 / $bw2" |& tee -ia $log
+bw.csh $inst1 $bw1 |& tee -ia $log
+bw.csh $inst2 $bw2 |& tee -ia $log
+
+echo "$me waiting for focus completion" |& tee -ia $log
+waitfocus $alist $highfreq
+atagetfocus $alist >$pfx-focus.txt
+
+echo "$me pointing to North Pole for autoattening ..." |& tee -ia $log
+atasetazel -w $alist 0 41 |& tee -ia $log
+
+echo "$me LNAs on" |& tee -ia $log
+atalnaon $alist |& tee -ia $log
+
+echo "$me setting integration times to $inttime ..." |& tee -ia $log
+(setintfx.csh $inttime $inst1 |& tee -ia $log) &
+setintfx.csh $inttime $inst2 |& tee -ia $log
+wait
+
+echo "$me autoattening ..." |& tee -ia $log
+(autoattenall.csh $inst1 |& tee -ia $log) &
+autoattenall.csh $inst2 |& tee -ia $log
+wait
+
+echo "$me hardware initialization complete!" |& tee -ia $log
+exit 0
+
+fail:
+
+echo "$me failure - unlocking LOs" |& tee -ia $log
+ataunlockserver lo$lo1 $pfx
+ataunlockserver lo$lo2 $pfx
+echo "$me failure - ended at `date`" |& tee -ia $log
+exit 1

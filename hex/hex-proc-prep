@@ -1,0 +1,217 @@
+#! /bin/tcsh -f
+#
+# Prepare raw hex-style observations for further analysis by
+# flagging and calibrating the data.
+
+#set echo = 1
+set newrfiflags = "subint=1"
+set calcalflags = "options=sefd,autoref"
+set selfcalflags = "options=amp,nosc refant=11 interval=999"
+
+# Set up Python environment for reading source and freq
+eval `~pkwill/sw/usepwsw_impl.sh -c`
+setenv PYTHONPATH ~pkwill/sw/pylib:$PYTHONPATH
+
+if ($#argv > 2) then
+    set flt = ($argv)
+else
+    echo "Enter: [analysis dir] [vis1] [vis2 ...]"
+    echo "E.g.:  work           hex-3c48-hp7-p*-1430a (but wildcards don't work with manual input)"
+    set flt = ($<)
+endif
+
+set workdir = $1
+mkdir -p $workdir
+shift # (rest of) argv is a list of raw uv datasets
+
+
+# Shadow the raw datasets into the work directory
+
+set old = `pwd`
+unset pnt0
+set rest = ()
+
+foreach vis ($argv)
+    set vis = `cd $vis ; pwd`
+    set vdup = hpp-`basename $vis`
+
+    # Build up lists of datasets
+    if (! $?pnt0) then
+	set pnt0 = $vdup
+    else
+	set rest = ($rest $vdup)
+    endif
+
+    if (-d $workdir/$vdup) then
+	echo "Shadowed dataset $workdir/$vdup exists"
+    else
+	echo "Shadow $vis -> $workdir/$vdup"
+	mkdir $workdir/$vdup
+	cd $workdir/$vdup
+
+	foreach fb (`cd $vis && ls -1`)
+	    set fn = $vis/$fb
+
+	    if ($fb == visdata) then
+		ln -s $fn visdata
+	    else
+		cp -a $fn .
+	    endif
+	end
+
+	cd $old
+    endif
+end
+
+cd $workdir
+
+
+# Try to get flux information
+
+set tmp = `mktemp`
+python >$tmp <<EOF
+from miriad import VisData
+t = VisData ("$pnt0").open ('rw')
+t.next ()
+print t.getVarString ('source')
+t.close ()
+EOF
+set source = `cat $tmp`
+
+python >$tmp <<EOF
+from miriad import VisData
+t = VisData ("$pnt0").open ('rw')
+t.next ()
+print int (t.getVarDouble ('freq') * 1000)
+t.close ()
+EOF
+set freq = `cat $tmp`
+
+echo "Read source $source, freq $freq"
+set flux = `python -m calmodels $source $freq`
+
+if ($status) then
+    echo "Error looking up flux, using 1 instead."
+    set flux = 1
+else
+    echo "Found flux = $flux Jy."
+endif
+
+cat >data-sinfo.txt <<EOF
+source $source
+freq $freq
+flux $flux
+EOF
+
+
+# RFI flag everything
+
+foreach vis ($pnt0 $rest)
+    if (! -d $vis/phoenix) then
+	echo "RFI sweep dataset $vis"
+	newrfisweep.csh vis=$vis $newrfiflags
+	if ($status) exit $status
+    endif
+end
+
+
+# Calibrate the on-source pointing
+
+if (-d $pnt0/gains.xxp) then
+    echo "Primary pointing dataset $pnt0 has already been calibrated"
+else
+    echo "Calibrating primary pointing dataset $pnt0"
+    newcalcal.csh vis=$pnt0 flux=$flux $calcalflags
+    if ($status) exit $status
+    cp $pnt0/gains $pnt0/gains.orig
+endif
+
+if (! -f data-calrpt.txt) then
+    # TODO: we could crack the calrpt in the same way that we
+    # crack the image report. I'm not quite sure why the calrpt
+    # contains image info that is slightly different than what's
+    # reported in imgrpt.
+    cp cal-$source-$freq-maps/calrpt data-calrpt.txt
+endif
+
+if (! -f data-imginfo.txt) then
+    hex-lib-crack-imgrpt <cal-$source-$freq-maps/imgrpt >data-imginfo.txt
+endif
+
+
+# Propagate the calibration
+
+foreach vis ($rest)
+    if (-f $vis/gains) then
+	echo "Dataset $vis has been calibrated"
+    else
+	echo "Calibrating dataset $vis"
+	gpcopy vis=$pnt0 out=$vis
+	if ($status) exit $status
+    endif
+end
+
+
+# Uvcat into pol-split datasets and selfcal
+
+mkdir -p selfcal-logs
+
+foreach vis ($pnt0 $rest)
+    foreach p (x y)
+	if (-d $vis.$p) then
+	    echo "Rough-calibrated dataset $vis.$p exists"
+	 else
+	    uvcat options=unflagged select="pol($p$p),-auto" vis=$vis out=$vis.$p
+	    if ($status) exit $status
+	endif
+
+	if (-f $vis.$p/gains) then
+	    echo "Dataset $vis.$p already self-caled"
+	else
+	    # dra/ddec are in radians and reflect physical offsets,
+	    # that is, d(RA coord) = dra / cos (dec)
+	    # the offset parameter to mselfcal is in arcsec. Testing confirms
+	    # that this value is appropriate for the RA fed to mselfcal.
+	    set ora = `gethd in=$vis/dra |awk '{print $1 * -206265}'`
+	    set odec = `gethd in=$vis/ddec |awk '{print $1 * -206265}'`
+	    mselfcal vis=$vis.$p flux=$flux offset=$ora,$odec $selfcalflags |tee selfcal-logs/$vis.$p
+	    if ($status) exit $status
+	endif
+    end
+end
+
+
+# Extract SEFD data
+
+if (! -f data-sefd.txt) then
+    cp $pnt0/sefd data-sefd.txt
+endif
+
+
+# Extract antenna gains normalized to 1 at pointing center
+
+if (! -f data-relgains.txt) then
+    hex-lib-extractgains -s $pnt0 $rest >data-relgains.txt
+    if ($status) exit $status
+endif
+
+
+# Extract absolute antenna gains at the pointing center
+
+if (! -f data-absgains.txt) then
+    hex-lib-extractgains -j $pnt0 >data-absgains.txt
+    if ($status) exit $status
+endif
+
+
+# Extract coordinate offsets in the data files
+
+if (! -f data-offsets.txt) then
+    hex-lib-calcoffsets $pnt0 $rest >data-offsets.txt
+    if ($status) exit $status
+endif
+
+
+# TODO: extract closure information of primary pointing.
+
+exit 0

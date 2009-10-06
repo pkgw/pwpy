@@ -1,0 +1,126 @@
+#! /usr/bin/env python
+# -*- python -*-
+#
+# Extract the antenna gains from Miriad datasets and write them
+# into text files for easier processing.
+
+import sys
+import numpy as N
+import miriad
+from mirtask import readgains
+
+
+if sys.argv[1] == '-s':
+    # Split mode
+    split = True
+elif sys.argv[1] == '-j':
+    # Joined mode
+    split = False
+else:
+    print >>sys.stderr, 'Error: first argument must be -s or -j.'
+    sys.exit (1)
+
+files = sys.argv[2:]
+
+
+# Read in all of the gains ...
+
+npnts = len (files)
+allgains = {}
+nants = None
+
+def readSplit (i, filebase):
+    global nants
+
+    for pol in 'xy':
+        fn = filebase + '.' + pol
+        vis = miriad.VisData (fn).open ('rw')
+        gr = readgains.GainsReader (vis)
+        gr.prep ()
+
+        if gr.nsols != 1:
+            print >>sys.stderr, 'Error: expected exactly one gain solution in', fn
+            sys.exit (1)
+        if gr.nfeeds != 1:
+            print >>sys.stderr, 'Error: expected exactly one feed per solution in', fn
+            sys.exit (1)
+        if gr.ntau != 0:
+            print >>sys.stderr, 'Error: expected no delays per solution in', fn
+            sys.exit (1)
+        if nants is None:
+            nants = gr.nants
+        elif gr.nants != nants:
+            print >>sys.stderr, 'Error: changed number of ants:', nants, 'to', gr.nants
+            sys.exit (1)
+            
+        time, gains = gr.readAll ()
+        gains = gains[0]
+
+        for j in xrange (nants):
+            key = (j + 1, pol)
+
+            if key not in allgains:
+                allgains[key] = [0.] * (2 * npnts)
+
+            allgains[key][i] = N.abs (gains[j])
+            allgains[key][i + npnts] = N.arctan2 (gains[j].imag, gains[j].real)
+
+
+def readJoined (i, fn):
+    global nants
+
+    vis = miriad.VisData (fn).open ('rw')
+    gr = readgains.GainsReader (vis)
+    gr.prep ()
+
+    if gr.nsols != 1:
+        print >>sys.stderr, 'Error: expected exactly one gain solution in', fn
+        sys.exit (1)
+    if gr.nfeeds != 2:
+        print >>sys.stderr, 'Error: expected exactly two feeds per solution in', fn
+        sys.exit (1)
+    if gr.ntau != 0:
+        print >>sys.stderr, 'Error: expected no delays per solution in', fn
+        sys.exit (1)
+    if nants is None:
+        nants = gr.nants
+    elif gr.nants != nants:
+        print >>sys.stderr, 'Error: changed number of ants:', nants, 'to', gr.nants
+        sys.exit (1)
+            
+    time, gains = gr.readAll ()
+    gains = gains[0]
+
+    for j in xrange (nants):
+        for k in (0, 1):
+            pol = 'xy'[k]
+            key = (j + 1, pol)
+
+            if key not in allgains:
+                allgains[key] = [0.] * (2 * npnts)
+
+            g = gains[2*j + k]
+            allgains[key][i] = N.abs (g)
+            allgains[key][i + npnts] = N.arctan2 (g.imag, g.real)
+
+if split:
+    for i in xrange (npnts):
+        readSplit (i, files[i])
+else:
+    for i in xrange (npnts):
+        readJoined (i, files[i])
+    
+
+# Then, output
+
+skeys = sorted (allgains.iterkeys ())
+
+for key in skeys:
+    vals = allgains[key]
+
+    print key[0], key[1],
+
+    for i in xrange (2 * npnts):
+        print '%.8f' % vals[i],
+
+    print
