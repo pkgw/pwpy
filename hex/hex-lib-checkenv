@@ -1,0 +1,58 @@
+# -*- shell-script -*-
+#
+# This script is sourced by all of the high-level hex scripts.
+# It makes sure that our $PATH and other environment variables
+# are set up correctly so that the scripts can run correctly.
+
+# First, check $PATH
+
+which hex-coords-hp7 >& /dev/null
+
+if ($status) then
+    # This relies on the assumption that we're being sourced by
+    # a script that lives in MMM/hex, so that $0 refers to the
+    # name of that script. If $0 contains a full path, we need
+    # to modify $PATH. If it doesn't, then the hex directory
+    # ought to already be in the path and we shouldn't be inside
+    # this code block. In that latter case, dirname would return 
+    # '.'. Such a case can also be encountered if '.' is not
+    # already in $PATH and the user is running ./hex-foo, so
+    # don't report that case as an error.
+    setenv PATH `dirname $0`:$PATH
+endif
+
+which hex-coords-hp7 >& /dev/null
+
+if ($status) then
+    echo "Warning: failed to add hex scripts to path; tried adding `dirname $0`"
+endif
+
+# Now, check the Miriad-Python modules, which are provided via
+# the PWSW (Peter Williams' software) environment setup.
+
+python -c 'import mirtask' >& /dev/null
+
+if ($status) eval `~pkwill/sw/usepwsw_impl.sh -c`
+
+python -c 'import mirtask' >& /dev/null
+
+if ($status) then
+    echo "Warning: failed to add Miriad-Python modules to PYTHONPATH"
+endif
+
+# Now check for the mpfit module, which is provided via Peter's
+# miscellaneous "pylib" directory
+
+python -c 'import mpfit' >& /dev/null
+
+if ($status) setenv PYTHONPATH ~pkwill/sw/pylib:$PYTHONPATH
+
+python -c 'import mpfit' >& /dev/null
+
+if ($status) then
+    echo "Warning: failed to add mpfit module to PYTHONPATH"
+endif
+
+# Make sure not to end this script with an "exit 0" or anything
+# since it's sourced, so such a command would exit the *calling*
+# script.

@@ -8,11 +8,10 @@ set newrfiflags = "subint=1"
 set calcalflags = "options=sefd,autoref"
 set selfcalflags = "options=amp,nosc refant=11 interval=999"
 
-# Set up Python environment for reading source and freq
-eval `~pkwill/sw/usepwsw_impl.sh -c`
-setenv PYTHONPATH ~pkwill/sw/pylib:$PYTHONPATH
+# Make sure the shell environment is set up
+source `dirname $0`/hex-lib-checkenv
 
-if ($#argv < 1) then
+if ($#argv < 2) then
     echo "Usage: [analysis dir] [vis1] [vis2 ...]"
     echo "E.g.:  work           hex-3c48-hp7-p*-1430a"
     exit 1

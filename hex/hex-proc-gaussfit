@@ -2,9 +2,8 @@
 #
 # Run a 2D gaussian fit on the relative antenna gains, recording the results.
 
-# Set up Python environment for reading source and freq
-eval `~pkwill/sw/usepwsw_impl.sh -c`
-setenv PYTHONPATH ~pkwill/sw/pylib:$PYTHONPATH
+# Make sure the shell environment is set up
+source `dirname $0`/hex-lib-checkenv
 
 if ($#argv < 2) then
     set analysisdir = .

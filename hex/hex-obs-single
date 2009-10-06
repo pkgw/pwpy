@@ -12,6 +12,10 @@ set me = hex-obs-single:
 set inttime = 10
 
 
+# Make sure the shell environment is set up
+source `dirname $0`/hex-lib-checkenv
+
+
 # Args
 
 if ($#argv > 8) then
