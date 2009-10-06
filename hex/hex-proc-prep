@@ -12,12 +12,10 @@ set selfcalflags = "options=amp,nosc refant=11 interval=999"
 eval `~pkwill/sw/usepwsw_impl.sh -c`
 setenv PYTHONPATH ~pkwill/sw/pylib:$PYTHONPATH
 
-if ($#argv > 2) then
-    set flt = ($argv)
-else
-    echo "Enter: [analysis dir] [vis1] [vis2 ...]"
-    echo "E.g.:  work           hex-3c48-hp7-p*-1430a (but wildcards don't work with manual input)"
-    set flt = ($<)
+if ($#argv < 1) then
+    echo "Usage: [analysis dir] [vis1] [vis2 ...]"
+    echo "E.g.:  work           hex-3c48-hp7-p*-1430a"
+    exit 1
 endif
 
 set workdir = $1
