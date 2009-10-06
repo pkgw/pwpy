@@ -525,10 +525,10 @@ while ($nants == "")
     endif
 end
 
-set tsysarray = (80)
+set tsysarray = (100000)
 
 while ($#tsysarray < $nants)
-    set tsysarray = ($tsysarray 80)
+    set tsysarray = ($tsysarray 100000)
 end
 
 set linecmds
@@ -783,6 +783,7 @@ if !($niters) set niters = 2500
 clean:
 
 # Create clean component map and make residual/cleaned images
+echo $nalevel
 clean map=$wd/tempmap.map beam=$wd/tempmap.beam out=$wd/tempmap.clean niters=$niters cutoff=$nalevel "$cregion" >& $wd/cleanlog 
 if !(-e $wd/tempmap.clean) then
     echo "FATAL ERROR: Image is not cleanable (likely too much data was culled)."
@@ -854,9 +855,9 @@ if (`grep -v "#" $wd/sfind.log | awk '{if ($7*$6 > 3000*noise) cycles+=2*log((30
 	    goto clean
 	endif
     endif
-else if (`echo $acheck $nacheck | awk '{if ($1 > 1 && $2 > 1) print 1; else print 0}'` && "$niters" != "50") then
+else if (`echo $acheck $nacheck | awk '{if ($1 > 1 || $2 > 1) print 1; else print 0}'` && "$niters" != "50") then
     if ($intclean) then
-	set niters = `echo $niters $acheck | awk '{print int($1*$2)}'`
+	set niters = `echo $niters $acheck $nacheck | awk '{if ($2 < $3) print int($1*$2); else print int($1*$3)}'`
 	if ($niters < 50) set niters = 50
 	echo "WARNING: Overcleaning detected, rolling back to $niters iterations..."
 	rm -rf $wd/tempmap.clean $wd/tempmap.rs $wd/tempmap.cm
