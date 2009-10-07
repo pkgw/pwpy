@@ -255,9 +255,9 @@ foreach pnt (`seq 1 $npnt`)
     set tstart = `date -u +%y%h%d:%H:%M:%S`
     (atafx $vpf1 $antpols1 $inst1 $ephem -duration $dur -bw $bw1 $switch |& tee -ia $vpnt-fx$ic1.log) &
     atafx $vpf2 $antpols2 $inst2 $ephem -duration $dur -bw $bw2 $switch |& tee -ia $vpnt-fx$ic2.log
+    wait
     set tend = `date -u +%y%h%d:%H:%M:%S`
     echo "$me catchers finished at `date`" |& tee -ia $log
-    wait
 
     echo "$me killing fringe rotators ..." |& tee -ia $log
     frot.csh $inst1 $ephem $freq1 `pwd` kill
