@@ -143,7 +143,7 @@ while (1)
     set freq2 = $freq2s[$i]
     set bw2 = $bw2s[$i]
 
-    echo "$me considering setup $i = $src $hexmode $freq1 $bw1 $freq2 $bw2" |& tee -ia $log
+    echo "$me `date` - considering setup $i = $src $hexmode $freq1 $bw1 $freq2 $bw2" |& tee -ia $log
 
     set subpfx = hex-$src-$hexmode
     set coords = $subpfx-$freq1-coords.txt
@@ -166,14 +166,14 @@ while (1)
     set shortstop = `echo $stophr $dur $npnt |awk '{print $1 - 0.05 - ($2 + 80) * $3 / 3600}'`
 
     if (`stopnow.csh $begin $shortstop` == stop) then
-	echo "$me not enough time to run next observation, finishing up"
+	echo "$me `date` - not enough time to run next observation, finishing up"
 	break
     endif
 
     # Set up the hardware for this setup: focus, bw, and LOs
 
     set highfreq = `echo $freq1 $freq2 | awk '{if($1>=$2) print $1; else print $2}'`
-    echo "$me setting focus to $highfreq" |& tee -ia $log
+    echo "$me `date`- setting focus to $highfreq" |& tee -ia $log
     atasetfocus $alist $highfreq
 
     echo "$me setting sky freqs: $lo1 $freq1 / $lo2 $freq2" |& tee -ia $log
@@ -204,11 +204,12 @@ while (1)
     # Check time left again
 
     if (`stopnow.csh $begin $shortstop` == stop) then
-	echo "$me darn, hardware setup took too long, no time for obs"
+	echo "$me `date` - darn, hardware setup took too long, no time for obs"
 	break
     endif
 
     # We can finally run the observation
+    echo "$me `date` - handing off to hex-obs-nosetup" |& tee -ia $log
     hex-obs-nosetup $inst1 $inst2 $coords $subpfx $src $dur $stophr
     if ($status) goto fail
 
