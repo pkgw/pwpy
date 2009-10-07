@@ -38,6 +38,21 @@ for l in file (join (analysisdir, 'data-gaussfits.txt')):
 
     data[ant][pol] = d
 
+src = ghz = flux = None
+
+for l in file (join (analysisdir, 'data-sinfo.txt')):
+    a = l.strip ().split ()
+
+    if a[0] == 'source':
+        src = a[1]
+    elif a[0] == 'freq':
+        ghz = float (a[1]) * 1e-3
+    elif a[0] == 'flux':
+        flux = float (a[1])
+
+assert src is not None, 'Bad sinfo file, no source name?'
+assert ghz is not None, 'Bad sinfo file, no source name?'
+assert flux is not None, 'Bad sinfo file, no source name?'
 
 # Compute uncertainty normalization and convert to consistent units
 
@@ -58,7 +73,7 @@ for pdata in data.itervalues ():
     
 pg = O.quickPager (sys.argv[1:])
 rad = N.linspace (0, 2 * N.pi, 100)
-hwhm = 1.75 / 1.430 * 3600
+hwhm = 1.75 / ghz * 3600
 
 for ant in sorted (data.iterkeys ()):
     pdata = data[ant]
