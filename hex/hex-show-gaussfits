@@ -12,6 +12,7 @@ if len (sys.argv) < 2:
     analysisdir = '.'
 else:
     analysisdir = sys.argv[1]
+    del sys.argv[1]
 
 
 # Load in data
