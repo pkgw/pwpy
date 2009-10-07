@@ -146,7 +146,7 @@ while (1)
     echo "$me considering setup $i = $src $hexmode $freq1 $bw1 $freq2 $bw2" |& tee -ia $log
 
     set subpfx = hex-$src-$hexmode
-    set coords = $subpfx-coords.txt
+    set coords = $subpfx-$freq1-coords.txt
 
     # Optionally generate coords file for this observation
 
