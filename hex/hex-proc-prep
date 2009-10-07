@@ -106,8 +106,10 @@ EOF
 foreach vis ($pnt0 $rest)
     if (! -d $vis/phoenix) then
 	echo "RFI sweep dataset $vis"
+	echo ">>>>>>>>>>>>>>>>>>>>"
 	newrfisweep.csh vis=$vis $newrfiflags
 	if ($status) exit $status
+	echo "<<<<<<<<<<<<<<<<<<<<"
     endif
 end
 
@@ -118,8 +120,10 @@ if (-d $pnt0/gains.xxp) then
     echo "Primary pointing dataset $pnt0 has already been calibrated"
 else
     echo "Calibrating primary pointing dataset $pnt0"
+    echo ">>>>>>>>>>>>>>>>>>>>"
     newcalcal.csh vis=$pnt0 flux=$flux $calcalflags
     if ($status) exit $status
+    echo "<<<<<<<<<<<<<<<<<<<<"
     cp $pnt0/gains $pnt0/gains.orig
 endif
 
