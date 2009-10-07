@@ -43,9 +43,7 @@
 # The coordinates file should consist of a sequence of floating point
 # numbers in text. If there are 2N numbers total, the first N numbers
 # are RAs in hours and the next N are the declinations in degrees. The
-# first RA and dec are taken to specify the central pointing. Output
-# datasets are given 'dra' and 'ddec' header variables specifying
-# their offset from the central pointing.
+# first RA and dec are taken to specify the central pointing.
 #
 # The outputs created by the script are:
 #
@@ -260,17 +258,6 @@ foreach pnt (`seq 1 $npnt`)
     set tend = `date -u +%y%h%d:%H:%M:%S`
     echo "$me catchers finished at `date`" |& tee -ia $log
     wait
-
-    # Put dra and ddec (in radians) into dataset as an item. Note that
-    # dra and ddec are technically UV variables, not dataset items, but
-    # that dataset items override UV variable values, so what we do here
-    # works.
-    set dra = `ruby -e "p ($ra-$ras[1]) * Math::PI / 12 * Math.cos($decs[1] * Math::PI / 180)"`
-    set ddec = `ruby -e "p ($dec-$decs[1]) * Math::PI / 180"`
-    puthd in=$vpf1/dra value=$dra
-    puthd in=$vpf1/ddec value=$ddec
-    puthd in=$vpf2/dra value=$dra
-    puthd in=$vpf2/ddec value=$ddec
 
     echo "$me killing fringe rotators ..." |& tee -ia $log
     frot.csh $inst1 $ephem $freq1 `pwd` kill

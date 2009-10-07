@@ -101,6 +101,18 @@ flux $flux
 EOF
 
 
+# Extract coordinate offsets in the data files and load in the RA/Dec
+# offsets in arcsec for use with mselfcal
+
+if (! -f data-offsets.txt) then
+    hex-lib-calcoffsets $pnt0 $rest >data-offsets.txt
+    if ($status) exit $status
+endif
+
+set oras = (`cut -d' ' -f1 <data-offsets.txt |awk '{print $1 * -206265}'`)
+set odecs = (`cut -d' ' -f2 <data-offsets.txt |awk '{print $1 * -206265}'`)
+
+
 # RFI flag everything
 
 foreach vis ($pnt0 $rest)
@@ -156,6 +168,7 @@ end
 # Uvcat into pol-split datasets and selfcal
 
 mkdir -p selfcal-logs
+set i = 1
 
 foreach vis ($pnt0 $rest)
     foreach p (x y)
@@ -169,16 +182,13 @@ foreach vis ($pnt0 $rest)
 	if (-f $vis.$p/gains) then
 	    echo "Dataset $vis.$p already self-caled"
 	else
-	    # dra/ddec are in radians and reflect physical offsets,
-	    # that is, d(RA coord) = dra / cos (dec)
-	    # the offset parameter to mselfcal is in arcsec. Testing confirms
-	    # that this value is appropriate for the RA fed to mselfcal.
-	    set ora = `gethd in=$vis/dra |awk '{print $1 * -206265}'`
-	    set odec = `gethd in=$vis/ddec |awk '{print $1 * -206265}'`
-	    mselfcal vis=$vis.$p flux=$flux offset=$ora,$odec $selfcalflags |tee selfcal-logs/$vis.$p
+	    set offset = ${oras[$i]},${odecs[$i]}
+	    mselfcal vis=$vis.$p flux=$flux offset=$offset $selfcalflags |tee selfcal-logs/$vis.$p
 	    if ($status) exit $status
 	endif
     end
+
+    @ i = $i + 1
 end
 
 
@@ -201,14 +211,6 @@ endif
 
 if (! -f data-absgains.txt) then
     hex-lib-extractgains -j $pnt0 >data-absgains.txt
-    if ($status) exit $status
-endif
-
-
-# Extract coordinate offsets in the data files
-
-if (! -f data-offsets.txt) then
-    hex-lib-calcoffsets $pnt0 $rest >data-offsets.txt
     if ($status) exit $status
 endif
 
