@@ -64,13 +64,13 @@ def linearConstrained (x, y, x0, y0, weights = None):
     yields the best-fit points.
     """
 
-    x = _N.asarray (x)
-    y = _N.asarray (y)
+    x = _N.asfarray (x)
+    y = _N.asfarray (y)
 
     if weights is None:
         weights = _N.ones (len (x))
     else:
-        weights = _N.asarray (weights)
+        weights = _N.asfarray (weights)
 
     A = (x - x0) * weights
     B = (y - y0) * weights
@@ -183,13 +183,13 @@ class FitBase (object):
         self.x = self.y = self.sigmas = None
     
     def setData (self, x, y, sigmas=None):
-        self.x = _N.asarray (x, dtype=_N.float)
-        self.y = _N.asarray (y, dtype=_N.float)
+        self.x = _N.asfarray (x)
+        self.y = _N.asfarray (y)
 
         if sigmas is None:
             self.sigmas = None
         else:
-            self.sigmas = _N.asarray (sigmas)
+            self.sigmas = _N.asfarray (sigmas)
 
         return self
 
@@ -199,8 +199,8 @@ class FitBase (object):
         return self
 
     def fakeDataSigmas (self, x, sigmas, *params):
-        self.x = _N.asarray (x)
-        self.sigmas = _N.asarray (sigmas)
+        self.x = _N.asfarray (x)
+        self.sigmas = _N.asfarray (sigmas)
         
         mfunc = self.makeModel (*params)
         self.y = mfunc (self.x) + _N.random.standard_normal (self.x.shape) * self.sigmas
@@ -208,7 +208,7 @@ class FitBase (object):
         return self
         
     def fakeDataFrac (self, x, frac, *params):
-        self.x = _N.asarray (x)
+        self.x = _N.asfarray (x)
         
         mfunc = self.makeModel (*params)
 
@@ -300,7 +300,7 @@ class FitBase (object):
         return self
 
     def assumeParams (self, *params):
-        self.params = _N.asarray (params)
+        self.params = _N.asfarray (params)
         self.uncerts = _N.zeros_like (self.params)
         self.mfunc = self.makeModel (*self.params)
 
