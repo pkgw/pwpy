@@ -11,56 +11,21 @@ set selfcalflags = "options=amp,nosc refant=11 interval=999"
 # Make sure the shell environment is set up
 source `dirname $0`/hex-lib-checkenv
 
-if ($#argv < 2) then
-    echo "Usage: [analysis dir] [vis1] [vis2 ...]"
-    echo "E.g.:  work           hex-3c48-hp7-p*-1430a"
+if ($#argv < 1) then
+    set workdir = .
+else
+    set workdir = $1
+endif
+
+if (! -d $workdir/vis00) then
+    echo "Error: analysis directory $workdir does not appear to contain any data."
+    echo "       (No such directory $workdir/vis00.)"
     exit 1
 endif
 
-set workdir = $1
-mkdir -p $workdir
-shift # (rest of) argv is a list of raw uv datasets
-
-
-# Shadow the raw datasets into the work directory
-
-set old = `pwd`
-unset pnt0
-set rest = ()
-
-foreach vis ($argv)
-    set vis = `cd $vis ; pwd`
-    set vdup = hpp-`basename $vis`
-
-    # Build up lists of datasets
-    if (! $?pnt0) then
-	set pnt0 = $vdup
-    else
-	set rest = ($rest $vdup)
-    endif
-
-    if (-d $workdir/$vdup) then
-	echo "Shadowed dataset $workdir/$vdup exists"
-    else
-	echo "Shadow $vis -> $workdir/$vdup"
-	mkdir $workdir/$vdup
-	cd $workdir/$vdup
-
-	foreach fb (`cd $vis && ls -1`)
-	    set fn = $vis/$fb
-
-	    if ($fb == visdata) then
-		ln -s $fn visdata
-	    else
-		cp -a $fn .
-	    endif
-	end
-
-	cd $old
-    endif
-end
-
 cd $workdir
+set rest = (vis??)
+set rest = (${rest[2-]})
 
 
 # Try to get flux information
@@ -68,7 +33,7 @@ cd $workdir
 set tmp = `mktemp`
 python >$tmp <<EOF
 from miriad import VisData
-t = VisData ("$pnt0").open ('rw')
+t = VisData ("vis00").open ('rw')
 t.next ()
 print t.getVarString ('source')
 t.close ()
@@ -77,7 +42,7 @@ set source = `cat $tmp`
 
 python >$tmp <<EOF
 from miriad import VisData
-t = VisData ("$pnt0").open ('rw')
+t = VisData ("vis00").open ('rw')
 t.next ()
 print int (t.getVarDouble ('freq') * 1000)
 t.close ()
@@ -105,7 +70,7 @@ EOF
 # offsets in arcsec for use with mselfcal
 
 if (! -f data-offsets.txt) then
-    hex-lib-calcoffsets $pnt0 $rest >data-offsets.txt
+    hex-lib-calcoffsets vis00 $rest >data-offsets.txt
     if ($status) exit $status
 endif
 
@@ -115,7 +80,7 @@ set odecs = (`cut -d' ' -f2 <data-offsets.txt |awk '{print $1 * -206265}'`)
 
 # RFI flag everything
 
-foreach vis ($pnt0 $rest)
+foreach vis (vis00 $rest)
     if (! -d $vis/phoenix) then
 	echo "RFI sweep dataset $vis"
 	echo ">>>>>>>>>>>>>>>>>>>>"
@@ -128,15 +93,15 @@ end
 
 # Calibrate the on-source pointing
 
-if (-d $pnt0/gains.xxp) then
-    echo "Primary pointing dataset $pnt0 has already been calibrated"
+if (-d vis00/gains.xxp) then
+    echo "Primary pointing dataset vis00 has already been calibrated"
 else
-    echo "Calibrating primary pointing dataset $pnt0"
+    echo "Calibrating primary pointing dataset vis00"
     echo ">>>>>>>>>>>>>>>>>>>>"
-    newcalcal.csh vis=$pnt0 flux=$flux $calcalflags
+    newcalcal.csh vis=vis00 flux=$flux $calcalflags
     if ($status) exit $status
     echo "<<<<<<<<<<<<<<<<<<<<"
-    cp $pnt0/gains $pnt0/gains.orig
+    cp vis00/gains vis00/gains.orig
 endif
 
 if (! -f data-calrpt.txt) then
@@ -159,7 +124,7 @@ foreach vis ($rest)
 	echo "Dataset $vis has been calibrated"
     else
 	echo "Calibrating dataset $vis"
-	gpcopy vis=$pnt0 out=$vis
+	gpcopy vis=vis00 out=$vis
 	if ($status) exit $status
     endif
 end
@@ -170,7 +135,7 @@ end
 mkdir -p selfcal-logs
 set i = 1
 
-foreach vis ($pnt0 $rest)
+foreach vis (vis00 $rest)
     foreach p (x y)
 	if (-d $vis.$p) then
 	    echo "Rough-calibrated dataset $vis.$p exists"
@@ -195,14 +160,14 @@ end
 # Extract SEFD data
 
 if (! -f data-sefd.txt) then
-    cp $pnt0/sefd data-sefd.txt
+    cp vis00/sefd data-sefd.txt
 endif
 
 
 # Extract antenna gains normalized to 1 at pointing center
 
 if (! -f data-relgains.txt) then
-    hex-lib-extractgains -s $pnt0 $rest >data-relgains.txt
+    hex-lib-extractgains -s vis00 $rest >data-relgains.txt
     if ($status) exit $status
 endif
 
@@ -210,7 +175,7 @@ endif
 # Extract absolute antenna gains at the pointing center
 
 if (! -f data-absgains.txt) then
-    hex-lib-extractgains -j $pnt0 >data-absgains.txt
+    hex-lib-extractgains -j vis00 >data-absgains.txt
     if ($status) exit $status
 endif
 
