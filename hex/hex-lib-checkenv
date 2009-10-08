@@ -4,7 +4,7 @@
 # It makes sure that our $PATH and other environment variables
 # are set up correctly so that the scripts can run correctly.
 
-# First, check $PATH
+# First, check $PATH for hex-related programs
 
 which hex-coords-hp7 >& /dev/null
 
@@ -25,6 +25,20 @@ which hex-coords-hp7 >& /dev/null
 
 if ($status) then
     echo "Warning: failed to add hex scripts to path; tried adding `dirname $0`"
+endif
+
+# Now check for RAPID
+
+which newrfisweep.csh >& /dev/null
+
+if ($status) then
+    setenv PATH /home/obs/mmm/karto/RAPIDBeta:$PATH
+endif
+
+which newrfisweep.csh >& /dev/null
+
+if ($status) then
+    echo "Warning: failed to add RAPID scripts to path"
 endif
 
 # Now, check the Miriad-Python modules, which are provided via
