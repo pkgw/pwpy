@@ -183,8 +183,14 @@ class FitBase (object):
         self.x = self.y = self.sigmas = None
     
     def setData (self, x, y, sigmas=None):
-        self.x = _N.asfarray (x)
-        self.y = _N.asfarray (y)
+        # Get the floating-point coercion of asfarray without doing a large
+        # number of needless computations, and also making it so that if the
+        # user provides a complex value don't crash. (By my reading of the docs
+        # N.asfarray ([complex]) should succeed but it doesn't for numpy <= 1.3)
+        x[0] += 0.0 
+        y[0] += 0.0
+        self.x = _N.asarray (x)
+        self.y = _N.asarray (y)
 
         if sigmas is None:
             self.sigmas = None
@@ -199,7 +205,9 @@ class FitBase (object):
         return self
 
     def fakeDataSigmas (self, x, sigmas, *params):
-        self.x = _N.asfarray (x)
+        # See comment in setData
+        x[0] += 0.0
+        self.x = _N.asarray (x)
         self.sigmas = _N.asfarray (sigmas)
         
         mfunc = self.makeModel (*params)
@@ -208,7 +216,9 @@ class FitBase (object):
         return self
         
     def fakeDataFrac (self, x, frac, *params):
-        self.x = _N.asfarray (x)
+        # See comment in setData
+        x[0] += 0.0
+        self.x = _N.asarray (x)
         
         mfunc = self.makeModel (*params)
 
@@ -294,7 +304,8 @@ class FitBase (object):
             self.resids = self.y - self.mdata
 
         if self.rchisq is None:
-            self.rchisq = ((self.resids / self.sigmas)**2).sum () / \
+            # resids may be complex
+            self.rchisq = (self.resids * self.resids.conj () / self.sigmas**2).sum () / \
                           (self.x.size - len (self.params))
 
         return self
@@ -309,7 +320,8 @@ class FitBase (object):
             self.resids = self.y - self.mdata
 
         if self.sigmas is not None:
-            self.rchisq = ((self.resids / self.sigmas)**2).sum () / \
+            # resids may be complex
+            self.rchisq = (self.resids * self.resids.conj () / self.sigmas**2).sum () / \
                           (self.x.size - len (self.params))
 
         return self
@@ -454,10 +466,16 @@ class LeastSquaresFit (FitBase):
         from scipy.optimize import leastsq
         
         w = sig ** -1
-        
-        def error (p):
-            self.mfunc = f = self.makeModel (*p)
-            return _N.ravel ((f (x) - y) * w)
+
+        if issubclass (y.dtype.type, _N.complexfloating):
+            def error (p):
+                self.mfunc = f = self.makeModel (*p)
+                wresid = _N.ravel ((f (x) - y) * w)
+                return _N.concatenate ((wresid.real, wresid.imag))
+        else:
+            def error (p):
+                self.mfunc = f = self.makeModel (*p)
+                return _N.ravel ((f (x) - y) * w)
 
         pfit, cov, xx, msg, success = leastsq (error, guess, full_output=True,
                                                **kwargs)
