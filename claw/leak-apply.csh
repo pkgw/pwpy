@@ -17,6 +17,7 @@ endif
 set chans=40  # channels per frequency chunk.  
 set refant=1
 
+echo 'Applying calibration to file '${apply}
 rm -rf tmp-${apply}-tmp
 uvaver vis=${apply} out=tmp-${apply}-tmp interval=0.001 options=nopol,nocal,nopass
 

@@ -12,12 +12,12 @@ else
   set source = $argv[1]  # or first argument
 endif
 set freq = 1430
-set diam = 6
+set diam = 20
 set imsize = 256
-set nchan = 20
+set nchan = 8
 set boxlo = `echo $imsize'/2 - 10' | bc`
 set boxhi = `echo $imsize'/2 + 10' | bc`
-set imgparams = "sup=0 cell=20 fwhm=200"
+set imgparams = "sup=0 cell=30 fwhm=200"
 set visall = `ls -df $source-? $source-?? | awk '{printf("%s,",$1)}' ; echo`
 
 #  clean up
@@ -65,8 +65,6 @@ imsub in=$source.ucln out=$source.ucln.imsub "region=abspix,box("$boxlo","$boxlo
 impol in=$source.qcln,$source.ucln,$source.icln poli=$source.pcln sigma=1e-9 options=bias sncut=0
 imsub in=$source.pcln out=$source.pcln.imsub "region=abspix,box("$boxlo","$boxlo","$boxhi","$boxhi")"
 
-goto skipsfind  # sfind coords bad.  just manually set cleaning to center
-
 #   Find polarised sources in map and make region file
 
 set sig = 9
@@ -102,13 +100,11 @@ while ($n <= $numsrc)
    @ n = ($n + 1)
 end
 
-skipsfind:
-
 # set clean region
 if (-f clean.$source.pcln) then
-  set regcommand = region=abspix,box'('$boxlo,$boxlo,$boxhi,$boxhi')'  # sfind not working?!
-#  cat clean.$source.pcln
-#  set regcommand = region=@clean.$source.pcln
+#  set regcommand = region=abspix,box'('$boxlo,$boxlo,$boxhi,$boxhi')'  # sfind not working?!
+  cat clean.$source.pcln
+  set regcommand = region=@clean.$source.pcln
 else
   set regcommand = ''
 endif
@@ -116,7 +112,7 @@ endif
 #  Make channel maps
 set n=1
 while ($n <= $nchan)
- echo 'Imaging bin '$n
+ echo 'Starting bin '$n' of source '${source}
  if ( -e t${n}vs ) then
   invert vis=t${n}vs map=$source-$n.imap,$source-$n.qmap,$source-$n.umap,$source-$n.vmap \
   beam=$source-$n.beam imsize=$imsize "select=-shadow($diam)" $imgparams  \
@@ -125,13 +121,13 @@ while ($n <= $nchan)
   set sig = 4.5
   set icut = `echo $rms $sig | awk '{print $1*$2}'`
   clean map=$source-$n.imap beam=$source-$n.beam out=$source-$n.icmp niters=500 $regcommand cutoff=$icut | tail -2
-  clean map=$source-$n.qmap beam=$source-$n.beam out=$source-$n.qcmp niters=200 $regcommand cutoff=$icut | tail -2
-  clean map=$source-$n.umap beam=$source-$n.beam out=$source-$n.ucmp niters=200 $regcommand cutoff=$icut | tail -2
+  clean map=$source-$n.qmap beam=$source-$n.beam out=$source-$n.qcmp niters=300 $regcommand cutoff=$icut | tail -2
+  clean map=$source-$n.umap beam=$source-$n.beam out=$source-$n.ucmp niters=300 $regcommand cutoff=$icut | tail -2
   restor model=$source-$n.icmp beam=$source-$n.beam map=$source-$n.imap out=$source-$n.icln | tail -2
   restor model=$source-$n.qcmp beam=$source-$n.beam map=$source-$n.qmap out=$source-$n.qcln | tail -2
   restor model=$source-$n.ucmp beam=$source-$n.beam map=$source-$n.umap out=$source-$n.ucln | tail -2
 #  \rm -fr $source.[1-9]*.[qu]{map,cmp}
-  \rm -fr $source-$n.beam
+#  \rm -fr $source-$n.beam
 
   impol in=$source-$n.qcln,$source-$n.ucln,$source-$n.imap poli=$source-$n.pcln sigma=1e-9 options=bias sncut=0
   imsub in=$source-$n.qcln out=$source-$n.qcln.imsub "region=abspix,box("$boxlo","$boxlo","$boxhi","$boxhi")"
