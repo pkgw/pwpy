@@ -102,9 +102,9 @@ end
 
 # set clean region
 if (-f clean.$source.pcln) then
-#  set regcommand = region=abspix,box'('$boxlo,$boxlo,$boxhi,$boxhi')'  # sfind not working?!
-  cat clean.$source.pcln
-  set regcommand = region=@clean.$source.pcln
+  set regcommand = region=abspix,box'('$boxlo,$boxlo,$boxhi,$boxhi')'  # sfind not working?!
+#  cat clean.$source.pcln
+#  set regcommand = region=@clean.$source.pcln
 else
   set regcommand = ''
 endif

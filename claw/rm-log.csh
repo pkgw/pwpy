@@ -35,7 +35,7 @@ set ymax = `echo "$y0+$b0" | bc -l`
 # Theoretical RMS
 set rms = `gethd in=$source.vmap/rms`
 # Observed RMS
-#set rms = `histo in=$source.vmap | grep Rms | cut -c24-38`
+#set rms = `histo in=$source.vmap | grep Rms | cut -c24-38
 
 
 echo $x0 $y0

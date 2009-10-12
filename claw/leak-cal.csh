@@ -30,8 +30,8 @@ foreach piece (1 2 3 4 5 6 7 8)
 
     # now do cal steps.  mfcal for bandpass, gpcal for gains and leakages
     mfcal vis=${visroot}-${piece} refant=1 interval=5 tol=0.00005
-    gpcal vis=${visroot}-${piece} refant=1 options=xyref interval=3 # options=xyref critical!
-    gpcal vis=${visroot}-${piece} refant=1 options=xyref interval=3 tol=0.00001 # options=xyref critical!
+    gpcal vis=${visroot}-${piece} refant=1 options=xyref interval=5 # options=xyref critical!
+    gpcal vis=${visroot}-${piece} refant=1 options=xyref interval=5 tol=0.00001 # options=xyref critical!
 #    gpcal vis=${visroot}-${piece} refant=1 options=xyref interval=5 flux=14.5,0.56,1.25,0.0 # options=xyref critical!
 #    gpcal vis=${visroot}-${piece} refant=1 options=xyref,qusolve interval=5 # options=xyref critical!  can also use 'qusolve'
 
