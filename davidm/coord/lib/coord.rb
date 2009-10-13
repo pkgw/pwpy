@@ -5,17 +5,36 @@
 # For method documentation, see the Coord module.
 
 # Methods for manipulation of geometric vectors.  This module is included in
-# Array, so all methods of Coord are available to instances of Array.
+# Array, so all methods of Coord are available to instances of Array, but the
+# module tries to be as general as possible.
 module Coord
+  # Returns self[0]||0
+  def x; self[0]||0; end
+
+  # Returns self[1]||0
+  def y; self[1]||0; end
+
+  # Returns self[2]||0
+  def z; self[2]||0; end
+
+  # Sets self[0] to +x+.
+  def x=(x); self[0] = x; end
+
+  # Sets self[1] to +y+
+  def y=(y); self[1] = y; end
+
+  # Sets self[2] to +z+
+  def z=(z); self[2] = z; end
+
   # call-seq: op(other_array) {|self[i], other[i]| ...} -> Array
   # call-seq: op(non_array) {|self[i], other| ...} -> Array
   #
-  # Facilitates element-wise operations on self by other.
-  # other can be Array but need not be.
-  # If other is an array, yields elements from self and elements of other.
-  # Otherwise, yields elements from self and other.
+  # Facilitates element-wise operations on +self+ by +other+.
+  # +other+ can be Array but need not be.
+  # If +other+ is an array, yields elements from +self+ and elements of +other+.
+  # Otherwise, yields elements from +self+ and +other+.
   #
-  # Returns result; leaves self and other unchanged.
+  # Returns result; leaves +self+ and +other+ unchanged.
   def op(other)
     n = length
     if Array === other
@@ -31,9 +50,9 @@ module Coord
   # call-seq: op!(other_array) {|self[i], other[i]| ...} -> modified self
   # call-seq: op!(non_array) {|self[i], other| ...} -> modified self
   #
-  # Facilitates in place element-wise operations on self by other.
-  # other can be Array but need not be.
-  # Returns modified self; leaves other unchanged.
+  # Facilitates in place element-wise operations on +self+ by +other+.
+  # +other+ can be Array but need not be.
+  # Returns modified +self+; leaves +other+ unchanged.
   def op!(other)
     n = length
     if Array === other
@@ -46,42 +65,42 @@ module Coord
     end
   end
 
-  # Returns result of adding self and other.
+  # Returns result of adding +self+ and +other+.
   def add(other)
     op(other) {|a,b| a+b}
   end
 
-  # Adds other to self.  Returns modified self.
+  # Adds +other+ to self.  Returns modified +self+.
   def add!(other)
     op!(other) {|a,b| a+b}
   end
 
-  # Returns result of subtracting other from self.
+  # Returns result of subtracting +other+ from +self+.
   def sub(other)
     op(other) {|a,b| a-b}
   end
 
-  # Subtracts other from self.  Returns modified self.
+  # Subtracts +other+ from self.  Returns modified +self+.
   def sub!(other)
     op!(other) {|a,b| a-b}
   end
 
-  # Returns result of multiplying self and other.
+  # Returns result of multiplying +self+ and +other+.
   def mul(other)
     op(other) {|a,b| a*b}
   end
 
-  # Multiplies self by other.  Returns modified self.
+  # Multiplies self by +other+.  Returns modified +self+.
   def mul!(other)
     op!(other) {|a,b| a*b}
   end
 
-  # Returns result of dividing self by other.
+  # Returns result of dividing +self+ by +other+.
   def div(other)
     op(other) {|a,b| a/b}
   end
 
-  # Divides self by other.  Returns modified self.
+  # Divides self by +other+.  Returns modified +self+.
   def div!(other)
     op!(other) {|a,b| a/b}
   end
@@ -96,12 +115,12 @@ module Coord
     inject {|s,x| s*=x}
   end
 
-  # Returns dot product of self and other.
+  # Returns dot product of +self+ and +other+.
   def dot(other)
     mul(other).sum
   end
 
-  # Returns cross product of self and other.
+  # Returns cross product of +self+ and +other+.
   def cross(other)
     raise 'self.length < 3' if length < 3
     raise 'other.length < 3' if other.length < 3
@@ -112,13 +131,13 @@ module Coord
     ]
   end
 
-  # Returns absolute value (aka magnitude) of self
+  # Returns absolute value (aka magnitude) of +self+
   def abs
     Math.sqrt(dot(self))
   end
   alias :mag :abs
 
-  # Returns angle between vectors represented by self and other
+  # Returns angle between vectors represented by +self+ and +other+
   # or NaN if the product of their absolute values is <= small**2.
   def angle(other, small=0.00000001)
      absv1 = self.abs
@@ -136,8 +155,8 @@ module Coord
   end
 
   # Polar to rectangular conversion.
-  # For length < 3, treats self as [r, th] and returns [x, y].
-  # For length <= 3, treats self as [r, az, el] and returns [x, y, z].
+  # For length < 3, treats +self+ as [r, th] and returns [x, y].
+  # For length >= 3, treats +self+ as [r, az, el] and returns [x, y, z].
   def p2r
     if length < 3
       r  = self[0] || 0
@@ -156,8 +175,8 @@ module Coord
   end
 
   # Rectangular to polar conversion.
-  # For length < 3, treats self as [x, y] and returns [r, th].
-  # For length <= 3, treats self as [x, y, z] and returns [r, az, el].
+  # For length < 3, treats +self+ as [x, y] and returns [r, th].
+  # For length >= 3, treats +self+ as [x, y, z] and returns [r, az, el].
   def r2p
     if length < 3
       x = self[0] || 0
@@ -175,7 +194,7 @@ module Coord
     end
   end
 
-  # Rotates self around axis by +theta+ radians
+  # Rotates +self+ around axis by +theta+ radians
   # +axis+ = 0 -> rotate around X axis
   # +axis+ = 1 -> rotate around Y axis
   # +axis+ = 2 -> rotate around Z axis
@@ -193,37 +212,37 @@ module Coord
     r
   end
 
-  # In-pace versino of rot (modifies self)
+  # In-pace versino of rot (modifies +self+)
   def rot!(theta, axis)
     self[0,3] = rot(theta, axis)
   end
 
-  # Rotates self counter-clockwise around X axis by +theta+ radians
+  # Rotates +self+ counter-clockwise around X axis by +theta+ radians
   def rotx(theta)
     rot(theta, 0)
   end
 
-  # In-place version of rotx (modifies self)
+  # In-place version of rotx (modifies +self+)
   def rotx!(theta)
     rot!(theta, 0)
   end
 
-  # Rotates self counter-clockwise around Y axis by +theta+ radians
+  # Rotates +self+ counter-clockwise around Y axis by +theta+ radians
   def roty(theta)
     rot(theta, 1)
   end
 
-  # In-place version of roty (modifies self)
+  # In-place version of roty (modifies +self+)
   def roty!(theta)
     rot!(theta, 1)
   end
 
-  # Rotates self counter-clockwise around Z axis by +theta+ radians
+  # Rotates +self+ counter-clockwise around Z axis by +theta+ radians
   def rotz(theta)
     rot(theta, 2)
   end
 
-  # In-place version of rotz (modifies self)
+  # In-place version of rotz (modifies +self+)
   def rotz!(theta)
     rot!(theta, 2)
   end
