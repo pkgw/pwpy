@@ -51,7 +51,6 @@ spec = Gem::Specification.new do |s|
     'lib/mirdl/maskio_na.rb',
     'lib/mirdl/gains.rb',
     'lib/mirdl/bandpass.rb',
-    'lib/mirdl/astroutil.rb',
     'lib/mirdl/task.rb',
     'test/**/*'
   ]
