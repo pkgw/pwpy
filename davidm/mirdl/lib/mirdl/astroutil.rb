@@ -113,15 +113,32 @@ class String
   alias :hms_to_h :dms_to_d
 end
 
-# Add astronomy-related and other utilty methods to the +DateTime+ class.
+# Adds astronomy-related and other utilty methods to the +DateTime+ class.
+# Includes conversions between various time frames:
+#
+# - UTC
+# - TAI
+# - TT
+# - GPS (TODO)
 class DateTime
 
   # The J2000 epoch
   J2000 = civil(2000,1,1,12)
 
   # Create a +DateTime+ object from a numeric Astronomical Julian Date.
-  def self.ajd(d)
-    J2000 + d - J2000.ajd
+  # If +n+ is given and d is an Integer, the Astronomical Julian Date is taken
+  # as <tt>Rational(d,n)</tt>.
+  def self.ajd(d,n=nil)
+    d = Rational(d, n) if n && Integer === d
+    J2000 + (d - J2000.ajd)
+  end
+
+  # Create a +DateTime+ object from a numeric Astronomical Modified Julian Date.
+  # If +n+ is given and d is an Integer, the Astronomical Modified Julian Date
+  # is taken as <tt>Rational(d,n)</tt>.
+  def self.amjd(d,n=nil)
+    d = Rational(d, n) if n && Integer === d
+    J2000 + (d - J2000.amjd)
   end
 
   # A +DateTime+ object corresponding to the same time as +self+, but
@@ -133,5 +150,93 @@ class DateTime
   # Create a +DateTime+ object corresponding to now, but with an offset of 0.
   def self.utc
     now.to_utc
+  end
+
+  #--
+  # (TAI - UTC) table (in days).
+  TAI_UTC_TABLE = [
+    # Add new leap seconds here
+    [DateTime.civil(2009,1,1), Rational(34, 86400)],
+    [DateTime.civil(2006,1,1), Rational(33, 86400)],
+    [DateTime.civil(1999,1,1), Rational(32, 86400)],
+    [DateTime.civil(1997,7,1), Rational(31, 86400)],
+    [DateTime.civil(1996,1,1), Rational(30, 86400)],
+    [DateTime.civil(1994,7,1), Rational(29, 86400)],
+    [DateTime.civil(1993,7,1), Rational(28, 86400)],
+    [DateTime.civil(1992,7,1), Rational(27, 86400)],
+    [DateTime.civil(1991,1,1), Rational(26, 86400)],
+    [DateTime.civil(1990,1,1), Rational(25, 86400)],
+    [DateTime.civil(1988,1,1), Rational(24, 86400)],
+    [DateTime.civil(1985,7,1), Rational(23, 86400)],
+    [DateTime.civil(1983,7,1), Rational(22, 86400)],
+    [DateTime.civil(1982,7,1), Rational(21, 86400)],
+    [DateTime.civil(1981,7,1), Rational(20, 86400)],
+    [DateTime.civil(1980,1,1), Rational(19, 86400)],
+    [DateTime.civil(1979,1,1), Rational(18, 86400)],
+    [DateTime.civil(1978,1,1), Rational(17, 86400)],
+    [DateTime.civil(1977,1,1), Rational(16, 86400)],
+    [DateTime.civil(1976,1,1), Rational(15, 86400)],
+    [DateTime.civil(1975,1,1), Rational(14, 86400)],
+    [DateTime.civil(1974,1,1), Rational(13, 86400)],
+    [DateTime.civil(1973,1,1), Rational(12, 86400)],
+    [DateTime.civil(1972,7,1), Rational(11, 86400)],
+  ]
+  #++
+
+  # Returns TAI-UTC as of date represented by +self+.
+  def tai_utc
+    if self >= TAI_UTC_TABLE[0][0]
+      TAI_UTC_TABLE[0][1]
+    elsif self < TAI_UTC_TABLE[-1][0]
+      0
+    else
+      (find {|epoch,dt| epoch <= self})[1]
+    end
+  end
+
+  # Returns TAI-UTC as of date given (defaults to <tt>DateTime.now</tt>).
+  def self.tai_utc(t=DateTime.now)
+    t.tai_utc
+  end
+ 
+  # TT-TAI in days.
+  TT_TAI = Rational(32184, 86400000)
+
+  # Returns TAI version of +self+, treating +self+ as UTC
+  def utc2tai
+    self + self.tai_utc
+  end
+
+  # Returns TT version of +self+, treating +self+ as UTC
+  def utc2tt
+    self + self.tai_utc + TT_TAI
+  end
+
+  # Returns UTC version of +self+, treating +self+ as TAI
+  def tai2utc
+    self - self.tai_utc
+  end
+
+  # Returns TT version of +self+, treating +self+ as TAI
+  def tai2tt
+    self + TT_TAI
+  end
+
+  # Returns UTC version of +self+, treating +self+ as TT
+  def tt2utc
+    self - TT_TAI - self.tai_utc
+  end
+
+  # Returns TAI version of +self+, treating +self+ as TT
+  def tt2tai
+    self - TT_TAI
+  end
+
+  # Format +self+ as String with (optional) fractional seconds
+  def to_s(prec=0)
+    width = prec == 0 ? 2 : prec+3
+    secf = sec + sec_fraction/86400
+    "%04d-%02d-%02dT%02d:%02d:%0#{width}.#{prec}f%s" %
+      [year, mon, day, hour, min, secf, zone]
   end
 end
