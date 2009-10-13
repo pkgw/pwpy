@@ -25,6 +25,7 @@ $-w = true if $0 == __FILE__
 require 'enumerator'
 require 'gauss2d'
 require 'mirdl'
+require 'astroutil'
 include Mirdl
 include Math
 
