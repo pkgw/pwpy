@@ -1,3 +1,9 @@
+"""
+claw, 13oct09
+Script to plot RM values from catalog in Hammer-Aitoff (equal area), all-sky projection.
+Note that projection is flipped in longitude by multiplying by -1 and relabeling.
+"""
+
 import numpy as n
 import pylab as p
 import asciidata
