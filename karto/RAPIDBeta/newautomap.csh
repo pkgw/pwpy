@@ -237,7 +237,7 @@ set line
 set regain
 set calmodel
 set scclip
-
+set cleanopt
 if ($#argv == 0) then
     echo "AUTOMAP: No input files detected!"
     exit 0
@@ -390,6 +390,10 @@ else if ("$argv[1]" =~ 'options='*) then
 	    set autoamp = 0
 	else if ($option == "nopha") then
 	    set autopha = 0
+	else if ($option == "negstop") then
+	    set cleanopt = "negstop,$cleanopt"
+	else if ($option == "positive") then
+	    set cleanopt = "positive,$cleanopt"
 	else if ($option == "noamp") then
     	    set autoamp = 0
 	else if ($option == "drmax") then
@@ -783,14 +787,13 @@ if !($niters) set niters = 2500
 clean:
 
 # Create clean component map and make residual/cleaned images
-echo $nalevel
-clean map=$wd/tempmap.map beam=$wd/tempmap.beam out=$wd/tempmap.clean niters=$niters cutoff=$nalevel "$cregion" >& $wd/cleanlog 
+clean map=$wd/tempmap.map beam=$wd/tempmap.beam out=$wd/tempmap.clean niters=$niters cutoff=$nalevel options="$cleanopt" "$cregion" >& $wd/cleanlog 
 if !(-e $wd/tempmap.clean) then
     echo "FATAL ERROR: Image is not cleanable (likely too much data was culled)."
     goto enderr
 endif
-restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd/tempmap.cm >& /dev/null 
-restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd/tempmap.rs mode=residual >& /dev/null 
+restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd/tempmap.cm >& $wd/restorcm
+restor map=$wd/tempmap.map beam=$wd/tempmap.beam model=$wd/tempmap.clean out=$wd/tempmap.rs mode=residual >& $wd/restorrs 
 if !(-e $wd/tempmap.cm && -e $wd/tempmap.rs) then
     echo "FATAL ERROR: Image is not restorable (likely too much data was culled)."
     goto enderr
