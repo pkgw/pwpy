@@ -84,8 +84,10 @@ set date1 = `date +%s.%N`
 set vis #File to be scanned
 set inttime = 5 #Integration time
 set nonormal = 0 #Switch to normalize spectra
-set nopass = "nopass" #Switch to apply bandpass corrections to data
-set crosspol = "nocross" #Swtich to exclude XY and YX polarization - should be done if bandpass and pol correction information are not available
+set nocal
+set nopass
+set nopol
+set crosspol = 0 #Swtich to exclude XY and YX polarization - should be done if bandpass and pol correction information are not available
 set autoedge = 0
 set autoedgechan = 100
 set debug = 0
@@ -132,7 +134,11 @@ else if ("$argv[1]" =~ 'options='*) then
 	else if ($option == "nopol") then
 	    set nopol = "nopol"
 	else if ($option == "crosspol") then
-	    set crosspol = "crosspol"
+	    set crosspol = 1
+	    set nonormal = 1
+	else if ($option == "allpol") then
+	    set crosspol = 2
+	    set nonormal = 1
 	else if ($option == "autoedge") then
 	    set autoedge = 1
 	else if ($option == "noautoedge") then
@@ -208,14 +214,25 @@ foreach file ($vislist)
     set filelist = ($filelist $outfile)
     if !($nonormal) then
 	echo "Beginning normalization of data..."
-	uvcal vis=$file options=fxcal,nocal,nopass,nopol select='pol(xx)' out=$wd/$outfile-xpol >& /dev/null
-	uvcal vis=$file options=fxcal,nocal,nopass,nopol select='pol(yy)' out=$wd/$outfile-ypol >& /dev/null
-    else if ($crosspol != "crosspol") then
-	uvaver vis=$file options=relax,nocal,nopol select='pol(xx)' out=$wd/$outfile-xpol > /dev/null
-    	uvaver vis=$file options=relax,nocal,nopol select='pol(yy)' out=$wd/$outfile-ypol > /dev/null
+	uvcal vis=$file options=fxcal,nopass,`echo $nocal $nopol | tr ' ' ','` select='pol(xx)' out=$wd/$outfile-xxpol >& /dev/null
+	uvcal vis=$file options=fxcal,nopass,`echo $nocal $nopol | tr ' ' ','` select='pol(yy)' out=$wd/$outfile-yypol >& /dev/null
+	uvflag vis="$wd/$outfile-??pol" flagval=f select=auto options=none >& /dev/null
     else
-	uvaver vis=$file options=relax,nocal,nopol select='pol(xx,xy)' out=$wd/$outfile-xpol > /dev/null
-	uvaver vis=$file options=relax,nocal,nopol select='pol(yy,yx)' out=$wd/$outfile-ypol > /dev/null
+	if ($crosspol != 1) then
+	    uvaver vis=$file options=relax,`echo $nocal $nopass $nopol | tr ' ' ','` select='pol(xx),-auto' out=$wd/$outfile-xxpol > /dev/null
+	    uvaver vis=$file options=relax,`echo $nocal $nopass $nopol | tr ' ' ','` select='pol(yy),-auto' out=$wd/$outfile-yypol > /dev/null
+	endif
+	if ($crosspol) then
+	    uvaver vis=$file options=relax,`echo $nocal $nopass $nopol | tr ' ' ','` select='pol(xy),-auto' out=$wd/$outfile-xypol > /dev/null
+	    uvaver vis=$file options=relax,`echo $nocal $nopass $nopol | tr ' ' ','` select='pol(yx),-auto' out=$wd/$outfile-yxpol > /dev/null
+	endif
+    endif
+    foreach pol (xx yy xy yx)
+	if !(-e $wd/$outfile-${pol}pol/visdata) rm -rf $wd/$outfile-${pol}pol
+    end
+    if !(-e $wd/$outfile-xxpol || -e $wd/$outfile-yypol || -e $wd/$outfile-xypol || -e $wd/$outfile-yxpol) then
+	echo "FATAL ERROR: No data found for $file! (possibly all flagged)"
+	goto fail
     endif
     echo "Preliminary processing for $file complete..."
 end
@@ -240,7 +257,7 @@ foreach file ($filelist)
     #First step is collecting meta-data, program attempts to speed this up by collecting metadata from a single antenna first
     echo "Performing Az/El/UTC data scan..."
     set ants = ( `uvlist vis=$vislist[$fileidx] options=list | awk '{if ($1*1 != 0) print $7,$8}'` )
-    uvlist vis=$vislist[$fileidx] select="ant($ants[1])($ants[2])" options=list recnum=0 | awk '{if ($1*1 > 0 && $3 != last) {printf "%s %3.2f %3.2f\n",$3,(540-$13)%360,$14*1; last=$3}}' | awk '{print $2,$3}' > $wd/$file.obstimes #Get Az/El information
+    uvlist vis=$vislist[$fileidx] select="ant($ants[1])($ants[2])" options=list recnum=0 | awk '{if ($1*1 > 0 && $3 != last) {printf "%s %3.2f %3.2f\n",$3,$13*1,$14*1; last=$3}}' | awk '{print $2,$3}' > $wd/$file.obstimes #Get Az/El information
     echo "Scanning source/freq information..."
     uvlist vis=$vislist[$fileidx] recnum=0 select="ant($ants[1])($ants[2])" options=var,full | sed -e '/Header/b' -e '/source  :/b' -e '/sfreq   :/b' -e '/sdf     :/b' -e '/dec     :/b' -e '/ra      :/b' -e '/freq    :/b' -e d | uniq | tr -d '()' | awk '{if ($1 == "Header") printf "\n%s %s\n",$1,$4; else printf "%s ",$0}' | sed '1d' | awk '{if ($1 == "Header") system("julian options=quiet date="$2); else print $0}' | grep '.' | sed 's/ : /   /g' > $wd/details #Get source/freq information
     #Convert dates to Julian Date, and combine metadata
@@ -312,14 +329,11 @@ foreach file ($filelist)
 #################################################################
     if ($autoedge) then
 	if (`echo $sfreq $freq | awk '{if ($1 == $2) print "go"}'` == "go") then
-	    if (-e $wd/$file-xpol/visdata) uvflag vis=$wd/$file-xpol edge=1,$autoedgechan,0 options=none flagval=f > /dev/null
-	    if (-e $wd/$file-ypol/visdata) uvflag vis=$wd/$file-ypol edge=1,$autoedgechan,0 options=none flagval=f > /dev/null
+	    uvflag vis="$wd/$file-??pol" edge=1,$autoedgechan,0 options=none flagval=f > /dev/null
 	else if (`echo $ilim $sdf $sfreq $freq | awk '{if ((($1-1)*$2)+$3 < $4) print "go"}'` == "go") then
-	    if (-e $wd/$file-xpol/visdata) uvflag vis=$wd/$file-xpol edge=$autoedgechan,0,0 options=none flagval=f > /dev/null
-	    if (-e $wd/$file-ypol/visdata) uvflag vis=$wd/$file-ypol edge=$autoedgechan,0,0 options=none flagval=f > /dev/null
+	    uvflag vis="$wd/$file-??pol" edge=$autoedgechan,0,0 options=none flagval=f > /dev/null
 	else
-	    if (-e $wd/$file-xpol/visdata) uvflag vis=$wd/$file-xpol edge=$autoedgechan,$autoedgechan,3 options=none flagval=f > /dev/null
-	    if (-e $wd/$file-ypol/visdata) uvflag vis=$wd/$file-ypol edge=$autoedgechan,$autoedgechan,3 options=none flagval=f > /dev/null
+	    uvflag vis="$wd/$file-??pol" edge=$autoedgechan,$autoedgechan,3 options=none flagval=f > /dev/null
 	endif
     endif
 
@@ -332,26 +346,21 @@ foreach file ($filelist)
     end
 
     #Dump uvlist data to a temp file
-    if (-e $wd/$file-xpol/visdata) then
-	uvlist vis=$wd/$file-xpol recnum=0 options=stat select=-auto > $wd/temp.log
-	grep "CHAN" $wd/temp.log | tr -d "CHAN" > $wd/temp.xlist1
-	sed 's/:/ /g' $wd/temp.log | awk '{if ($1" "$2 == "Data values") date=$4; else if ($7 == "XX" || $7 == "XY") printf "%s%.6f ABC%2.0d ABC%2.0d %s\n",date,($2/24+$3/1440+$4/86400),$5*1,$6,$7}' | sed -e 's/ABC /0/g' -e 's/ABC//g' > $wd/temp.xlist2
-	echo "X-pol scan complete..."
-    else
-	echo "No X-pol data found..."
-    endif
+    rm -rf $wd/temp.chanlist $wd/temp.log $wd/temp.metachanlist
+    foreach scanfile ($wd/$file-??pol)
+	if ($scanfile =~ *"-xxpol") set pol = XX
+	if ($scanfile =~ *"-yypol") set pol = YY
+	if ($scanfile =~ *"-xypol") set pol = XY
+	if ($scanfile =~ *"-yxpol") set pol = YX
+	uvlist vis=$scanfile recnum=0 options=stat > $wd/temp.log	
+	grep "CHAN" $wd/temp.log | sed 's/CHAN//' >> $wd/temp.chanlist
+	sed 's/:/ /g' $wd/temp.log | awk '{if ($1" "$2 == "Data values") date=$4; else if ($7 == pol) printf "%s%.6f %s  %s %s\n",date,($2/24+$3/1440+$4/86400),$5*1,$6,$7}' pol=$pol | sed -e 's/ \([0-9]\) / 0\1 /g' >> $wd/temp.metachanlist
 
-    if (-e $wd/$file-ypol/visdata) then
-	uvlist vis=$wd/$file-ypol recnum=0 options=stat select=-auto > $wd/temp.log
-	grep "CHAN" $wd/temp.log | tr -d "CHAN" >> $wd/temp.xlist1
-	sed 's/:/ /g' $wd/temp.log | awk '{if ($1" "$2 == "Data values") date=$4; else if ($7 == "YX" || $7 == "YY") printf "%s%.6f ABC%2.0d ABC%2.0d %s\n",date,($2/24+$3/1440+$4/86400),$5*1,$6,$7}' | sed -e 's/ABC /0/g' -e 's/ABC//g' >> $wd/temp.xlist2
-	echo "Y-pol scan complete..."
-    else
-	echo "No Y-pol data found..."
-    endif
+	echo "$pol-scan complete..."
+    end
 
     #Check to see if metadata parameters (number of unique tags) match. If not, rerun metadata collection WITHOUT shortcut (process all data)
-    if (`awk '{print $1}' $wd/temp.xlist2 | sort -u | wc -l` != `wc -l $wd/$file.obstimes | awk '{print $1}'`) then
+    if (`awk '{print $1}' $wd/temp.metachanlist | sort -u | wc -l` != `wc -l $wd/$file.obstimes | awk '{print $1}'`) then
 	echo "Initial obstimes detection failed, moving to brute force method..."
 	uvlist vis=$vislist[$fileidx] options=list recnum=0 | awk '{if ($1*1 > 0 && $3 != last) {printf "%s %3.2f %3.2f\n",$3,(540-$13)%360,$14*1; last=$3}}' | awk '{print $2,$3}' > $wd/$file.obstimes #Get Az/El information
 	uvlist vis=$vislist[$fileidx] recnum=0 options=var,full | sed -e '/Header/b' -e '/source  :/b' -e '/sfreq   :/b' -e '/sdf     :/b' -e '/dec     :/b' -e '/ra      :/b' -e '/freq    :/b' -e d | uniq | tr -d '()' | awk '{if ($1 == "Header") printf "\n%s %s\n",$1,$4; else printf "%s ",$0}' | sed '1d' | awk '{if ($1 == "Header") system("julian options=quiet date="$2); else print $0}' | grep '.' | sed 's/ : /   /g' > $wd/details
@@ -406,7 +415,7 @@ foreach file ($filelist)
 	perl -e ' $separator="\t"; ($file1, $file2) = @ARGV; open (F1, $file1) or die; open (F2, $file2) or die; while (<F1>) { if (eof(F2)) { warn "WARNING: File $file2 ended early\n"; last } $line2 = <F2>; s/\r?\n//; print "$_$separator$line2" } if (! eof(F2)) { warn "WARNING: File $file1 ended early\n"; } warn "Metadata scanning complete...\n" ' $wd/emoredetails $wd/$file.obstimes | sort -nk1 > $wd/meta.full
     endif
     #End check/repeat processing, metadata integrity now confirmed
-    set odates = (`awk '{if ($1 != last) {last = $1; print $1}}' $wd/temp.xlist2 | sed 's/0\./  /g' | awk '{print $1}' | uniq`)
+    set odates = (`awk '{if ($1 != last) {last = $1; print $1}}' $wd/temp.metachanlist | sed 's/0\./  /g' | awk '{print $1}' | uniq`)
 
     echo -n 'sed ' > $wd/julday.source
     #Substitute dates for Julian dates in uvlist data
@@ -418,11 +427,11 @@ foreach file ($filelist)
     foreach odate (`echo $odates`)
 	echo -n "-e 's/"`julian date=$odate | grep 'Modified' | awk '{print $1"0/"int($6)"/g"}'`"' " >> $wd/julday.source
     end
-    echo "$wd/temp.xlist2" >> $wd/julday.source
-    source $wd/julday.source > $wd/temp.xlist3
+    echo "$wd/temp.metachanlist" >> $wd/julday.source
+    source $wd/julday.source > $wd/temp.m2chanlist
     cp $wd/$file.obstimes $wd/obstimes
-    awk '{print $2"-"$3"-"$4}' $wd/temp.xlist2 | sort -u | tr '-' ' ' > $wd/baselist
-    perl -e ' $separator="\t"; ($file1, $file2) = @ARGV; open (F1, $file1) or die; open (F2, $file2) or die; while (<F1>) { if (eof(F2)) { warn "WARNING: File $file2 ended early\n"; last } $line2 = <F2>; s/\r?\n//; print "$_$separator$line2" } if (! eof(F2)) { warn "WARNING: File $file1 ended early\n"; } warn "Scanning complete. Building count spectra...\n" ' $wd/temp.xlist3 $wd/temp.xlist1 | sort -nk1 > $wd/temp.full
+    awk '{print $2"-"$3"-"$4}' $wd/temp.metachanlist | sort -u | tr '-' ' ' > $wd/baselist
+    perl -e ' $separator="\t"; ($file1, $file2) = @ARGV; open (F1, $file1) or die; open (F2, $file2) or die; while (<F1>) { if (eof(F2)) { warn "WARNING: File $file2 ended early\n"; last } $line2 = <F2>; s/\r?\n//; print "$_$separator$line2" } if (! eof(F2)) { warn "WARNING: File $file1 ended early\n"; } warn "Scanning complete. Building count spectra...\n" ' $wd/temp.m2chanlist $wd/temp.chanlist | sort -nk1 > $wd/temp.full
     
     #Build source files for spectra processing. antspec performs counts baseline-by-baseline, storing each spectra in a unique array. antreset resets all arrays back to their "0" value
     awk '{print "set "$3$1$2" = ($chan)"}' $wd/baselist > $wd/antreset.source
