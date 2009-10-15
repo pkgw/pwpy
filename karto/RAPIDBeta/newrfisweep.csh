@@ -692,6 +692,10 @@ while ($idx <= $lim)
 		echo -n "."
 	    end
 	    echo "."
+	    if (`grep line=chan $wd/flagslist | wc -l` == 0) then
+		echo "No bad channels found! Moving forward..."
+		set scanidx = $scans
+	    endif
 	    @ scanidx++
 	end
     endif
