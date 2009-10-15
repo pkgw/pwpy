@@ -21,7 +21,7 @@
 
 import sys
 import numpy as N
-from mirtask import keys, uvdat
+from mirtask import keys, uvdat, util
 import numdisplay
 import gtk
 from numutils import ArrayGrower
@@ -52,6 +52,7 @@ for dset, pream, data, flags, n in uvdat.readAll ():
         nacc = 0
         prevt = None
         t0 = t
+        times = []
     else:
         if n != prevn:
             print >>sys.stderr, 'Error: changing number of channels in selected data'
@@ -61,12 +62,14 @@ for dset, pream, data, flags, n in uvdat.readAll ():
             print >>sys.stderr, 'Warning: time goes backwards in selected data'
         elif t0 == t and not opts.accuma:
             print >>sys.stderr, 'Warning: time repeated in selected data'
+        if t > prevt:
+            times.append(util.jdToFull(prevt))
 
     data = data[:n]
-    flags = flags[:n]
+    flags = flags[:n].astype (N.bool)
 
     # Could have options for what to do with this.
-    data[~flags] = 0.0
+    data[N.where (~flags)] = 0.0
 
     if not opts.accuma:
         ag.addLine (data)
@@ -89,6 +92,9 @@ if accum is not None and opts.accuma:
     ag.addLine (accum / nacc)
 
 data = ag.finish ()
+
+print 'Integration/Time conversion:'
+print zip(N.arange(N.shape(data)[0]), times)
 
 if data.size == 0:
     print >>sys.stderr, 'Error: no data selected'
