@@ -1,0 +1,21 @@
+#!/usr/bin/env python
+
+"""
+claw, 14oct09
+quick wrapper script for peter's ds9 visibility display tool
+Input:  uv file
+"""
+
+import sys, os
+from subprocess import call
+
+print 'Displaying dynamic spectra of ',sys.argv[1]
+
+good = [1, 3, 4, 5, 8, 11, 12, 13, 16, 29, 32, 33, 36, 37, 38, 40, 41, 42]
+
+for a1 in good:
+    for a2 in good[good.index(a1)+1:]:
+	cmd = 'uvasimg select=pol\"(xx)\",ant\"(%d)(%d)\" vis=%s' % (a1, a2, sys.argv[1])
+	print '\nExecuting...  ',cmd
+	ret = os.system(cmd)
+	if ret != 0:  sys.exit(ret)
