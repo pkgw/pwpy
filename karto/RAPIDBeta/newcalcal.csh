@@ -1641,7 +1641,7 @@ if ($copymode) then
 	    end
 	    foreach file ($filelist)
 		if (-e $wd/xflags) uvflag vis=$file select=@$wd/xflags flagval=f options=none > /dev/null
-		if (-e $wd/yflags) uvflag vis=$file select=@$wd/xflags flagval=f options=none > /dev/null
+		if (-e $wd/yflags) uvflag vis=$file select=@$wd/yflags flagval=f options=none > /dev/null
 		echo -n "."
 	    end
 	    @ fidx++
