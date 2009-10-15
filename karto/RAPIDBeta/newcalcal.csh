@@ -417,11 +417,26 @@ else if (`echo $flux | wc -w` == 1 ) then
     set calflux = "$flux"
     set flux = "$flux,$freq,0"
 else if ("$flux" == "") then
-    set calflux = 1
-    set flux = 1
-    set flux = "1,$freq,0"
-    set addflux = 0
-    set sysflux = .5
+    if ("`where calinfo`" != "") then
+	calinfo target=$source freq=$freq options=auto >& $wd/calcheck
+	if (`wc -w $wd/calcheck | awk '{print $1}'` != 5) then
+	    echo "Calibrator lookup enabled!"
+	    set flux = `awk '{print $1","$2","$3}' $wd/calcheck`
+	    set calflux = `echo $freq $flux | tr ',' ' ' | awk '{print $2*($1/$3)^$4}'`
+	else
+	    set calflux = 1
+	    set flux = 1
+	    set flux = "1,$freq,0"
+	    set addflux = 0
+	    set sysflux = .5
+	endif
+    else
+	set calflux = 1
+	set flux = 1
+	set flux = "1,$freq,0"
+	set addflux = 0
+	set sysflux = .5
+    endif
 else
     echo "Flux option not recognized!" # Error out if flux isn't put in properly
     exit 1
