@@ -650,7 +650,6 @@ while ($idx <= $lim)
     
     if ($flaglist[1] != "") then
 	newrfi32.csh vis=$wd/vis options=flagopt,$corr,$rfitype chanlist=$wd/flagslist subint=$subint edgerfi=$edgerfi npoly=$npoly nsig=$nsig select="$timesel,$fsel[1] $timesel,$fsel[2]" $csel $device >& $wd/rfidebug
-#	echo "newrfi32.csh vis=$wd/vis options=flagopt,$corr,$rfitype chanlist=$wd/flagslist subint=$subint edgerfi=$edgerfi npoly=$npoly nsig=$nsig select=$timesel,$fsel[1] $timesel,$fsel[2] $csel $device"
     else
 	echo "No source information found, using the last results..."
 	if (-e $wd/flagslist.bu) cp $wd/flagslist.bu $wd/flagslist
