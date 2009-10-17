@@ -64,10 +64,10 @@ echo "$me starting at `date`" |& tee -ia $log
 echo "$me args: $flt" |& tee -ia $log
 
 
-# Init variables.
+# Init variables - needed to unlock at end
 
-set lo1 = `fxconf.rb hookup $inst1 |grep LO |cut -c1` # needed to unlock at end
-set lo2 = `fxconf.rb hookup $inst2 |grep LO |cut -c1`
+set lo1 = `fxconf.rb hookup $inst1 |grep LO |sed -e 's/.*,\([abcd]\)[1234].*/\1/'`
+set lo2 = `fxconf.rb hookup $inst2 |grep LO |sed -e 's/.*,\([abcd]\)[1234].*/\1/'`
 
 
 # Setup

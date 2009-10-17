@@ -33,8 +33,8 @@ set log = $argv[9]
 
 # A few variables
 
-set lo1 = `fxconf.rb hookup $inst1 |grep LO |cut -c1`
-set lo2 = `fxconf.rb hookup $inst2 |grep LO |cut -c1`
+set lo1 = `fxconf.rb hookup $inst1 |grep LO |sed -e 's/.*,\([abcd]\)[1234].*/\1/'`
+set lo2 = `fxconf.rb hookup $inst2 |grep LO |sed -e 's/.*,\([abcd]\)[1234].*/\1/'`
 set alist = `slist.csh $inst1` # assume $inst2 uses same ants
 
 

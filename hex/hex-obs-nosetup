@@ -176,11 +176,11 @@ set decs = ($radecs[$npntp1-$npntt2])
 
 # Determine freq and BW settings
 
-set lo1 = `fxconf.rb hookup $inst1 |grep LO |cut -c1`
+set lo1 = `fxconf.rb hookup $inst1 |grep LO |sed -e 's/.*,\([abcd]\)[1234].*/\1/'`
 set freq1 = `atagetskyfreq $lo1`
 set freq1 = `python -c "print int (round ($freq1))"`
 
-set lo2 = `fxconf.rb hookup $inst2 |grep LO |cut -c1`
+set lo2 = `fxconf.rb hookup $inst2 |grep LO |sed -e 's/.*,\([abcd]\)[1234].*/\1/'`
 set freq2 = `atagetskyfreq $lo2`
 set freq2 = `python -c "print int (round ($freq2))"`
 

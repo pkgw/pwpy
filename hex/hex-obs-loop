@@ -103,8 +103,8 @@ while ($i <= $n)
     @ i = $i + 1
 end
 
-set lo1 = `fxconf.rb hookup $inst1 |grep LO |cut -c1`
-set lo2 = `fxconf.rb hookup $inst2 |grep LO |cut -c1`
+set lo1 = `fxconf.rb hookup $inst1 |grep LO |sed -e 's/.*,\([abcd]\)[1234].*/\1/'`
+set lo2 = `fxconf.rb hookup $inst2 |grep LO |sed -e 's/.*,\([abcd]\)[1234].*/\1/'`
 set alist = `slist.csh $inst1` # assume $inst2 uses same ants
 
 set begin = `date +"%H %M" | awk '{print $1 + ($2 / 60) - 0.1}'`
