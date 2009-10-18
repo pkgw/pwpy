@@ -2,7 +2,9 @@
 #
 # Create a new analysis directory for processing hex-style observations.
 # The only work done here is to "shadow" the data into the analysis
-# directory. The next step is to flag and calibrate the data with 
+# directory and flag out data outside of the observations' time range
+# (in case the dataset is appended to multiple times during a loop
+# observations). The next step is to flag and calibrate the data with 
 # hex-proc-prep.
 
 # Uncomment to debug the commands executed by this script
@@ -12,8 +14,8 @@
 source `dirname $0`/hex-lib-checkenv
 
 if ($#argv < 2) then
-    echo "Usage: [vis1] [vis2 ...]     [analysis dir]"
-    echo "E.g.:  hex-3c48-hp7-p*-1430a work"
+    echo "Usage: [summary file] [analysis dir]"
+    echo "E.g.:  hex-3c48-hp7-summ-23:59:59a.hexsumm 3c48-1430"
     exit 1
 endif
 
@@ -30,6 +32,55 @@ if (-e $workdir/data-rawdata.txt) then
 endif
 
 
+# Figure out whether we've been passed a summary file or (easter egg!)
+# a list of UV datasets
+
+if (-f $1 && $#argv == 2) then
+    # Summary file.
+    set summdir = `dirname "$1"`
+    set tstart = `grep tstart "$1" |cut -d' ' -f2`
+    set tend = `grep tend "$1" |cut -d' ' -f2`
+    set nfull = `grep nfull "$1" |cut -d' ' -f2`
+
+    grep success "$1" >& /dev/null
+    if ($status) then
+	echo "Warning: no success indicator in summary file."
+	echo "  This observation may have failed or been aborted."
+    endif
+
+    # make sure to get them in proper order
+    set relvises = (`grep scan "$1" |sort |cut -d' ' -f3`)
+    set nvis = $#relvises
+
+    if ($nfull != $nvis) then
+	echo "Warning: this hex run didn't include all of the scans that "
+	echo "  it should have. There may not be enough data to analyze."
+    endif
+
+    # Convert to absolute paths
+    set vises = ()
+
+    foreach rvis ($relvises)
+	set vises = ($vises $summdir/$rvis)
+    end
+else
+    set tstart = none
+
+    # List of UV datasets.
+    @ nvis = $#argv - 1
+    set vises = (${argv[1-$nvis]})
+
+    # Check that that's actually what they are
+    foreach vis ($vises)
+	if (! -e $vis/visdata) then
+	    echo "Error: arguments appear to include list of UV datasets, but"
+	    echo "  no such file $vis/visdata"
+	    exit 1
+	endif
+    end
+endif
+
+
 # Shadow the raw datasets into the work directory
 #
 # FIXME: this is where we should do sanity-checking on the input data:
@@ -39,8 +90,6 @@ endif
 
 set old = `pwd`
 @ n = 0
-@ nvis = $#argv - 1
-set vises = (${argv[1-$nvis]})
 
 foreach vis ($vises)
     set vis = `cd $vis ; pwd`
@@ -69,5 +118,16 @@ foreach vis ($vises)
     @ n = $n + 1
     cd $old
 end
+
+
+# If a time range is specified, flag out data outside of the relevant
+# time period.
+
+if ($tstart != none) then
+    foreach vis ($workdir/vis??)
+	echo uvflag flagval=f select="-time($tstart,$tend)" vis=$vis
+	uvflag flagval=f select="-time($tstart,$tend)" vis=$vis
+    end
+endif
 
 exit 0

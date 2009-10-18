@@ -57,6 +57,16 @@
 #    n'th pointing on the first instrument
 # $outpfx-p$n-$freq2$c2 - Miriad data file for the observations of the
 #    n'th pointing on the second instrument
+# $outpfx-summ-$time$c1.hexsumm - "hex summary" file listing the data
+#    files corresponding to this observing run on the first instrument. 
+#    $time is the current local time formatted as HH:MM:SS; it is used 
+#    to prevent filename clashes between multiple hex summary files if
+#    more than one observation with the same setup is run in a single
+#    directory.
+# $outpfx-summ-$time$c2.hexsumm - Analogous to the above. The value of
+#    $time is not guaranteed to be identical to that of the previous
+#    file, but in practice it almost always will be. You shouldn't
+#    ever find yourself relying on that fact, though.
 #
 # Several standard miscellanous logfiles are created by scripts invoked
 # by this program as well:
@@ -197,6 +207,29 @@ set bw2 = `ibob i1.$fx2 regread bwsel |cut -c9`
 set bw2 = $bws[$bw2]
 
 
+# Set up for logging this session to the summary files
+# that tell the automated tools about this particular session
+
+set n = 0
+
+while (1)
+    set summfile1 = $outpfx-summ-`date +%H:%M:%S`$ic1.hexsumm
+    set summfile2 = $outpfx-summ-`date +%H:%M:%S`$ic2.hexsumm
+    if (! -f $summfile1 && ! -f $summfile2) break
+    if ($n > 9) then
+	echo "$me: fatal error: can't come up with new summary file names?!"
+	exit 1
+    endif
+    sleep 1
+    @ n = $n + 1
+end
+
+echo tstart `date -u +%y%b%d:%H:%M:%S.0` >$summfile1
+echo nfull $npnt >>$summfile1
+echo tstart `date -u +%y%b%d:%H:%M:%S.0` >$summfile2
+echo nfull $npnt >>$summfile2
+
+
 # Run the observations
 
 echo "$me inst1 $inst1 freq $freq1 bw $bw1" |& tee -ia $log
@@ -267,13 +300,29 @@ foreach pnt (`seq 1 $npnt`)
     if ($pnt == 1) then
 	echo "compass `pwd`/$vpf2 $tstart $tend $inst2" > ~/karto/compass.log
     endif
+
+    # Note these observations in the summary files
+    echo scan `printf %02d $pnt0` $vpf1 >>$summfile1
+    echo scan `printf %02d $pnt0` $vpf2 >>$summfile2
 end
+
+# Close out the summary files -- lack of a 'success' entry
+# implies that observing crashed or aborted 
+echo tend `date -u +%y%b%d:%H:%M:%S.0` >>$summfile1
+echo success 1 >>$summfile1
+echo tend `date -u +%y%b%d:%H:%M:%S.0` >>$summfile2
+echo success 1 >>$summfile2
 
 echo "$me ended successfully at `date`" |& tee -ia $log
 exit 0
 
 fail:
 echo "$me aborting" |& tee -ia $log
+
+# Try to close out the summary files -- may be helpful
+# for recovering if most of the observation is still usable
+echo tend `date -u +%y%b%d:%H:%M:%S.0` >>$summfile1
+echo tend `date -u +%y%b%d:%H:%M:%S.0` >>$summfile2
 
 # Kill rotators just in case
 frot.csh $inst1 $ephem $freq1 `pwd` kill
