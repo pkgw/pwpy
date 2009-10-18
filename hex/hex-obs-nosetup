@@ -57,13 +57,13 @@
 #    n'th pointing on the first instrument
 # $outpfx-p$n-$freq2$c2 - Miriad data file for the observations of the
 #    n'th pointing on the second instrument
-# $outpfx-summ-$time$c1.hexsumm - "hex summary" file listing the data
+# $outpfx-summ-$freq1$c1-$time.hexsumm - "hex summary" file listing the data
 #    files corresponding to this observing run on the first instrument. 
 #    $time is the current local time formatted as HH:MM:SS; it is used 
 #    to prevent filename clashes between multiple hex summary files if
 #    more than one observation with the same setup is run in a single
 #    directory.
-# $outpfx-summ-$time$c2.hexsumm - Analogous to the above. The value of
+# $outpfx-summ-$freq2$c2-$time.hexsumm - Analogous to the above. The value of
 #    $time is not guaranteed to be identical to that of the previous
 #    file, but in practice it almost always will be. You shouldn't
 #    ever find yourself relying on that fact, though.
@@ -213,8 +213,8 @@ set bw2 = $bws[$bw2]
 set n = 0
 
 while (1)
-    set summfile1 = $outpfx-summ-`date +%H:%M:%S`$ic1.hexsumm
-    set summfile2 = $outpfx-summ-`date +%H:%M:%S`$ic2.hexsumm
+    set summfile1 = $outpfx-summ-$freq1$ic1-`date +%H:%M:%S`.hexsumm
+    set summfile2 = $outpfx-summ-$freq2$ic2-`date +%H:%M:%S`.hexsumm
     if (! -f $summfile1 && ! -f $summfile2) break
     if ($n > 9) then
 	echo "$me: fatal error: can't come up with new summary file names?!"
