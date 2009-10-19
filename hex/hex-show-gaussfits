@@ -25,11 +25,11 @@ for l in file (join (analysisdir, 'data-gaussfits.txt')):
     ant = int (a[0])
     pol = a[1]
 
-    if a[2] == '0':
+    if a[3] == '0':
         # Fit failed
         continue
 
-    d = N.asarray ([float (x) for x in a[3:]])
+    d = N.asarray ([float (x) for x in a[4:]])
 
     chisqs.append (d[0])
 
@@ -74,6 +74,7 @@ for pdata in data.itervalues ():
 pg = O.quickPager (sys.argv[1:])
 rad = N.linspace (0, 2 * N.pi, 100)
 hwhm = 1.75 / ghz * 3600
+_styles = {'x': 1, 'y': 2}
 
 for ant in sorted (data.iterkeys ()):
     pdata = data[ant]
@@ -83,7 +84,7 @@ for ant in sorted (data.iterkeys ()):
     p = O.RectPlot ()
 
     # Theory
-    p.addXY (N.cos (rad) * hwhm, N.sin (rad) * hwhm, 'PB Model')
+    p.addXY (N.cos (rad) * hwhm, N.sin (rad) * hwhm, 'PB Model').primaryStyleNum = 0
 
     # Fit results
     for pol in 'xy':
@@ -97,7 +98,14 @@ for ant in sorted (data.iterkeys ()):
         x = x0 + N.cos (rad) * xhwhm
         y = y0 + N.sin (rad) * yhwhm
 
-        p.addXY (x, y, 'Pol ' + pol)
+        p.addXY (x, y, 'Pol ' + pol).primaryStyleNum = _styles[pol]
+
+        # Crosshair
+        bx = 0.1 * xhwhm
+        by = 0.1 * yhwhm
+        p.addXY ([x0 - bx, x0 + bx], [y0, y0], None).primaryStyleNum = _styles[pol]
+        p.addXY ([x0, x0], [y0 - by, y0 + by], None).primaryStyleNum = _styles[pol]
+        
 
     # Center on 0, 0
     b = N.abs (p.defaultField.xaxis.min)
@@ -108,9 +116,11 @@ for ant in sorted (data.iterkeys ()):
 
     # Add a little central crosshair
     b /= 10
-    psn = p.addXY ([-b, b], [0, 0], None, rebound=False).primaryStyleNum
-    p.addXY ([0, 0], [-b, b], None, rebound=False).primaryStyleNum = psn
-    
+    p.addXY ([-b, b], [0, 0], None, rebound=False).primaryStyleNum = 0
+    p.addXY ([0, 0], [-b, b], None, rebound=False).primaryStyleNum = 0
+
+    p.addKeyItem ('Antenna %d' % ant)
+
     pg.send (p)
 
 pg.done ()
