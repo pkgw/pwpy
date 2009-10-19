@@ -152,7 +152,7 @@ while (1)
 
     if (! -f $coords) then
 	set radec = (`radec.csh $src`)
-	echo "$me generating coords in mode $hexmode for $src = $radec[4] $radec[5]" |& tee -ia $log
+	echo "$me generating coords in mode $hexmode for $src = $radec[4] $radec[5], $freq1 MHz" |& tee -ia $log
 	hex-coords-$hexmode $freq1 $radec[4] $radec[5] >$coords
     endif
 
