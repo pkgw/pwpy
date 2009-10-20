@@ -45,7 +45,7 @@ for vis in sys.argv[1:]:
 # terms, not coordinate terms, i.e. multiply by cos (dec) or
 # cos (el)
 
-f = lambda x: '%.8f' % x
+f = lambda x: '%.8g' % x
 
 ra0, dec0 = coords[0][:2]
 
