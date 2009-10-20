@@ -961,8 +961,8 @@ Keywords:
       x = N.take(self.params, ifree)  ## x is the set of free parameters
 
       ## LIMITED parameters ?
-      limited = self.parinfo(parinfo, 'limited', default=[0,0])
-      limits = self.parinfo(parinfo, 'limits', default=[0.,0.])
+      limited = self.parinfo(parinfo, 'limited', default=[0,0], n=npar)
+      limits = self.parinfo(parinfo, 'limits', default=[0.,0.], n=npar)
       if (limited != None) and (limits != None):
          ## Error checking on limits in parinfo
          wh = N.nonzero((limited[:,0] & (xall < limits[:,0])) |
