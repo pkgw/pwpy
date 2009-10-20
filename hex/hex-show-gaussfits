@@ -18,7 +18,6 @@ else:
 # Load in data
 
 data = {}
-chisqs = []
 
 for l in file (join (analysisdir, 'data-gaussfits.txt')):
     a = l.split ()
@@ -30,8 +29,6 @@ for l in file (join (analysisdir, 'data-gaussfits.txt')):
         continue
 
     d = N.asarray ([float (x) for x in a[4:]])
-
-    chisqs.append (d[0])
 
     if ant not in data:
         data[ant] = {}
@@ -54,20 +51,9 @@ assert src is not None, 'Bad sinfo file, no source name?'
 assert ghz is not None, 'Bad sinfo file, no source name?'
 assert flux is not None, 'Bad sinfo file, no source name?'
 
-# Compute uncertainty normalization and convert to consistent units
-
-uscale = N.sqrt (N.median (N.asarray (chisqs)))
-print 'Median-chisq-based uncert scale:', uscale
-chimin = 1
-
 for pdata in data.itervalues ():
     for d in pdata.itervalues ():
         d[7:11] *= 3600 # deg. to arcsec
-
-        d[0] /= uscale**2  # normalize uncert units
-        d[2::2] *= uscale
-
-        chimin = min (chimin, d[0])
 
 # Display
     
@@ -93,7 +79,7 @@ for ant in sorted (data.iterkeys ()):
         d = pdata[pol]
         amp, x0, y0, xhwhm, yhwhm = d[1::2]
 
-        print '   ', pol, 'chisq:', d[0], '=', d[0] / chimin, '* chimin'
+        print '   ', pol, 'rchisq:', d[0]
 
         x = x0 + N.cos (rad) * xhwhm
         y = y0 + N.sin (rad) * yhwhm
