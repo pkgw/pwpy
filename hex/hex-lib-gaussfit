@@ -30,6 +30,7 @@ i = 0
 ghz = None
 offsets = []
 gains = {}
+guncerts = {}
 runs = {}
 runnpts = []
 runofs = []
@@ -38,6 +39,7 @@ for analysisdir in sys.argv[1:]:
     sinfofn = join (analysisdir, 'data-sinfo.txt')
     ofsfn = join (analysisdir, 'data-offsets.txt')
     gainsfn = join (analysisdir, 'data-relgains.txt')
+    errsfn = join (analysisdir, 'data-relgainerrs.txt')
 
     thisghz = None
 
@@ -92,6 +94,30 @@ for analysisdir in sys.argv[1:]:
         if key not in gains: gains[key] = []
         gains[key] += amps
 
+    for l in file (errsfn, 'r'):
+        a = l.strip ().split ()
+
+        if len (a) != 3 + thisn:
+            print >>sys.stderr, 'Error: unexpected number of entries in', gainsfn, ':', \
+                  len (a), 'not', 3 + thisn
+            sys.exit (1)
+
+        ant = int (a[0])
+        pol = a[1]
+        ltype = a[2]
+
+        if ltype != 'aerr':
+            continue
+
+        key = (ant, pol)
+
+        # FIXME: can have '-' for no gain solution for a pointing
+        errs = map (float, a[3:])
+
+        # TODO: do something with the phases
+        if key not in guncerts: guncerts[key] = []
+        guncerts[key] += errs
+
     i += 1
 
 nruns = i
@@ -127,17 +153,19 @@ _parinfo = [{'parname': 'amp',
              'limits': [0., 0.],
              'value': 0.0}]
             
-def fit (sigma, xs, ys, amps, **kwargs):
+def fit (sigma, xs, ys, amps, errs, **kwargs):
     _parinfo[3]['value'] = sigma
     _parinfo[4]['value'] = sigma
-    
+
     # FIXME: should just use fit.py but I worry that it will fall down
     # for two-dimensional 'x' coordinates.
+
+    wts = 1 / errs
 
     def f (params, fjac=None):
         a, x0, y0, xw, yw = params
         model = a * N.exp (-0.5 * (((xs - x0) / xw)**2 + ((ys - y0) / yw)**2))
-        return 0, amps - model
+        return 0, wts * (amps - model)
 
     o = mpfit (f, parinfo=_parinfo, quiet=True, **kwargs)
 
@@ -164,7 +192,9 @@ for ((ant, pol), gamps) in gains.iteritems ():
     f = Fit ()
     fitdata[(ant, pol)] = f
 
-    f.amps = N.asarray (gamps)**-2 # gain -> sensitivity
+    gamps = N.asarray (gamps)
+    f.amps = gamps**-2 # gain -> sensitivity
+    f.gerrs = (N.asarray (guncerts[(ant, pol)]) * 2 / gamps**3)
     f.ant = ant
     f.pol = pol
 
@@ -199,12 +229,13 @@ for ((ant, pol), gamps) in gains.iteritems ():
     # Now we can do the fit.
 
     try:
-        params, uncerts, resids, chisq = fit (hwhm, antxs, antys, f.amps)
+        params, puncerts, resids, chisq = fit (hwhm, antxs, antys, f.amps, f.gerrs)
         f.failed = False
         f.params = params
-        f.uncerts = uncerts
+        f.puncerts = puncerts
         f.resids = resids
         f.chisq = chisq
+        f.rchisq = chisq / (f.amps.size - params.size)
     except Exception:
         import traceback
         traceback.print_exc ()
@@ -216,19 +247,10 @@ for ((ant, pol), gamps) in gains.iteritems ():
 
 print >>sys.stderr, 'Modeled HWHM:', hwhm * 180 / N.pi
 
-t = N.asarray ([x[0] for x in gains.itervalues ()])
-uscale = N.sqrt (((1./t - 1.)**2).mean ())
-print >>sys.stderr, 'Central-pointing-RMS-based uncert scale:', uscale
-
-t = N.asarray ([f.chisq for f in fitdata.itervalues () if not f.failed])
-uscale = N.sqrt (N.median (t))
-print >>sys.stderr, 'Median-chisq-based uncert scale:', uscale
-
-skey = sorted (fitdata.iterkeys ())
 _conv = N.sqrt (2 * N.log (2)) * 180 / N.pi # sigma -> HWHM, rad -> deg
 _scale = N.asarray ([1, 206265, 206265, _conv, _conv])
 
-for key in skey:
+for key in sorted (fitdata.iterkeys ()):
     f = fitdata[key]
 
     if pretty:
@@ -238,7 +260,7 @@ for key in skey:
             print '   Failed'
             continue
 
-        u = lambda i: '%.2f%%' % (f.uncerts[i] / N.abs (f.params[i]) * 100 * uscale)
+        u = lambda i: '%.2f%%' % (f.puncerts[i] / N.abs (f.params[i]) * 100) # * uscale)
         vals = f.params * _scale
     
         print '   # points:', f.npts
@@ -249,7 +271,7 @@ for key in skey:
         print '      uncerts:', u (3), ';', u (4)
         print '   --Amps:', f.amps
         print '   Resids:', f.resids
-        print '   Chisq:', f.chisq / uscale**2
+        print '   RChisq:', f.rchisq #/ uscale**2
         print
     else:
         print f.ant, f.pol, f.npts, 
@@ -259,7 +281,7 @@ for key in skey:
             continue
 
         vals = f.params * _scale
-        us = f.uncerts * _scale
+        us = f.puncerts * _scale
 
-        print 1, f.chisq,
+        print 1, f.rchisq,
         print vals[0], us[0], vals[1], us[1], vals[2], us[2], vals[3], us[3], vals[4], us[4]
