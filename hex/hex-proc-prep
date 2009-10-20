@@ -81,6 +81,11 @@ set odecs = (`cut -d' ' -f2 <data-offsets.txt |awk '{print $1 * -206265}'`)
 # RFI flag everything
 
 foreach vis (vis00 $rest)
+    # Remove dra/ddec headers that will mess up the modeling of the
+    # offset pointings if they're there.
+    delhd in=$vis/dra >&/dev/null
+    delhd in=$vis/ddec >&/dev/null
+
     if (! -d $vis/phoenix) then
 	echo "RFI sweep dataset $vis"
 	echo ">>>>>>>>>>>>>>>>>>>>"
