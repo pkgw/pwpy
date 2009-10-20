@@ -1,0 +1,543 @@
+#! /usr/bin/env python
+# -*- python -*-
+
+"""So, this is pretty bad. For the purposes of our
+primary beam fits, we'd really like to know the uncertainties
+associated with the antenna gain and phase solutions so that we
+can have an absolute scale for how well the PB model is fitting the
+data.
+
+However, the calibration tasks (mfcal, smamfcal, selfcal, mselfcal)
+generally don't report this information or even really derive it.
+MSelfcal does report uncertainties in the antenna phases but the gains
+are more important for us.
+
+The best thing I can think to do is run a fit ourselves with a
+least-squares fitter and output the uncertainties that it gives us.
+We already know the solution (assuming a calib task has already been
+run) so we don't have to worry a whole lot about being smart. I hope.
+"""
+
+import sys
+import numpy as N
+import mpfit
+from miriad import *
+from mirtask import readgains, util
+
+
+# Arguments
+
+if len (sys.argv) < 6:
+    print >>sys.stderr, 'Usage: hex-lib-calcgainerr [vis] [vis2?] [flux] [RA offset] [dec offset] [logfile]'
+    sys.exit (1)
+
+vis1 = VisData (sys.argv[1])
+
+if not vis1.exists:
+    print >>sys.stderr, 'Error: input visibility', vis1, 'does not exist'
+    sys.exit (1)
+
+if len (sys.argv) == 6:
+    join = False
+    ofs = 2
+    vis2 = None
+elif len (sys.argv) == 7:
+    join = True
+    ofs = 3
+    vis2 = VisData (sys.argv[2])
+
+    if not vis2.exists:
+        print >>sys.stderr, 'Error: input visibility', vis2, 'does not exist'
+        sys.exit (1)
+else:
+    print >>sys.stderr, 'Error: too many arguments'
+    sys.exit (1)
+
+flux = float (sys.argv[ofs])
+
+# We're given the pointing offset from the source in radians; need to 
+# reverse to get the offset of the source from the pointing.
+dra = -float (sys.argv[ofs+1])
+ddec = -float (sys.argv[ofs+2])
+
+logfn = sys.argv[ofs+3]
+
+# Read in the gains. Three cheers for already knowing the right
+# answer!
+
+def readvisgains (vis, expectdualpol):
+    vhnd = vis.open ('rw')
+    gr = readgains.GainsReader (vhnd)
+    gr.prep ()
+
+    if gr.nfeeds != 2 and expectdualpol:
+        print >>sys.stderr, 'Error: need dual-feed solution in dataset', vis
+        sys.exit (1)
+    elif gr.nfeeds != 1 and not expectdualpol:
+        print >>sys.stderr, 'Error: need single-feed solution in dataset', vis
+        sys.exit (1)
+
+    if gr.nsols != 1:
+        print >>sys.stderr, 'Error: need one solution interval in dataset', vis
+        sys.exit (1)
+
+    times, gains = gr.readAll ()
+    gains = gains[0]
+    vhnd.close ()
+    return gr.nants, gains
+
+def readdata (vis, nants, blinfo, expectdualpol):
+    # We're just gonna average willy-nilly because our needs are
+    # pretty simple - point source model, one solution interval, etc.
+
+    print 'Reading', vis, '...'
+
+    nbl = nants * (nants - 1) / 2
+    visgen = vis.readLowlevel (False, select='-auto,pol(xx,yy)', nocal=True)
+    thepol = None
+
+    rephase = dra != 0. or ddec != 0.
+    lmn = None
+
+    for inp, pream, data, flags, n in visgen:
+        data = data[:n]
+        flags = flags[:n]
+        pol = inp.getVarInt ('pol')
+
+        if expectdualpol:
+            if pol == util.POL_XX:
+                pidx = 0
+            elif pol == util.POL_YY:
+                pidx = 1
+            else:
+                raise Exception ('Unexpected pol code ' + util.polarizationName (pol))
+        else:
+            if thepol is None:
+                thepol = pol
+            elif pol != thepol:
+                raise Exception ('Expected single-pol data')
+
+        ant1, ant2 = util.decodeBaseline (pream[4])
+        i, j = ant1 - 1, ant2 - 1
+        # this took way too long to work out ...
+        blidx = i * (2 * nants - 3 - i) / 2 + j - 1
+
+        if expectdualpol:
+            iinfo = blinfo[pidx,blidx]
+        else:
+            iinfo = blinfo[blidx]
+
+        if lmn is None and rephase:
+            # This logic is derived from that used in the MIRIAD modeling
+            # subroutines to, we hope, precisely mimic the phases expected
+            # when selfcal is run with an offset point source; we need this
+            # to be able to rederive the antenna gains that such a selfcal
+            # produces. Testing shows that this reproduces MIRIAD very well.
+            ra0 = inp.getVarDouble ('ra')
+            dec0 = inp.getVarDouble ('dec')
+            ra = ra0 + dra / N.cos (dec0)
+            dec = dec0 + ddec
+            l = N.sin (ra - ra0) * N.cos (dec)
+            m = N.sin (dec) * N.cos (dec0) - N.cos (ra - ra0) * N.cos (dec) * N.sin (dec0)
+            n = N.sin (dec) * N.sin (dec0) + N.cos (ra - ra0) * N.cos (dec) * N.cos (dec0)
+            n -= 1 # makes the work below easier
+            lmn = N.asarray ([l, m, n])
+
+            sdf = inp.getVarDouble ('sdf')
+            sfreq = inp.getVarDouble ('sfreq')
+            phscale = 1 + N.arange (data.size) * sdf / sfreq
+
+        if rephase:
+            ph0 = (0-2j) * N.pi * N.dot (lmn, pream[0:3])
+            data *= N.exp (ph0 * phscale)
+
+        data = data[N.where (flags)]
+        if data.size < 3:
+            # Need enough to calculate std.
+            continue
+
+        for qidx, component in ((0, data.real), (2, data.imag)):
+            # compute mean and inverse variance-of-the-mean
+            m = component.mean ()
+            wt = component.size * (component.size - 1) / ((component - m)**2).sum ()
+
+            iinfo[qidx] += m * wt
+            iinfo[qidx + 1] += wt
+
+    return thepol
+
+if not join:
+    nants, gains = readvisgains (vis1, True)
+    newgains = N.zeros ((2, nants), dtype=N.complex)
+    newgains[0] = gains[::2]
+    newgains[1] = gains[1::2]
+    gains = newgains
+
+    nbl = nants * (nants - 1) / 2
+    blinfo = N.zeros ((2, nbl, 4))
+    readdata (vis1, nants, blinfo, True)
+else:
+    nants1, gains1 = readvisgains (vis1, False)
+    nants2, gains2 = readvisgains (vis2, False)
+    nants = max (nants1, nants2)
+    gains = N.zeros ((2, nants), dtype=N.complex)
+
+    nbl = nants * (nants - 1) / 2
+    blinfo = N.zeros ((2, nbl, 4))
+
+    pol1 = readdata (vis1, nants, blinfo[0], False)
+
+    if pol1 == util.POL_XX:
+        pol2 = readdata (vis2, nants, blinfo[1], False)
+
+        if pol2 != util.POL_YY:
+            raise Exception ('Expected XX and YY pols in two datasets')
+
+        gains[0,:nants1] = gains1
+        gains[1,:nants2] = gains2
+    elif pol1 == util.POL_YY:
+        blinfo[1] = blinfo[0]
+        pol2 = readdata (vis2, nants, blinfo[0], False)
+
+        if pol2 != util.POL_XX:
+            raise Exception ('Expected XX and YY pols in two datasets')
+
+        gains[1,:nants1] = gains1
+        gains[0,:nants2] = gains2
+    else:
+        raise Exception ('Expected XX or YY pols in first dataset')
+
+
+# Convert from working quantities to weighted averages and variances
+# Points without data will go to infinities or NaNs
+
+blinfo[:,:,0] /= blinfo[:,:,1]
+blinfo[:,:,2] /= blinfo[:,:,3]
+blinfo[:,:,1] = 1. / blinfo[:,:,1]
+blinfo[:,:,3] = 1. / blinfo[:,:,3]
+
+
+# Dump
+
+def dump (blinfo):
+    blidx = 0
+    for i in xrange (nants):
+        for j in xrange (i + 1, nants):
+            for pidx in (0, 1):
+                p = 'xy'[pidx]
+                v = blinfo[pidx,blidx]
+
+                if not N.isfinite (v[0]):
+                    continue
+
+                s = '%d%c-%d%c' % (i + 1, p, j + 1, p)
+                print '%8s: re %8f +- %8f im %8f +- %8f' % \
+                      (s, v[0], N.sqrt (v[1]), v[2], N.sqrt (v[3]))
+            blidx += 1
+
+#dump (blinfo)
+#sys.exit (0)
+
+# Now we solve for the gains. Our initial "guess" should be good
+# enough that convergence won't be an issue.
+#
+# The model equation we want to solve is:
+#
+# gi gj* vij = model
+
+def fit (blinfo, gains, flux, **kwargs):
+    from mpfit import mpfit
+
+    squeezeant = {}
+
+    def squeeze (i):
+        if i in squeezeant:
+            sq = squeezeant[i]
+        else:
+            sq = len (squeezeant)
+            squeezeant[i] = sq
+        return sq
+
+    # We need to build up our table of "squeezed" indices based
+    # on which antennas we actually have gain solutions for. We
+    # do this in two passes to also discover which antenna was
+    # the reference antenna (-> imaginary part of its gain solution
+    # is 0) -- when starting from the previously-derived soluiton,
+    # we want to apply the same constraint, otherwise the uncertainties
+    # in the gain solution for the refant are overlarge. (Not quite
+    # sure why this happens.) Our parameter-fixing is lame, so
+    # we accomplish this by modifying the squeeze table to put the
+    # reference antenna at the very end.
+    
+    ndata = 0
+    blidx = -1
+    refant = None
+    lastsqidx = -1
+    lastsqant = -1
+    
+    for i in xrange (nants):
+        for j in xrange (i + 1, nants):
+            blidx += 1
+            
+            if not N.isfinite (blinfo[blidx,0]):
+                continue
+
+            ndata += 1
+            
+            sqi = squeeze (i)
+            sqj = squeeze (j)
+
+            if sqi > lastsqidx:
+                lastsqidx = sqi
+                lastsqant = i
+
+            if sqj > lastsqidx:
+                lastsqidx = sqj
+                lastsqant = j
+
+        if N.abs (gains[i].imag) < 1e-8:
+            # Skip ants without gain solutions
+            if N.abs (gains[i].real) > 1e-8:
+                if refant is None:
+                    refant = i
+                elif refant is not None:
+                    raise Exception ('Two refants?')
+
+    if refant is None:
+        raise Exception ('Couldn\'t find refant')
+    
+    print 'Refant is', refant + 1
+    
+    # hack the squeeze table so we can fix the refants imaginary gain
+    sqref = squeezeant[refant]
+    squeezeant[refant] = lastsqidx
+    squeezeant[lastsqant] = sqref
+
+    # We now know enough to allocate buffers
+
+    nantpols = len (squeezeant)
+    nfit = 2 * nantpols - 1 # fix the very last value (<=> set refant)
+
+    idxdata = N.empty ((ndata, 3), dtype=N.int)
+    yvals, ywts, model = N.empty ((3, 2 * ndata))
+    fullgains = N.empty (2 * nantpols)  # 2 complex components
+
+    # Now fill in the data.
+
+    blidx = -1
+    didx = 0
+
+    for i in xrange (nants):
+        sqi = squeezeant.get (i)
+
+        if sqi is not None:
+            fullgains[2*sqi] = gains[i].real
+            fullgains[2*sqi+1] = gains[i].imag
+
+        for j in xrange (i + 1, nants):
+            blidx += 1
+            
+            if not N.isfinite (blinfo[blidx,0]):
+                continue
+            
+            sqj = squeezeant[j]
+
+            idxdata[didx] = sqi, sqj, blidx
+
+            rval, rvar, ival, ivar = blinfo[blidx]
+
+            # This is where our simplistic model assumption
+            # comes in ...
+
+            amp2 = rval**2 + ival**2
+                    
+            yvals[2 * didx] = flux * rval / amp2
+            yvals[2 * didx + 1] = -flux * ival / amp2
+
+            ampm4 = amp2**-2
+            a = flux * (ival**2 - rval**2) * ampm4
+            b = 2 * flux * rval * ival * ampm4
+            c = flux * (rval**2 - ival**2) * ampm4
+                    
+            ywts[2 * didx] = 1. / N.sqrt (a**2 * rvar + b**2 * ivar)
+            ywts[2 * didx + 1] = 1. / N.sqrt (b**2 * rvar + c**2 * ivar)
+
+            didx += 1
+
+    # Fitting!  mpfit has a pretty strong desire for the problem to be
+    # well-conditioned, e.g. all of the parameters have a similar
+    # magnitude. This isn't a problem with raw data, but when dealing
+    # with already-calibrated data, the real parts are all ~1 and the
+    # imaginary parts are all ~0, which makes mpfit sad. We avoid this
+    # by putting all of the parameters in terms of the already-known
+    # gain solutions, so all of the mpfit parameters will be around 1
+    # regardless of the actual gains. Once again, it's pretty helpful
+    # to know the answer in advance.
+
+    fullderiv = N.zeros ((2 * ndata, nfit + 1))
+    fullparams = N.ones (2 * nantpols)
+    
+    def f (params, fjac=None):
+        fullparams[:-1] = params
+        fullparams[-1] = 1
+        fullparams[:] *= fullgains
+
+        for i in xrange (ndata):
+            sq1, sq2, blidx = idxdata[i]
+
+            re1, im1 = fullparams[2*sq1], fullparams[2*sq1+1]
+            re2, im2 = fullparams[2*sq2], fullparams[2*sq2+1]
+
+            model[2 * i] = re1 * re2 + im1 * im2
+            model[2 * i + 1] = im1 * re2 - im2 * re1
+
+        r = ywts * (yvals - model)
+        #print 'F:', fullparams[:5], '->', (r**2).sum ()
+
+        if fjac is None:
+            return 0, r
+
+        for i in xrange (ndata):
+            sq1, sq2, blidx = idxdata[i]
+
+            re1, im1 = fullparams[2*sq1], fullparams[2*sq1+1]
+            re2, im2 = fullparams[2*sq2], fullparams[2*sq2+1]
+
+            # dmodelreal/dre1
+            fullderiv[2*i,2*sq1] = re2
+            # dmodelreal/dim1
+            fullderiv[2*i,2*sq1+1] = im2
+            # dmodelreal/dre2
+            fullderiv[2*i,2*sq2] = re1
+            # dmodelreal/dim2
+            fullderiv[2*i,2*sq2+1] = im1
+            
+            # dmodelimag/dre1
+            fullderiv[2*i+1,2*sq1] = -im2
+            # dmodelimag/dim1
+            fullderiv[2*i+1,2*sq1+1] = re2
+            # dmodelimag/dre2
+            fullderiv[2*i+1,2*sq2] = im1
+            # dmodelimag/dim2
+            fullderiv[2*i+1,2*sq2+1] = -re1
+
+        deriv = fullderiv[:,:-1]
+        deriv *= -ywts[:,N.newaxis]
+        return 0, r, deriv
+
+    #print 'FIT: ndata =', ndata, '; nantpols =', nantpols
+    #print 'Initial params:', params
+
+    o = mpfit (f, N.ones (nfit), quiet=True, autoderivative=False, **kwargs)
+
+    if o.status <= 0 or o.status >= 5:
+        raise Exception ('MPFIT failed: %d, %s' % (o.status, o.errmsg))
+    if o.perror is None:
+        raise Exception ('MPFIT failed to find uncerts: %d, %s' % (o.status, o.errmsg))
+
+    nresids = f (o.params)[1]
+    rchisq = (nresids**2).sum () / (2 * ndata - nfit)
+
+    uncerts = N.empty (nfit + 1)
+    uncerts[:-1] = o.perror
+    uncerts[-1] = 0.0
+    uncerts *= fullgains
+
+    cov = N.zeros ((nfit + 1, nfit + 1))
+    cov[:-1,:-1] = o.covar
+
+    return squeezeant, fullparams, uncerts, nresids, rchisq, cov
+
+def processone (pidx, blinfo, gains, dtable, flux):
+    blinfo = blinfo[pidx]
+    gains = gains[pidx]
+
+    print 'Running %c fit ...' % ('XY'[pidx], )
+    squeeze, params, uncerts, resids, rchisq, cov = fit (blinfo, gains, flux)
+
+    print 'Reduced chi squared:', rchisq
+
+    # Scale up uncertainties because, as it turns out, our
+    # model is probably not perfect
+
+    if rchisq < 1:
+        print 'Warning: suspiciously-good fit ...'
+    else:
+        print '   Scaling uncertainties by', N.sqrt (rchisq)
+        uncerts *= N.sqrt (rchisq)
+
+    #import omega as O
+    #O.quickHist (resids, bins=30).show ()
+
+    if False:
+        # Print out fitted gains and uncerts in real/imag components
+        for i in sorted (squeeze.iterkeys ()):
+            sqi = squeeze[i]
+            rval, ival = params[2*sqi], params[2*sqi+1]
+            rerr, ierr = uncerts[2*sqi], uncerts[2*sqi+1]
+
+            #g = gains[i]
+            s = '%d%c' % (i + 1, 'xy'[pidx])
+
+            print '%4s: re %#+.3f +- %.2f%% im %#+.3f +- %.2f%%' % \
+                  (s, rval, 100 * rerr / abs (rval), ival, 100 * ierr / abs (ival))
+
+    if False:
+        # Dump the covariance matrix as correlation coefficients
+        for i in xrange (2*len (squeeze)):
+            for j in xrange (i, 2*len (squeeze)):
+                if i == j:
+                    print 'Stddev', i, N.sqrt (cov[i,i])
+                else:
+                    print 'Corrcoeff', i, j, cov[i,j] / N.sqrt (cov[i,i] * cov[j,j])
+
+    # Now compute amplitudes, phases, and their uncertainties
+
+    rvals = params[::2]
+    ivals = params[1::2]
+    rerrs = uncerts[::2]
+    ierrs = uncerts[1::2]
+
+    ams = N.sqrt (rvals**2 + ivals**2)
+    phs = N.arctan2 (ivals, rvals)
+
+    aerrs = N.sqrt ((rvals * rerrs)**2 + (ivals * ierrs)**2) / ams
+    perrs = N.sqrt ((rvals * ierrs)**2 + (ivals * rerrs)**2) / ams**2
+
+    if False:
+        # Dump the fitten gains and uncerts in amp/phase coordinates
+        for i in sorted (squeeze.iterkeys ()):
+            sqi = squeeze[i]
+            s = '%d%c' % (i + 1, 'xy'[pidx])
+
+            am, ph = ams[sqi], phs[sqi]
+            aerr, perr = aerrs[sqi], perrs[sqi]
+        
+            print '%4s: am %#.3f +- %6.2f%% ph %#+.1f +- %.1f' % \
+                  (s, am, 100 * aerr / am, ph * 180 / N.pi, perr * 180 / N.pi)
+
+    # Save it all into the data table
+
+    pchar = 'xy'[pidx]
+
+    for (i, sqi) in squeeze.iteritems ():
+        ant = i + 1
+        assert (ant, pchar) not in dtable
+        dtable[(ant, pchar)] = ams[sqi], aerrs[sqi], phs[sqi], perrs[sqi]
+
+dtable = {}
+processone (0, blinfo, gains, dtable, flux)
+processone (1, blinfo, gains, dtable, flux)
+
+# Finally, log the results
+
+if logfn == '-':
+    logf = sys.stdout
+else:
+    logf = file (logfn, 'w')
+
+f = lambda x: '%.8g' % x
+
+for ant, pol in sorted (dtable.iterkeys ()):
+    am, aerr, ph, perr = dtable[(ant, pol)]
+    print >>logf, ant, pol, f(am), f(aerr), f(ph), f(perr)
