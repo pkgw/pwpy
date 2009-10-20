@@ -164,21 +164,40 @@ if (! -f data-sefd.txt) then
 endif
 
 
-# Extract antenna gains normalized to 1 at pointing center
+# Extract antenna gains normalized to 1 at pointing center and uncerts
 
 if (! -f data-relgains.txt) then
     hex-lib-extractgains -s vis00 $rest >data-relgains.txt
     if ($status) exit $status
 endif
 
+if (! -f data-relgainerrs.txt) then
+    set gefiles = ()
+    set oras = (`cut -d' ' -f1 <data-offsets.txt`)
+    set odecs = (`cut -d' ' -f2 <data-offsets.txt`)
+    set i = 1
 
-# Extract absolute antenna gains at the pointing center
+    mkdir -p gainerrs
+
+    foreach vis (vis00 $rest)
+	hex-lib-calcgainerr $vis.x $vis.y $flux $oras[$i] $odecs[$i] gainerrs/$vis.rel
+	set gefiles = ($gefiles gainerrs/$vis.rel)
+	@ i = $i + 1
+    end
+
+    hex-lib-mergegainerrtables $gefiles >data-relgainerrs.txt
+endif
+    
+# Extract absolute antenna gains at the pointing center and uncerts
 
 if (! -f data-absgains.txt) then
     hex-lib-extractgains -j vis00 >data-absgains.txt
     if ($status) exit $status
 endif
 
+if (! -f data-absgainerrs.txt) then
+    hex-lib-calcgainerr vis00 $flux 0 0 data-absgainerrs.txt
+endif
 
 # TODO: extract closure information of primary pointing.
 
