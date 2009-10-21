@@ -438,7 +438,7 @@ rb_novas_nutate(VALUE v_mod, VALUE args)
 }
 
 /*
- * call-seq: spin(tdb, pos1) -> pos2
+ * call-seq: spin(st, pos1) -> pos2
  *
  * Transforms geocentric rectangular coordinates from rotating system based on
  * rotational equator and orthogonal reference meridian to non-rotating system
