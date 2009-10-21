@@ -183,32 +183,43 @@ module Pgplot
         :line => :line,
         :marker => nil,
         :overlay => false,
-        :yrange => nil
+        :xrange => nil,
+        :yrange => nil,
+        :xpad => 0,
+        :ypad => 0.1
       }.merge!(opts)
 
       # Convert true to 1
       opts[:just] = 1 if opts[:just] == true
 
-      xxmin = xx.min
-      xxmax = xx.max
+      xxmin, xxmax = opts[:xrange]
+      unless xxmin && xxmax
+        xxmin = xx.min
+        xxmax = xx.max
+      end
       if xxmin == xxmax
         xxmin -= 1
         xxmax += 1
+      elsif opts[:xpad] != 0
+        xxavg = (xxmin + xxmax)/2.0
+        xxdev = (xxmax - xxmin)/2.0
+        xxmin = xxavg - (1+opts[:xpad])*xxdev
+        xxmax = xxavg + (1+opts[:xpad])*xxdev
       end
 
       yymin, yymax = opts[:yrange]
       unless yymin && yymax
         yymin = yy.min
         yymax = yy.max
-        if yymin == yymax
-          yymin -= 1
-          yymax += 1
-        else
-          yyavg = (yymin + yymax)/2.0
-          yydev = (yymax - yymin)/2.0
-          yymin = yyavg - 1.1*yydev
-          yymax = yyavg + 1.1*yydev
-        end
+      end
+      if yymin == yymax
+        yymin -= 1
+        yymax += 1
+      elsif opts[:ypad] != 0
+        yyavg = (yymin + yymax)/2.0
+        yydev = (yymax - yymin)/2.0
+        yymin = yyavg - (1+opts[:ypad])*yydev
+        yymax = yyavg + (1+opts[:ypad])*yydev
       end
 
       # Make sure this Plotter's device is pgplot's current selection
