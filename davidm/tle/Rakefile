@@ -28,6 +28,7 @@ spec = Gem::Specification.new do |s|
   s.files = FileList[
     'README',
     'Rakefile',
+    'lib/tle.rb',
     'ext/debug1.i',
     'ext/debug2.i',
     'ext/debug3.i',

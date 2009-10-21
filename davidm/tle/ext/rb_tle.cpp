@@ -14,6 +14,12 @@
 #include "sgp4io.h"
 #include "sgp4unit.h"
 
+// From the cpp files
+#define pi 3.14159265358979323846
+
+static VALUE cDateTime = Qnil;
+static ID id_ajd = Qnil;
+
 /* Document-method: rv2coe
  *
  * call-seq: Tle.rv2coe(r,v,mu) -> [p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper]
@@ -207,24 +213,73 @@ static VALUE rb_elements_new(int argc, VALUE *argv, VALUE clazz)
   return self;
 }
 
-/* ddoDocument-method: sgp4
+/* Document-method: sgp4
  *
- * call-seq: sgp4(tsince) -> [r, v]
+ * call-seq: sgp4(tsince, grav_const, ee=0.0) -> [r, v]
  *
  * Calls prediction code to calculate geocentric equatorial position +r+ and
  * velocity +v+ of object whose orbit is represented by +self+ at +tsince+
  * minutes since TLE epoch.  +r+ and +v+ are three element Arrays in units of
  * km and km/s, respectively.
+ *
+ * +tsince+ can also be given as a DateTime object (or any object responding to
+ * +ajd+).  In this case, the minutes since TLE epoch will be calculated as...
+ *
+ *   (tsince.ajd - jdsatepoch) * (24*60)
+ *
+ * +grav_const+ can be one of <tt>Tle::WGS72OLD</tt>, <tt>Tle::WGS72</tt>, or
+ * <tt>Tle::WGS84</tt>.  Presumably, this should be the same value that was
+ * used when creating this object, but the underlying library does not enforce
+ * this so this method does not either.
+ *
+ * The underlying sgp4 library uses a coordinate system that is referenced to
+ * the true equator and mean equinox (TEME) of the TLE epoch.  If +ee+, the
+ * equation of the equinoxes (in hours) at the TLE epoch, is given and is
+ * non-zero then the results returned by the underlying library will be rotated
+ * around the Z axis (i.e.  pole) by the amount specified, thereby transforming
+ * the values into a coordinate system that is referenced to the true equator
+ * and true equinox (TETE) of the TLE epoch.
  */
-static VALUE rb_elements_sgp4(VALUE self, VALUE vtsince, VALUE vwhichconst)
+static VALUE rb_elements_sgp4(int argc, VALUE *argv, VALUE self)
 {
-  elsetrec * e;                                       \
-  Data_Get_Struct(self, elsetrec, e);                 \
-  double tsince = NUM2DBL(vtsince);
-  gravconsttype whichconst = (gravconsttype)NUM2INT(vwhichconst);
-  double r[3], v[3];
+  VALUE vtsince;     double tsince;
+  VALUE vwhichconst; gravconsttype whichconst;
+  VALUE veqeq;       double eqeq_rad = 0.0;
+  VALUE vajd;
+  elsetrec * e;
+  double r[3], v[3], cosee, sinee, x, y;
+
+  rb_scan_args(argc, argv, "21", &vtsince, &vwhichconst, &veqeq);
+
+  Data_Get_Struct(self, elsetrec, e);
+  if(rb_respond_to(vtsince, id_ajd)) {
+    vajd = rb_funcall(vtsince, id_ajd, 0);
+    tsince = (NUM2DBL(vajd) - e->jdsatepoch) * (24*60);
+  } else {
+    tsince = NUM2DBL(vtsince);
+  }
+  whichconst = (gravconsttype)NUM2INT(vwhichconst);
+  if(argc == 3) {
+    eqeq_rad = NUM2DBL(veqeq) * pi / 12.0;
+  }
+
   // TODO Raise exception on error
   sgp4(whichconst, *e, tsince, r, v);
+
+  if(eqeq_rad != 0.0)
+  {
+    cosee = cos(eqeq_rad);
+    sinee = sin(eqeq_rad);
+    x = r[0]*cosee - r[1]*sinee;
+    y = r[0]*sinee + r[1]*cosee;
+    r[0] = x;
+    r[1] = y;
+    x = v[0]*cosee - v[1]*sinee;
+    y = v[0]*sinee + v[1]*cosee;
+    v[0] = x;
+    v[1] = y;
+  }
+
   return rb_ary_new3(2,
       rb_ary_new3(3,
         rb_float_new(r[0]),
@@ -242,7 +297,7 @@ static VALUE rb_elements_sgp4(VALUE self, VALUE vtsince, VALUE vwhichconst)
 #define CHR2STR(c) rb_str_new(&(c), 1)
 
 #define DEFINE_ELEMENTS_GETTER(field_name, conv_func) \
-static VALUE rb_elements_##field_name(VALUE self)           \
+static VALUE rb_elements_##field_name(VALUE self)     \
 {                                                     \
   elsetrec * e;                                       \
   Data_Get_Struct(self, elsetrec, e);                 \
@@ -252,18 +307,42 @@ static VALUE rb_elements_##field_name(VALUE self)           \
 DEFINE_ELEMENTS_GETTER(satnum, INT2NUM)
 DEFINE_ELEMENTS_GETTER(epochyr, INT2NUM)
 DEFINE_ELEMENTS_GETTER(epochtynumrev, INT2NUM)
+
+/* Document-method: error
+ *
+ * call-seq: error -> Integer
+ *
+ * Returns most recent error code.
+ */
 DEFINE_ELEMENTS_GETTER(error, INT2NUM)
-DEFINE_ELEMENTS_GETTER(init, CHR2STR)
+
+//DEFINE_ELEMENTS_GETTER(init, CHR2STR)
 DEFINE_ELEMENTS_GETTER(method, CHR2STR)
 DEFINE_ELEMENTS_GETTER(t, rb_float_new)
 DEFINE_ELEMENTS_GETTER(epochdays, rb_float_new)
+
+/* Document-method: jdsatepoch
+ *
+ * call-seq: jdsatepoch -> Float
+ *
+ * Returns (astronomical) Julian Date at TLE epoch.
+ */
 DEFINE_ELEMENTS_GETTER(jdsatepoch, rb_float_new)
 
 #define BIND_ELEMENTS_GETTER(field_name) \
   rb_define_method(cElements, #field_name, RUBY_METHOD_FUNC(rb_elements_##field_name), 0);
 
-extern "C" void Init_tle()
+extern "C" void Init_tle_ext()
 {
+  rb_require("date");
+
+  ID idDateTime = rb_intern("DateTime");
+  cDateTime = rb_const_get(rb_cObject, idDateTime);
+  if(cDateTime == Qnil) {
+    rb_raise(rb_eLoadError, "DateTime not found");
+  }
+  id_ajd = rb_intern("ajd");
+
   VALUE mTle = rb_define_module("Tle");
   rb_define_singleton_method(mTle, "rv2coe", RUBY_METHOD_FUNC(rb_tle_rv2coe), -1);
 
@@ -277,15 +356,20 @@ extern "C" void Init_tle()
   VALUE cElements = rb_define_class_under(mTle, "Elements", rb_cObject);
   rb_define_singleton_method(cElements, "new", RUBY_METHOD_FUNC(rb_elements_new), -1);
   rb_define_method(cElements, "initialize", RUBY_METHOD_FUNC(rb_elements_initialize), 3);
-  rb_define_method(cElements, "sgp4", RUBY_METHOD_FUNC(rb_elements_sgp4), 2);
+  rb_define_method(cElements, "sgp4", RUBY_METHOD_FUNC(rb_elements_sgp4), -1);
   BIND_ELEMENTS_GETTER(satnum);
   BIND_ELEMENTS_GETTER(satnum);
   BIND_ELEMENTS_GETTER(epochyr);
   BIND_ELEMENTS_GETTER(epochtynumrev);
   BIND_ELEMENTS_GETTER(error);
-  BIND_ELEMENTS_GETTER(init);
+  //BIND_ELEMENTS_GETTER(init);
   BIND_ELEMENTS_GETTER(method);
   BIND_ELEMENTS_GETTER(t);
   BIND_ELEMENTS_GETTER(epochdays);
   BIND_ELEMENTS_GETTER(jdsatepoch);
+#if 0
+  /* These are just for RDOC */
+  rb_define_method(cElements, "error", NULL, 0);
+  rb_define_method(cElements, "jdsatepoch", NULL, 0);
+#endif
 }

@@ -20,4 +20,4 @@ have_func('asinh')
 $CFLAGS.sub!(/ -fno-builtin$/,'') if Config::CONFIG['CC'] = 'gcc'
 
 # Generate Makefile
-create_makefile("tle")
+create_makefile("tle_ext")
