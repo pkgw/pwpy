@@ -40,17 +40,17 @@ module Math
   def hms_to_h(*args); dms_to_d(*args); end
 
   # Convert degrees to radians
-  def d2r(d) d*PI/180; end; module_function :d2r
+  def d2r(d) d*Rational(1,180)*PI; end; module_function :d2r
   # Convert radians to degrees
   def r2d(r) r*180/PI; end; module_function :r2d
   # Convert hours to radians
-  def h2r(h) h*PI/12; end; module_function :h2r
+  def h2r(h) h*Rational(1,12)*PI; end; module_function :h2r
   # Convert radians to hours
   def r2h(r) r*12/PI; end; module_function :r2h
   # Convert degrees to hours
-  def d2h(d) d/15.0; end; module_function :d2h
+  def d2h(d) d*Rational(1,15); end; module_function :d2h
   # Convert hours to degrees
-  def h2d(h) h*15.0; end; module_function :h2d
+  def h2d(h) h*15; end; module_function :h2d
 end
 
 # Add angle conversion and angle formatting methods to Numeric class.
@@ -87,6 +87,14 @@ class Numeric
   def h2d() Math.h2d(self); end
 end
 
+# Add #to_r method to Float
+class Float
+  # Convert +self+ to a Rational.
+  def to_r
+    Rational(1,Rational(1,self)) rescue Rational(0,1)
+  end
+end
+
 # Add angle conversion methods to Array class.
 class Array
   # Convert +self+ from [degrees, minutes, seconds] to degrees.
@@ -117,7 +125,7 @@ end
 # - UTC
 # - TAI
 # - TT
-# - GPS (TODO)
+# - GPS
 class DateTime
 
   # The J2000 epoch
@@ -186,7 +194,7 @@ class DateTime
     elsif self < TAI_UTC_TABLE[-1][0]
       0
     else
-      (find {|epoch,dt| epoch <= self})[1]
+      (TAI_UTC_TABLE.find {|epoch,dt| epoch <= self})[1]
     end
   end
 
@@ -198,6 +206,9 @@ class DateTime
   # TT-TAI in days.
   TT_TAI = Rational(32184, 86400000)
 
+  # TAI-GPS in days.
+  TAI_GPS = Rational(19, 86400)
+
   # Returns TAI version of +self+, treating +self+ as UTC
   def utc2tai
     self + self.tai_utc
@@ -206,6 +217,11 @@ class DateTime
   # Returns TT version of +self+, treating +self+ as UTC
   def utc2tt
     self + self.tai_utc + TT_TAI
+  end
+
+  # Returns GPS version of +self+, treating +self+ as UTC
+  def utc2gps
+    self + self.tai_utc - TAI_GPS
   end
 
   # Returns UTC version of +self+, treating +self+ as TAI
@@ -218,6 +234,11 @@ class DateTime
     self + TT_TAI
   end
 
+  # Returns GPS version of +self+, treating +self+ as TAI
+  def tai2gps
+    self - TAI_GPS
+  end
+
   # Returns UTC version of +self+, treating +self+ as TT
   def tt2utc
     self - TT_TAI - self.tai_utc
@@ -228,6 +249,26 @@ class DateTime
     self - TT_TAI
   end
 
+  # Returns GPS version of +self+, treating +self+ as TT
+  def tt2gps
+    self - TT_TAI - TAI_GPS
+  end
+
+  # Returns UTC version of +self+, treating +self+ as GPS
+  def gps2utc
+    self + TAI_GPS - self.tai_utc
+  end
+
+  # Returns TAI version of +self+, treating +self+ as GPS
+  def gps2tai
+    self + TAI_GPS
+  end
+
+  # Returns TT version of +self+, treating +self+ as GPS
+  def gps2tt
+    self + TAI_GPS + TT_TAI
+  end
+
   # Format +self+ as String with (optional) fractional seconds
   def to_s(prec=0)
     width = prec == 0 ? 2 : prec+3
@@ -236,3 +277,26 @@ class DateTime
       [year, mon, day, hour, min, secf, zone]
   end
 end
+
+# Returns the angular velocity of Earth in radians per second for a given +lod+ in
+# milliseconds.  From http://www.iers.org/MainDisp.csl?pid=95-97 ...
+#
+# The difference between the astronomically determined duration of the day and
+# 86400 SI seconds is also called length of day (LOD). The relationship of the
+# angular velocity of the earth Omega with LOD is...
+#
+# Omega = 72,921,151.467064 - 0.843994809*LOD
+#
+# ...where Omega is in picoradians/s and LOD in milliseconds [but note that
+# this method returns radians per second].
+#--
+# TODO? Move this into a module?
+#++
+def Omega(lod)
+  omega = Rational(72921151467064,1e18)
+  omega -= Rational(843994809,1e21)*lod.to_r if lod != 0
+  omega
+end
+
+# Angular velocity of Earth ignoring length of day variations.
+Omega = Omega(0)

@@ -8,7 +8,9 @@ require 'rake/gempackagetask'
 spec = Gem::Specification.new do |s|
   # Basics
   s.name = 'astroutil'
-  s.version = '0.1'
+  # Version is YYYY.M.V, where YYYY.M is year and month of most recent leap
+  # second included, and V is version within that epoch.
+  s.version = '2009.1.0'
   s.summary = 'Astronomy related extensions for Ruby'
   s.description = <<-EOD
     Provides astronomy related extensions to standard Ruby classes, including
@@ -16,7 +18,9 @@ spec = Gem::Specification.new do |s|
     conversions to Numeric, Array, and String classes, DateTime::J2000 constant
     for J2000.0 epoch, convenience methods to create DateTime objects from ajd
     and amjd values, and conversions between various time frames to DateTime
-    class. 
+    class.  The version number of this gem is YYYY.M.V, where YYYY.M is year
+    and month of most recent leap second included, and V is version within that
+    epoch.
     EOD
   #s.platform = Gem::Platform::Ruby
   s.required_ruby_version = '>= 1.8.1'
