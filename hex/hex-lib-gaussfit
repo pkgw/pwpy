@@ -60,12 +60,13 @@ for analysisdir in sys.argv[1:]:
     theseoffsets = [map (float, l.strip ().split ()) for l in file (ofsfn, 'r')]
     offsets += theseoffsets
 
-    thisn = len (theseoffsets)
-    runnpts.append (thisn)
     if i == 0:
         runofs.append (0)
     else:
         runofs.append (runofs[-1] + runnpts[-1])
+
+    thisn = len (theseoffsets)
+    runnpts.append (thisn)
 
     for l in file (gainsfn, 'r'):
         a = l.strip ().split ()
