@@ -65,6 +65,7 @@ if (-f $1 && $#argv == 2) then
     end
 else
     set tstart = none
+    set tend = none
 
     # List of UV datasets.
     @ nvis = $#argv - 1
@@ -120,14 +121,9 @@ foreach vis ($vises)
 end
 
 
-# If a time range is specified, flag out data outside of the relevant
-# time period.
+# Record the relevant time range if specified
 
-if ($tstart != none) then
-    foreach vis ($workdir/vis??)
-	echo uvflag flagval=f select="-time($tstart,$tend)" vis=$vis
-	uvflag flagval=f select="-time($tstart,$tend)" vis=$vis
-    end
-endif
+echo tstart "$tstart" >$workdir/data-databounds.txt
+echo tend "$tend" >>$workdir/data-databounds.txt
 
 exit 0

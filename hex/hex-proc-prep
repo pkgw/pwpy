@@ -66,11 +66,25 @@ flux $flux
 EOF
 
 
+# If a time range is specified, flag out data outside of the relevant
+# time period.
+
+set tstart = `grep tstart data-databounds.txt |cut -d' ' -f2`
+set tend = `grep tend data-databounds.txt |cut -d' ' -f2`
+
+if ($tstart != none) then
+    foreach vis (vis00 $rest)
+	echo uvflag flagval=f select="-time($tstart,$tend)" vis=$vis
+	uvflag flagval=f select="-time($tstart,$tend)" vis=$vis
+    end
+endif
+
+
 # Extract coordinate offsets in the data files and load in the RA/Dec
 # offsets in arcsec for use with mselfcal
 
 if (! -f data-offsets.txt) then
-    hex-lib-calcoffsets vis00 $rest >data-offsets.txt
+    hex-lib-calcoffsets $tstart $tend vis00 $rest >data-offsets.txt
     if ($status) exit $status
 endif
 
@@ -186,11 +200,13 @@ if (! -f data-relgainerrs.txt) then
 
     foreach vis (vis00 $rest)
 	hex-lib-calcgainerr $vis.x $vis.y $flux $oras[$i] $odecs[$i] gainerrs/$vis.rel
+	if ($status) exit $status
 	set gefiles = ($gefiles gainerrs/$vis.rel)
 	@ i = $i + 1
     end
 
     hex-lib-mergegainerrtables $gefiles >data-relgainerrs.txt
+    if ($status) exit $status
 endif
     
 # Extract absolute antenna gains at the pointing center and uncerts
@@ -202,6 +218,7 @@ endif
 
 if (! -f data-absgainerrs.txt) then
     hex-lib-calcgainerr vis00 $flux 0 0 data-absgainerrs.txt
+    if ($status) exit $status
 endif
 
 # TODO: extract closure information of primary pointing.

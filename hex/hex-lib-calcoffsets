@@ -14,20 +14,40 @@ import numpy as N
 from miriad import *
 from mirtask import util
 
-if len (sys.argv) < 2:
-    print >>sys.stderr, 'Usage: hex-lib-calcoffsets [datasets...]'
+if len (sys.argv) < 4:
+    print >>sys.stderr, 'Usage: hex-lib-calcoffsets [tstart] [tend] [datasets...]'
     sys.exit (1)
+
+
+# Get the time bounds we're applying. We use scanUntilChange below, which means
+# we don't have access to flag information, so we can't just rely on the flagging
+# of the dataset to let us know which records to pay attention to.
+
+def tparse (s):
+    if s == 'none':
+        return None
+    return util.dateOrTimeToJD (s)
+    
+tstart = tparse (sys.argv[1])
+tend = tparse (sys.argv[2])
 
 
 # Compute mean radecs and azels for each data file
 
 coords = []
 
-for vis in sys.argv[1:]:
+for vis in sys.argv[3:]:
     vis = VisData (vis).open ('rw')
     work = []
 
     while vis.scanUntilChange ('time'):
+        time = vis.getVarDouble ('time')
+
+        if tstart is not None and time < tstart:
+            continue
+        if tend is not None and time > tend:
+            continue
+
         obsra = vis.getVarDouble ('obsra')
         obsdec = vis.getVarDouble ('obsdec')
 
