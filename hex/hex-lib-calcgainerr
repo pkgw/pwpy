@@ -295,12 +295,14 @@ def fit (blinfo, gains, flux, **kwargs):
                 lastsqidx = sqj
                 lastsqant = j
 
-        if N.abs (gains[i].imag) < 1e-8:
+        if N.abs (gains[i].imag) < 1e-10:
             # Skip ants without gain solutions
             if N.abs (gains[i].real) > 1e-8:
                 if refant is None:
                     refant = i
                 elif refant is not None:
+                    print 'Previous refant:', refant, gains[refant].real, gains[refant].imag
+                    print 'New refant :-( :', i, gains[i].real, gains[i].imag
                     raise Exception ('Two refants?')
 
     if refant is None:
