@@ -1,0 +1,54 @@
+#
+# $Id$
+#
+
+require 'rubygems'
+require 'rake/gempackagetask'
+
+spec = Gem::Specification.new do |s|
+  # Basics
+  s.name = 'eop'
+  s.version = '0.0.0'
+  s.summary = 'Ruby classes to manage Earth orientation parameters'
+  s.description = <<-EOD
+    Parses Earth Orientation Parameter data files from IERS.  Facilitates
+    management of local EOP data file cache.
+    EOD
+  #s.platform = Gem::Platform::Ruby
+  s.required_ruby_version = '>= 1.8.1'
+  #s.add_dependency('narray', '>= 0.5.9')
+
+  # About
+  s.authors = 'David MacMahon'
+  s.email = 'davidm@astro.berkeley.edu'
+  s.homepage = 'http://eop.rubyforge.org/'
+  s.rubyforge_project = 'eop' 
+
+  # Files, Libraries, and Extensions
+  s.files = FileList[
+    'Rakefile',
+    'lib/eop.rb',
+    'test/**/*'
+  ]
+  s.require_paths = ['lib']
+  #s.autorequire = nil
+  #s.bindir = 'bin'
+  #s.executables = []
+  #s.default_executable = nil
+
+  # C compilation
+  #s.extensions = %w[ ext/extconf.rb ]
+
+  # Documentation
+  #s.rdoc_options = []
+  s.has_rdoc = true
+  #s.extra_rdoc_files = []
+
+  # Testing TODO
+  #s.test_files = [test/test.rb]
+end
+
+Rake::GemPackageTask.new(spec) do |pkg|
+  pkg.need_zip = true
+  pkg.need_tar = true
+end
