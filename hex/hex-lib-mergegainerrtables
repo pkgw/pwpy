@@ -5,43 +5,78 @@
 
 import sys
 
+
+# Read in files individually
+
 data = {}
 idx = 0
+lens = []
+alltypes = set ()
 
 for tabfn in sys.argv[1:]:
+    firstn = None
+
     for l in file (tabfn, 'r'):
         a = l.strip ().split ()
-        assert len (a) == 6, 'Unexpected table format'
+        n = len (a) - 3
+
+        if firstn is None:
+            firstn = n
+            lens.append (n)
+        elif n != firstn:
+            raise Exception ('Unexpected change in number of columns in table ' + tabfn)
 
         antpol = (int (a[0]), a[1])
-        vals = map (float, a[2:])
+        etype = a[2]
+        vals = map (float, a[3:])
+
+        alltypes.add (etype)
 
         if antpol in data:
-            byidx = data[antpol]
+            bytype = data[antpol]
         else:
-            byidx = data[antpol] = {}
+            bytype = data[antpol] = {}
+
+        if etype in bytype:
+            byidx = bytype[etype]
+        else:
+            byidx = bytype[etype] = {}
 
         byidx[idx] = vals
     idx += 1
 
 nfiles = idx
 
-for antpol in sorted (data.iterkeys ()):
-    byidx = data[antpol]
 
-    for i in xrange (nfiles):
-        if i not in byidx:
-            byidx[i] = [None, None, None, None]
+# String together arrays, putting blanks for entries missing from a given file
 
-    names = ['amp', 'aerr', 'ph', 'perr']
-
-    for qidx in xrange (4):
-        print antpol[0], antpol[1], names[qidx],
+for bytype in data.itervalues ():
+    for etype in bytype.keys ():
+        byidx = bytype[etype]
+        arr = []
 
         for i in xrange (nfiles):
-            if byidx[i][qidx] is None:
-                print '-',
+            if i not in byidx:
+                v = [None] * lens[i]
             else:
-                print '%.8g' % byidx[i][qidx],
+                v = byidx[i]
+            arr += v
 
+        bytype[etype] = arr
+
+
+# Print it all out
+
+def f (x):
+    if x is None:
+        return '-'
+    return '%.8g' % x
+
+for antpol in sorted (data.iterkeys ()):
+    bytype = data[antpol]
+
+    for etype, arr in bytype.iteritems ():
+        print antpol[0], antpol[1], etype,
+        for x in arr:
+            print f (x),
         print

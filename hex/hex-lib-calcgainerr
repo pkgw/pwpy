@@ -542,4 +542,7 @@ f = lambda x: '%.8g' % x
 
 for ant, pol in sorted (dtable.iterkeys ()):
     am, aerr, ph, perr = dtable[(ant, pol)]
-    print >>logf, ant, pol, f(am), f(aerr), f(ph), f(perr)
+    print >>logf, ant, pol, 'amp', f(am)
+    print >>logf, ant, pol, 'aerr', f(aerr)
+    print >>logf, ant, pol, 'ph', f(ph)
+    print >>logf, ant, pol, 'perr', f(perr)
