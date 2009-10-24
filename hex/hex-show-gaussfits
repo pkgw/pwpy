@@ -35,21 +35,15 @@ for l in file (join (analysisdir, 'data-gaussfits.txt')):
 
     data[ant][pol] = d
 
-src = ghz = flux = None
+ghz = None
 
 for l in file (join (analysisdir, 'data-sinfo.txt')):
     a = l.strip ().split ()
 
-    if a[0] == 'source':
-        src = a[1]
-    elif a[0] == 'freq':
+    if a[0] == 'freq':
         ghz = float (a[1]) * 1e-3
-    elif a[0] == 'flux':
-        flux = float (a[1])
 
-assert src is not None, 'Bad sinfo file, no source name?'
 assert ghz is not None, 'Bad sinfo file, no source name?'
-assert flux is not None, 'Bad sinfo file, no source name?'
 
 for pdata in data.itervalues ():
     for d in pdata.itervalues ():
