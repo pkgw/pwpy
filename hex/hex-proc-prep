@@ -69,8 +69,13 @@ EOF
 # If a time range is specified, flag out data outside of the relevant
 # time period.
 
-set tstart = `grep tstart data-databounds.txt |cut -d' ' -f2`
-set tend = `grep tend data-databounds.txt |cut -d' ' -f2`
+if (-e data-databounds.txt) then
+    set tstart = `grep tstart data-databounds.txt |cut -d' ' -f2`
+    set tend = `grep tend data-databounds.txt |cut -d' ' -f2`
+else
+    set tstart = none
+    set tend = none
+endif
 
 if ($tstart != none) then
     foreach vis (vis00 $rest)
