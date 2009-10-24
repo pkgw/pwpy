@@ -71,17 +71,19 @@ for analysisdir in sys.argv[1:]:
     for l in file (gainsfn, 'r'):
         a = l.strip ().split ()
 
-        if len (a) != 2 * thisn + 2:
+        if len (a) != thisn + 3:
             print >>sys.stderr, 'Error: unexpected number of entries in', gainsfn, ':', \
-                  len (a), 'not', 2 * thisn + 2
+                  len (a), 'not', thisn + 3
             sys.exit (1)
 
         ant = int (a[0])
         pol = a[1]
         key = (ant, pol)
 
-        amps = map (float, a[2:thisn + 2])
-        phs = map (float, a[thisn + 2:2 * thisn + 2])
+        if a[2] != 'amp':
+            continue
+
+        amps = map (float, a[3:])
 
         if amps[0] == 0:
             continue # No gain solution for this antpol

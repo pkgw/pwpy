@@ -118,9 +118,12 @@ skeys = sorted (allgains.iterkeys ())
 for key in skeys:
     vals = allgains[key]
 
-    print key[0], key[1],
-
-    for i in xrange (2 * npnts):
+    print key[0], key[1], 'amp',
+    for i in xrange (npnts):
         print '%.8f' % vals[i],
+    print
 
+    print key[0], key[1], 'ph',
+    for i in xrange (npnts, 2 * npnts):
+        print '%.8f' % vals[i],
     print
