@@ -502,7 +502,7 @@ if ("$line" != "") then
     set nchan = `echo $line | tr ',' ' ' | awk '{print $2}'`
 endif
 
-set sourceline = (`uvlist vis=$vis[1] options=var,full | grep "source" | tr ':' ' ' | grep -v \*`)
+set sourceline = (`uvlist vis=$vis[1] options=var,full | grep "source" | tr ':' ' ' | grep -v \* | sed 's/\?/ /g'`)
 set source
 
 while ($source == "")
@@ -858,7 +858,7 @@ if (`grep -v "#" $wd/sfind.log | awk '{if ($7*$6 > 3000*noise) cycles+=2*log((30
 	    goto clean
 	endif
     endif
-else if (`echo $acheck $nacheck | awk '{if ($1 > 1 || $2 > 1) print 1; else print 0}'` && "$niters" != "50") then
+else if (`echo $acheck $nacheck | awk '{if ($1 > 1 && $2 > 1) print 1; else print 0}'` && "$niters" != "50") then
     if ($intclean) then
 	set niters = `echo $niters $acheck $nacheck | awk '{if ($2 < $3) print int($1*$2); else print int($1*$3)}'`
 	if ($niters < 50) set niters = 50
