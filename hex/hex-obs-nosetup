@@ -143,8 +143,19 @@ echo "$me args $flt" |& tee -ia $log
 
 set switch="`cat /home/obs/bin/genswitch`"
 # we drive only the ants in $inst1 -- it is assumed that $inst2 contains
-# the same antennas.
-set alist = `slist.csh $inst1`
+# the same antennas. We should take their union.
+set alist1 = `slist.csh $inst1`
+set alist2 = `slist.csh $inst2`
+
+if ($%alist1 == 0) then
+    echo "$me error: no antennas in instrument $inst1" |& tee -ia $log
+    exit 1
+endif
+
+if ($%alist2 == 0) then
+    echo "$me error: no antennas in instrument $inst2" |& tee -ia $log
+    exit 1
+endif
 
 spolist.csh $inst1 # makes list of antpols in file 'antpols'
 set antpols1 = `cat antpols`
@@ -276,10 +287,10 @@ foreach pnt (`seq 1 $npnt`)
     frot.csh $inst1 $ephem $freq1 `pwd` start
     frot.csh $inst2 $ephem $freq2 `pwd` start
 
-    echo "$me pointing $alist" |& tee -ia $log
-    echo "-- atatrackephem $alist $ephem -w" |& tee -ia $outpfx-track.log
+    echo "$me pointing $alist1" |& tee -ia $log
+    echo "-- atatrackephem $alist1 $ephem -w" |& tee -ia $outpfx-track.log
     echo "--   at: `date`" |& tee -ia $outpfx-track.log
-    atatrackephem $alist $ephem -w |& tee -ia $outpfx-track.log
+    atatrackephem $alist1 $ephem -w |& tee -ia $outpfx-track.log
 
     # Run the catchers!
     echo "$me launching catchers at `date`" |& tee -ia $log

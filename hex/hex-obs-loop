@@ -105,12 +105,23 @@ end
 
 set lo1 = `fxconf.rb hookup $inst1 |grep LO |sed -e 's/.*,\([abcd]\)[1234].*/\1/'`
 set lo2 = `fxconf.rb hookup $inst2 |grep LO |sed -e 's/.*,\([abcd]\)[1234].*/\1/'`
-set alist = `slist.csh $inst1` # assume $inst2 uses same ants
+set alist1 = `slist.csh $inst1`
+set alist2 = `slist.csh $inst2` # unused, assume $alist1 = $alist2 (should take union)
 
 set begin = `date +"%H %M" | awk '{print $1 + ($2 / 60) - 0.1}'`
 
 
 # Setup
+
+if ($%alist1 == 0) then
+    echo "$me error: no antennas in instrument $inst1" |& tee -ia $log
+    exit 1
+endif
+
+if ($%alist2 == 0) then
+    echo "$me error: no antennas in instrument $inst2" |& tee -ia $log
+    exit 1
+endif
 
 onintr fail
 
@@ -174,7 +185,7 @@ while (1)
 
     set highfreq = `echo $freq1 $freq2 | awk '{if($1>=$2) print $1; else print $2}'`
     echo "$me `date`- setting focus to $highfreq" |& tee -ia $log
-    atasetfocus $alist $highfreq
+    atasetfocus $alist1 $highfreq
 
     echo "$me setting sky freqs: $lo1 $freq1 / $lo2 $freq2" |& tee -ia $log
     ataunlockserver lo$lo1 $pfx |& tee -ia $log
@@ -197,9 +208,9 @@ while (1)
     endif
 
     echo "$me waiting for focus completion" |& tee -ia $log
-    waitfocus $alist $highfreq
+    waitfocus $alist1 $highfreq
     echo "$me focus setup at `date`" >>$subpfx-focus.txt
-    atagetfocus $alist >>$subpfx-focus.txt
+    atagetfocus $alist1 >>$subpfx-focus.txt
 
     # Check time left again
 
