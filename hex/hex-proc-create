@@ -50,19 +50,29 @@ if (-f $1 && $#argv == 2) then
 
     # make sure to get them in proper order
     set relvises = (`grep scan "$1" |sort |cut -d' ' -f3`)
-    set nvis = $#relvises
-
-    if ($nfull != $nvis) then
-	echo "Warning: this hex run didn't include all of the scans that "
-	echo "  it should have. There may not be enough data to analyze."
-    endif
 
     # Convert to absolute paths
     set vises = ()
 
     foreach rvis ($relvises)
-	set vises = ($vises $summdir/$rvis)
+	if (-f $summdir/$rvis/visdata) then
+	    set vises = ($vises $summdir/$rvis)
+	else
+	    echo "Warning: listed vis file $summdir/$rvis does not exist or is invalid"
+	endif
     end
+
+    set nvis = $#vises
+
+    if ($nvis == 0) then
+	echo "Error: this hex run failed to create any vises!"
+	exit 1
+    endif
+
+    if ($nfull != $nvis) then
+	echo "Warning: this hex run didn't include all of the scans that "
+	echo "  it should have. There may not be enough data to analyze."
+    endif
 else
     set tstart = none
     set tend = none
