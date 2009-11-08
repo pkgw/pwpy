@@ -274,7 +274,7 @@ def fit (blinfo, gains, flux, **kwargs):
     refant = None
     lastsqidx = -1
     lastsqant = -1
-    
+ 
     for i in xrange (nants):
         for j in xrange (i + 1, nants):
             blidx += 1
@@ -295,7 +295,7 @@ def fit (blinfo, gains, flux, **kwargs):
                 lastsqidx = sqj
                 lastsqant = j
 
-        if N.abs (gains[i].imag) < 1e-10:
+        if N.abs (gains[i].imag) < 5e-10:
             # Skip ants without gain solutions
             if N.abs (gains[i].real) > 1e-8:
                 if refant is None:
