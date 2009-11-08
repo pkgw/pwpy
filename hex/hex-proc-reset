@@ -1,0 +1,37 @@
+#! /bin/tcsh -f
+#
+# Reset an analysis directory to contain just the raw data
+# so that the analsys can be rerun from the start.
+
+#Uncomment the next line to debug what commands this script is running
+#set echo = 1
+
+if ($#argv < 1) then
+    set workdir = .
+else
+    set workdir = $1
+endif
+
+if (! -d $workdir/vis00) then
+    echo "Error: analysis directory $workdir does not appear to contain any data."
+    echo "       (No such directory $workdir/vis00.)"
+    exit 1
+endif
+
+cd $workdir
+
+foreach item (`ls -1`)
+    if ($item =~ vis??) then
+	(cd $item; rm -rf bandpass gains gains.orig \
+	 gains.xxp gains.yyp phoenix retmap sefd specdata)
+    else if ($item == data-rawdata.txt) then
+	:
+    else if ($item == data-databounds.txt) then
+	:
+    else
+	rm -rf $item
+    endif
+end
+
+exit 0
+
