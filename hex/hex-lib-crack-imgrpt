@@ -70,8 +70,8 @@ def write (tup, f):
     writeone (pa, 'beampa')
     writeone (cell, 'cell')
     writeone (imsize, 'imsize')
-    writeone (immin, 'immax')
-    writeone (immax, 'immin')
+    writeone (immin, 'immin')
+    writeone (immax, 'immax')
 
 
 if __name__ == '__main__':
