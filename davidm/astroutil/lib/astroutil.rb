@@ -120,12 +120,49 @@ class String
 end
 
 # Adds astronomy-related and other utilty methods to the +DateTime+ class.
-# Includes conversions between various time frames:
+# Includes conversions between various time scales:
 #
-# - UTC
+# - GPS
 # - TAI
 # - TT
-# - GPS
+# - UT1
+# - UTC
+#
+# This class represents these differences between time scales as fractions of a
+# "day", which is assumed to be 86,400 "seconds" long.  Differences between
+# time scales can be fixed or variable.  Fixed differences are defined as
+# constants; variable differences are defined as methods.  The difference
+# between timescale +XXx+ and timescale +yyy+ is expressed as xxx_yyy+ (or
+# +XXX_YYY+ if it is a constant).  The underscore is a mnemonic for a minus
+# sign.  For example, +TAI_GPS+ is the constant difference between the TAI time
+# scale and the GPS time scale (i.e. <tt>TAI-GPS</tt>), which is defined as 19
+# seconds.
+#
+# This table describes the time scale differences defined here:
+#
+#   --> |   TAI     TT     UT1
+#  ------------------------------
+#   GPS | TAI_GPS
+#   TAI |         TT_TAI
+#   UTC | tai_utc        ut1_utc(*)
+#
+# (*) Note that conversions involving UT1 requires a value for UT1-UTC.  This
+# value can be passed explicitly to the methods that convert to/from UT1.  If a
+# UT1-UTC value is not passed, the conversion methods will call
+# <tt>self.ut1_utc</tt> if it has been externally defined (NB: the #ut1_utc
+# method is not defined here).  The eop extension defines DateTime#ut1_utc.  If
+# a value for UT1-UTC is not explicitly passed, and DateTime#ut1_utc is not
+# defined, conversion to/from UT1 is equivalent to conversion to/from UTC.
+#
+# Using the differences in the above tables, a supported time scale can be
+# converted to any other supported time scales.  Time scale conversion methods
+# have the form +xxx_to_yyy+, treat +self+ as being in time scale +xxx+, and
+# return a new DateTime object representing the same time in time scale +yyy+.
+#
+# This extension defines a TAI-UTC table that captures leap second information.
+# When a leap seconds is announced, this extension should be updated to include
+# it.
+
 class DateTime
 
   # The J2000 epoch
@@ -202,7 +239,7 @@ class DateTime
   def self.tai_utc(t=DateTime.now)
     t.tai_utc
   end
- 
+
   # TT-TAI in days.
   TT_TAI = Rational(32184, 86400000)
 
@@ -210,69 +247,158 @@ class DateTime
   TAI_GPS = Rational(19, 86400)
 
   # Returns TAI version of +self+, treating +self+ as UTC
-  def utc2tai
+  def utc_to_tai
     self + self.tai_utc
   end
 
   # Returns TT version of +self+, treating +self+ as UTC
-  def utc2tt
-    self + self.tai_utc + TT_TAI
+  def utc_to_tt
+    self + (self.tai_utc + TT_TAI)
   end
 
   # Returns GPS version of +self+, treating +self+ as UTC
-  def utc2gps
-    self + self.tai_utc - TAI_GPS
+  def utc_to_gps
+    self + (self.tai_utc - TAI_GPS)
+  end
+
+  # Returns UT1 version of +self+, treating +self+ as UTC
+  def utc_to_ut1(ut1_utc_days=nil)
+    if ut1_utc_days
+      self + ut1_utc_days
+    elsif defined? ut1_utc
+      self + ut1_utc
+    else
+      self
+    end
   end
 
   # Returns UTC version of +self+, treating +self+ as TAI
-  def tai2utc
+  def tai_to_utc
     self - self.tai_utc
   end
 
   # Returns TT version of +self+, treating +self+ as TAI
-  def tai2tt
+  def tai_to_tt
     self + TT_TAI
   end
 
   # Returns GPS version of +self+, treating +self+ as TAI
-  def tai2gps
+  def tai_to_gps
     self - TAI_GPS
   end
 
+  # Returns UT1 version of +self+, treating +self+ as TAI
+  def tai_to_ut1(ut1_utc_days=nil)
+    if ut1_utc_days
+      self - (self.tai_utc - ut1_utc_days)
+    elsif defined? ut1_utc
+      self - (self.tai_utc - ut1_utc)
+    else
+      self - self.tai_utc
+    end
+  end
+
   # Returns UTC version of +self+, treating +self+ as TT
-  def tt2utc
-    self - TT_TAI - self.tai_utc
+  def tt_to_utc
+    self - (TT_TAI + self.tai_utc)
   end
 
   # Returns TAI version of +self+, treating +self+ as TT
-  def tt2tai
+  def tt_to_tai
     self - TT_TAI
   end
 
   # Returns GPS version of +self+, treating +self+ as TT
-  def tt2gps
-    self - TT_TAI - TAI_GPS
+  def tt_to_gps
+    self - (TT_TAI + TAI_GPS)
+  end
+
+  # Returns UT1 version of +self+, treating +self+ as TT
+  def tt_to_ut1(ut1_utc_days=nil)
+    if ut1_utc_days
+      self - (TT_TAI + self.tai_utc - ut1_utc_days)
+    elsif defined? ut1_utc
+      self - (TT_TAI + self.tai_utc - ut1_utc)
+    else
+      self - (TT_TAI + self.tai_utc)
+    end
   end
 
   # Returns UTC version of +self+, treating +self+ as GPS
-  def gps2utc
-    self + TAI_GPS - self.tai_utc
+  def gps_to_utc
+    self + (TAI_GPS - self.tai_utc)
   end
 
   # Returns TAI version of +self+, treating +self+ as GPS
-  def gps2tai
+  def gps_to_tai
     self + TAI_GPS
   end
 
   # Returns TT version of +self+, treating +self+ as GPS
-  def gps2tt
-    self + TAI_GPS + TT_TAI
+  def gps_to_tt
+    self + (TAI_GPS + TT_TAI)
+  end
+
+  # Returns UT1 version of +self+, treating +self+ as GPS
+  def gps_to_ut1(ut1_utc_days=nil)
+    if ut1_utc_days
+      self + (TAI_GPS - self.tai_utc + ut1_utc_days)
+    elsif defined? ut1_utc
+      self + (TAI_GPS - self.tai_utc + ut1_utc)
+    else
+      self + (TAI_GPS - self.tai_utc)
+    end
+  end
+
+  # TODO
+  # Returns UTC version of +self+, treating +self+ as UT1
+  def ut1_to_utc(ut1_utc_days=nil)
+    if ut1_utc_days
+      self + ut1_utc_days
+    elsif defined? ut1_utc
+      self + ut1_utc
+    else
+      self
+    end
+  end
+
+  # Returns TAI version of +self+, treating +self+ as UT1
+  def ut1_to_tai(ut1_utc_days=nil)
+    if ut1_utc_days
+      self - (self.tai_utc - ut1_utc_days)
+    elsif defined? ut1_utc
+      self - (self.tai_utc - ut1_utc)
+    else
+      self - self.tai_utc
+    end
+  end
+
+  # Returns TT version of +self+, treating +self+ as UT1
+  def ut1_to_tt(ut1_utc_days=nil)
+    if ut1_utc_days
+      self - (TT_TAI + self.tai_utc - ut1_utc_days)
+    elsif defined? ut1_utc
+      self - (TT_TAI + self.tai_utc - ut1_utc)
+    else
+      self - (TT_TAI + self.tai_utc)
+    end
+  end
+
+  # Returns GPS version of +self+, treating +self+ as UT1
+  def ut1_to_gps(ut1_utc_days=nil)
+    if ut1_utc_days
+      self + (TAI_GPS - self.tai_utc + ut1_utc_days)
+    elsif defined? ut1_utc
+      self + (TAI_GPS - self.tai_utc + ut1_utc)
+    else
+      self + (TAI_GPS - self.tai_utc)
+    end
   end
 
   # Format +self+ as String with (optional) fractional seconds
   def to_s(prec=0)
     width = prec == 0 ? 2 : prec+3
-    secf = sec + sec_fraction/86400
+    secf = sec + sec_fraction*86400
     "%04d-%02d-%02dT%02d:%02d:%0#{width}.#{prec}f%s" %
       [year, mon, day, hour, min, secf, zone]
   end
