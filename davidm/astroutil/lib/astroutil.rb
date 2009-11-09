@@ -241,8 +241,10 @@ class DateTime
     end
   end
 
-  # Returns TAI-UTC as of date given (defaults to <tt>DateTime.now</tt>).
+  # Returns TAI-UTC as of DateTime given or Numeric day offset given (defaults
+  # to <tt>DateTime.now</tt>).
   def self.tai_utc(t=DateTime.now)
+    t = DateTime.now + t unless DateTime === t
     t.tai_utc
   end
 
@@ -258,8 +260,10 @@ class DateTime
   end
   alias :deltat :tt_ut1
 
-  # Returns TT-UT1 as of date given (defaults to <tt>DateTime.now</tt>).
+  # Returns TT-UT1 as of DateTime given or Numeric day offset given (defaults
+  # to <tt>DateTime.now</tt>).
   def self.tt_ut1(t=DateTime.now, ut1_utc_days=nil)
+    t = DateTime.now + t unless DateTime === t
     t.tt_ut1(ut1_utc_days)
   end
   class << self
