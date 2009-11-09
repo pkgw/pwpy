@@ -224,6 +224,12 @@ class DateTime
     [DateTime.civil(1972,7,1), Rational(11, 86400)],
   ] # :nodoc:
 
+  # TT-TAI in days.
+  TT_TAI = Rational(32184, 86400000)
+
+  # TAI-GPS in days.
+  TAI_GPS = Rational(19, 86400)
+
   # Returns TAI-UTC as of date represented by +self+.
   def tai_utc
     if self >= TAI_UTC_TABLE[0][0]
@@ -240,26 +246,43 @@ class DateTime
     t.tai_utc
   end
 
-  # TT-TAI in days.
-  TT_TAI = Rational(32184, 86400000)
+  # Returns TT_UT1 as of date represented by +self+.
+  def tt_ut1(ut1_utc_days=nil)
+    if ut1_utc_days
+      TT_TAI + tai_utc - ut1_utc_days
+    elsif defined? ut1_utc
+      TT_TAI + tai_utc - ut1_utc
+    else
+      TT_TAI + tai_utc
+    end
+  end
+  alias :deltat :tt_ut1
 
-  # TAI-GPS in days.
-  TAI_GPS = Rational(19, 86400)
+  # Returns TT-UT1 as of date given (defaults to <tt>DateTime.now</tt>).
+  def self.tt_ut1(t=DateTime.now, ut1_utc_days=nil)
+    t.tt_ut1(ut1_utc_days)
+  end
+  class << self
+    alias :deltat :tt_ut1
+  end
 
   # Returns TAI version of +self+, treating +self+ as UTC
   def utc_to_tai
     self + self.tai_utc
   end
+  alias :utc2tai :utc_to_tai
 
   # Returns TT version of +self+, treating +self+ as UTC
   def utc_to_tt
     self + (self.tai_utc + TT_TAI)
   end
+  alias :utc2tt :utc_to_tt
 
   # Returns GPS version of +self+, treating +self+ as UTC
   def utc_to_gps
     self + (self.tai_utc - TAI_GPS)
   end
+  alias :utc2gps :utc_to_gps
 
   # Returns UT1 version of +self+, treating +self+ as UTC
   def utc_to_ut1(ut1_utc_days=nil)
@@ -271,21 +294,25 @@ class DateTime
       self
     end
   end
+  alias :utc2ut1 :utc_to_ut1
 
   # Returns UTC version of +self+, treating +self+ as TAI
   def tai_to_utc
     self - self.tai_utc
   end
+  alias :tai2utc :tai_to_utc
 
   # Returns TT version of +self+, treating +self+ as TAI
   def tai_to_tt
     self + TT_TAI
   end
+  alias :tai2tt :tai_to_tt
 
   # Returns GPS version of +self+, treating +self+ as TAI
   def tai_to_gps
     self - TAI_GPS
   end
+  alias :tai2gps :tai_to_gps
 
   # Returns UT1 version of +self+, treating +self+ as TAI
   def tai_to_ut1(ut1_utc_days=nil)
@@ -297,21 +324,25 @@ class DateTime
       self - self.tai_utc
     end
   end
+  alias :tai2ut1 :tai_to_ut1
 
   # Returns UTC version of +self+, treating +self+ as TT
   def tt_to_utc
     self - (TT_TAI + self.tai_utc)
   end
+  alias :tt2utc :tt_to_utc
 
   # Returns TAI version of +self+, treating +self+ as TT
   def tt_to_tai
     self - TT_TAI
   end
+  alias :tt2tai :tt_to_tai
 
   # Returns GPS version of +self+, treating +self+ as TT
   def tt_to_gps
     self - (TT_TAI + TAI_GPS)
   end
+  alias :tt2gps :tt_to_gps
 
   # Returns UT1 version of +self+, treating +self+ as TT
   def tt_to_ut1(ut1_utc_days=nil)
@@ -323,21 +354,25 @@ class DateTime
       self - (TT_TAI + self.tai_utc)
     end
   end
+  alias :tt2ut1 :tt_to_ut1
 
   # Returns UTC version of +self+, treating +self+ as GPS
   def gps_to_utc
     self + (TAI_GPS - self.tai_utc)
   end
+  alias :gps2utc :gps_to_utc
 
   # Returns TAI version of +self+, treating +self+ as GPS
   def gps_to_tai
     self + TAI_GPS
   end
+  alias :gps2tai :gps_to_tai
 
   # Returns TT version of +self+, treating +self+ as GPS
   def gps_to_tt
     self + (TAI_GPS + TT_TAI)
   end
+  alias :gps2tt :gps_to_tt
 
   # Returns UT1 version of +self+, treating +self+ as GPS
   def gps_to_ut1(ut1_utc_days=nil)
@@ -349,8 +384,8 @@ class DateTime
       self + (TAI_GPS - self.tai_utc)
     end
   end
+  alias :gps2ut1 :gps_to_ut1
 
-  # TODO
   # Returns UTC version of +self+, treating +self+ as UT1
   def ut1_to_utc(ut1_utc_days=nil)
     if ut1_utc_days
@@ -361,6 +396,7 @@ class DateTime
       self
     end
   end
+  alias :ut12utc :ut1_to_utc
 
   # Returns TAI version of +self+, treating +self+ as UT1
   def ut1_to_tai(ut1_utc_days=nil)
@@ -372,6 +408,7 @@ class DateTime
       self - self.tai_utc
     end
   end
+  alias :ut12tai :ut1_to_tai
 
   # Returns TT version of +self+, treating +self+ as UT1
   def ut1_to_tt(ut1_utc_days=nil)
@@ -383,6 +420,7 @@ class DateTime
       self - (TT_TAI + self.tai_utc)
     end
   end
+  alias :ut12tt :ut1_to_tt
 
   # Returns GPS version of +self+, treating +self+ as UT1
   def ut1_to_gps(ut1_utc_days=nil)
@@ -394,6 +432,7 @@ class DateTime
       self + (TAI_GPS - self.tai_utc)
     end
   end
+  alias :ut12gps :ut1_to_gps
 
   # Format +self+ as String with (optional) fractional seconds
   def to_s(prec=0)
