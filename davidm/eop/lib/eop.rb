@@ -47,8 +47,9 @@ class Eop < OpenStruct
   # Used to fetch Eop instances by +amjd+, which can be an (astronomical)
   # Modified Julian Date (or other object which has an #amjd method) or a
   # Numeric.  In either case, it will be "floored" to the largest integer not
-  # greater than +amjd+.
-  def self.[](amjd)
+  # greater than +amjd+.  For convenience, +amjd+ defaults to
+  # <tt>DateTime.now</tt>.
+  def self.[](amjd=DateTime.now)
     amjd = amjd.amjd if amjd.respond_to?(:amjd)
     amjd = amjd.floor
 
@@ -182,5 +183,18 @@ class Eop < OpenStruct
     '.00000 0.00000  ' \
     '.00000 0.00000'
   )
+end
 
+class DateTime
+  # Returns UT1-UTC (in days) for time represented by +self+.
+  def ut1_utc
+    Rational((Eop[amjd].ut1_utc*1e9).to_i, 86400e9)
+  end
+
+  # Returns UT1-UTC (in days) for DateTime given or Numeric day offset given
+  # (defaults to <tt>DateTime.now</tt>)
+  def self.ut1_utc(t=DateTime.now)
+    t = DateTime.now + t unless DateTime === t
+    t.ut1_utc
+  end
 end
