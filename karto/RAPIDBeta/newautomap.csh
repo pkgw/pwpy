@@ -55,7 +55,7 @@ echo ""
 echo "CALLING SEQUENCE: newautomap.csh vis=vis (mode=[auto,inter,skip]"
 echo "    crange=crange interval=interval weightmode=[natural,uniform]"
 echo "    imsize=imsize1,imsize2 cellsize=cellsize cleantpye=[clean,"
-echo "    mem] cregion=cregion cleanlim=cleanlim model=model"
+echo "    mem] cregion=cregion cleanlim=cleanlim calmodel=calmodel"
 echo "    amplim=amplim1,amplim2,amplim3 sysflux=sysflux refant=refant"
 echo "    selfcalint=selfcalint selfcaltol=selfcaltol selfcalsigma="
 echo "    selfcalsigma device=device dregion=dregion outdir=outdir"
@@ -113,8 +113,8 @@ echo ""
 echo " cleanlim - Number of iterations that CLEAN is limited to."
 echo "    Default is 2500"
 echo ""
-echo " model - Name of the model to use for calibration. Default is to"
-echo "    use the CLEAN model from the current dataset(s)."
+echo " calmodel - Name of the model to use for calibration. Default is"
+echo "    to use the CLEAN model from the current dataset(s)."
 echo ""
 echo " amplim - Amplitude limits (in Jy) for automated flagging, the"
 echo "    first number specifying the minimum flux, the second number"
@@ -882,7 +882,7 @@ else
 endif
 
 cd $wd; rm -f sfind.log; touch sfind.log
-if ($mode != "skip") sfind in=tempmap.cm options=oldsfind,auto,nofit rmsbox=256 xrms=4 labtyp=arcsec >& /dev/null
+sfind in=tempmap.cm options=oldsfind,auto,nofit rmsbox=256 xrms=4 labtyp=arcsec >& /dev/null
 cd ..
 
 # Find some stats about the map...
@@ -1232,7 +1232,7 @@ else
 endif
 
 foreach file ($vislist)
-    selfcal vis=$file model=$wd/tempmap.clean interval=$scint select=$sel minants=4 options=mfs,$scopt clip=$clip refant=$refant >& /dev/null
+    selfcal vis=$file model=$calmodel interval=$scint select=$sel minants=4 options=mfs,$scopt clip=$clip refant=$refant >& /dev/null
     if ($autoamp && ! $autopha && -e $file/gains) gpedit vis=$file options=amp > /dev/null
 end
 
