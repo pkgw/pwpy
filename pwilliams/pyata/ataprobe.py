@@ -15,6 +15,7 @@ runLogger = None
 _bindir = '/hcro/atasys/ata/run/'
 _rubydir = '/home/obs/ruby/bin/'
 _obsbindir = '/home/obs/bin/'
+_sysrubydir = '/hcro/opt/bin/'
 
 def ataArgs (command, *rest):
     a = ['/bin/sh', _bindir + command]
@@ -30,6 +31,12 @@ def obsArgs (command, *rest):
 
 def obsRubyArgs (command, *rest):
     a = ['/usr/bin/env', 'ruby', _rubydir + command]
+    for x in rest: a.append (str (x))
+    return a
+
+
+def sysRubyArgs (command, *rest):
+    a = ['/usr/bin/env', 'ruby', _sysrubydir + command]
     for x in rest: a.append (str (x))
     return a
 

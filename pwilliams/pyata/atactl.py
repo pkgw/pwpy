@@ -916,7 +916,7 @@ def autoAttenAll (hookup, rms=13.0):
     settings = {}
     
     for (antpol, (ibob, inp)) in hookup.apIbobs ():
-        cmd = obsRubyArgs ('autoatten.rb', ibob, 'in%d' % inp, rms, 0)
+        cmd = sysRubyArgs ('autoatten.rb', ibob, 'in%d' % inp, rms, 0)
 
         if noopMode:
             log ('WOULD slurp: ' + ' '.join (cmd))
