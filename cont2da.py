@@ -5,10 +5,13 @@ extremely well-behaved functions, so probably doesn't cope
 well with poorly-behaved ones.
 """
 
+# TODO: allow boundaries on X and Y.
+
 import numpy as N
 
 def cont2da (f, df, x0, y0, maxiters=5000, defeta=0.05, netastep=12,
-             vtol1=1e-3, vtol2=1e-8, maxnewt=20, dorder=7, goright=False):
+             vtol1=1e-3, vtol2=1e-8, maxnewt=20, dorder=7, goright=False,
+             hackxbounds=[-N.inf, N.inf], hackybounds=[-N.inf, N.inf]):
     """Required arguments:
     
 f  - a function, mapping (x, y) -> z
@@ -39,7 +42,7 @@ maxnewt - Maximum number of Newton's method steps to take when
 dorder - Number of function evaluations to perform when evaluating
   the derivative of f numerically. Must be an odd integer greater
   than 1. Default 7.
-goright - If True, trace the contour rightward (as looking uphill,
+goright - If True, trace the contour rightward (as looking uphill),
   rather than leftward (the default).
 """
     
@@ -74,13 +77,25 @@ goright - If True, trace the contour rightward (as looking uphill,
         derivy = abs (y0 * 0.025)
         from scipy import derivative
         print 'derivxy %.20g %.20g' % (derivx, derivy)
-        
-        def df (x1, y1):
-            print 'df %.20g %.20g' % (x1, y1)
-            dx = derivative (lambda x: f (x, y1), x1, derivx, order=dorder)
-            dy = derivative (lambda y: f (x1, y), y1, derivy, order=dorder)
-            print '   -> %.20g %.20g' % (dx, dy)
-            return [dx, dy]
+
+        if dorder == 2:
+            # simple derivative
+            def df (x1, y1):
+                print 'df(2) %.20g %.20g' % (x1, y1)
+                z0 = f (x1, y1)
+                dx = max (abs (x1) * 1e-5, 1e-8)
+                dy = max (abs (y1) * 1e-5, 1e-8)
+                dzdx = (f (x1 + dx, y1) - z0) / dx
+                dzdy = (f (x1, y1 + dy) - z0) / dy
+                print '   -> %.20g %.20g' % (dzdx, dzdy)
+                return [dzdx, dzdy]
+        else:
+            def df (x1, y1):
+                print 'df %.20g %.20g' % (x1, y1)
+                dx = derivative (lambda x: f (x, y1), x1, derivx, order=dorder)
+                dy = derivative (lambda y: f (x1, y), y1, derivy, order=dorder)
+                print '   -> %.20g %.20g' % (dx, dy)
+                return [dx, dy]
     
     # Init eta progression
     rez = N.finfo (N.double).resolution
@@ -156,7 +171,10 @@ goright - If True, trace the contour rightward (as looking uphill,
             # Is the value of the function sufficently close to what
             # we're aiming for?
 
+            #print 'S1:', i, dx, dy, nx, ny, nv, abs (nv / v - 1)
+            
             if abs (nv / v - 1) < vtol1:
+                #print 'S1: good'
                 break
 
             # No. Try a smaller dx/dy
@@ -169,7 +187,7 @@ goright - If True, trace the contour rightward (as looking uphill,
             # out of loop)
             s = 'xy %g,%g; dv %g; df %g,%g; dxy %g,%g; defeta %g; eta_scale %g' \
                 % (x, y, nv - v, dfdx, dfdy, dx, dy, defeta, eta_scale)
-            raise RuntimeError ('Failed to find sufficiently small'
+            raise RuntimeError ('Failed to find sufficiently small '
                                 'eta: ' + s)
 
         # Now compute a new [df/dx, df/dy], and move along it, finding
@@ -201,17 +219,25 @@ goright - If True, trace the contour rightward (as looking uphill,
         x = nx
         y = ny
         n += 1
+        print '<-', n, x, y
 
+        # Temp boundaries for BBS.
+        if x < hackxbounds[0] or x > hackxbounds[1]:
+            break
+        if y < hackybounds[0] or y > hackybounds[1]:
+            break
+        
         # Time to stop? Make sure we've gone at least a half-turn so
         # that we don't just exit on the first iteration.
         
         if quitflag == 2:
             dist2 = (x/x0 - 1)**2 + (y/y0 - 1)**2
-            if dist2 < vtol1**2:
+            print 'proxcheck', dist2, 3 * (dx**2 + dy**2)
+            if dist2 < 3 * (dx**2 + dy**2):
                 break
     else:
-        # Did not break out of loop -- too many pts.
-        raise RuntimeError ('Needed too many points to close contour.')
+        #raise RuntimeError ('Needed too many points to close contour.')
+        print 'oh no failed to close contour!'
 
     # Woohoo! All done.
 
