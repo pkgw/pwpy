@@ -960,6 +960,8 @@ Keywords:
       self.params = xall      ## self.params is the set of parameters to be returned
       x = N.take(self.params, ifree)  ## x is the set of free parameters
 
+      dside = dside[ifree]
+      
       ## LIMITED parameters ?
       limited = self.parinfo(parinfo, 'limited', default=[0,0], n=npar)
       limits = self.parinfo(parinfo, 'limits', default=[0.,0.], n=npar)
