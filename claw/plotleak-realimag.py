@@ -14,10 +14,10 @@ def run():
     p = []; p2 = []
     for i in range(1,9):
         # specify ascii files output by 'split-cal-leak.csh'
-        a.append(asciidata.AsciiData ('mosfxc-3c286.uvaver.high-leakamp%d.txt' % i))
-        p.append(asciidata.AsciiData ('mosfxc-3c286.uvaver.high-leakphase%d.txt' % i))
-        a2.append(asciidata.AsciiData ('mosfxc-3c286.uvaver.negha-leakamp%d.txt' % i))
-        p2.append(asciidata.AsciiData ('mosfxc-3c286.uvaver.negha-leakphase%d.txt' % i))
+        a.append(asciidata.AsciiData ('hexa-3c286-hp0-1430-leakamp%d.txt' % i))
+        p.append(asciidata.AsciiData ('hexa-3c286-hp0-1430-leakphase%d.txt' % i))
+        a2.append(asciidata.AsciiData ('hexc-3c286-hp0-1430-leakamp%d.txt' % i))
+        p2.append(asciidata.AsciiData ('hexc-3c286-hp0-1430-leakphase%d.txt' % i))
 
     nants = len(a[0][0])
     print '%d antennas...' % (nants)

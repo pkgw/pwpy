@@ -44,7 +44,7 @@ echo $id $srctot $p0 $rms $shortsource > $filename
 
 #  Make channel maps
 set n=1
-set nchan=8
+set nchan=16
 
 while ($n <= $nchan)
 

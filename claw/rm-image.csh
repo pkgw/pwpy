@@ -13,8 +13,8 @@ else
 endif
 set freq = 1430
 set diam = 20
-set imsize = 256
-set nchan = 8
+set imsize = 512
+set nchan = 16
 set boxlo = `echo $imsize'/2 - 10' | bc`
 set boxhi = `echo $imsize'/2 + 10' | bc`
 set imgparams = "sup=0 cell=30 fwhm=200"
@@ -30,15 +30,18 @@ set visall = `ls -df $source-? $source-?? | awk '{printf("%s,",$1)}' ; echo`
 \rm -fr $source-??.?{cln,map,cmp}
 \rm -fr $source-??.?{cln,map,cmp}.imsub
 \rm -fr $source-??.beam
-\rm -f t?vs
-\rm -f t??vs
+\rm -f t???vs
+\rm -f t????vs
+
+set regcommand = region=abspix,box'('$boxlo,$boxlo,$boxhi,$boxhi')'  # sfind not working?!
 
 # need to check that bins have data.  also need short file names for invert
 set n = 1
+set rand = `date | cut -c 18-19`
 foreach f (`ls -df ${source}-? ${source}-??`)
     set records = `uvindex vis=$f | grep 'Total number of records' | awk '{printf("%d\n",$6)}'`
     if ( $records > 0 ) then
-	ln -s $f t${n}vs
+	ln -s $f t${rand}${n}vs
     else
 	echo 'No records in '$f'. Skipping.'
     endif
@@ -46,13 +49,13 @@ foreach f (`ls -df ${source}-? ${source}-??`)
 end
 
 #   Make one map
-invert vis=t\*vs map=$source.imap,$source.qmap,$source.umap,$source.vmap beam=$source.beam imsize=$imsize \
+invert vis=t${rand}\*vs map=$source.imap,$source.qmap,$source.umap,$source.vmap beam=$source.beam imsize=$imsize \
 stokes=i,q,u,v options=mfs,double "select=-shadow($diam)" $imgparams
 set rms = `gethd in=$source.imap/rms`
 set icut = `echo "4.5*$rms" | bc -l`
-clean map=$source.imap beam=$source.beam out=$source.icmp niters=1000 cutoff=$icut | tail -2
-clean map=$source.qmap beam=$source.beam out=$source.qcmp niters=500 cutoff=$icut | tail -2
-clean map=$source.umap beam=$source.beam out=$source.ucmp niters=500 cutoff=$icut | tail -2
+clean map=$source.imap beam=$source.beam out=$source.icmp niters=1000 cutoff=$icut $regcommand | tail -2
+clean map=$source.qmap beam=$source.beam out=$source.qcmp niters=500 cutoff=$icut $regcommand | tail -2
+clean map=$source.umap beam=$source.beam out=$source.ucmp niters=500 cutoff=$icut $regcommand | tail -2
 restor model=$source.icmp beam=$source.beam map=$source.imap out=$source.icln | tail -2
 restor model=$source.qcmp beam=$source.beam map=$source.qmap out=$source.qcln | tail -2
 restor model=$source.ucmp beam=$source.beam map=$source.umap out=$source.ucln | tail -2
@@ -64,6 +67,8 @@ imsub in=$source.ucln out=$source.ucln.imsub "region=abspix,box("$boxlo","$boxlo
  
 impol in=$source.qcln,$source.ucln,$source.icln poli=$source.pcln sigma=1e-9 options=bias sncut=0
 imsub in=$source.pcln out=$source.pcln.imsub "region=abspix,box("$boxlo","$boxlo","$boxhi","$boxhi")"
+
+goto skipsfind  # sfind not working yet...
 
 #   Find polarised sources in map and make region file
 
@@ -102,19 +107,22 @@ end
 
 # set clean region
 if (-f clean.$source.pcln) then
-  set regcommand = region=abspix,box'('$boxlo,$boxlo,$boxhi,$boxhi')'  # sfind not working?!
 #  cat clean.$source.pcln
 #  set regcommand = region=@clean.$source.pcln
 else
   set regcommand = ''
 endif
 
+skipsfind:
+
+set regcommand = region=abspix,box'('$boxlo,$boxlo,$boxhi,$boxhi')'  # sfind not working?!
+
 #  Make channel maps
 set n=1
 while ($n <= $nchan)
  echo 'Starting bin '$n' of source '${source}
- if ( -e t${n}vs ) then
-  invert vis=t${n}vs map=$source-$n.imap,$source-$n.qmap,$source-$n.umap,$source-$n.vmap \
+ if ( -e t${rand}${n}vs ) then
+  invert vis=t${rand}${n}vs map=$source-$n.imap,$source-$n.qmap,$source-$n.umap,$source-$n.vmap \
   beam=$source-$n.beam imsize=$imsize "select=-shadow($diam)" $imgparams  \
        stokes=i,q,u,v options=double,mfs | tail -2
   set rms = `gethd in=$source-$n.imap/rms`
@@ -127,7 +135,7 @@ while ($n <= $nchan)
   restor model=$source-$n.qcmp beam=$source-$n.beam map=$source-$n.qmap out=$source-$n.qcln | tail -2
   restor model=$source-$n.ucmp beam=$source-$n.beam map=$source-$n.umap out=$source-$n.ucln | tail -2
 #  \rm -fr $source.[1-9]*.[qu]{map,cmp}
-#  \rm -fr $source-$n.beam
+  \rm -fr $source-$n.beam
 
   impol in=$source-$n.qcln,$source-$n.ucln,$source-$n.imap poli=$source-$n.pcln sigma=1e-9 options=bias sncut=0
   imsub in=$source-$n.qcln out=$source-$n.qcln.imsub "region=abspix,box("$boxlo","$boxlo","$boxhi","$boxhi")"
@@ -140,6 +148,6 @@ while ($n <= $nchan)
 end
 
 # clean up working visibility files
-\rm -f t?vs
-\rm -f t??vs
+\rm -f t???vs
+\rm -f t????vs
  
