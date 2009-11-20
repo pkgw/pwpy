@@ -5,13 +5,13 @@
 
 set in=$argv[1]
 set outroot=${in}
-set cleanreg='-110,-40,-40,0'
+set cleanreg='-50,-50,50,50'
 
 # first clean up
 set stokes=i
 rm -rf ${outroot}-${stokes}.*
 #image stokes i
-invert vis=${in} options=mfs map=${outroot}-${stokes}.mp beam=${outroot}-${stokes}.bm stokes=${stokes} robust=-2 imsize=250,100
+invert vis=${in} options=mfs map=${outroot}-${stokes}.mp beam=${outroot}-${stokes}.bm stokes=${stokes} robust=0
 clean map=${outroot}-${stokes}.mp beam=${outroot}-${stokes}.bm out=${outroot}-${stokes}.cl niters=400 region='relpixel,boxes('${cleanreg}')'
 restor map=${outroot}-${stokes}.mp beam=${outroot}-${stokes}.bm out=${outroot}-${stokes}.rm model=${outroot}-${stokes}.cl
 

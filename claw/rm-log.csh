@@ -3,7 +3,9 @@
 #
 # Script to write log file of Q, U, for polarised sources
 
+set nchan=16
 # What source are we processing?
+
 if $#argv == 0 then
   set source = hexa-3c286-hp0-1430  # default
 else
@@ -44,8 +46,6 @@ echo $id $srctot $p0 $rms $shortsource > $filename
 
 #  Make channel maps
 set n=1
-set nchan=16
-
 while ($n <= $nchan)
 
 if (-d $source-$n.ucln) then
