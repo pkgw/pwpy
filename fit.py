@@ -423,7 +423,7 @@ class SlopeFit (FitBase):
     def makeModel (self, m):
         return lambda x: m * x
 
-    def _fitImpl (self, x, y, sig, guess):
+    def _fitImpl (self, x, y, sig, guess, reckless):
         # Ignore the guess since we can solve this exactly
 
         sm2 = sig ** -2
