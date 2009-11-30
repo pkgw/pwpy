@@ -41,14 +41,16 @@ end
 dir_config('miriad')
 
 d = ENV['MIRINC']
-$CPPFLAGS << " -I#{d} " if test ?d, d
-d += '/../miriad-c'
-$CPPFLAGS << " -I#{d} " if test ?d, d
+if d
+  $CPPFLAGS << " -I#{d} " if test ?d, d
+  d += '/../miriad-c'
+  $CPPFLAGS << " -I#{d} " if test ?d, d
+end
 exit unless have_header("miriad.h")
 
 # Check mir_uvio library
 d = ENV['MIRLIB']
-$LDFLAGS << " -L#{d} " if test ?d, d
+$LDFLAGS << " -L#{d} " if d && test(?d, d)
 exit unless have_library('mir_uvio', 'bug_c')
 
 # Check for new MIRIAD bug handler function
@@ -56,6 +58,7 @@ have_func('bughandler_c', 'miriad.h')
 
 # Check mir library (also requires mir_linpack and pgplot libraries)
 exit unless have_library('mir_linpack', 'sdot_')
+have_library('png','png_init_io') # optional png library
 exit unless have_library('pgplot', 'pgpt_')
 exit unless have_library('mir', 'options_')
 
