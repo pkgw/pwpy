@@ -111,7 +111,7 @@ class String
   # <b>NOT</b> the inverse of Numeric#to_dmsstr (but may become so).
   def dms_to_d;
     d, m, s = split(':',3)
-    d, m, s = d.to_i, m.to_i, s.to_f
+    d, m, s = d.to_f, m.to_f, s.to_f
     m, s = -m, -s if d == 0 && self =~ /^\s*-/
     Math::dms_to_d(d,m,s)
   end
