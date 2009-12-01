@@ -6,7 +6,7 @@ require 'rake/gempackagetask'
 spec = Gem::Specification.new do |s|
   # Basics
   s.name = 'novas'
-  s.version = '2.0.1.0'
+  s.version = '2.0.1.1'
   s.summary = 'Ruby interface to NOVAS'
   s.description = <<-EOS
     The NOVAS-Ruby package...

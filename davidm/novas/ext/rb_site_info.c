@@ -14,6 +14,10 @@
 
 // Site class
 
+static VALUE sym_units;
+static ID id_au_per_day;
+static ID id_km_per_sec;
+
 static VALUE
 rb_novas_site_info_alloc(VALUE klass)
 {
@@ -244,7 +248,7 @@ rb_novas_site_info_equ2hor(VALUE self, VALUE args)
 }
 
 /*
- * call-seq: terra(st=0) -> [pos, vel]
+ * call-seq: terra(st=0, opts={}) -> [pos, vel]
  *
  * Computes the position and velocity vectors of a terrestrial observer with
  * respect to the center of the Earth.
@@ -262,6 +266,12 @@ rb_novas_site_info_equ2hor(VALUE self, VALUE args)
  *   INPUTS:
  *      st (Float)
  *         Local apparent sidereal time at reference meridian in hours.
+ *      opts (Hash)
+ *         Options affecting returned values.  Supported options are:
+ *            :units => :au_per_day - position is in AU,
+ *                                    velocity is in AU/day (default).
+ *            :units => :km_per_sec - position is in km,
+ *                                    velocity is in km/sec.
  *
  *   OUTPUTS:
  *      pos (Array of 3 Floats)
@@ -280,12 +290,17 @@ rb_novas_site_info_terra(VALUE self, VALUE args)
   double st = 0.0;
   double pos[3], vel[3];
   int i;
+  VALUE opts = Qnil, units = Qnil;
   int argc = RARRAY(args)->len;
+  ID id_units;
 
   Data_Get_Struct(self, site_info, location);
 
   // Get values from args
   switch(argc) {
+    case 2: opts = rb_ary_entry(args,1);
+            Check_Type(opts, T_HASH);
+            units = rb_hash_aref(opts, sym_units);
     case 1: st = NUM2DBL(rb_ary_entry(args,0));
     case 0: break;
     default:
@@ -293,6 +308,18 @@ rb_novas_site_info_terra(VALUE self, VALUE args)
   }
 
   terra(location, st, pos, vel);
+
+  if(units != Qnil) {
+    id_units = SYM2ID(units);
+    if(id_units == id_km_per_sec) {
+      for(i=0; i<3; i++) {
+        pos[i] *= KMAU;
+        vel[i] *= KMAU / 86400;
+      }
+    } else if(id_units != id_au_per_day) {
+      rb_raise(rb_eArgError, "unrecognized value for :units option (%s)", rb_id2name(id_units));
+    }
+  }
 
   return rb_ary_new3(2, rb_novas_dbl2ary(pos, 3), rb_novas_dbl2ary(vel, 3));
 }
@@ -305,6 +332,10 @@ rb_novas_site_info_terra(VALUE self, VALUE args)
 void
 init_site_info()
 {
+  sym_units = ID2SYM(rb_intern("units"));
+  id_au_per_day = rb_intern("au_per_day");
+  id_km_per_sec = rb_intern("km_per_sec");
+
   // Novas::Site Class
   VALUE rb_mNovas = rb_define_module("Novas");
   VALUE rb_cSiteInfo = rb_define_class_under(rb_mNovas,"Site",rb_cObject);
