@@ -40,14 +40,12 @@ fancy/ataglue.py
 fancy/byant
 fancy/calctsys
 fancy/closanal
-fancy/copytsys
 fancy/fxcal.py
 fancy/gpcat
 fancy/gpunity
 fancy/multiflag2
 fancy/qimage
 fancy/uvasimg
-fancy/uvpyextract
 fancy/varcat.py
 '
 
@@ -67,7 +65,6 @@ pylib/closanal.py
 pylib/hhaa.dat
 pylib/multiflag.py
 pylib/multiflag2.py
-pylib/uvextract.py
 '
 
 set -e
