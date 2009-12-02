@@ -204,11 +204,12 @@ def _interactive (args):
     try:
         flux = models[source](freq)
         print '%lg' % (flux, )
-        exit (0)
     except Exception, e:
         # Catch, e.g, going beyond frequency limits.
         print >>stderr, 'Error finding flux of %s at %f MHz:' % (source, freq), e
         exit (1)
+
+    exit (0)
 
 if __name__ == '__main__':
     from sys import argv
