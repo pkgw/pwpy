@@ -14,11 +14,11 @@ endif
 set freq = 1430
 set diam = 20
 set imsize = 512
-set nchan = 16
+set nchan = 160
 set boxlo = `echo $imsize'/2 - 10' | bc`
 set boxhi = `echo $imsize'/2 + 10' | bc`
 set imgparams = "sup=0 cell=30 fwhm=200"
-set visall = `ls -df $source-? $source-?? | awk '{printf("%s,",$1)}' ; echo`
+set visall = `ls -df $source-? $source-?? $source-??? | awk '{printf("%s,",$1)}' ; echo`
 
 #  clean up
 \rm -fr $source.?{cln,map,cmp}
@@ -30,15 +30,19 @@ set visall = `ls -df $source-? $source-?? | awk '{printf("%s,",$1)}' ; echo`
 \rm -fr $source-??.?{cln,map,cmp}
 \rm -fr $source-??.?{cln,map,cmp}.imsub
 \rm -fr $source-??.beam
+\rm -fr $source-???.?{cln,map,cmp}
+\rm -fr $source-???.?{cln,map,cmp}.imsub
+\rm -fr $source-???.beam
 \rm -f t???vs
 \rm -f t????vs
+\rm -f t?????vs
 
 set regcommand = region=abspix,box'('$boxlo,$boxlo,$boxhi,$boxhi')'  # sfind not working?!
 
 # need to check that bins have data.  also need short file names for invert
 set n = 1
 set rand = `date | cut -c 18-19`
-foreach f (`ls -df ${source}-? ${source}-??`)
+foreach f (`ls -df ${source}-? ${source}-?? ${source}-???`)
     set records = `uvindex vis=$f | grep 'Total number of records' | awk '{printf("%d\n",$6)}'`
     if ( $records > 0 ) then
 	ln -s $f t${rand}${n}vs
@@ -150,4 +154,5 @@ end
 # clean up working visibility files
 \rm -f t???vs
 \rm -f t????vs
+\rm -f t?????vs
  

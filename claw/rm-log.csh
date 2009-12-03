@@ -3,7 +3,7 @@
 #
 # Script to write log file of Q, U, for polarised sources
 
-set nchan=16
+set nchan=160
 # What source are we processing?
 
 if $#argv == 0 then
@@ -40,8 +40,9 @@ set rms = `gethd in=$source.vmap/rms`
 #set rms = `histo in=$source.vmap | grep Rms | cut -c24-38
 
 
-echo $x0 $y0
-echo $id $srctot $p0 $rms $shortsource > $filename
+echo $x0 $y0 $p0 $rms $shortsource
+echo $x0 $y0 $p0 $rms $shortsource > $filename
+#echo $id $srctot $p0 $rms $shortsource > $filename
 
 
 #  Make channel maps

@@ -7,14 +7,25 @@
 
 # User parameters
 set visroot=$1
-set chans=50  # channels per frequency chunk.  
-set refant=1
+set chans=5  # channels per frequency chunk.  
 set combine=0  # combine cal with other sources (hardcoded)?
-set leaks=0   # output leakage text files?
+set leaks=1   # output leakage text files?
 #set antsel=select=ant'('1,8,33,37')('1,8,33,37')' # smaller leak in polcal2.uvaver.high
 set antsel=''
-set cal2='mosfxa-NVSSJ052109+163822-1430-100'
-set cal3='mosfxa-NVSSJ084124+705341-1430-100'
+# set refant, if you like
+if $#argv == 2 then
+    set refant=$2
+else
+    set refant=1
+endif
+# do second order phase correction with multiple files
+if $#argv == 4 then
+    set cal2=$3
+    set cal3=$4
+else
+    set cal2='mosfxa-NVSSJ052109+163822-1430-100'
+    set cal3='mosfxa-NVSSJ084124+705341-1430-100'
+endif
 
 # put data in time, stokes order
 rm -rf tmp-${visroot}-tmp
@@ -28,8 +39,8 @@ endif
 
 # loop over frequency chunks
 #foreach piece (1 2 3 4 5 6 7 8)
-foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16)
-#foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40)
+#foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16)
+foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52  53  54  55  56  57  58  59  60  61  62  63  64 65  66  67  68  69  70  71  72  73  74  75  76  77 78  79  80  81  82  83  84  85  86  87  88  89  90 91  92  93  94  95  96  97  98  99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 129 130 131 132 133 134 135 136 137 138 139 140 141 142 143 144 145 146 147 148 149 150 151 152 153 154 155 156 157 158 159 160)
 
     # define first channel number of frequency chunk
     set startchan = `echo '100 + '${chans}' * ('${piece}'-1)' | bc`
@@ -100,4 +111,7 @@ end
 rm -rf tmp-${visroot}-tmp
 rm -rf tmp-${cal2}-tmp
 rm -rf tmp-${cal3}-tmp
-
+if ${combine} == 1 then
+    rm -rf ${cal2}-*
+    rm -rf ${cal3}-*
+endif
