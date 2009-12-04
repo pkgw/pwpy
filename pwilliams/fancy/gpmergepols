@@ -98,6 +98,7 @@ checksame (int1, int2, 'disagreeing solution durations')
 
 nants = gr1.nants
 
+
 # Create and populate the new gains dataset
 
 out = miriad.Data (opts.out)
