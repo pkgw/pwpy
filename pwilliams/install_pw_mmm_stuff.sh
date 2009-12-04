@@ -42,6 +42,7 @@ fancy/calctsys
 fancy/closanal
 fancy/fxcal.py
 fancy/gpcat
+fancy/gpmergepols
 fancy/gpunity
 fancy/multiflag2
 fancy/qimage
