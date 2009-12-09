@@ -10,7 +10,7 @@ open(SETI,"setiuns.txt");
 @setii=<SETI>;
 close(SETI);
 
-my $setihash;
+my %setihash;
 
 # output script
 $outf = "setisort.txt";
@@ -29,7 +29,7 @@ foreach $seti (@setii) {
     for ($ep = 1; $ep <= $nep; $ep++) {
 	$col = 2*($ep);
 	$flux = $ins[$col];
-	if ($flux > $maxf) {
+	if ($flux >= $maxf) {
 	    $maxf = $flux;
 	}
     }
