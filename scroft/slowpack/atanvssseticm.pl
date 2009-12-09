@@ -73,7 +73,11 @@ foreach $seti (@setijid) {
 	    $sfx = "_NVSS.cm";
 	    $tits = "NVSS";
 	    $flux = $ins[3];
-	    $bcol = 2;
+# NVSS border green if NVSS source; red if no NVSS source
+	    $bcol = 3;
+	    if ($flux == 0) {
+		$bcol = 2;
+	    }
 	}
 	$imname = "$pfx/scl_$imroot$sfx";
 	print "$imname $psblock:$psnum\n";

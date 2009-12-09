@@ -4,11 +4,13 @@
 # detection
 #
 # S. Croft 2008/11/25
-#
+# Modified 2009/12/08 to avoid overwriting sources with identical max fluxes
 
 open(SETI,"setiuns.txt");
 @setii=<SETI>;
 close(SETI);
+
+my $setihash;
 
 # output script
 $outf = "setisort.txt";
@@ -17,10 +19,7 @@ open(OUT,">$outf");
 foreach $seti (@setii) {
 #    chomp($seti);
     @ins = split(/\s+/,$seti);
-    
-    $ra = ($ins[0] * 240.0);
-    $dec = ($ins[1] * 3600.0);
-    
+        
 # number of epochs
     $nep = (@ins - 2) / 2;
     
@@ -33,6 +32,10 @@ foreach $seti (@setii) {
 	if ($flux > $maxf) {
 	    $maxf = $flux;
 	}
+    }
+    # avoid overwriting hash key for two sources with the same flux
+    while ($setihash{$maxf} != "") {
+	$maxf = $maxf - 1E-10;
     }
     $setihash{$maxf} = $seti;
 }
