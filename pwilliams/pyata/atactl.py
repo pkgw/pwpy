@@ -988,14 +988,14 @@ def autoAttenAll (hookup, rms=13.0):
 
         try:
             assert len (out) == 1, 'Unexpected output from autoatten.rb'
-            out = out[0]
+            out0 = out[0]
 
-            log (out)
-            if 'too low' in out: flag = 'low'
-            elif 'too high' in out: flag = 'high'
+            log (out0)
+            if 'too low' in out0: flag = 'low'
+            elif 'too high' in out0: flag = 'high'
             else: flag = 'ok'
 
-            setting = float (out.split ()[3])
+            setting = float (out0.split ()[3])
             settings[(ibob, inp)] = (setting, flag)
         except StandardError, e:
             raise SlurpError (cmd, 0, out, None, e)
