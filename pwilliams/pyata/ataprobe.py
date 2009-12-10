@@ -129,8 +129,9 @@ def check (source):
     (code, stdout, stderr) = _slurp (ataArgs ('atacheck', source), False)
 
     # Get rid of warning about ambiguous catalog entries to make
-    # our assumptions simpler.
-    if 'another entry' in stdout[0]: del stdout[0]
+    # our assumptions simpler. Can get a message about 'another entry'
+    # or 'other entries'.
+    if 'other entr' in stdout[0]: del stdout[0]
     if stdout[0].startswith ('AntUtil:'): del stdout[0]
     
     if len (stdout) != 6 and len (stdout) != 5:
