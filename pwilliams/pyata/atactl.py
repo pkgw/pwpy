@@ -141,14 +141,36 @@ def log (text):
 
 def logAbort (exc_info):
     import traceback
+    from ataprobe import SlurpError
 
-    tup = traceback.extract_tb (exc_info[2])
+    etype, eobj, tb = exc_info
+    tup = traceback.extract_tb (tb)
     # report info for innermost frame
     fn, line, funcname, text = tup[-1]
 
     log ('Exception raised in \'%s\' at %s:%d!' % (funcname, fn, line))
-    log (exc_info[1].__class__.__name__ + ': ' + str (exc_info[1]))
-    log ('Aborting after %f hours elapsed' % ((time.time () - _startTime) / 3600.0))
+
+    if not isinstance (eobj, SlurpError):
+        log (etype.__name__ + ': ' + str (eobj))
+    else:
+        args, code, stdout, stderr, subexc = eobj.args
+        log ('Error parsing output from a subcommand!')
+        log ('- Ran: ' + ' '.join (args))
+        log ('- Return code: %d' % code)
+        if stdout is None:
+            log ('- No stdout captured')
+        else:
+            for l in stdout:
+                log ('- stdout: ' + l)
+        if stderr is None:
+            log ('- No stderr captured')
+        else:
+            for l in stderr:
+                log ('- stderr: ' + l)
+        log ('- Sub-exception: %s: %s', eobj.__class__.__name__,
+             str (eobj))
+
+    log ('Aborting after %.2f hours elapsed' % ((time.time () - _startTime) / 3600.0))
 
 
 import ataprobe
@@ -775,7 +797,7 @@ _noopFXtargid = 0
 
 def registerFXTarget (hookup, filepart, durationSeconds):
     global _noopFXtargid
-    from ataprobe import _slurp
+    from ataprobe import _slurp, SlurpError
 
     log ('Registering target: %s, %s, %f s' % (hookup.instr, filepart, durationSeconds))
 
@@ -790,14 +812,16 @@ def registerFXTarget (hookup, filepart, durationSeconds):
         _noopFXtargid += 1
     else:
         out = _slurp (cmd)
-        targid = None
-        for l in out:
-            log ('output: ' + l.strip ())
-            if not l.startswith ('ID:'):
-                continue
-            targid = int (l[3:])
-            break
-        assert targid is not None, 'No output id from atafxcatcher'
+        try:
+            targid = None
+            for l in out:
+                if not l.startswith ('ID:'):
+                    continue
+                targid = int (l[3:])
+                break
+            assert targid is not None, 'No output id from atafxcatcher'
+        except StandardError, e:
+            raise SlurpError (cmd, 0, out, None, e)
 
     log ('Got output id %d' % targid)
     return targid
@@ -947,7 +971,7 @@ _fakeAtten = \
 _acctAttemp = 'controlling attemplifiers'
 
 def autoAttenAll (hookup, rms=13.0):
-    from ataprobe import _slurp, obsRubyArgs
+    from ataprobe import _slurp, obsRubyArgs, SlurpError
     
     tStart = time.time ()
     log ('@@ Auto-attening all antpols')
@@ -958,19 +982,23 @@ def autoAttenAll (hookup, rms=13.0):
 
         if noopMode:
             log ('WOULD slurp: ' + ' '.join (cmd))
-            out = _fakeAtten
+            out = [_fakeAtten]
         else:
             out = _slurp (cmd)
+
+        try:
             assert len (out) == 1, 'Unexpected output from autoatten.rb'
             out = out[0]
 
-        log (out)
-        if 'too low' in out: flag = 'low'
-        elif 'too high' in out: flag = 'high'
-        else: flag = 'ok'
-        
-        setting = float (out.split ()[3])
-        settings[(ibob, inp)] = (setting, flag)
+            log (out)
+            if 'too low' in out: flag = 'low'
+            elif 'too high' in out: flag = 'high'
+            else: flag = 'ok'
+
+            setting = float (out.split ()[3])
+            settings[(ibob, inp)] = (setting, flag)
+        except StandardError, e:
+            raise SlurpError (cmd, 0, out, None, e)
 
     account (_acctAttemp, time.time () - tStart)
     return settings

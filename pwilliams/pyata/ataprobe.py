@@ -41,6 +41,18 @@ def sysRubyArgs (command, *rest):
     return a
 
 
+# Getting information by parsing program output.
+
+class SlurpError (EnvironmentError):
+    """An error raised if a program whose output was desired
+    exited with an error code or produced unexpected output."""
+
+    def __init__ (self, args, code, stdout, stderr, subexc):
+        args = list (args)
+        code = int (code)
+        super (SlurpError, self).__init__ (args, code, stdout, stderr, subexc)
+
+
 def _slurp (args, checkCode=True):
     """Return the output of a cmd, which is executed in a shell.
 
@@ -64,18 +76,26 @@ def _slurp (args, checkCode=True):
 
     if checkCode:
         if proc.returncode != 0:
-            raise Exception ("Command '%s' failed: %s" % (' '.join (args), stderr))
+            raise SlurpError (args, proc.returncode, stdout, stderr,
+                              EnvironmentError ())
         return stdout.splitlines ()
     else:
         return proc.returncode, stdout.splitlines (), stderr.splitlines ()
+
 
 def getLAST ():
     """Return the local apparent sidereal time, according to the ATA
     system."""
 
-    lines = _slurp (ataArgs ('atamainsystime', '--csv', '-s'))
-    if len (lines) != 1: raise Exception ('Expected only one line from atamainsystime')
-    return float (lines[0].split (',')[1])
+    args = ataArgs ('atamainsystime', '--csv', '-s')
+    lines = _slurp (args)
+
+    try:
+        assert len (lines) == 1
+        return float (lines[0].split (',')[1])
+    except StandardError, e:
+        raise SlurpError (args, 0, lines, None, e)
+
 
 def _checkGeneric (code, stdout):
     import re
@@ -126,7 +146,8 @@ def check (source):
     setsIn  - Number of hours until the source next sets below 18 deg
     """
 
-    (code, stdout, stderr) = _slurp (ataArgs ('atacheck', source), False)
+    args = ataArgs ('atacheck', source)
+    (code, stdout, stderr) = _slurp (args, False)
 
     # Get rid of warning about ambiguous catalog entries to make
     # our assumptions simpler. Can get a message about 'another entry'
@@ -134,10 +155,11 @@ def check (source):
     if 'other entr' in stdout[0]: del stdout[0]
     if stdout[0].startswith ('AntUtil:'): del stdout[0]
     
-    if len (stdout) != 6 and len (stdout) != 5:
-        raise Exception ('Error checking source "%s" -- probably not in the catalog.' % source)
-
-    return _checkGeneric (code, stdout)
+    try:
+        assert len (stdout) == 6 or len (stdout) == 5
+        return _checkGeneric (code, stdout)
+    except StandardError, e:
+        raise SlurpError (args, code, stdout, stderr, e)
 
 
 def checkRADec (raHours, decDeg):
@@ -153,13 +175,14 @@ def checkRADec (raHours, decDeg):
     setsIn  - Number of hours until the source next sets below 18 deg
     """
 
-    (code, stdout, stderr) = _slurp (ataArgs ('atacheck', '--radec',
-                                              '%.6f,%.6f' % (raHours, decDeg)), False)
+    args = ataArgs ('atacheck', '--radec', '%.6f,%.6f' % (raHours, decDeg))
+    (code, stdout, stderr) = _slurp (args, False)
 
-    if len (stdout) != 6 and len (stdout) != 5:
-        raise Exception ('Error checking Ra/Dec %f,%f: %d' % (raHours, decDeg, len (stdout)))
-
-    return _checkGeneric (code, stdout)
+    try:
+        assert len (stdout) == 5 or len (stdout) == 6
+        return _checkGeneric (code, stdout)
+    except StandardError, e:
+        raise SlurpError (args, code, stdout, stderr, e)
 
 
 def getPAMDefaults (ants):
@@ -169,16 +192,18 @@ def getPAMDefaults (ants):
     (XPamDefault, YPamDefault).
     """
 
-    lines = _slurp (ataArgs ('atasetpams', ','.join (ants)))
-
-    if len (lines) != len (ants):
-        raise Exception ('Unexpected output from atasetpams!')
+    args = ataArgs ('atasetpams', ','.join (ants))
+    lines = _slurp (args)
 
     def parse (line):
         a = line.split ()
         return (float (a[1]), float (a[2]))
 
-    return [parse (l) for l in lines]
+    try:
+        assert len (lines) == len (ants)
+        return [parse (l) for l in lines]
+    except StandardError, e:
+        raise SlurpError (args, 0, lines, None, e)
 
 
 # Integration time
@@ -187,9 +212,12 @@ def getIntegTime (hookup):
     """Returns the integration time for the specified hookup object,
     measured in seconds."""
     
-    lines = _slurp (obsArgs ('getintfx.csh', hookup.instr))
-    integ = float (lines[0])
-    return integ
+    args = obsArgs ('getintfx.csh', hookup.instr)
+    lines = _slurp (args)
+    try:
+        return float (lines[0])
+    except StandardError, e:
+        raise SlurpError (args, 0, lines, None, e)
 
 
 # Focus stuff
@@ -201,33 +229,36 @@ def getFocusSettings (ants):
     estimated focus frequency in MHz. Antennas with uncalibrated
     focus settings are not present in the dictionary."""
 
-    lines = _slurp (ataArgs ('atagetfocus', ','.join (ants)))
-
+    args = ataArgs ('atagetfocus', ','.join (ants))
+    lines = _slurp (args)
     res = {}
 
-    for l in lines:
-        l = l.strip ()
-        if len (l) == 0: continue
+    try:
+        for l in lines:
+            l = l.strip ()
+            if len (l) == 0: continue
 
-        a = l.split ()
+            a = l.split ()
 
-        try:
-            freq = float (a[1])
-        except ValueError:
-            # there's an error message for this ant
-            continue
+            try:
+                freq = float (a[1])
+            except ValueError:
+                # there's an error message for this ant
+                continue
 
-        ant = a[0]
+            ant = a[0]
 
-        # Handle the fact that we may refer to an ant as '3f'
-        # but getfocus will print out 'ant3f' as the name.
+            # Handle the fact that we may refer to an ant as '3f'
+            # but getfocus will print out 'ant3f' as the name.
 
-        if ant in ants:
-            res[ant] = freq
-        elif ant[3:] in ants:
-            res[ant[3:]] = freq
-        else:
-            raise Exception ('Unexpected antname in atagetfocus output: ' + ant)
+            if ant in ants:
+                res[ant] = freq
+            elif ant[3:] in ants:
+                res[ant[3:]] = freq
+            else:
+                raise Exception ('Unexpected antname in atagetfocus output: ' + ant)
+    except StandardError, e:
+        raise SlurpError (args, 0, lines, None, e)
 
     return res
 
@@ -241,20 +272,16 @@ def logFocusSettings (ants, destname):
 
 _defaultInstrument = 'fx64c:fxa'
 
-class Hookup (object):
-    def __init__ (self, instr=None):
-        if instr is None: instr = _defaultInstrument
 
-        self.instr = instr
-        self.lo = self.tab = self.sants = None
+def _parseHookup (instr):
+    tab = {}
+    ants = set ()
+    los = set ()
         
-    def load (self):
-        lines = _slurp (obsRubyArgs ('fxconf.rb', 'hookup_tab', self.instr))
+    args = obsRubyArgs ('fxconf.rb', 'hookup_tab', instr)
+    lines = _slurp (args)
 
-        tab = {}
-        ants = set ()
-        los = set ()
-        
+    try:
         for l in lines:
             if len (l) == 0 or l[0] == ':':
                 # "grayed out" and not used
@@ -283,13 +310,28 @@ class Hookup (object):
             tab[antpol] = (ibob, inp, lo, outp, walsh, num, mirnum)
             ants.add (antpol[0:2])
             los.add (lo)
+    except StandardError, e:
+        raise SlurpError (args, 0, lines, None, e)
 
+    return tab, ants, los
+
+
+class Hookup (object):
+    def __init__ (self, instr=None):
+        if instr is None: instr = _defaultInstrument
+
+        self.instr = instr
+        self.lo = self.tab = self.sants = None
+        
+    def load (self):
+        tab, ants, los = _parseHookup (self.instr)
+        
         assert len (ants) > 0, 'No ants! Using an empty subarray?'
+        assert len (los) == 1
 
         self.tab = tab
         self.sants = sorted (ants)
-        assert len (los) == 1
-        self.lo = lo
+        self.lo = list (los)[0]
 
     def ants (self): return self.sants
 
