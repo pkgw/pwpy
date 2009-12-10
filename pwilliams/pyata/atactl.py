@@ -126,7 +126,10 @@ def initScript (doAnything, logname, realwarn=True, useattens=True):
     log ('Initialized script in %s mode' % mode)
     log (ataprobe.SVNID)
     log (SVNID)
-    
+
+    _setupCleanup ()
+
+
 def log (text):
     utc = time.gmtime ()
     stamp = time.strftime ('%Y-%m-%dT%H:%M:%SZ', utc)
@@ -134,6 +137,7 @@ def log (text):
     if logFile is not None:
         print >>logFile, '%s: %s' % (stamp, text)
     print '%s: %s' % (stamp, text)
+
 
 def logAbort (exc_info):
     import traceback
@@ -146,12 +150,46 @@ def logAbort (exc_info):
     log (exc_info[1].__class__.__name__ + ': ' + str (exc_info[1]))
     log ('Aborting after %f hours elapsed' % ((time.time () - _startTime) / 3600.0))
 
+
 import ataprobe
 
 def _logProbeCommand (cmd):
     log ('running (probe): ' + ' '.join (cmd))
     
 ataprobe.runLogger = _logProbeCommand
+
+
+# Script cleanup infrastructure.
+
+def _setupCleanup ():
+    import signal
+
+    # Uncaught exception ...
+    def uncaught (etype, evalue, etb):
+        exc_info = (etype, evalue, etb)
+        logAbort (exc_info)
+        log ('(Exception was uncaught within interpreter)')
+        # atexit will run the cleanups, and Python will
+        # exit.
+
+    sys.excepthook = uncaught
+
+    # UNIX signals ...
+    def clean_and_die (signum, frame):
+        log ('Received fatal signal %d! Cleaning up.' % signum)
+        log ('Aborting after %.2f hours elapsed' % ((time.time () - _startTime) / 3600.0))
+        # atexits will run
+        sys.exit (1)
+
+    signal.signal (signal.SIGABRT, clean_and_die)
+    signal.signal (signal.SIGILL, clean_and_die)
+    signal.signal (signal.SIGQUIT, clean_and_die)
+    signal.signal (signal.SIGTERM, clean_and_die)
+    # SIGINT converted to KeyboardInterrupt by Python and is
+    # handled as an uncaught exception or within the program.
+
+    signal.signal (signal.SIGHUP, signal.SIG_IGN)
+
 
 # Time accounting.
 
