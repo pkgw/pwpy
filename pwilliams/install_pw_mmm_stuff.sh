@@ -63,6 +63,7 @@ pylib/blflag.py
 pylib/blmapper.glade
 pylib/calctsys.py
 pylib/closanal.py
+pylib/gpmergepols.py
 pylib/hhaa.dat
 pylib/multiflag.py
 pylib/multiflag2.py
