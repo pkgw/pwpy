@@ -15,7 +15,8 @@
  Multiple options can be specified, separated by commas. Minimum-match
  is used.
 
- 'accuma' Magic!
+ 'notimes' Do not print out a table mapping row number to observation
+           time.
 --
 """
 
@@ -34,7 +35,7 @@ numdisplay.open ()
 # Args
 
 keys.doUvdat ('dsl3', True)
-keys.option ('accuma')
+keys.option ('notimes')
 opts = keys.process ()
 
 
@@ -50,20 +51,16 @@ for dset, pream, data, flags, n in uvdat.readAll ():
         ag = ArrayGrower (n, dtype=data.dtype)
         accum = None
         nacc = 0
-        prevt = None
-        t0 = t
         times = []
     else:
         if n != prevn:
             print >>sys.stderr, 'Error: changing number of channels in selected data'
             sys.exit (1)
 
-        if t0 > t:
+        if t < times[-1]:
             print >>sys.stderr, 'Warning: time goes backwards in selected data'
-        elif t0 == t and not opts.accuma:
+        elif t == times[-1]:
             print >>sys.stderr, 'Warning: time repeated in selected data'
-        if t > prevt:
-            times.append(util.jdToFull(prevt))
 
     data = data[:n]
     flags = flags[:n].astype (N.bool)
@@ -71,34 +68,19 @@ for dset, pream, data, flags, n in uvdat.readAll ():
     # Could have options for what to do with this.
     data[N.where (~flags)] = 0.0
 
-    if not opts.accuma:
-        ag.addLine (data)
-    else:
-        if prevt is None:
-            accum = N.abs (data)
-            nacc = N.array (flags, dtype=N.int)
-        elif t == prevt:
-            accum += N.abs (data)
-            nacc += flags
-        else:
-            nacc[nacc == 0] = 1
-            ag.addLine (accum / nacc)
-            accum = N.abs (data)
-            nacc = N.array (flags, dtype=N.int)
-
-    prevt = t
-
-if accum is not None and opts.accuma:
-    ag.addLine (accum / nacc)
+    ag.addLine (data)
+    times.append (t)
 
 data = ag.finish ()
-
-print 'Integration/Time conversion:'
-print zip(N.arange(N.shape(data)[0]), times)
 
 if data.size == 0:
     print >>sys.stderr, 'Error: no data selected'
     sys.exit (1)
+
+if not opts.notimes:
+    print 'Integration/Time conversion:'
+    for i, t in enumerate (times):
+        print '%10d :' % i, util.jdToFull (t)
 
 
 # Show control window
