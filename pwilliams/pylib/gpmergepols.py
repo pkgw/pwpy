@@ -16,17 +16,17 @@
  gains tables for the same number of antennas, the same times, and
  so on.
 
-< vis
+@ vis
  Two input datasets. The first should contain a solution for the 
  X or L feeds only and the second should contain a solution for the
  Y or R feeds only.
 
-< out
+@ out
  The name of an output dataset. The created dataset will contain the
  gain information but no visibility data. The gains in this set can
  by copied to visibility datasets with GPCOPY.
 
-< ttol
+@ ttol
  The tolerance for differing gain solution timestamps in the datasets,
  measured in seconds. If SELFCAL is run separately on the XX and YY
  pols in a dataset, the gain solution timestamps will vary slightly
@@ -117,8 +117,8 @@ def merge (name1, ds1, name2, ds2, outset, banner, ttol):
             break
 
         if abs (t1 - t2) > ttol:
-            raise FormatError ('Disagreeing timestamps %f and %f (%f, tol %f)' %
-                               (t1, t2, t1 - t2, ttol))
+            raise FormatError ('Disagreeing timestamps %f and %f (%.1f s, tol %.1f s)' %
+                               (t1, t2, (t1 - t2) * 86400, ttol * 86400))
 
         gbuf[0::2] = g1
         gbuf[1::2] = g2
