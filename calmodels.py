@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 
 models = {}
+spindexes = {}
 
 def CasA (freqInMHz, year):
     """Return the flux of Cas A given a frequency and the year of
@@ -49,8 +50,22 @@ def _makeGenericBaars (a, b, c, fmin, fmax):
 
     return f
 
+def _makeGenericBaarsSpindex (a, b, c, fmin, fmax):
+    from numpy import log10, any
+
+    def f (freqInMHz):
+        if any (freqInMHz < fmin) or any (freqInMHz > fmax):
+            raise Exception ('Going beyond frequency limits of model!')
+        
+        return b + 2 * c * lf
+
+    return f
+
+
 def _addGenericBaars (src, a, b, c, fmin, fmax):
     models[src] = _makeGenericBaars (a, b, c, fmin, fmax)
+    spindexes[src] = _makeGenericBaarsSpindex (a, b, c, fmin, fmax)
+
 
 baarsParameters = {
     '3c48': (2.345, 0.071, -0.138, 405., 15000.),
@@ -81,15 +96,30 @@ def _makeVLAModel (a, b, c, d):
 
     def f (freqInMHz):
         if any (freqInMHz < 300) or any (freqInMHz > 50000):
-            raise Exception ('Going beyond frequency limits of model!')
+            raise StandardError ('Going beyond frequency limits of model!')
         
         lghz = log10 (freqInMHz) - 3
         return 10.**(a + b * lghz + c * lghz**2 + d * lghz**3)
 
     return f
 
+def _makeVLASpindex (a, b, c, d):
+    from numpy import log10, any
+
+    def f (freqInMHz):
+        if any (freqInMHz < 300) or any (freqInMHz > 50000):
+            raise StandardError ('Going beyond frequency limits of model!')
+        
+        lghz = log10 (freqInMHz) - 3
+        return b + 2 * c * lghz + 3 * d * lghz**2
+
+    return f
+
+
 def _addVLAModel (src, a, b, c, d):
     models[src] = _makeVLAModel (a, b, c, d)
+    spindexes[src] = _makeVLASpindex (a, b, c, d)
+
 
 vlaParameters = {
     # These are the "1999.2" model parameters. These seem to
@@ -143,12 +173,23 @@ def funcFromVLAObs (Lband, Cband):
 
     return f
 
+
+def spindexFromVLAObs (Lband, Cband):
+    A, B = modelFromVLAObs (Lband, Cband)
+    
+    def f (freqInMHz):
+        return A
+
+    return f
+
+
 def addFromVLAObs (src, Lband, Cband):
     """Add an entry into the models table for a source based on the
     Lband and Cband entries from the VLA catalog."""
 
     if src in models: raise Exception ('Already have a model for ' + src)
     models[src] = funcFromVLAObs (Lband, Cband)
+    spindexes[src] = spindexFromVLAObs (Lband, Cband)
 
 # addFromVLA ('3c48', 16.50, 5.48)
 addFromVLAObs ('3c84', 23.9, 23.3)
@@ -158,59 +199,77 @@ addFromVLAObs ('3c84', 23.9, 23.3)
 # name
 
 def _usage ():
-    from sys import stderr, argv, exit
+    from sys import stderr, argv
     
-    print >>stderr, """Usage: %s <source> <freq> [year]
+    print >>stderr, """Usage: %s [-f] <source> <freq> [year]
 
 Where:
   <source> is the source name (e.g., 3c348)
   <freq> is the observing frequency in MHz (e.g., 1420)
   [year] is the decimal year of the observation (e.g., 2007.8).
      Only needed if <source> is CasA.
+  [-f] is "flux" mode, which prints out a three-item string
+     that can be passed to MIRIAD tasks that accept a model flux
+     and spectral index argument.
 
 Prints the flux in Jy of the specified calibrator at the
 specified frequency.""" % argv[0]
-    exit (0)
+    return 0
     
 def _interactive (args):
-    from sys import exit, stderr
+    from sys import stderr
 
-    if len (args) < 1: _usage ()
+    if len (args) < 1: return _usage ()
+
+    fluxMode = (args[0] == '-f')
+    if fluxMode: del args[0]
 
     source = args[0]
 
     if source == 'CasA':
-        if len (args) != 3: _usage ()
+        if len (args) != 3: return _usage ()
 
         try:
             year = float (args[2])
             initCasA (year)
         except Exception, e:
             print >>stderr, 'Unable to parse year \"%s\":' % args[2], e
-            exit (1)
-    elif len (args) != 2: _usage ()
+            return 1
+    elif len (args) != 2: return _usage ()
 
     try:
         freq = float (args[1])
     except Exception, e:
         print >>stderr, 'Unable to parse frequency \"%s\":' % args[1], e
-        exit (1)
+        return 1
         
     if source not in models:
         print >>stderr, 'Unknown source \"%s\". Known sources are:' % source
         print >>stderr, '   ', ', '.join (sorted (models.keys ()))
-        exit (1)
+        return 1
 
     try:
         flux = models[source](freq)
-        print '%lg' % (flux, )
     except Exception, e:
         # Catch, e.g, going beyond frequency limits.
         print >>stderr, 'Error finding flux of %s at %f MHz:' % (source, freq), e
-        exit (1)
+        return 1
 
-    exit (0)
+    if not fluxMode:
+        print '%lg' % (flux, )
+        return 0
+
+    try:
+        spindex = spindexes[source](freq)
+    except Exception, e:
+        print >>stderr, 'WARNING: error finding spectral index of %s at %f MHz:' \
+            % (source, freq), e
+        spindex = 0
+
+    print '%lg,%lg,%lg' % (flux, freq * 1e-3, spindex)
+    return 0
+
 
 if __name__ == '__main__':
-    from sys import argv
-    _interactive (argv[1:])
+    from sys import argv, exit
+    exit (_interactive (argv[1:]))
