@@ -12,12 +12,13 @@
  UV variable. Temperatures are listed in Kelvin.
 
  The system temperatures are computed from the variance in the real
- and imaginary parts across the spectral window of a visibility. The
- data for each baseline are averaged in time (see the "interval"
- keyword) before the variances are computed. A smoothed version of the
- data may also be subtracted off before the variances are computed
- (see the "hann" keyword). The effective system temperature for a
- baseline is computed as:
+ and imaginary parts across the spectral window of a visibility --
+ they are thus really expressions of the antenna system equivalent
+ flux densities (SEFDs). The data for each baseline are averaged in 
+ time (see the "interval" keyword) before the variances are computed.
+ A smoothed version of the data may also be subtracted off before the
+ variances are computed (see the "hann" keyword). The effective
+ system temperature for a baseline is computed as:
 
  TSys = G * (SRe + SIm)/2 * etaQ * sqrt(2 * SDF * tau) / jyperk .
 
@@ -81,14 +82,27 @@
  system temperature of 9999 K. Baselines involving such antennas will
  written into the new dataset, but be completely flagged. Any baselines
  with residuals to the fit above "maxresid" will also be flagged.
+
+ Due to limitations in the MIRIAD handling of system temperatures, by
+ default the output dataset can only contain data for antennas with
+ one polarization input: that is, the system temperature variable
+ can record only one value for each antenna even if the antenna has
+ two feeds. (In some feed architectures, the two polarization
+ components for one antenna can have significantly different system
+ temperatures, in which case this limitation becomes significant. There
+ are "xtsys" and "ytsys" UV variables defined in MIRIAD, but they are
+ not hooked up to the UV I/O code in the same way that "systemp" is.)
+ In normal operation, CALCTSYS will signal an error if it attempts
+ to write an output dataset with more than one polarization per
+ antenna. The "dualpol" option can circumvent this limitation by
+ writing the data in a different format: all antennas are given a
+ single semi-arbitrary system temperature, and for each record a
+ different "jyperk" value is written out, resulting in a correct
+ SEFD for each baseline. This system is a slight abuse of the data
+ format and is consumes a bit more disk space, but it works.
  
  LIMITATIONS: Currently CALCTSYS can only handle data with a single
- spectral window and no wide channels. CALCTSYS will only process data
- of a single polarization -- it is capable of handling multiple
- polarizations internally, but the author is unclear how best to write
- out TSys values for multiple feeds on the same antenna. (There are the
- UV variables "xtsys" and "ytsys" but they don't seem to be hooked up
- the UVIO code in the same way that "systemp" is.)
+ spectral window and no wide channels.
 
 < vis
  Only a single input file is supported by CALCTSYS.
@@ -175,6 +189,9 @@
  Multiple options can be specified, separated by commas. Minimum-match
  is used.
 
+ 'dualpol'   Write varying 'jyperk' variables in the output data set
+             so that it may contain multiple-polarization data. See 
+             discussion in the main help text.
  'showpre'   Plot the baseline-based TSys values before a fit is
              attempted. One plot for each antenna is shown. Requires the
              Python module 'omega'.
@@ -569,7 +586,7 @@ class SysTemps (object):
         self.integData = {}
         self.tmin = None
 
-        return tmin, dict (zip (self.aps, self.soln)), allBadBps
+        return tmin, dict (zip (self.aps, self.soln)), allBadBps, jyperk
 
 # Hooks up the SysTemp calculator to the reading of a dataset
 
@@ -675,11 +692,11 @@ class DataProcessor (object):
         self.solutions.sort (key = lambda t: t[0])
 
         # Sentinel entry to make rewriteData algorithm simpler.
-        self.solutions.append ((self.solutions[-1][0] + self.interval, None, None))
+        self.solutions.append ((self.solutions[-1][0] + self.interval, None, None, None))
 
 # Rewrite a dataset with new TSys solutions embedded
 
-def rewriteData (banner, vis, out, solutions):
+def rewriteData (banner, vis, out, solutions, varyJyPerK):
     dOut = out.open ('c')
     dOut.setPreambleType ('uvw', 'time', 'baseline')
 
@@ -687,23 +704,29 @@ def rewriteData (banner, vis, out, solutions):
     nextSolnIdx = 0
     thePol = None
     flaggedAps = None
-    
+
+    if varyJyPerK:
+        theSysTemp = solutions[0][1].values ()[0]
+
     for inp, preamble, data, flags, nread in vis.readLowlevel (False):
         if first:
             first = False
 
-            toTrack = ['nants', 'jyperk', 'inttime']        
+            toTrack = ['nants', 'inttime']
 
             nants = inp.getVarFirstInt ('nants', 0)
             assert nants > 0
             nspect = inp.getVarFirstInt ('nspect', 0)
             nwide = inp.getVarFirstInt ('nwide', 0)
             assert nspect > 0 or nwide > 0
-            jyperk = inp.getVarFirstFloat ('jyperk', 0.0)
-            assert jyperk > 0
             inttime = inp.getVarFirstFloat ('inttime', 10.0)
             assert inttime > 0.
         
+            if not varyJyPerK:
+                toTrack.append ('jyperk')
+                jyperk = inp.getVarFirstFloat ('jyperk', 0.0)
+                assert jyperk > 0
+
             if nspect > 0:
                 sdf = inp.getVarDouble ('sdf', nspect)
                 toTrack.append ('sdf')
@@ -723,6 +746,10 @@ def rewriteData (banner, vis, out, solutions):
             inp.copyHeader (dOut, 'history')
             inp.initVarsAsInput (' ') # ???
 
+            if varyJyPerK:
+                systemps = N.zeros (nants, dtype=N.float32) + theSysTemp
+                dOut.writeVarFloat ('systemp', systemps)
+
             dOut.openHistory ()
             dOut.writeHistory (banner)
             dOut.logInvocation ('CALCTSYS')
@@ -736,8 +763,6 @@ def rewriteData (banner, vis, out, solutions):
                 nwide = inp.getVarInt ('nwide')
             # assert nspect > 0 or nwide > 0 FIXME: implement all this
             assert nspect == 1 and nwide == 0
-            jyperk = inp.getVarFloat ('jyperk')
-            assert jyperk > 0
             inttime = inp.getVarFloat ('inttime')
             assert inttime > 0.
 
@@ -745,8 +770,12 @@ def rewriteData (banner, vis, out, solutions):
                 sdf = inp.getVarDouble ('sdf', nspect)
 
             dOut.writeVarInt ('nants', nants)
-            dOut.writeVarFloat ('jyperk', jyperk)
             dOut.writeVarFloat ('inttime', inttime)
+
+            if not varyJyPerK:
+                jyperk = inp.getVarFloat ('jyperk')
+                assert jyperk > 0
+                dOut.writeVarFloat ('jyperk', jyperk)
 
             if nspect > 0:
                 dOut.writeVarInt ('nspect', nspect)
@@ -770,29 +799,31 @@ def rewriteData (banner, vis, out, solutions):
 
         if thePol is None:
             thePol = pol
-        elif pol != thePol:
+        elif pol != thePol and not varyJyPerK:
             raise Exception ('Can only write meaningful systemp values for one set of polarizations at time.')
         
         # Write a new systemp entry?
 
         if time >= solutions[nextSolnIdx][0]:
-            solns = solutions[nextSolnIdx][1]
+            curSolns = solutions[nextSolnIdx][1]
             badBps = solutions[nextSolnIdx][2]
-            assert solns is not None, 'Bizarre interval calculation issues?'
+            curDataJyPerK = solutions[nextSolnIdx][3]
+            assert curSolns is not None, 'Bizarre interval calculation issues?'
 
             if flaggedAps is not None:
                 dOut.writeHistory ('CALCTSYS: in previous solution, '
                                    'flagged %d antpols' % len (flaggedAps))
                 for ap in flaggedAps:
                     dOut.writeHistory ('CALCTSYS:   flagged ' + util.fmtAP (ap))
-            
+
+
             systemps = N.zeros (nants, dtype=N.float32) + reallyBadTSys
             goodAps = set ()
 
             jd = util.jdToFull (solutions[nextSolnIdx][0])
-            dOut.writeHistory ('CALCTSYS: soln %s: temps for %d antpols' % (jd, len (solns)))
+            dOut.writeHistory ('CALCTSYS: soln %s: temps for %d antpols' % (jd, len (curSolns)))
         
-            for ap, tsys in sorted (solns.iteritems (), key=lambda x: x[0]):
+            for ap, tsys in sorted (curSolns.iteritems (), key=lambda x: x[0]):
                 goodAps.add (ap)
                 ant = util.apAnt (ap)
                 systemps[ant-1] = tsys
@@ -802,8 +833,9 @@ def rewriteData (banner, vis, out, solutions):
 
             for bp in sorted (badBps):
                 dOut.writeHistory ('CALCTSYS:   flagging %s' % util.fmtAPs (bp))
-                
-            dOut.writeVarFloat ('systemp', systemps)
+
+            if not varyJyPerK:
+                dOut.writeVarFloat ('systemp', systemps)
 
             nextSolnIdx += 1
             thePol = None
@@ -823,6 +855,14 @@ def rewriteData (banner, vis, out, solutions):
 
         if bad:
             flags.fill (0)
+
+        if varyJyPerK:
+            if bad:
+                jyperk = 1e-6
+            else:
+                sefd = N.sqrt (curSolns[bp[0]] * curSolns[bp[1]]) * curDataJyPerK
+                jyperk = sefd / theSysTemp
+            dOut.writeVarFloat ('jyperk', jyperk)
 
         # Convert UVW coordinates from wavelengths back to nanoseconds
         # (readLowlevel automatically has Miriad do the conversion to
@@ -861,7 +901,7 @@ def task ():
     keys.keyword ('quant', 'i', None, 2)
     keys.keyword ('hann', 'i', 1)
     keys.keyword ('jyperk', 'd', -1.0)
-    keys.option ('showpre', 'showfinal', 'showall')
+    keys.option ('showpre', 'showfinal', 'showall', 'dualpol')
 
     args = keys.process ()
 
@@ -956,6 +996,11 @@ def task ():
     else:
         print '  Scaling value of jyperk in file by %g' % (-args.jyperk)
 
+    if args.dualpol:
+        print '  Rewriting jyperk variable for dual-pol data.'
+    else:
+        print '  Rewriting tsys variable; single-pol data only.'
+
     # Let's go!
 
     dp = DataProcessor (interval, args.flux, etaQ, args.hann, args.jyperk,
@@ -974,7 +1019,7 @@ def task ():
     # Now write the new dataset with TSys data embedded.
 
     out = VisData (args.out)
-    rewriteData (banner, vis, out, dp.solutions)
+    rewriteData (banner, vis, out, dp.solutions, args.dualpol)
     return 0
 
 if __name__ == '__main__':
