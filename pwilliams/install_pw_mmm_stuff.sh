@@ -45,6 +45,7 @@ fancy/gpcat
 fancy/gpmergepols
 fancy/gpunity
 fancy/multiflag2
+fancy/pwmodel
 fancy/qimage
 fancy/uvasimg
 fancy/varcat.py
