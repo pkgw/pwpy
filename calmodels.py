@@ -256,7 +256,7 @@ def _interactive (args):
         return 1
 
     if not fluxMode:
-        print '%lg' % (flux, )
+        print '%g' % (flux, )
         return 0
 
     try:
@@ -266,7 +266,7 @@ def _interactive (args):
             % (source, freq), e
         spindex = 0
 
-    print '%lg,%lg,%lg' % (flux, freq * 1e-3, spindex)
+    print '%g,%g,%g' % (flux, freq * 1e-3, spindex)
     return 0
 
 
