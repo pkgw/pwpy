@@ -101,11 +101,45 @@
  SEFD for each baseline. This system is a slight abuse of the data
  format and is consumes a bit more disk space, but it works.
  
+ System temperature information can also be stored in a simple
+ line-oriented text file via the "textout" keyword. This information 
+ can then be applied to other datasets using the task APPLYTSYS. The 
+ format of the text file is designed to be forward-compatible to
+ allow the introduction of more data fields if necessary. The
+ current format is:
+
+ - The first line contains the string 'nsol', then a space, than an
+   integer giving the number of solutions in the file.
+ - Lines are ignored until a line starting with the string
+   'startsolution' is encountered.
+ - Information for the solution is read until a line starting with
+   the string 'endsolution' is encountered. 
+ - The file is read in this way to the end. It is an error if there
+   are not the same number of solutions as specified in the first line.
+ - Each solution section must contain a line starting with the string
+   'tstart', then giving a floating-point number giving the start time
+   of the solution as a Julian Date.
+ - Each solution section must also contain a line starting with the
+   string 'duration', then giving a floating-point number giving the
+   length of the solution interval in days.
+ - Each solution section may contain any number of lines beginning with
+   the string 'sefd', followed by an antpol name (e.g., '12X'), followed
+   by the system equivalent flux density (SEFD) of the antpol in that
+   solution, in Janskys.
+ - Each solution section may contain any number of lines beginning with
+   the string 'badbp', followed by a basepol name (e.g., '3Y-10Y'),
+   indicating that the specified basepol should be flagged during this
+   solution interval.
+ - The order of the above-mentioned entries is unspecified, except that
+   later entries override earlier entries.
+
  LIMITATIONS: Currently CALCTSYS can only handle data with a single
  spectral window and no wide channels.
 
 < vis
  Only a single input file is supported by CALCTSYS.
+
+< select
  
 @ flux
  The assumed flux of the source in Janskys, if the antenna gains in
@@ -201,13 +235,19 @@
  'showall'   Plot values and model results after each iteration of the
              fitting process. Same requirements and behavior as
              'showpre'.
+ 'nocal'     Do not apply calibration corrections when reading or
+             writing the data.
+ 'nopass'    Do not apply bandpass corrections when reading or writing
+             the data.
+ 'nopol'     Do not apply polarization leakage corrections when reading
+             or writing the data.
 --
 """
 
 import sys, numpy as N
 from numutils import *
 from miriad import *
-from mirtask import keys, util, uvdat
+from mirtask import keys, util
 
 SVNID = '$Id$'
 # here is a demo change
@@ -694,9 +734,91 @@ class DataProcessor (object):
         # Sentinel entry to make rewriteData algorithm simpler.
         self.solutions.append ((self.solutions[-1][0] + self.interval, None, None, None))
 
+
+def dumpText (solutions, durDays, outfn):
+    """Dump the solution data to a simple textual file format."""
+
+    f = file (outfn, 'w')
+
+    # There's a final sentinel entry to ignore.
+    print >>f, 'nsol', len (solutions) - 1
+
+    for tstart, systemps, badbps, jyperk in solutions[:-1]:
+        print >>f, 'startsolution'
+        print >>f, 'tstart', '%.10f' % tstart
+        print >>f, 'duration', '%.10f' % durDays
+
+        # Write SEFDs since those are really the fundamental
+        # piece of information that we've computed.
+
+        for ap, tsys in systemps.iteritems ():
+            print >>f, 'sefd', util.fmtAP (ap), '%.3f' % (tsys * jyperk)
+
+        for bp in badbps:
+            print >>f, 'badbp', util.fmtBP (bp)
+
+        print >>f, 'endsolution'
+
+    f.close ()
+
+
+def loadText (fn):
+    """Load solution data from the simple textual file format."""
+
+    f = file (fn, 'r')
+
+    a = f.readline ().strip ().split ()
+
+    if a[0] != 'nsol' or len (a) != 2:
+        print >>sys.stderr, 'Error: file', fn, 'does not appear to contain TSys information.'
+        sys.exit (1)
+
+    nsol_expected = int (a[1])
+    in_soln = False
+    solutions = []
+
+    for ln in f:
+        a = ln.strip ().split ()
+
+        if not in_soln:
+            if a[0] == 'startsolution':
+                in_soln = True
+                sefds = {}
+                tstart = None
+                durDays = None
+                badbps = set ()
+            continue
+
+        if a[0] == 'endsolution':
+            in_soln = False
+            if tstart is None:
+                print >>sys.stderr, 'Error: no start time for solution in file', fn
+                sys.exit (1)
+            if durDays is None:
+                print >>sys.stderr, 'Error: no duration for solution in file', fn
+                sys.exit (1)
+            solutions.append ((tstart, sefds, badbps, 1.0))
+            continue
+
+        if a[0] == 'tstart':
+            tstart = float (a[1])
+        elif a[0] == 'duration':
+            durDays = float (a[1])
+        elif a[0] == 'sefd':
+            ap = util.parseAP (a[1])
+            sefds[ap] = float (a[2])
+        elif a[0] == 'badbp':
+            badbps.add (util.parseBP (a[1]))
+
+    if len (solutions) != nsol_expected:
+        print >>sys.stderr, 'Error: missing soltions in file', fn
+
+    solutions.append ((tstart + durDays, None, None, None))
+    return solutions
+
 # Rewrite a dataset with new TSys solutions embedded
 
-def rewriteData (banner, vis, out, solutions, varyJyPerK):
+def rewriteData (banner, vis, out, solutions, varyJyPerK, **kwargs):
     dOut = out.open ('c')
     dOut.setPreambleType ('uvw', 'time', 'baseline')
 
@@ -708,7 +830,7 @@ def rewriteData (banner, vis, out, solutions, varyJyPerK):
     if varyJyPerK:
         theSysTemp = solutions[0][1].values ()[0]
 
-    for inp, preamble, data, flags, nread in vis.readLowlevel (False):
+    for inp, preamble, data, flags, nread in vis.readLowlevel (False, **kwargs):
         if first:
             first = False
 
@@ -886,7 +1008,12 @@ def rewriteData (banner, vis, out, solutions, varyJyPerK):
 
 # Task implementation.
 
-def task ():
+def die (s):
+    print >>sys.stderr, 'Error:', s
+    return 1
+
+
+def taskCalc ():
     banner = util.printBannerSvn ('calctsys',
                                   'compute TSys values from data noise properties', SVNID)
     
@@ -898,10 +1025,13 @@ def task ():
     keys.keyword ('maxresid', 'd', 50.)
     keys.keyword ('vis', 'f', ' ')
     keys.keyword ('out', 'f', ' ')
+    keys.keyword ('textout', 'f', ' ')
     keys.keyword ('quant', 'i', None, 2)
     keys.keyword ('hann', 'i', 1)
     keys.keyword ('jyperk', 'd', -1.0)
-    keys.option ('showpre', 'showfinal', 'showall', 'dualpol')
+    kesy.keyword ('select', 'a', '')
+    keys.option ('showpre', 'showfinal', 'showall', 'dualpol',
+                 'nocal', 'nopass', 'nopol')
 
     args = keys.process ()
 
@@ -938,13 +1068,31 @@ def task ():
     if args.jyperk == 0.:
         print >>sys.stderr, 'Error: jyperk argument may not be zero.'
         sys.exit (1)
-    
+
+    inputArgs = {}
+
+    if args.nocal:
+        inputArgs['nocal'] = True
+
+    if args.nopass:
+        inputArgs['nopass'] = True
+
+    if args.nopol:
+        inputArgs['nopol'] = True
+
+    if args.select != '':
+        inputArgs['select'] = args.select
+
     # Print out summary of config
     
     print 'Configuration:'
     rewrite = args.out != ' '
     if not rewrite:
         print '  Computing gains only, not writing new dataset.'
+
+    writeText = args.textout != ' '
+    if writeText:
+        print '  Writing TSys information to text file', args.textout, '.'
 
     if args.flux < 0:
         print '  Assuming data are calibrated to Jansky units.'
@@ -996,10 +1144,11 @@ def task ():
     else:
         print '  Scaling value of jyperk in file by %g' % (-args.jyperk)
 
-    if args.dualpol:
-        print '  Rewriting jyperk variable for dual-pol data.'
-    else:
-        print '  Rewriting tsys variable; single-pol data only.'
+    if rewrite:
+        if args.dualpol:
+            print '  Rewriting jyperk variable for dual-pol data.'
+        else:
+            print '  Rewriting tsys variable; single-pol data only.'
 
     # Let's go!
 
@@ -1007,11 +1156,14 @@ def task ():
                         args.maxtsys, args.maxresid, args.showpre, args.showall,
                         args.showfinal)
 
-    for tup in vis.readLowlevel (False):
+    for tup in vis.readLowlevel (False, **inputArgs):
         dp.process (*tup)
 
     dp.finish ()
-    
+
+    if writeText:
+        dumpText (dp.solutions, interval, args.textout)
+
     if not rewrite:
         # All done in this case.
         return 0
@@ -1019,8 +1171,51 @@ def task ():
     # Now write the new dataset with TSys data embedded.
 
     out = VisData (args.out)
-    rewriteData (banner, vis, out, dp.solutions, args.dualpol)
+    rewriteData (banner, vis, out, dp.solutions, args.dualpol, **inputArgs)
     return 0
 
+
+def taskApply (argv):
+    banner = util.printBannerSvn ('applytsys',
+                                  'insert TSys information into UV data', SVNID)
+
+    keys.keyword ('vis', 'f', ' ')
+    keys.keyword ('out', 'f', ' ')
+    keys.keyword ('textin', 'f', ' ')
+    keys.keyword ('select', 'a', '')
+    keys.option ('dualpol', 'nocal', 'nopass', 'nopol')
+
+    args = keys.process (argv)
+
+    if args.vis == ' ':
+        return die ('no UV input specified')
+
+    if args.out == ' ':
+        return die ('no UV output specified')
+
+    if args.textin == ' ':
+        return die ('no TSys information input specified')
+
+    inputArgs = {}
+
+    if args.nocal:
+        inputArgs['nocal'] = True
+
+    if args.nopass:
+        inputArgs['nopass'] = True
+
+    if args.nopol:
+        inputArgs['nopol'] = True
+
+    if args.select != '':
+        inputArgs['select'] = args.select
+
+    vis = VisData (args.vis)
+    out = VisData (args.out)
+    solutions = loadText (args.textin)
+    rewriteData (banner, vis, out, solutions, args.dualpol, **inputArgs)
+    return 0
+
+
 if __name__ == '__main__':
-    sys.exit (task ())
+    sys.exit (taskCalc ())

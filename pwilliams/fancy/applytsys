@@ -1,0 +1,48 @@
+#! /usr/bin/env python
+# -*- python -*-
+
+"""= applytsys - insert TSys information into UV data
+& pkgw
+: Calibration
++
+ APPLYTSYS inserts system temperature information into a UV dataset.
+ The data come from a textual file created by CALCTSYS (see keyword
+ "textin") or any other tool that generates such a file in a compatible
+ format. 
+
+ The output dataset is created using the same code as that in CALCTSYS.
+ See the documentation for that task for detailed information,
+ especially as regards the "dualpol" option.
+
+< vis
+ APPLYTSYS accepts only a single input dataset.
+
+@ out
+ The name of the output dataset to write.
+
+< select
+
+@ textin
+ The name of the text file giving system temperature information
+ that will be inserted into the dataset. Such a file is generated
+ by the task CALCTSYS.
+
+@ options
+ Multiple options can be specified, separated by commas. Minimum-match
+ is used.
+
+ 'dualpol'   Write varying 'jyperk' variables in the output data set
+             so that it may contain multiple-polarization data. See 
+             discussion in the main help text.
+ 'nocal'     Do not apply calibration corrections when reading or
+             writing the data.
+ 'nopass'    Do not apply bandpass corrections when reading or writing
+             the data.
+ 'nopol'     Do not apply polarization leakage corrections when reading
+             or writing the data.
+--
+"""
+
+import sys, calctsys
+
+sys.exit (calctsys.taskApply (sys.argv))

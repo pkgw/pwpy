@@ -35,6 +35,7 @@ walsh_adc_conflict.sh
 walsh-flags.py
 fancy/ampadd.py
 fancy/amprfi
+fancy/applytsys
 fancy/atabpass
 fancy/ataglue.py
 fancy/byant
