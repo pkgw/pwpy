@@ -1029,7 +1029,7 @@ def taskCalc ():
     keys.keyword ('quant', 'i', None, 2)
     keys.keyword ('hann', 'i', 1)
     keys.keyword ('jyperk', 'd', -1.0)
-    kesy.keyword ('select', 'a', '')
+    keys.keyword ('select', 'a', '')
     keys.option ('showpre', 'showfinal', 'showall', 'dualpol',
                  'nocal', 'nopass', 'nopol')
 
