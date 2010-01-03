@@ -44,6 +44,8 @@
 
 @ model
  The name of the model image, which should be a JY/PIXEL MIRIAD image.
+ If unspecified, a point source model must be specified via the 
+ keyword "flux".
 
 @ out
  The name of the output dataset.
@@ -55,6 +57,15 @@
 
 @ clip
  A clip value to apply to the model image, passed verbatim to UVMODEL.
+
+@ flux
+ If not using a model image, the flux of a point source model, in
+ Janskys.
+
+@ offset
+ If not using a model image, the RA and dec. offsets to apply to the
+ position of the point source model. North and east are positive offsets,
+ respectively. The default is no offset (i.e., 0,0).
 
 @ options
  PWMODEL accepts some Unix-style command-line flags. They cannot be
@@ -93,6 +104,8 @@ model = None
 mode = MODE_SUBTRACT
 precat = False
 clip = 0.0
+flux = None
+offset = '0,0'
 preserve = False
 touchup = False
 
@@ -124,6 +137,10 @@ for arg in sys.argv[1:]:
         touchup = True
     elif arg.startswith ('clip='):
         clip = float (arg[5:])
+    elif arg.startswith ('flux='):
+        flux = float (arg[5:])
+    elif arg.startswith ('offset='):
+        offset = arg[7:]
     else:
         vises.append (miriad.VisData (arg))
 
@@ -137,10 +154,13 @@ if out is None:
 if out.exists:
     die ('output dataset \'%s\' exists.' % out)
 
-if model is None:
-    die ('must specify model image.')
+if model is None and flux is None:
+    die ('must specify model image or point source flux.')
 
-if not model.exists:
+if model is not None and flux is not None:
+    die ('cannot specify both model image and point source flux.')
+
+if model is not None and not model.exists:
     die ('nonexistant model image \'%s\'.' % model)
 
 cleanup = []
@@ -170,6 +190,8 @@ elif mode == MODE_DIVIDE:
 t.mfs = True
 t.clip = clip
 t.line = 'chan'
+t.flux = flux
+t.offset = offset
 
 cmodel = []
 
