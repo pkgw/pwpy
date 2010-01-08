@@ -7,10 +7,12 @@
 
 # User parameters
 set visroot=$1
-set chans=5  # channels per frequency chunk.  
+set chans=50  # channels per frequency chunk.  
 set combine=0  # combine cal with other sources (hardcoded)?
-set leaks=1   # output leakage text files?
-#set antsel=select=ant'('1,8,33,37')('1,8,33,37')' # smaller leak in polcal2.uvaver.high
+#set leakcal=''  # if leakages are calibrated externally
+set leakcal='../nvss-rm2/try2/mosfxc-3c286-1800-100-flagged'  # if leakages are calibrated externally
+set leaks=0   # output leakage text files?
+#set antsel=select=ant'('1,4,5,6,7,8,10,11,12,13,14,33,37')('1,4,5,6,7,8,10,11,12,13,14,33,37')' # smaller leak in polcal2.uvaver.high
 set antsel=''
 # set refant, if you like
 if $#argv == 2 then
@@ -39,8 +41,8 @@ endif
 
 # loop over frequency chunks
 #foreach piece (1 2 3 4 5 6 7 8)
-#foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16)
-foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52  53  54  55  56  57  58  59  60  61  62  63  64 65  66  67  68  69  70  71  72  73  74  75  76  77 78  79  80  81  82  83  84  85  86  87  88  89  90 91  92  93  94  95  96  97  98  99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 129 130 131 132 133 134 135 136 137 138 139 140 141 142 143 144 145 146 147 148 149 150 151 152 153 154 155 156 157 158 159 160)
+foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16)
+#foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52  53  54  55  56  57  58  59  60  61  62  63  64 65  66  67  68  69  70  71  72  73  74  75  76  77 78  79  80  81  82  83  84  85  86  87  88  89  90 91  92  93  94  95  96  97  98  99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 129 130 131 132 133 134 135 136 137 138 139 140 141 142 143 144 145 146 147 148 149 150 151 152 153 154 155 156 157 158 159 160)
 
     # define first channel number of frequency chunk
     set startchan = `echo '100 + '${chans}' * ('${piece}'-1)' | bc`
@@ -54,9 +56,19 @@ foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25
     #rm -rf ${visroot}${piece};  mv ${visroot}${piece}.uvredo ${visroot}${piece}
 
     # now do cal steps.  mfcal for bandpass, gpcal for gains and leakages
-    mfcal vis=${visroot}-${piece} refant=${refant} interval=10 tol=0.00005 $antsel
-    gpcal vis=${visroot}-${piece} refant=${refant} options=xyref,polref interval=10 $antsel # options=xyref,polref critical!
-    gpcal vis=${visroot}-${piece} refant=${refant} options=xyref,polref interval=10 tol=0.00001 $antsel
+    if ${leakcal} == '' then
+	echo 'Running gpcal...'
+	mfcal vis=${visroot}-${piece} refant=${refant} interval=10 tol=0.00005 $antsel
+	gpcal vis=${visroot}-${piece} refant=${refant} options=xyref,polref interval=10 $antsel # options=xyref,polref critical!
+	gpcal vis=${visroot}-${piece} refant=${refant} options=xyref,polref interval=10 tol=0.00001 $antsel
+    else
+	echo 'Copying leakage calbration from '${leakcal}
+	mfcal vis=${visroot}-${piece} refant=${refant} interval=10 tol=0.00005 $antsel
+	gpcopy vis=${leakcal}-${piece} out=${visroot}-${piece}
+	set xyphases = `grep GPCAL ${leakcal}-${piece}/history | grep Xyphase | tail -n 7 | cut -c 25- | gawk '{printf("%s,%s,%s,%s,%s,%s,%s,",$1,$2,$3,$4,$5,$6,$7)}'`
+#	gpcal vis=${visroot}-${piece} refant=${refant} options=nopol,noxy interval=10 tol=0.000001 $antsel xyphase=$xyphases
+	gpcal vis=${visroot}-${piece} refant=${refant} options=nopol,noxy,xyref,polref interval=10 tol=0.00001 $antsel
+    endif
 
     if ${combine} == 1 then
 	# apply main calibrator to others, selfcal others, then merge to single calibration file

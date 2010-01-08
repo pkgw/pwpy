@@ -3,7 +3,7 @@
 #
 # Script to write log file of Q, U, for polarised sources
 
-set nchan=160
+set nchan=16
 # What source are we processing?
 
 if $#argv == 0 then
@@ -27,6 +27,9 @@ echo $id
 set x0 = `histo in=$source.icln | grep 'Maximum value' | sed s/\(/" "/g | sed s/\,/" "/g | awk '{print $5}'`
 set y0 = `histo in=$source.icln | grep 'Maximum value' | sed s/\(/" "/g | sed s/\,/" "/g | awk '{print $6}'`
 set p0 = `histo in=$source.pcln | grep 'Maximum value' | awk '{print $3}'`
+set x0 = 257
+set y0 = 257
+
 
 set xmin = `echo "$x0-$b0" | bc -l`
 set xmax = `echo "$x0+$b0" | bc -l`

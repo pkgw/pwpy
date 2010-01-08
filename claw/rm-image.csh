@@ -14,7 +14,7 @@ endif
 set freq = 1430
 set diam = 20
 set imsize = 512
-set nchan = 160
+set nchan = 16
 set boxlo = `echo $imsize'/2 - 10' | bc`
 set boxhi = `echo $imsize'/2 + 10' | bc`
 set imgparams = "sup=0 cell=30 fwhm=200"
