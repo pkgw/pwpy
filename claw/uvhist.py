@@ -2,9 +2,10 @@
 
 """Skeleton code to read in a UV data file."""
 
-import miriad, mirtask, mirtask.util
+import miriad, mirtask, mirtask.util, pylab, sys
+import numpy as N
 
-vis = miriad.VisData ('yourfilenamehere')
+vis = miriad.VisData ('ata42.snap')
 
 # If the argument to readLowlevel is True, flags will be written
 # while iterating through the file. False is what you will want
@@ -17,6 +18,9 @@ vis = miriad.VisData ('yourfilenamehere')
 #
 # etc.
 
+u = []
+v = []
+
 for inp, preamble, data, flags, nread in vis.readLowlevel (False):
     
     # Reduce these arrays to the correct size
@@ -24,11 +28,14 @@ for inp, preamble, data, flags, nread in vis.readLowlevel (False):
     flags = flags[0:nread]
 
     # Decode the preamble
-    u, v, w = preamble[0:3]
-    time = preamble[3]
-    baseline = mirtask.util.decodeBaseline (preamble[4])
+    uvw = preamble[0:3]
+    u.append(uvw[0])
+    v.append(uvw[1])
 
-    pol = inp.getVarInt ('pol')
+#    time = preamble[3]
+#    baseline = mirtask.util.decodeBaseline (preamble[4])
+
+#    pol = inp.getVarInt ('pol')
     
     # inp is a handle representing the current input file.
     # You can access UV variables and other things via inp.
@@ -50,7 +57,17 @@ for inp, preamble, data, flags, nread in vis.readLowlevel (False):
     # pol is the FITS-encoded polarization value; mnemonics
     # are stored in util.POL_XX, util.POL_YY, etc.
 
-    print 'Do something here!'
+#    print 'Do something here!'
 
-# End of loop.
-sys.exit (0)
+u = N.array(u)
+v = N.array(v)
+
+uvhist = N.histogram(u**2 + v**2, 50)
+pylab.plot(uvhist[1][0:-1],uvhist[0])
+
+gaussian = lambda amp,x,x0,sigma: amp * N.exp(-1./(2.*sigma**2)*(x-x0)**2)  # gaussian SNR distribution for comparison
+gau = gaussian(max(uvhist[0]),100*N.arange(uvhist[1][-1]/100),0,10000)
+
+pylab.plot(100*N.arange(uvhist[1][-1]/100), gau)
+
+pylab.show()

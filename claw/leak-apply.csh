@@ -7,9 +7,9 @@
 
 # User parameters
 set chans=50  # channels per frequency chunk.  
-set combine=0
-#set leakcal=''  # if leakages are calibrated externally
-set leakcal='../nvss-rm2/try2/mosfxc-3c286-1800-100-flagged'  # if leakages are calibrated externally
+set combine=1
+set leakcal=''  # if leakages are calibrated externally
+#set leakcal='../nvss-rm2/try2/mosfxc-3c286-1800-100-flagged'  # if leakages are calibrated externally
 
 if $#argv == 0 then
   set cal=hexa-3c286-hp0-1430  # original file of leakage calibrated data

@@ -8,10 +8,10 @@
 # User parameters
 set visroot=$1
 set chans=50  # channels per frequency chunk.  
-set combine=0  # combine cal with other sources (hardcoded)?
+set combine=1  # combine cal with other sources (hardcoded)?
 #set leakcal=''  # if leakages are calibrated externally
 set leakcal='../nvss-rm2/try2/mosfxc-3c286-1800-100-flagged'  # if leakages are calibrated externally
-set leaks=0   # output leakage text files?
+set leaks=1   # output leakage text files?
 #set antsel=select=ant'('1,4,5,6,7,8,10,11,12,13,14,33,37')('1,4,5,6,7,8,10,11,12,13,14,33,37')' # smaller leak in polcal2.uvaver.high
 set antsel=''
 # set refant, if you like
@@ -23,21 +23,25 @@ endif
 # do second order phase correction with multiple files
 if $#argv == 4 then
     set cal2=$3
-    set cal3=$4
+#    set cal3=$4
 else
-    set cal2='mosfxa-NVSSJ052109+163822-1430-100'
-    set cal3='mosfxa-NVSSJ084124+705341-1430-100'
+    set cal2='mosfxc-NVSSJ133108+303032-1800-100-flagged'
+#    set cal3='mosfxa-NVSSJ084124+705341-1430-100'
 endif
 
 # put data in time, stokes order
-rm -rf tmp-${visroot}-tmp
-uvaver vis=${visroot} out=tmp-${visroot}-tmp interval=0.001 options=nocal,nopass,nopol
+if ( -e tmp-${visroot}-tmp ) then
+    goto tmpexists
+else
+    uvaver vis=${visroot} out=tmp-${visroot}-tmp interval=0.001 options=nocal,nopass,nopol
+
 if $combine == 1 then
-    rm -rf tmp-${cal2}-tmp
     uvaver vis=${cal2} out=tmp-${cal2}-tmp interval=0.001 options=nocal,nopass,nopol
-    rm -rf tmp-${cal3}-tmp
-    uvaver vis=${cal3} out=tmp-${cal3}-tmp interval=0.001 options=nocal,nopass,nopol
+#    rm -rf tmp-${cal3}-tmp
+#    uvaver vis=${cal3} out=tmp-${cal3}-tmp interval=0.001 options=nocal,nopass,nopol
 endif
+
+tmpexists:
 
 # loop over frequency chunks
 #foreach piece (1 2 3 4 5 6 7 8)
@@ -58,16 +62,16 @@ foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16)
     # now do cal steps.  mfcal for bandpass, gpcal for gains and leakages
     if ${leakcal} == '' then
 	echo 'Running gpcal...'
-	mfcal vis=${visroot}-${piece} refant=${refant} interval=10 tol=0.00005 $antsel
-	gpcal vis=${visroot}-${piece} refant=${refant} options=xyref,polref interval=10 $antsel # options=xyref,polref critical!
-	gpcal vis=${visroot}-${piece} refant=${refant} options=xyref,polref interval=10 tol=0.00001 $antsel
+	mfcal vis=${visroot}-${piece} refant=${refant} interval=10 tol=0.00005 $antsel select='-auto'
+	gpcal vis=${visroot}-${piece} refant=${refant} options=xyref,polref interval=10 $antsel select='-auto' # options=xyref,polref critical!
+	gpcal vis=${visroot}-${piece} refant=${refant} options=xyref,polref interval=30 tol=0.00001 $antsel select='-auto'
     else
 	echo 'Copying leakage calbration from '${leakcal}
-	mfcal vis=${visroot}-${piece} refant=${refant} interval=10 tol=0.00005 $antsel
-	gpcopy vis=${leakcal}-${piece} out=${visroot}-${piece}
+	mfcal vis=${visroot}-${piece} refant=${refant} interval=10 tol=0.00005 $antsel select='-auto'
+	gpcopy vis=${leakcal}-${piece} out=${visroot}-${piece} select='-auto'
 	set xyphases = `grep GPCAL ${leakcal}-${piece}/history | grep Xyphase | tail -n 7 | cut -c 25- | gawk '{printf("%s,%s,%s,%s,%s,%s,%s,",$1,$2,$3,$4,$5,$6,$7)}'`
-#	gpcal vis=${visroot}-${piece} refant=${refant} options=nopol,noxy interval=10 tol=0.000001 $antsel xyphase=$xyphases
-	gpcal vis=${visroot}-${piece} refant=${refant} options=nopol,noxy,xyref,polref interval=10 tol=0.00001 $antsel
+	gpcal vis=${visroot}-${piece} refant=${refant} options=nopol,noxy interval=30 tol=0.000001 $antsel xyphase=$xyphases select='-auto'
+#	gpcal vis=${visroot}-${piece} refant=${refant} options=nopol,noxy,xyref,polref interval=30 tol=0.00001 $antsel select='-auto'
     endif
 
     if ${combine} == 1 then
@@ -78,21 +82,21 @@ foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16)
 	uvcat vis=${cal2}-${piece} out=tmp-${piece}
 	rm -rf ${cal2}-${piece}
 	mv tmp-${piece} ${cal2}-${piece}
-	selfcal vis=${cal2}-${piece} refant=${refant} interval=999 select='-auto'
+	selfcal vis=${cal2}-${piece} refant=${refant} interval=30 select='-auto'
 
 	# tertiary cal
-	uvaver vis=tmp-${cal3}-tmp out=${cal3}-${piece} line=ch,${chans},${startchan},1,1 interval=0.001 options=nocal,nopass,nopol
-	gpcopy vis=${visroot}-${piece} out=${cal3}-${piece}
-	uvcat vis=${cal3}-${piece} out=tmp-${piece}
-	rm -rf ${cal3}-${piece}
-	mv tmp-${piece} ${cal3}-${piece}
-	selfcal vis=${cal3}-${piece} refant=${refant} interval=999 select='-auto'
+#	uvaver vis=tmp-${cal3}-tmp out=${cal3}-${piece} line=ch,${chans},${startchan},1,1 interval=0.001 options=nocal,nopass,nopol
+#	gpcopy vis=${visroot}-${piece} out=${cal3}-${piece}
+#	uvcat vis=${cal3}-${piece} out=tmp-${piece}
+#	rm -rf ${cal3}-${piece}
+#	mv tmp-${piece} ${cal3}-${piece}
+#	selfcal vis=${cal3}-${piece} refant=${refant} interval=999 select='-auto'
 
 	# merge cals into new file
 	uvcat vis=${visroot}-${piece} out=${visroot}join-${piece}
-	selfcal vis=${visroot}join-${piece} refant=${refant} interval=999 select='-auto'
+	selfcal vis=${visroot}join-${piece} refant=${refant} interval=30 select='-auto'
 	gpcopy mode=merge vis=${cal2}-${piece} out=${visroot}join-${piece}
-	gpcopy mode=merge vis=${cal3}-${piece} out=${visroot}join-${piece}
+#	gpcopy mode=merge vis=${cal3}-${piece} out=${visroot}join-${piece}
 
     endif
 
@@ -122,8 +126,8 @@ end
 # clean up
 rm -rf tmp-${visroot}-tmp
 rm -rf tmp-${cal2}-tmp
-rm -rf tmp-${cal3}-tmp
+#rm -rf tmp-${cal3}-tmp
 if ${combine} == 1 then
     rm -rf ${cal2}-*
-    rm -rf ${cal3}-*
+#    rm -rf ${cal3}-*
 endif
