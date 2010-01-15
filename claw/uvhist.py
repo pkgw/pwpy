@@ -5,7 +5,10 @@
 import miriad, mirtask, mirtask.util, pylab, sys
 import numpy as N
 
-vis = miriad.VisData ('ata42.snap')
+vis1 = miriad.VisData ('ata42.snap')
+vis2 = miriad.VisData ('ata1-32.snap')
+#vis3 = miriad.VisData ('ata.top-bottom.cut.snap')
+vis3 = miriad.VisData ('ata21-20.merge.cut.snap')
 
 # If the argument to readLowlevel is True, flags will be written
 # while iterating through the file. False is what you will want
@@ -18,10 +21,11 @@ vis = miriad.VisData ('ata42.snap')
 #
 # etc.
 
-u = []
-v = []
+u1 = []; v1 = []
+u2 = []; v2 = []
+u3 = []; v3 = []
 
-for inp, preamble, data, flags, nread in vis.readLowlevel (False):
+for inp, preamble, data, flags, nread in vis1.readLowlevel (False):
     
     # Reduce these arrays to the correct size
     data = data[0:nread]
@@ -29,45 +33,58 @@ for inp, preamble, data, flags, nread in vis.readLowlevel (False):
 
     # Decode the preamble
     uvw = preamble[0:3]
-    u.append(uvw[0])
-    v.append(uvw[1])
+    u1.append(uvw[0])
+    v1.append(uvw[1])
 
-#    time = preamble[3]
-#    baseline = mirtask.util.decodeBaseline (preamble[4])
-
-#    pol = inp.getVarInt ('pol')
+for inp, preamble, data, flags, nread in vis2.readLowlevel (False):
     
-    # inp is a handle representing the current input file.
-    # You can access UV variables and other things via inp.
+    # Reduce these arrays to the correct size
+    data = data[0:nread]
+    flags = flags[0:nread]
 
-    # data is a Numpy array of 'nread' complex numbers giving
-    # the complex visibilities
+    # Decode the preamble
+    uvw = preamble[0:3]
+    u2.append(uvw[0])
+    v2.append(uvw[1])
 
-    # flags is a Numpy array of 'nread' integers giving flag
-    # status: 0 if flagged out, 1 if unflagged
-
-    # u, v, w are the coordinates of this spectrum measured
-    # in nanoseconds
+for inp, preamble, data, flags, nread in vis3.readLowlevel (False):
     
-    # time is a julian date
+    # Reduce these arrays to the correct size
+    data = data[0:nread]
+    flags = flags[0:nread]
 
-    # baseline is a tuple of two integers giving the baseline
-    # of this visibility
+    # Decode the preamble
+    uvw = preamble[0:3]
+    u3.append(uvw[0])
+    v3.append(uvw[1])
 
-    # pol is the FITS-encoded polarization value; mnemonics
-    # are stored in util.POL_XX, util.POL_YY, etc.
+u1 = N.array(u1);  v1 = N.array(v1)
+u2 = N.array(u2);  v2 = N.array(v2)
+u3 = N.array(u3);  v3 = N.array(v3)
 
-#    print 'Do something here!'
+print len(u1)
+print len(u2)
+print len(u3)
 
-u = N.array(u)
-v = N.array(v)
+# make and plot uv histograms
+uvhist1 = N.histogram(N.sqrt(u1**2 + v1**2), 40)
+uvhist2 = N.histogram(N.sqrt(u2**2 + v2**2), 40)
+uvhist3 = N.histogram(N.sqrt(u3**2 + v3**2), 40)
 
-uvhist = N.histogram(u**2 + v**2, 50)
-pylab.plot(uvhist[1][0:-1],uvhist[0])
+pylab.plot(uvhist1[1][0:-1],uvhist1[0], label='Full 42')
+pylab.plot(uvhist2[1][0:-1],uvhist2[0], label='Minimal 1-32')
+pylab.plot(uvhist3[1][0:-1],uvhist3[0], label='Proposed dual correlator')
+
+# make and plot similar gaussians
 
 gaussian = lambda amp,x,x0,sigma: amp * N.exp(-1./(2.*sigma**2)*(x-x0)**2)  # gaussian SNR distribution for comparison
-gau = gaussian(max(uvhist[0]),100*N.arange(uvhist[1][-1]/100),0,10000)
+gau1 = gaussian(0.9*max(uvhist1[0]),100*N.arange(uvhist1[1][-1]/100),100,500)
+gau2 = gaussian(0.8*max(uvhist2[0]),100*N.arange(uvhist2[1][-1]/100),100,500)
 
-pylab.plot(100*N.arange(uvhist[1][-1]/100), gau)
+#pylab.plot(100*N.arange(uvhist1[1][-1]/100), gau1)
+#pylab.plot(100*N.arange(uvhist2[1][-1]/100), gau2, color='green')
+pylab.xlabel('UV Distance (lambda)')
+pylab.ylabel('Number of baselines')
+pylab.legend()
 
 pylab.show()
