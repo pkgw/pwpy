@@ -32,6 +32,12 @@
  pols in a dataset, the gain solution timestamps will vary slightly
  between the two gains solutions. Default is 1 second, which should
  be strict but not overly so.
+
+@ options
+ Options are specified separated by commas. Minimum-match is used.
+
+ 'replace' - The output dataset already exists, and its gains will
+   be replaced with the merged gains table.
 --
 """
 
@@ -81,7 +87,6 @@ def merge (name1, ds1, name2, ds2, outset, banner, ttol):
     nants = gr1.nants
 
     # Create and populate the new gains dataset
-    ds1.copyHeader (outset, 'history')
     outset.openHistory ()
     outset.writeHistory (banner)
     outset.logInvocation ('GPMERGEPOLS')
@@ -141,6 +146,7 @@ def task (argv):
     keys.keyword ('vis', 'f', ' ', 2)
     keys.keyword ('out', 'f', ' ')
     keys.keyword ('ttol', 'd', DEFAULT_TTOL * 86400)
+    keys.option ('replace')
     opts = keys.process ()
 
     if len (opts.vis) != 2:
@@ -156,7 +162,12 @@ def task (argv):
     # Run it
     ds1 = miriad.Data (opts.vis[0]).open ('rw')
     ds2 = miriad.Data (opts.vis[1]).open ('rw')
-    outset = miriad.Data (opts.out).open ('c')
+
+    if opts.replace:
+        outset = miriad.Data (opts.out).open ('rw')
+    else:
+        outset = miriad.Data (opts.out).open ('c')
+        ds1.copyHeader (outset, 'history')
 
     try:
         merge (opts.vis[0], ds1, opts.vis[1], ds2, outset, banner, ttol)
