@@ -14,8 +14,11 @@ def run():
     p = []; p2 = []
     for i in range(1,9):
         # specify ascii files output by 'split-cal-leak.csh'
-        a.append(asciidata.AsciiData ('/o/claw/big_scr3/data/ata/nvss-rm2/try2/mosfxc-3c286-1800-100-flagged-leakamp%d.txt' % i))
-        p.append(asciidata.AsciiData ('/o/claw/big_scr3/data/ata/nvss-rm2/try2/mosfxc-3c286-1800-100-flagged-leakphase%d.txt' % i))
+        a.append(asciidata.AsciiData ('/o/claw/big_scr3/data/ata/hex14-polcal-sep7/hexc-3c286-hp0-1430-leakamp%d.txt' % i))
+        p.append(asciidata.AsciiData ('/o/claw/big_scr3/data/ata/hex14-polcal-sep7/hexc-3c286-hp0-1430-leakphase%d.txt' % i))
+
+#        a.append(asciidata.AsciiData ('/o/claw/big_scr3/data/ata/nvss-rm2/try5/mosfxc-3c286-1800-100-flagged2-leakamp%d.txt' % i))
+#        p.append(asciidata.AsciiData ('/o/claw/big_scr3/data/ata/nvss-rm2/try5/mosfxc-3c286-1800-100-flagged2-leakphase%d.txt' % i))
         a2.append(asciidata.AsciiData ('/o/claw/big_scr3/data/ata/nvss-rm3/mosfxc-3c286-1800-100-flagged-leakamp%d.txt' % i))
         p2.append(asciidata.AsciiData ('/o/claw/big_scr3/data/ata/nvss-rm3/mosfxc-3c286-1800-100-flagged-leakphase%d.txt' % i))
 

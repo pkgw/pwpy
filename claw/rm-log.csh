@@ -24,12 +24,16 @@ echo $id
 \rm $filename
 
 # Get peak position
-set x0 = `histo in=$source.icln | grep 'Maximum value' | sed s/\(/" "/g | sed s/\,/" "/g | awk '{print $5}'`
-set y0 = `histo in=$source.icln | grep 'Maximum value' | sed s/\(/" "/g | sed s/\,/" "/g | awk '{print $6}'`
-set p0 = `histo in=$source.pcln | grep 'Maximum value' | awk '{print $3}'`
-set x0 = 257
-set y0 = 257
+if $#argv == 3 then
+  echo 'Using input pixel coords to measure RM'
+  set x0 = $argv[2]
+  set y0 = $argv[3]
+else
+  set x0 = `histo in=$source.icln | grep 'Maximum value' | sed s/\(/" "/g | sed s/\,/" "/g | awk '{print $5}'`
+  set y0 = `histo in=$source.icln | grep 'Maximum value' | sed s/\(/" "/g | sed s/\,/" "/g | awk '{print $6}'`
+endif
 
+set p0 = `histo in=$source.pcln | grep 'Maximum value' | awk '{print $3}'`
 
 set xmin = `echo "$x0-$b0" | bc -l`
 set xmax = `echo "$x0+$b0" | bc -l`

@@ -7,9 +7,15 @@
 
 # User parameters
 set chans=50  # channels per frequency chunk.  
-set combine=1
-set leakcal=''  # if leakages are calibrated externally
-#set leakcal='../nvss-rm2/try2/mosfxc-3c286-1800-100-flagged'  # if leakages are calibrated externally
+set combine=0
+#set leakcal=''  # if leakages are calibrated externally
+#set leakcal='../nvss-rm2/try3/mosfxc-3c286-1800-100-flagged'  # if leakages are calibrated externally
+#set antsel=select=ant'('1,4,5,6,7,8,10,11,12,13,14,33,37')('1,4,5,6,7,8,10,11,12,13,14,33,37')' # smaller leak in polcal2.uvaver.high
+#set antsel=select=ant'('16,17,25,26,27,29,30,31,32,34,35,36,37,40,41')('16,17,25,26,27,29,30,31,32,34,35,36,37,40,41')'
+#set antsel='select=-ant(6,10)'
+set antsel='select=-ant(5,6,10,11,42)'  # best set to exclude for day 3 nvss-rm
+#set antsel=''
+#set refant=16
 
 if $#argv == 0 then
   set cal=hexa-3c286-hp0-1430  # original file of leakage calibrated data
@@ -22,7 +28,7 @@ endif
 
 echo 'Applying calibration to file '${apply}
 rm -rf tmp-${apply}-tmp
-uvaver vis=${apply} out=tmp-${apply}-tmp interval=0.001 options=nopol,nocal,nopass
+uvaver vis=${apply} out=tmp-${apply}-tmp interval=0.001 options=nopol,nocal,nopass $antsel
 
 # loop over frequency chunks
 #foreach piece (1 2 3 4 5 6 7 8)
@@ -44,10 +50,14 @@ foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16)
 	gpcopy vis=${cal}join-${piece} out=${apply}-${piece} #options=nocal,nopass
     else
 	gpcopy vis=${cal}-${piece} out=${apply}-${piece} #options=nocal,nopass
-	if ${leakcal} != '' then
-	    echo 'apply leakage from '${leakcal}
-	    gpcopy vis=${leakcal}-${piece} out=${apply}-${piece} options=nocal,nopass
-	endif
+# fitting 1331 as 3c286
+#	set xyphases = `grep GPCAL ${cal}-${piece}/history | grep Xyphase | tail -n 7 | cut -c 25- | gawk '{printf("%s,%s,%s,%s,%s,%s,%s,",$1,$2,$3,$4,$5,$6,$7)}'`
+#	gpcal vis=${apply}-${piece} refant=${refant} options=xyref,nopol interval=999 tol=0.00001 xyphase=$xyphases
+#
+#	if ${leakcal} != '' then
+#	    echo 'apply leakage from '${leakcal}
+#	    gpcopy vis=${leakcal}-${piece} out=${apply}-${piece} options=nocal,nopass
+#	endif
     endif
 
 end
