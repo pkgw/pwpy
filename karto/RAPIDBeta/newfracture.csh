@@ -289,7 +289,7 @@ while ($iidx <= $lim)
     echo -n "$vals " >> $wd/badlist
     set pvals = (`newrfi32.csh vis=$wd options=$corr,$rfitype select="$sel" npoly=$npoly nsig=$nsig "$csel" | grep "bad channels detected" | tr '()' ' ' | awk '{print $5,$7,$11}'`)
     if ($quiet == "verb") echo -n "Antenna $vals "
-    if ($quiet == "verb") newrfi32.csh vis=$wd device=/xs options=$rfitype,$corr npoly=$npoly nsig=$nsig select="$sel" "$csel" | grep "bad channels detected"
+    if ($quiet == "verb") newrfi32.csh vis=$wd device=$device options=$rfitype,$corr npoly=$npoly nsig=$nsig select="$sel" "$csel" | grep "bad channels detected"
     echo $pvals >> $wd/badlist
 
     @ iidx++
