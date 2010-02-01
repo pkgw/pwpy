@@ -300,7 +300,9 @@ def rotateRADectoAzEl(raCenter,decCenter,raOff,decOff,antChi,antAz,antEl)
   return [offsetsPrime,azelPrime].flatten # Return offAz, offEl, newAz, newEl
 end
 
+#
 # Here is where the main script starts
+#
 executeAndLog(">>Start astrolabe.rb", false);
 visFile = ARGV[0]
 lineSelection = ARGV[1]
