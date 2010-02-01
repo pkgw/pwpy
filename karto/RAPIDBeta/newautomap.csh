@@ -834,7 +834,7 @@ cd ..
 echo "Currently at $niters cycles..."
 
 if (`grep -v "#" $wd/sfind.log | awk '{if ($7*$6 > 3000*noise) cycles+=2*log((3000*noise)/($6*$7))/log(.9)} END {print int(cycles)*1}' noise=$imstats[3]` > `echo $niters | awk '{print int(.025*$1)}'` && $niters != 25000) then
-    if (`echo $actniters $niters | awk '{if ($1*1 != $2*1) print 1; else print 0}'` || `echo $alevel | awk '{if ($1 < 1.025) print 1; else print 0}'`) then
+    if (`echo $actniters $niters | awk '{if ($1*1 != $2*1) print "1"; else print "0"}'` || `echo $alevel | awk '{if ($1 < 1.025) print "1"; else print "0"}'`) then
 	echo "Cleaning reached theoretical noise limit!"
     else if ($intclean) then
 	set niters = `grep -v "#" $wd/sfind.log | awk '{if ($7*$6 > 3000*noise) cycles+=2*log((3000*noise)/($6*$7))/log(.9)} END {print int(cycles)+niters}' noise=$imstats[3] niters=$niters`
@@ -847,7 +847,7 @@ if (`grep -v "#" $wd/sfind.log | awk '{if ($7*$6 > 3000*noise) cycles+=2*log((30
 	endif
 	rm -rf $wd/tempmap.clean $wd/tempmap.rs $wd/tempmap.cm
 	goto clean
-    else if ($mode == "auto" || $mode="skip") then
+    else if ("$mode" == "auto" || "$mode" == "skip") then
 	echo "Warning! Automap has determined that this map is possibly undercleaned!"
     else
 	echo "Warning! Automap has determined that this map is possibly undercleaned! Would you like to adjust niters? ([y]es (n)o)"
@@ -860,7 +860,7 @@ if (`grep -v "#" $wd/sfind.log | awk '{if ($7*$6 > 3000*noise) cycles+=2*log((30
     endif
 else if (`echo $acheck $nacheck | awk '{if ($1 > 1 && $2 > 1) print 1; else print 0}'` && "$niters" != "50") then
     if ($intclean) then
-	set niters = `echo $niters $acheck $nacheck | awk '{if ($2 < $3) print int($1*$2); else print int($1*$3)}'`
+	set niters = `echo $niters $acheck $nacheck | awk '{if ($2 < $3) print int($1*$2); else print int($1*$2)}'`
 	if ($niters < 50) set niters = 50
 	echo "WARNING: Overcleaning detected, rolling back to $niters iterations..."
 	rm -rf $wd/tempmap.clean $wd/tempmap.rs $wd/tempmap.cm
