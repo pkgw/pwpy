@@ -38,6 +38,9 @@ fancy/amprfi
 fancy/applytsys
 fancy/atabpass
 fancy/ataglue.py
+fancy/box-fitpoint
+fancy/box-overlay
+fancy/box-region
 fancy/byant
 fancy/calctsys
 fancy/closanal

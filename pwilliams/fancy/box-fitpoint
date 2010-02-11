@@ -1,0 +1,51 @@
+#! /usr/bin/env python
+# -*- python -*-
+
+"""Fit a point source to a generous interpretation of a specified
+box. See box-region for a general description of the 'box' scripts.
+
+Usage: box-fitpoint <boxfile> <image> <boxnum>
+
+<boxnum> is number of the box for which to do the fit, starting at
+1. So each box's number is its line number in the file as reported
+by a text editor.
+"""
+
+import sys
+import miriad, mirexec
+
+boxfn = sys.argv[1]
+img = miriad.ImData (sys.argv[2])
+boxnum = int (sys.argv[3])
+
+if not img.exists:
+    print >>sys.stderr, 'Error: no such image dataset %s' % img
+    sys.exit (1)
+
+boxi = 1
+boxinfo = None
+
+for line in file (boxfn):
+    a = line.split ('#', 1)[0].strip ().split ()
+    if len (a) == 0:
+        continue
+
+    a = map (float, a)
+
+    if boxi == boxnum:
+        boxinfo = a
+        break
+    boxi += 1
+
+if boxinfo is None:
+    print >>sys.stderr, 'Error: no such box #%d (1-based) in %s' % (boxnum, boxfn)
+    sys.exit (1)
+
+cra, cdec, wra, wdec = boxinfo
+t = mirexec.TaskImFit (in_=img, object='point')
+# Note: double-sizing the box.
+t.region = 'arcsec,b(%.0f,%.0f,%.0f,%.0f)' % (cra - wra, cdec - wdec, 
+                                              cra + wra, cdec + wdec)
+t.spar = '1,%.0f,%.0f' % (cra, cdec)
+t.xrun ()
+sys.exit (0)

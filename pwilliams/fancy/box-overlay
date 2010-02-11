@@ -1,0 +1,41 @@
+#! /usr/bin/env python
+# -*- python -*-
+
+"""Run a task with a temporary overlay file as an argument. See
+box-region for a general description of the 'box' scripts.
+
+Usage: box-overlay <boxfile> <command ....>
+
+Invokes <command> with an additional argument 'olay=<tmpfile>',
+where <tmpfile> is the name of a temporary file created by this
+command. The file is in the 'overlay' format supported by cgdisp.
+This script is probably not useful except for driving cgdisp.
+"""
+
+import sys, tempfile, subprocess, os
+
+boxfn = sys.argv[1]
+command = sys.argv[2:]
+
+olayfile = tempfile.NamedTemporaryFile (delete=False)
+boxnum = 1
+
+for line in file (boxfn):
+    a = line.split ('#', 1)[0].strip ().split ()
+    if len (a) == 0:
+        continue
+
+    a = map (float, a)
+    cra, cdec, wra, wdec = a
+
+    s = ','.join (('box', 'arcsec', 'arcsec', str (boxnum), 'yes', 
+                   str (cra), str (cdec), str (wra/2), str (wdec/2), '0'))
+    print >>olayfile, s
+    boxnum += 1
+
+olayfile.close ()
+command.append ('olay=' + olayfile.name)
+
+rval = subprocess.call (command)
+os.unlink (olayfile.name)
+sys.exit (rval)
