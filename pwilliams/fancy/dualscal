@@ -1,0 +1,174 @@
+#! /usr/bin/env python
+
+"""= dualscal - selfcal polarizations separately
+& pkgw
+: calibration
++
+ DUALSCAL runs SELFCAL or MSELFCAL on the specified dataset(s) twice,
+ selecting XX polarizations once and YY polarizations once. It then
+ merges the XX and YY gains tables and saves them either in a 
+ gains-only Miriad dataset (via the out= keyword) or writes the
+ calibration tables into the source dataset (if no out= keyword is
+ supplied and there is only a single visibility input file).
+
+ DUALSCAL supports all of the options that SELFCAL and MSELFCAL do. 
+ This includes the option "verbose", which is only supported by
+ MSELFCAL -- an error will be raised if you attempt to give SELFCAL
+ this option. The following arguments specific to DUALSCAL:
+
+@ ttol
+ The tolerance for differing gain solution timestamps in the datasets,
+ measured in seconds. The gain solution timestamps derived by the
+ self-calibration tasks may vary slightly between the two gains solutions
+ depending on the data flagging and contents of the raw observations.
+ Default is 1 second, which should be strict but not overly so.
+
+@ options
+ Options are specified separated by commas. Minimum-match is used.
+
+ 'usemself' - Use MSELFCAL instead of SELFCAL to perform the selfcal.
+--
+"""
+
+from mirexec import TaskSelfCal, TaskMSelfCal
+from miriad import *
+from mirtask import keys, util
+from sys import argv, stderr, exit
+import numpy as N
+from gpmergepols import merge, DEFAULT_TTOL
+
+basicTrace ()
+SVNID = '$Id$'
+banner = util.printBannerSvn ('dualscal', 'selfcal polarizations separately', SVNID)
+
+# Define all the arguments 
+
+keys.keyword ('vis', 'f', None, 128)
+keys.keyword ('select', 'a', ' ')
+keys.keyword ('model', 'f', ' ')
+keys.keyword ('clip', 'd', N.nan)
+keys.keyword ('interval', 'd', N.nan)
+keys.keyword ('minants', 'i', -1)
+keys.keyword ('refant', 'i', -1)
+keys.keyword ('flux', 'd', N.nan)
+keys.keyword ('offset', 'd', None, 2)
+keys.keyword ('line', 'a', None, 5)
+keys.keyword ('out', 'f', ' ')
+keys.option ('amplitude', 'phase', 'smooth', 'polarized', 'mfs',
+             'relax', 'apriori', 'noscale', 'mosaic', 'verbose')
+# Specific to this task:
+keys.keyword ('ttol', 'd', DEFAULT_TTOL * 86400)
+keys.option ('usemself')
+
+kws = keys.process ()
+
+
+# Process the arguments
+
+if len (kws.vis) == 0:
+    print >>stderr, 'Error: must specify a visibility file.'
+    exit (1)
+
+vises = [VisData (x) for x in kws.vis]
+for vis in vises:
+    if not vis.exists:
+        print >>stderr, 'Error: visibility input file', vis, 'does not exist.'
+        exit (1)
+vistr = ','.join (str (v) for v in vises)
+
+if kws.usemself:
+    task = TaskMSelfCal ()
+else:
+    task = TaskSelfCal ()
+
+    if kws.verbose:
+        print >>stderr, 'Error: option "verbose" only supported by mselfcal.'
+        exit (1)
+
+if kws.select == ' ':
+    selformat = 'pol(%s)'
+else:
+    selformat = kws.select + ',pol(%s)'
+
+if kws.ttol <= 0.0:
+    print >>stderr, 'Error: option "ttol" must be positive.'
+    exit (1)
+
+ttol = kws.ttol / 86400.
+
+if kws.out == ' ':
+    if len (vises) != 1:
+        print >>stderr, 'Error: must specify "out" keyword if more than ' \
+            'one visibility input specified.'
+        exit (1)
+
+    # Write back into source dataset
+    dest = vises[0].open ('rw')
+else:
+    dest = miriad.Data (kws.out).open ('c')
+    vises[0].copyHeader (dest, 'history')
+
+# Copy them over
+
+def copyfloats (*names):
+    for name in names:
+        v = getattr (kws, name)
+        if not N.isnan (v):
+            setattr (task, name, v)
+
+
+def copyints (*names):
+    for name in names:
+        v = getattr (kws, name)
+        if v >= 0:
+            setattr (task, name, v)
+
+
+def copyfns (*names):
+    for name in names:
+        v = getattr (kws, name)
+        if v != ' ':
+            setattr (task, name, v)
+
+
+def copylists (*names):
+    for name in names:
+        v = getattr (kws, name)
+        if len (v):
+            setattr (task, name, ','.join (v))
+
+
+def copyopts (*names):
+    for name in names:
+        setattr (task, name, bool (getattr (kws, name)))
+
+
+copyfns ('model')
+copyfloats ('clip', 'interval', 'flux')
+copyints ('minants', 'refant')
+copylists ('offset', 'line')
+copyopts ('amplitude', 'phase', 'smooth', 'polarized', 'mfs',
+          'relax', 'apriori', 'noscale', 'mosaic', 'verbose')
+
+
+# Go
+
+task.vis = vistr
+worksets = []
+
+for pol in 'xx', 'yy':
+    workset = vises[0].makeVariant ('sc' + pol, Data)
+    workset.delete ()
+    worksets.append (workset)
+    task.select = selformat % pol
+    task.out = workset
+    task.xrun ()
+
+src1 = worksets[0].open ('rw')
+src2 = worksets[1].open ('rw')
+merge (str (worksets[0]), src1, str (worksets[1]), src2, dest, banner, ttol)
+
+for workset in worksets:
+    workset.delete ()
+
+exit (0)

@@ -44,6 +44,7 @@ fancy/box-region
 fancy/byant
 fancy/calctsys
 fancy/closanal
+fancy/dualscal
 fancy/fxcal.py
 fancy/gpcat
 fancy/gpmergepols
