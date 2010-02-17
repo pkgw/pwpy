@@ -105,8 +105,11 @@ if kws.out == ' ':
     # Write back into source dataset
     dest = vises[0].open ('rw')
 else:
-    dest = miriad.Data (kws.out).open ('c')
-    vises[0].copyHeader (dest, 'history')
+    dest = Data (kws.out).open ('c')
+    src1 = vises[0].open ('rw')
+    src1.copyHeader (dest, 'history')
+    src1.close ()
+
 
 # Copy them over
 
