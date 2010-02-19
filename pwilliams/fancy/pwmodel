@@ -207,6 +207,28 @@ for pol, polcode in zip ('xy', (-6, -7)):
     t.setArgs (select='pol(%s)' % (pol * 2), out=pv).xrun ()
     cleanup.append (pv)
 
+    # If the user is modeling with a point-source model, UVMODEL
+    # doesn't write any polarization information into the output
+    # dataset, which causes UVCAL to not apply the polcode correction
+    # (even though the default assumption is I pol, I believe).  So we
+    # edit the dataset to insert polarization information
+    # unconditionally. We append npol and pol UV variables because
+    # UVCAL checks the presence of these UV variables when deciding if
+    # its input has any polarization information. We also write header
+    # items so that the values of the UV variables will be defined for
+    # the entire UV stream via the override mechanism -- otherwise,
+    # they'd remain undefined until the entire stream was finished!
+    # Appending in this way means that we don't have to rewrite the
+    # entire dataset just to stick a "pol = npol = 1" at its
+    # beginning.
+
+    phnd = pv.open ('a')
+    phnd.writeVarInt ('npol', 1)
+    phnd.writeVarInt ('pol', util.POL_I)
+    phnd.writeHeaderInt ('npol', 1)
+    phnd.writeHeaderInt ('pol', util.POL_I)
+    phnd.close ()
+
     cv = out.vvis ('cal' + pol)
     cv.delete ()
     mirexec.TaskUVCal (vis=pv, out=cv, polcode=polcode).xrun ()
