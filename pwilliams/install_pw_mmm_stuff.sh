@@ -25,6 +25,7 @@ pwflag
 show
 sortinplace
 tiph
+ucvc
 uvdam
 uvdph
 uvlock
