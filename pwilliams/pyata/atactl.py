@@ -753,24 +753,19 @@ def setIntegTime (hookup, itime=None):
     _integTime = itime
     account ('setting integration time', time.time () - tStart)
 
-def launchCatcher (hookup, src, freq, radec, durationSeconds, outbase, ebase):
-    assert _integTime is not None, 'Unknown integration time'
-    
+def launchCatcher (hookup, src, freq, durationSeconds, outbase, ebase):
     tStart = time.time ()
-    ndumps = int (math.ceil (durationSeconds / _integTime))
     nsephem = ebase + '.ephem'
     
     log ('@@ Launching data catcher: %s at %s MHz on %s' % (src, freq, hookup.instr))
     log ('        atafx output base: %s' % outbase)
-    log ('         Embedding coords: ' + radec)
     log ('   Ephemeris file (in ns): ' + nsephem)
-    log ('                 Duration: %f s (%d dumps)' % (durationSeconds, ndumps))
+    log ('                 Duration: %f s' % durationSeconds)
 
     mydir = os.path.dirname (__file__)
     script = os.path.join (mydir, 'fxlaunch.sh')
-    args = ['/bin/sh', script, src, str(freq), radec, str (ndumps),
-            outbase, ','.join (hookup.antpols ()), hookup.lo, nsephem,
-            str (durationSeconds)]
+    args = ['/bin/sh', script, src, str(freq), outbase, ','.join (hookup.antpols ()), 
+            hookup.lo, nsephem, str (durationSeconds)]
     
     if noopMode:
         log ('WOULD execute: %s' % (' '.join (args))) 
@@ -1074,15 +1069,12 @@ _registeredFringeKill = set ()
 def observe (hookup, outBase, src, freq, integTimeSeconds):
     global _lastFreq, _lastSrc, _lastSrcExpire
 
-    # save time in this case
-    assert _integTime is not None, 'Unknown integration time'
-
     # Start the ants focusing. Don't wait for them, so that
     # we can do other stuff while they're moving around.
     setFocus (hookup.ants (), freq, False)
 
     f = src + '.ephem'
-    radec = ensureEphem (src, src, integTimeSeconds)
+    ensureEphem (src, src, integTimeSeconds)
     now = time.time ()
     
     # Start tracking. Same rationale as above.
@@ -1120,7 +1112,7 @@ def observe (hookup, outBase, src, freq, integTimeSeconds):
         waitForFocus (hookup.ants ())
 
         log ('@@ Beginning observations (%s, %s, %d MHz)' % (outBase, src, freq))
-        launchCatcher (hookup, src, freq, radec, integTimeSeconds, outBase, src)
+        launchCatcher (hookup, src, freq, integTimeSeconds, outBase, src)
     finally:
         # Make sure to always kill the frotter.
         fringeStop (hookup)
@@ -1152,19 +1144,15 @@ def setupAttens2 (src, freq, mhookup):
     _curAttenKey = k
 
 
-def launchCatchers2 (mhookup, src, freq, radec, durationSeconds, outbase, ebase):
-    assert _integTime is not None, 'Unknown integration time'
-    
+def launchCatchers2 (mhookup, src, freq, durationSeconds, outbase, ebase):
     tStart = time.time ()
-    ndumps = int (math.ceil (durationSeconds / _integTime))
     nsephem = ebase + '.ephem'
     
     log ('@@ Launching data catcher: %s at %s MHz on %s' % \
              (src, freq, ', '.join (mhookup.hookups.iterkeys ())))
     log ('        atafx output base: %s' % outbase)
-    log ('         Embedding coords: ' + radec)
     log ('   Ephemeris file (in ns): ' + nsephem)
-    log ('                 Duration: %f s (%d dumps)' % (durationSeconds, ndumps))
+    log ('                 Duration: %f s' % durationSeconds)
 
     mydir = os.path.dirname (__file__)
     script = os.path.join (mydir, 'fxlaunch.sh')
@@ -1172,8 +1160,8 @@ def launchCatchers2 (mhookup, src, freq, radec, durationSeconds, outbase, ebase)
 
     for instr, hookup in mhookup.hookups.iteritems ():
         outbase2 = outbase + '-' + instr
-        args = ['/bin/sh', script, src, str(freq), radec, str (ndumps),
-                outbase2, ','.join (hookup.antpols ()), hookup.lo, nsephem,
+        args = ['/bin/sh', script, src, str(freq), outbase2, 
+                ','.join (hookup.antpols ()), hookup.lo, nsephem, 
                 str (durationSeconds)]
     
         if noopMode:
@@ -1201,15 +1189,12 @@ def launchCatchers2 (mhookup, src, freq, radec, durationSeconds, outbase, ebase)
 def observe2 (mhookup, outBase, src, freq, integTimeSeconds):
     global _lastFreq, _lastSrc, _lastSrcExpire
 
-    # save time in this case
-    assert _integTime is not None, 'Unknown integration time'
-
     # Start the ants focusing. Don't wait for them, so that
     # we can do other stuff while they're moving around.
     setFocus (mhookup.ants (), freq, False)
 
     f = src + '.ephem'
-    radec = ensureEphem (src, src, integTimeSeconds)
+    ensureEphem (src, src, integTimeSeconds)
     now = time.time ()
     
     # Start tracking. Same rationale as above.
@@ -1249,7 +1234,7 @@ def observe2 (mhookup, outBase, src, freq, integTimeSeconds):
         waitForFocus (mhookup.ants ())
 
         log ('@@ Beginning observations (%s, %s, %d MHz)' % (outBase, src, freq))
-        launchCatchers2 (mhookup, src, freq, radec, integTimeSeconds, outBase, src)
+        launchCatchers2 (mhookup, src, freq, integTimeSeconds, outBase, src)
     finally:
         # Make sure to always kill the frotters.
         for hookup in mhookup.hookups.itervalues ():

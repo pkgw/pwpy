@@ -2,16 +2,11 @@
 
 src="$1"
 freq="$2"
-radec="$3"
-ndumps="$4"
-outbase="$5"
-antpols="$6"
-lo="$7"
-nsephem="$8"
-duration="$9"
-
-# When only using atafx, 'radec' and 'ndumps' are not needed.
-# They are used by fxmir.
+outbase="$3"
+antpols="$4"
+lo="$5"
+nsephem="$6"
+duration="$7"
 
 echo atafx $outbase-$src-$freq $antpols fx64c:fxa $nsephem -duration $duration -noabort -fringeon
 exec atafx $outbase-$src-$freq $antpols fx64c:fxa $nsephem -duration $duration -noabort -fringeon
