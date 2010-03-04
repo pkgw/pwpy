@@ -172,7 +172,7 @@ foreach vis (vis00 $rest)
 	    echo "Dataset $vis.$p already self-caled"
 	else
 	    set offset = ${oras[$i]},${odecs[$i]}
-	    mselfcal vis=$vis.$p flux=$flux offset=$offset $selfcalflags |tee selfcal-logs/$vis.$p
+	    selfcal vis=$vis.$p flux=$flux offset=$offset $selfcalflags |tee selfcal-logs/$vis.$p
 	    if ($status) exit $status
 	endif
     end
