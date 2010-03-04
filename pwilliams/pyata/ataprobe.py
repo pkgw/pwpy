@@ -355,7 +355,7 @@ class Hookup (object):
 
     def ibobInps (self):
         # Same sorting as above.
-        return sorted (t[0], t[1] for t in self.tab.itervalues (),
+        return sorted (((t[0], t[1]) for t in self.tab.itervalues ()),
                        key = lambda t: str (t[1]) + t[0])
 
 

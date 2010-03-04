@@ -289,7 +289,7 @@ def runCommand (args):
         raise Exception ("Command failed")
 
 
-from ataprobe import ataArgs, obsArgs, obsRubyArgs
+from ataprobe import ataArgs, obsArgs, obsRubyArgs, sysRubyArgs
 
 
 def runAta (*args):
@@ -302,6 +302,10 @@ def runObs (*args):
 
 def runObsRuby (*args):
     return runCommand (obsRubyArgs (*args))
+
+
+def runSysRuby (*args):
+    return runCommand (sysRubyArgs (*args))
 
 
 # Script state save/restore in case the script gets interrupted
@@ -1007,35 +1011,37 @@ def setAttens (settings):
         if flag != 'ok':
             log ('!! Warning: flag = %s ; what to do ?' % flag)
         
-        runObsRuby ('setatten.rb', ibob, 'in%d' % inp, db, '0')
+        runSysRuby ('setatten.rb', ibob, 'in%d' % inp, db, '0')
 
     account (_acctAttemp, time.time () - tStart)
 
 def makeAttenKey (src, freq): return freq
 
 _attenSettings = {}
-_curAttenKey = None
+_curAttenKeys = {}
 
 def setupAttens (src, freq, hookup):
-    global _curAttenKey
-    
     k = makeAttenKey (src, freq)
 
-    s = _attenSettings.get (k)
     log ('Retrieving or auto-getting attemplifier ' + \
-         'settings for key ' + str (k))
+         'settings for instr %s, key %s' % (hookup.instr, k))
 
-    if _curAttenKey is not None and _curAttenKey == k:
+    hookupSettings = _attenSettings.setdefault (hookup.instr, {})
+    cur = _curAttenKeys.get (hookup.instr)
+
+    if cur is not None and cur == k:
         log ('Already at right settings.')
         return
     
+    s = hookupSettings.get (k)
+
     if s is not None:
         setAttens (s)
     else:
         s = autoAttenAll (hookup)
-        _attenSettings[k] = s
+        _attenSettings[hookup.instr][k] = s
 
-    _curAttenKey = k
+    _curAttenKeys[hookup.instr] = k
 
 # Fringe rotation control
 
@@ -1073,7 +1079,6 @@ def observe (hookup, outBase, src, freq, integTimeSeconds):
     # we can do other stuff while they're moving around.
     setFocus (hookup.ants (), freq, False)
 
-    f = src + '.ephem'
     ensureEphem (src, src, integTimeSeconds)
     now = time.time ()
     
@@ -1118,47 +1123,27 @@ def observe (hookup, outBase, src, freq, integTimeSeconds):
         fringeStop (hookup)
 
 
-# Quick multi-instrument observation code -- with all instruments
-# observing at the same frequency.
+# Quick multi-instrument observation code
 
-def setupAttens2 (src, freq, mhookup):
-    global _curAttenKey
-    
-    k = makeAttenKey (src, freq)
-
-    s = _attenSettings.get (k)
-    log ('Retrieving or auto-getting attemplifier ' + \
-         'settings for key ' + str (k))
-
-    if _curAttenKey is not None and _curAttenKey == k:
-        log ('Already at right settings.')
-        return
-    
-    if s is not None:
-        setAttens (s)
-    else:
-        _attenSettings[k] = s = {}
-        for h in mhookup.hookups.itervalues ():
-            s.update (autoAttenAll (h))
-
-    _curAttenKey = k
-
-
-def launchCatchers2 (mhookup, src, freq, durationSeconds, outbase, ebase):
+def launchCatchers2 (mhookup, src, freqs, durationSeconds, outbase, ebase):
     tStart = time.time ()
     nsephem = ebase + '.ephem'
     
-    log ('@@ Launching data catcher: %s at %s MHz on %s' % \
-             (src, freq, ', '.join (mhookup.hookups.iterkeys ())))
-    log ('        atafx output base: %s' % outbase)
-    log ('   Ephemeris file (in ns): ' + nsephem)
-    log ('                 Duration: %f s' % durationSeconds)
+    instrs = sorted (mhookup.hookups.iterkeys ())
+
+    log ('@@ Launching data catchers: %s on %s' % (src, ', '.join (instrs)))
+    log ('         atafx output base: %s' % outbase)
+    log ('    Ephemeris file (in ns): ' + nsephem)
+    log ('                  Duration: %f s' % durationSeconds)
 
     mydir = os.path.dirname (__file__)
     script = os.path.join (mydir, 'fxlaunch.sh')
     procs = []
 
-    for instr, hookup in mhookup.hookups.iteritems ():
+    for instr in instrs:
+        hookup = mhookup.hookups[instr]
+        freq = freqs[instr]
+
         outbase2 = outbase + '-' + instr
         args = ['/bin/sh', script, src, str(freq), outbase2, 
                 ','.join (hookup.antpols ()), hookup.lo, nsephem, 
@@ -1185,38 +1170,47 @@ def launchCatchers2 (mhookup, src, freq, durationSeconds, outbase, ebase):
     
     account ('integrating for %d seconds' % durationSeconds, time.time () - tStart)
 
+_lastFreqs = {}
 
-def observe2 (mhookup, outBase, src, freq, integTimeSeconds):
-    global _lastFreq, _lastSrc, _lastSrcExpire
+def observe2 (mhookup, outBase, src, freqs, integTimeSeconds):
+    global _lastSrc, _lastSrcExpire
 
     # Start the ants focusing. Don't wait for them, so that
     # we can do other stuff while they're moving around.
-    setFocus (mhookup.ants (), freq, False)
+    # FIXME: we just enforce a policy of focusing to the highest selected
+    # frequency. Other policies might be valid ...
 
-    f = src + '.ephem'
+    maxfreq = max (freqs.itervalues ())
+    setFocus (mhookup.ants (), maxfreq, False)
+
     ensureEphem (src, src, integTimeSeconds)
     now = time.time ()
     
     # Start tracking. Same rationale as above.
-    if _lastSrc != src or now >= _lastSrcExpire:
+    if _lastSrc == src and now < _lastSrcExpire:
+        needTrackWait = False
+    else:
         trackEphem (mhookup.ants (), src, False)
         _lastSrc = src
         _lastSrcExpire = now + 2000 # ensureephem actually gives us 1.1 hours
         needTrackWait = True
-    else: needTrackWait = False
 
-    if _lastFreq != freq:
-        for lo in mhookup.los ():
-            setSkyFreq (lo, freq)
-        _lastFreq = freq
+    for instr, freq in freqs.iteritems ():
+        if freq != _lastFreqs.get (instr):
+            setSkyFreq (mhookup.hookups[instr].lo, freq)
+            _lastFreqs[instr] = freq
 
     if useAttens:
-        setupAttens2 (src, freq, mhookup)
+        for instr, hookup in mhookup.hookups.iteritems ():
+            freq = freqs[instr]
+            setupAttens (src, freq, hookup)
 
     # Fringe rotation. Start this last to not tickle the ibobs too much --
     # auto-attening can fail with this going, I think.
 
-    for hookup in mhookup.hookups.itervalues ():
+    for instr, hookup in mhookup.hookups.iteritems ():
+        freq = freqs[instr]
+
         if hookup not in _registeredFringeKill:
             atexit.register (lambda: fringeKill (hookup))
             _registeredFringeKill.add (hookup)
@@ -1233,8 +1227,8 @@ def observe2 (mhookup, outBase, src, freq, integTimeSeconds):
         # already.
         waitForFocus (mhookup.ants ())
 
-        log ('@@ Beginning observations (%s, %s, %d MHz)' % (outBase, src, freq))
-        launchCatchers2 (mhookup, src, freq, integTimeSeconds, outBase, src)
+        log ('@@ Beginning observations (%s, %s)' % (outBase, src))
+        launchCatchers2 (mhookup, src, freqs, integTimeSeconds, outBase, src)
     finally:
         # Make sure to always kill the frotters.
         for hookup in mhookup.hookups.itervalues ():
