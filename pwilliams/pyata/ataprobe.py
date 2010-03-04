@@ -353,6 +353,11 @@ class Hookup (object):
         l.sort (key = lambda t: str (t[1][1]) + t[1][0])
         return l
 
+    def ibobInps (self):
+        # Same sorting as above.
+        return sorted (t[0], t[1] for t in self.tab.itervalues (),
+                       key = lambda t: str (t[1]) + t[0])
+
 
 _defaultMultiInstrs = ['fx64a:fxa', 'fx64c:fxa']
 

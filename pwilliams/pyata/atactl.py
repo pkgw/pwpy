@@ -966,13 +966,13 @@ _fakeAtten = \
 _acctAttemp = 'controlling attemplifiers'
 
 def autoAttenAll (hookup, rms=13.0):
-    from ataprobe import _slurp, obsRubyArgs, SlurpError
+    from ataprobe import _slurp, sysRubyArgs, SlurpError
     
     tStart = time.time ()
     log ('@@ Auto-attening all antpols')
     settings = {}
     
-    for (antpol, (ibob, inp)) in hookup.apIbobs ():
+    for ibob, inp in hookup.ibobInps ():
         cmd = sysRubyArgs ('autoatten.rb', ibob, 'in%d' % inp, rms, 0)
 
         if noopMode:
