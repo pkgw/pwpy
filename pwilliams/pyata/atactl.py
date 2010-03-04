@@ -600,7 +600,7 @@ def makeCatalogEphem (src, durHours, outbase, usets=False):
     outbase.{ns,ms}ephem.
     """
     
-    for owner in ['bima', 'pta', 'pkgw']:
+    for owner in ['bima', 'pta', 'pkwill']:
         try:
             retval = makeCatalogEphemsOwned (owner, src, durHours, outbase, usets)
             log ('Found catalog ephemeris for source "%s" under owner "%s"' % (src, owner))
@@ -1226,6 +1226,45 @@ def observe2 (mhookup, outBase, src, freqs, integTimeSeconds):
         # Wait for the ants to reach their focus if they haven't
         # already.
         waitForFocus (mhookup.ants ())
+
+        log ('@@ Beginning observations (%s, %s)' % (outBase, src))
+        launchCatchers2 (mhookup, src, freqs, integTimeSeconds, outBase, src)
+    finally:
+        # Make sure to always kill the frotters.
+        for hookup in mhookup.hookups.itervalues ():
+            fringeStop (hookup)
+
+
+def observe_nohw (mhookup, outBase, src, freqs, integTimeSeconds):
+    # Observe assuming that the hardware is set up exactly how we want.
+
+    global _lastSrc, _lastSrcExpire
+
+    ensureEphem (src, src, integTimeSeconds)
+    now = time.time ()
+    
+    if _lastSrc == src and now < _lastSrcExpire:
+        needTrackWait = False
+    else:
+        trackEphem (mhookup.ants (), src, False)
+        _lastSrc = src
+        _lastSrcExpire = now + 2000 # ensureephem actually gives us 1.1 hours
+        needTrackWait = True
+
+    for instr, hookup in mhookup.hookups.iteritems ():
+        freq = freqs[instr]
+
+        if hookup not in _registeredFringeKill:
+            atexit.register (lambda: fringeKill (hookup))
+            _registeredFringeKill.add (hookup)
+
+        fringeStart (hookup, src, freq)
+
+    try:
+        # Wait to finish tracking. This reissues the trackephem command,
+        # but we're already on the way so it doesn't take long to finish.
+        if needTrackWait:
+            trackEphem (mhookup.ants (), src, True)
 
         log ('@@ Beginning observations (%s, %s)' % (outBase, src))
         launchCatchers2 (mhookup, src, freqs, integTimeSeconds, outBase, src)
