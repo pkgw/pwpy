@@ -768,9 +768,9 @@ def launchCatcher (hookup, src, freq, durationSeconds, outbase, ebase):
 
     mydir = os.path.dirname (__file__)
     script = os.path.join (mydir, 'fxlaunch.sh')
-    args = ['/bin/sh', script, src, str(freq), outbase, ','.join (hookup.antpols ()), 
-            hookup.lo, nsephem, str (durationSeconds)]
-    
+    args = ['/bin/sh', script, src, str(freq), hookup.instr, outbase, 
+            ','.join (hookup.antpols ()), nsephem, str (durationSeconds)]
+
     if noopMode:
         log ('WOULD execute: %s' % (' '.join (args))) 
     else:
@@ -1144,11 +1144,9 @@ def launchCatchers2 (mhookup, src, freqs, durationSeconds, outbase, ebase):
         hookup = mhookup.hookups[instr]
         freq = freqs[instr]
 
-        outbase2 = outbase + '-' + instr
-        args = ['/bin/sh', script, src, str(freq), outbase2, 
-                ','.join (hookup.antpols ()), hookup.lo, nsephem, 
-                str (durationSeconds)]
-    
+        args = ['/bin/sh', script, src, str(freq), instr, outbase, 
+                ','.join (hookup.antpols ()), nsephem, str (durationSeconds)]
+
         if noopMode:
             log ('WOULD execute: %s' % (' '.join (args))) 
             continue
