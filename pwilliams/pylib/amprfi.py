@@ -9,7 +9,7 @@ This documentation is wildly insufficient.
 Note that this is not a standalone script, but a module that should
 be imported into IPython and used interactively."""
 
-import omega, numpy as N
+import numpy as N
 import miriad
 from mirexec import TaskUVCal
 import os.path
@@ -112,7 +112,8 @@ class AmpRfi (object):
         self.suggFlag (noshow=noshow)
 
     def plotRaw (self):
-        return omega.quickXY (self.ch, self.y)
+        from omega import quickXY
+        return quickXY (self.ch, self.y)
 
     def showRaw (self):
         self.rawPlot = self.plotRaw ().show ('amprfi-raw')
@@ -171,11 +172,13 @@ class AmpRfi (object):
         self.mergeRegions ()
     
     def plotDeltas (self, boxcar=1, ylim=None):
+        from omega import quickXY
+
         deltas = self.y[1:] - self.y[:-1]
         if boxcar > 1:
             deltas = N.convolve (deltas, N.ones (boxcar) / boxcar, 'same')
         my = self.mfactor * N.median (N.abs (deltas))
-        p = omega.quickXY (self.ch[0:-1], deltas, 'Deltas')
+        p = quickXY (self.ch[0:-1], deltas, 'Deltas')
         p.addXY ((0, self.maxnchan), (my, my), '+MFactor')
         p.addXY ((0, self.maxnchan), (-my, -my), '-MFactor')
 
@@ -238,14 +241,14 @@ class AmpRfi (object):
             self.show ()
 
     def plot (self, merged=True):
-        import omega.rect
-        p = omega.rect.RectPlot ()
+        from omega.rect import RectPlot, XBand
+        p = RectPlot ()
 
         if merged: set = self.toFlag
         else: set = self.toFlagSugg
         
         for bound in self.toFlag:
-            r = omega.rect.XBand (*bound)
+            r = XBand (*bound)
             p.add (r)
 
         p.addXY (self.ch, self.y, None)
