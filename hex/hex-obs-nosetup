@@ -250,6 +250,7 @@ echo "$me decs $decs" |& tee -ia $log
 
 set vpnt = none # no "undefined variable" error if we goto fail
 set ephem = none
+set nok = 0
 onintr fail
 
 foreach pnt (`seq 1 $npnt`)
@@ -315,7 +316,13 @@ foreach pnt (`seq 1 $npnt`)
     # Note these observations in the summary files
     echo scan `printf %02d $pnt0` $vpf1 >>$summfile1
     echo scan `printf %02d $pnt0` $vpf2 >>$summfile2
+    @ nok = $nok + 1
 end
+
+if ($nok == 0) then
+    echo "$me didn't observe any pointings!" |& tee -ia $log
+    goto fail
+endif
 
 # Close out the summary files -- lack of a 'success' entry
 # implies that observing crashed or aborted 
