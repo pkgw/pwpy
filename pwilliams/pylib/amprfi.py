@@ -21,7 +21,7 @@ class AmpFlagsAccum (object):
         self._clear ()
 
     def _clear (self):
-        self.data = self.flags = self.times = None
+        self.data = self.flags = self.times = self.dsq = None
         self.maxnchan = 0
 
     def _accum (self, tup):
@@ -39,9 +39,11 @@ class AmpFlagsAccum (object):
 
         if self.data is None:
             self.data = data.copy ()
+            self.dsq = data**2
             self.times = times.copy ()
         else:
             self.data += data
+            self.dsq += data**2
             self.times += times
             
     def process (self, dset, **kwargs):
@@ -68,6 +70,7 @@ class AmpFlagsAccum (object):
         
         self.ch = ch
         self.y = self.data[w] / self.times[w]
+        self.ystd = N.sqrt (self.dsq[w] / self.times[w] - self.y**2)
 
 class AmpRfi (object):
     def setupNext (self, vises, fname, freq, noshow=False, **kwargs):
