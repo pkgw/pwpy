@@ -11,10 +11,16 @@
  calibration tables into the source dataset (if no out= keyword is
  supplied and there is only a single visibility input file).
 
+ By default, DUALSCAL will run the two selfcal tasks in parallel.
+ This behavior should result in a nontrivial speed boost in most
+ cases, but it does result in the output of the selfcal tasks
+ being interleaved in an unpredictable manner. The tasks can be
+ run serially via the "serial" option.
+
  DUALSCAL supports all of the options that SELFCAL and MSELFCAL do. 
  This includes the option "verbose", which is only supported by
  MSELFCAL -- an error will be raised if you attempt to give SELFCAL
- this option. The following arguments specific to DUALSCAL:
+ this option. The following arguments are specific to DUALSCAL:
 
 @ ttol
  The tolerance for differing gain solution timestamps in the datasets,
@@ -27,6 +33,7 @@
  Options are specified separated by commas. Minimum-match is used.
 
  'usemself' - Use MSELFCAL instead of SELFCAL to perform the selfcal.
+ 'serial'   - Run the selfcal tasks serially, rather than in parallel.
 --
 """
 
@@ -58,7 +65,7 @@ keys.option ('amplitude', 'phase', 'smooth', 'polarized', 'mfs',
              'relax', 'apriori', 'noscale', 'mosaic', 'verbose')
 # Specific to this task:
 keys.keyword ('ttol', 'd', DEFAULT_TTOL * 86400)
-keys.option ('usemself')
+keys.option ('usemself', 'serial')
 
 kws = keys.process ()
 
@@ -158,6 +165,7 @@ copyopts ('amplitude', 'phase', 'smooth', 'polarized', 'mfs',
 
 task.vis = vistr
 worksets = []
+procs = []
 
 for pol in 'xx', 'yy':
     workset = vises[0].makeVariant ('sc' + pol, Data)
@@ -165,7 +173,17 @@ for pol in 'xx', 'yy':
     worksets.append (workset)
     task.select = selformat % pol
     task.out = workset
-    task.xrun ()
+
+    if kws.serial:
+        task.xrun ()
+    else:
+        task.xint = True
+        task.launch ()
+        procs.append (task.proc)
+
+if not kws.serial:
+    for proc in procs:
+        proc.wait ()
 
 src1 = worksets[0].open ('rw')
 src2 = worksets[1].open ('rw')
