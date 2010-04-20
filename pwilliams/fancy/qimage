@@ -237,48 +237,71 @@ All of the supported options are:
 
 
     def run (self):
+        if self.invert.stokes is None or len (self.invert.stokes) == 0:
+            stokes = ['ii']
+        else:
+            stokes = self.invert.stokes.split (',')
+
         vis = [VisData (v) for v in self.vis]
-        mp = VisData (self.outbase + '.mp')
-        bm = VisData (self.outbase + '.bm')
-        cl = VisData (self.outbase + '.cl')
-        rm = VisData (self.outbase + '.rm')
-        rr = VisData (self.outbase + '.rr')
 
         vtime = 0
         for v in vis:
             vtime = max (vtime, v.mtime)
 
-        if self.force or vtime > mp.umtime or vtime > bm.umtime:
-            mp.delete ()
+        if len (stokes) == 1:
+            mapinfo = [(stokes[0], VisData (self.outbase + '.mp'))]
+        else:
+            mapinfo = [(p, VisData (self.outbase + '.%s.mp' % p)) for p in stokes]
+
+        maptime = 0
+        for pol, mp in mapinfo:
+            maptime = max (maptime, mp.umtime)
+
+        bm = VisData (self.outbase + '.bm')
+
+        if self.force or vtime > maptime or vtime > bm.umtime:
             bm.delete ()
+            for pol, mp in mapinfo:
+                mp.delete ()
 
             t = self.invert
             t.setArgs (vis=','.join (self.vis),
-                       map=mp, beam=bm, xint=True)
+                       map=','.join (str (t[1]) for t in mapinfo),
+                       beam=bm, xint=True)
             t.run ()
 
-        if self.force or mp.mtime > cl.umtime or bm.mtime > cl.umtime:
-            cl.delete ()
+        for pol, mp in mapinfo:
+            if len (stokes) == 1:
+                cl = VisData (self.outbase + '.cl')
+                rm = VisData (self.outbase + '.rm')
+                rr = VisData (self.outbase + '.rr')
+            else:
+                cl = VisData (self.outbase + '.%s.cl' % pol)
+                rm = VisData (self.outbase + '.%s.rm' % pol)
+                rr = VisData (self.outbase + '.%s.rr' % pol)
 
-            t = self.clean
-            t.setArgs (map=mp, beam=bm, out=cl, xint=True)
-            t.run ()
+            if self.force or mp.mtime > cl.umtime or bm.mtime > cl.umtime:
+                cl.delete ()
 
-        if self.force or (cl.mtime > rm.umtime or mp.mtime > rm.mtime or
-                          bm.mtime > rm.umtime):
-            rm.delete ()
+                t = self.clean
+                t.setArgs (map=mp, beam=bm, out=cl, xint=True)
+                t.run ()
 
-            t = self.restore
-            t.setArgs (map=mp, beam=bm, model=cl, out=rm, mode='clean')
-            t.run ()
+            if self.force or (cl.mtime > rm.umtime or mp.mtime > rm.mtime or
+                              bm.mtime > rm.umtime):
+                rm.delete ()
 
-        if self.force or (cl.mtime > rr.umtime or mp.mtime > rr.mtime or
-                          bm.mtime > rr.umtime):
-            rr.delete ()
+                t = self.restore
+                t.setArgs (map=mp, beam=bm, model=cl, out=rm, mode='clean')
+                t.run ()
 
-            t = self.restore
-            t.setArgs (map=mp, beam=bm, model=cl, out=rr, mode='residual')
-            t.run ()
+            if self.force or (cl.mtime > rr.umtime or mp.mtime > rr.mtime or
+                              bm.mtime > rr.umtime):
+                rr.delete ()
+
+                t = self.restore
+                t.setArgs (map=mp, beam=bm, model=cl, out=rr, mode='residual')
+                t.run ()
 
 
 q = QuickImager ()
