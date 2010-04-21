@@ -1,0 +1,3 @@
+#!/bin/tcsh -f
+
+echo "/ataarchive/`date -d yesterday +%Y`/`date -d yesterday +%m`/`date -d yesterday +%d`"

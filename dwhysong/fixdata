@@ -1,0 +1,21 @@
+#!/bin/bash
+for y in $@ ;
+  do x=`dirname $y`\/`basename $y`
+  echo "Processing $x"
+  
+  if [ $x == "*3[Cc]286*" ] ; then
+    echo "Correcting coordinates for 3C286"
+    puthd in="$x"/ra value=13:31:08.2879,hms
+    puthd in="$x"/dec value=30:30:32.958,dms
+    puthd in="$x"/obsra value=13:31:08.2879,hms
+    puthd in="$x"/obsdec value=30:30:32.958,dms
+  fi
+
+  uvaver vis="$x" interval=0.0000001 select="-auto" options=nocal,nopass,nopol out="$x".1 || exit
+  #multiflag.pl "$x".1
+  #uvflag vis="$x".1 flagval=f select="uvrange(0,0.08)"
+  newrfisweep.csh vis="$x".1 scans=999 subint=999 options=rescan,noseedcorr
+  uvaver vis="$x".1 stokes=xx,yy,xy,yx select="-auto" options=nocal,nopass,nopol out="$x".pol || exit
+  rm -rf "$x".1
+  fits in="$x".pol op=uvout out="$x".pol.fits
+done

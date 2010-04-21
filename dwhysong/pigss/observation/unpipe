@@ -1,0 +1,1 @@
+cat pigss2.done | perl -an -F'\|' -e 'chomp(@F); foreach(@F){print "$_\n"}'
