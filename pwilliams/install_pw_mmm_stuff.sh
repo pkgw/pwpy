@@ -75,6 +75,7 @@ pylib/gpmergepols.py
 pylib/hhaa.dat
 pylib/multiflag.py
 pylib/multiflag2.py
+pylib/pwflux.py
 '
 
 set -e

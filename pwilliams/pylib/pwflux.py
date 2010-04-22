@@ -47,30 +47,7 @@ import sys, numpy as N, miriad
 from mirtask import keys, uvdat, util
 
 SVNID = '$Id$'
-banner = util.printBannerSvn ('pwflux', 'calculate flux from UV data', SVNID)
-
-
-# Parameters
-
-keys.keyword ('interval', 'd', 1)
-keys.keyword ('offset', 'd', None, 2)
-keys.doUvdat ('dsl3w', True)
-opts = keys.process ()
-
-interval = opts.interval / (24. * 60.)
-
-if interval <= 0:
-    print >>sys.stderr, 'Error: averaging interval must be positive, not', opts.interval
-    sys.exit (1)
-
-if len (opts.offset) == 0:
-    offset = N.zeros (2)
-elif len (opts.offset) == 2:
-    offset = N.asarray (opts.offset) / 206265.
-else:
-    print >>sys.stderr, ('Error: zero or two values must be specified for source offset;'
-                         ' got'), opts.offset
-    sys.exit (1)
+__all__ = ['Fluxer']
 
 
 # Actual task implementation
@@ -196,7 +173,37 @@ class Fluxer (object):
             print '%s: real %f, imag %f, amp %f (+- %f), ph %f deg (+- %f) (%d items)' % \
                 (pname, mreal, mimag, amp, u, phdeg, uphdeg, idata[I_COUNT])
 
+
+# Task
+
+def task (argv):
+    banner = util.printBannerSvn ('pwflux', 'calculate flux from UV data', SVNID)
+
+    keys.keyword ('interval', 'd', 1)
+    keys.keyword ('offset', 'd', None, 2)
+    keys.doUvdat ('dsl3w', True)
+    opts = keys.process (argv)
+
+    interval = opts.interval / (24. * 60.)
+
+    if interval <= 0:
+        print >>sys.stderr, 'Error: averaging interval must be positive, not', opts.interval
+        return 1
+
+    if len (opts.offset) == 0:
+        offset = N.zeros (2)
+    elif len (opts.offset) == 2:
+        offset = N.asarray (opts.offset) / 206265.
+    else:
+        print >>sys.stderr, ('Error: zero or two values must be specified for source offset;'
+                             ' got'), opts.offset
+        return 1
+
+    Fluxer (interval, offset).process ()
+    return 0
+
+
 # Go
 
-Fluxer (interval, offset).process ()
-sys.exit (0)
+if __name__ == '__main__':
+    sys.exit (task (sys.argv))
