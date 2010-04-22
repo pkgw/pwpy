@@ -152,6 +152,10 @@
  copied with the computed TSys values inserted into it. If
  unspecified, no output dataset is created.
 
+@ textout
+ The name of a file into which to write a textual table of systemp
+ temperature information. The format of this file is described above.
+
 @ interval
  The UV data averaging interval in minutes. Default is 5. The UV data
  are time-averaged before baseline-based TSys values are computed.
@@ -826,6 +830,8 @@ def rewriteData (banner, vis, out, solutions, varyJyPerK, **kwargs):
     nextSolnIdx = 0
     thePol = None
     flaggedAps = None
+
+    # FIXME: we don't write out npol!
 
     if varyJyPerK:
         theSysTemp = solutions[0][1].values ()[0]
