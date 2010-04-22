@@ -13,11 +13,11 @@ else
 endif
 set freq = 1430
 set diam = 20
-set imsize = 512
+set imsize = 1024
 set nchan = 16
-set boxlo = `echo $imsize'/2 - 10' | bc`
-set boxhi = `echo $imsize'/2 + 10' | bc`
-set imgparams = "sup=0 cell=30 fwhm=200"
+set boxlo = `echo $imsize'/2 - 30' | bc`
+set boxhi = `echo $imsize'/2 + 30' | bc`
+set imgparams = "robust=0 cell=10 select=-shadow($diam),ti(09SEP19:18:00:00,09SEP20:15:00:00),ti(09NOV27:16:00:00,09NOV27:23:59:00),ti(09DEC04:17:30:00,09DEC04:23:59:00)"  # cuts bad cal in day 1,2,3
 set visall = `ls -df $source-? $source-?? $source-??? | awk '{printf("%s,",$1)}' ; echo`
 
 #  clean up
@@ -54,12 +54,12 @@ end
 
 #   Make one map
 invert vis=t${rand}\*vs map=$source.imap,$source.qmap,$source.umap,$source.vmap beam=$source.beam imsize=$imsize \
-stokes=i,q,u,v options=mfs,double "select=-shadow($diam)" $imgparams
+stokes=i,q,u,v options=mfs,double $imgparams
 set rms = `gethd in=$source.imap/rms`
 set icut = `echo "4.5*$rms" | bc -l`
-clean map=$source.imap beam=$source.beam out=$source.icmp niters=1000 cutoff=$icut $regcommand | tail -2
-clean map=$source.qmap beam=$source.beam out=$source.qcmp niters=500 cutoff=$icut $regcommand | tail -2
-clean map=$source.umap beam=$source.beam out=$source.ucmp niters=500 cutoff=$icut $regcommand | tail -2
+clean map=$source.imap beam=$source.beam out=$source.icmp niters=500 cutoff=$icut $regcommand | tail -2
+clean map=$source.qmap beam=$source.beam out=$source.qcmp niters=300 cutoff=$icut $regcommand | tail -2
+clean map=$source.umap beam=$source.beam out=$source.ucmp niters=300 cutoff=$icut $regcommand | tail -2
 restor model=$source.icmp beam=$source.beam map=$source.imap out=$source.icln | tail -2
 restor model=$source.qcmp beam=$source.beam map=$source.qmap out=$source.qcln | tail -2
 restor model=$source.ucmp beam=$source.beam map=$source.umap out=$source.ucln | tail -2
@@ -127,14 +127,14 @@ while ($n <= $nchan)
  echo 'Starting bin '$n' of source '${source}
  if ( -e t${rand}${n}vs ) then
   invert vis=t${rand}${n}vs map=$source-$n.imap,$source-$n.qmap,$source-$n.umap,$source-$n.vmap \
-  beam=$source-$n.beam imsize=$imsize "select=-shadow($diam)" $imgparams  \
+  beam=$source-$n.beam imsize=$imsize $imgparams  \
        stokes=i,q,u,v options=double,mfs | tail -2
   set rms = `gethd in=$source-$n.imap/rms`
   set sig = 4.5
   set icut = `echo $rms $sig | awk '{print $1*$2}'`
-  clean map=$source-$n.imap beam=$source-$n.beam out=$source-$n.icmp niters=500 $regcommand cutoff=$icut | tail -2
-  clean map=$source-$n.qmap beam=$source-$n.beam out=$source-$n.qcmp niters=300 $regcommand cutoff=$icut | tail -2
-  clean map=$source-$n.umap beam=$source-$n.beam out=$source-$n.ucmp niters=300 $regcommand cutoff=$icut | tail -2
+  clean map=$source-$n.imap beam=$source-$n.beam out=$source-$n.icmp niters=300 $regcommand cutoff=$icut | tail -2
+  clean map=$source-$n.qmap beam=$source-$n.beam out=$source-$n.qcmp niters=200 $regcommand cutoff=$icut | tail -2
+  clean map=$source-$n.umap beam=$source-$n.beam out=$source-$n.ucmp niters=200 $regcommand cutoff=$icut | tail -2
   restor model=$source-$n.icmp beam=$source-$n.beam map=$source-$n.imap out=$source-$n.icln | tail -2
   restor model=$source-$n.qcmp beam=$source-$n.beam map=$source-$n.qmap out=$source-$n.qcln | tail -2
   restor model=$source-$n.ucmp beam=$source-$n.beam map=$source-$n.umap out=$source-$n.ucln | tail -2

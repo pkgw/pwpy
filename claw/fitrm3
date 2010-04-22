@@ -1,0 +1,18 @@
+#!/usr/bin/env tcsh
+# wrapper to take input for fitrm-textout and python plot
+
+# clean up
+rm -f /tmp/tmp-pound /tmp/tmp-log /tmp/tmp-rmspectrum
+rm -f /log.qu.1001.x rm_spectrum_1001.txt
+
+# create rm spectrum
+cp $1 log.qu.1001.x
+fitrm-textout  
+
+# create files for python plotting
+echo -n '#' > /tmp/tmp-pound
+cat /tmp/tmp-pound $1 > /tmp/tmp-log
+cat /tmp/tt rm_spectrum_1001.txt > /tmp/tmp-rmspectrum
+
+# python plot
+rm-est.py /tmp/tmp-log /tmp/tmp-rmspectrum
