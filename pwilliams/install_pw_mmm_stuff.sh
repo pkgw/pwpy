@@ -51,6 +51,7 @@ fancy/gpcat
 fancy/gpmergepols
 fancy/gpunity
 fancy/multiflag2
+fancy/pwflux
 fancy/pwmodel
 fancy/qimage
 fancy/uvasimg
