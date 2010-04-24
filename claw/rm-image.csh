@@ -14,7 +14,7 @@ endif
 set freq = 1430
 set diam = 20
 set imsize = 1024
-set nchan = 16
+set nchan = 160
 set boxlo = `echo $imsize'/2 - 30' | bc`
 set boxhi = `echo $imsize'/2 + 30' | bc`
 set imgparams = "robust=0 cell=10 select=-shadow($diam),ti(09SEP19:18:00:00,09SEP20:15:00:00),ti(09NOV27:16:00:00,09NOV27:23:59:00),ti(09DEC04:17:30:00,09DEC04:23:59:00)"  # cuts bad cal in day 1,2,3

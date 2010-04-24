@@ -32,7 +32,7 @@ clean_im = numpy.array(f2.columns[5])
 resid_re = numpy.array(f2.columns[8])
 resid_im = numpy.array(f2.columns[9])
 
-pola = 0.5*numpy.arctan2(q,u)
+pola = 0.5*numpy.arctan2(u,q)
 lsq = numpy.array((3e-1/nu)**2)
 
 # now plot
