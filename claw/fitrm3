@@ -3,10 +3,10 @@
 
 # clean up
 rm -f /tmp/tmp-pound /tmp/tmp-log /tmp/tmp-rmspectrum
-rm -f /log.qu.1001.x rm_spectrum_1001.txt
+rm -f log rm_spectrum_1001.txt
 
 # create rm spectrum
-cp $1 log.qu.1001.x
+cp $1 log
 fitrm-textout  
 
 # create files for python plotting

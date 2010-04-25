@@ -16,8 +16,8 @@ set leaks=1   # output leakage text files?
 #set antsel=select=ant'('1,4,5,6,7,8,10,11,12,13,14,33,37')('1,4,5,6,7,8,10,11,12,13,14,33,37')' # smaller leak in polcal2.uvaver.high
 #set antsel='select=-ant(5,6,10,11,42)'  # removes 1800 day2,3 large leaks
 #set antsel='select=-ant(5,8,16,26,42)'  # removes 1000 day2,3 large leaks
-#set antsel='select=-ant(5,16,42)'  # removes 2010 day1,2 large leaks
-set antsel='select=-ant(6)'  # removes 1430 day1 large leak
+set antsel='select=-ant(5,16,42)'  # removes 2010 day1,2 large leaks
+#set antsel='select=-ant(6)'  # removes 1430 day1 large leak
 #set antsel=''
 
 # set refant, if you like
@@ -33,7 +33,7 @@ if $#argv == 3 then
 #    set cal3=$4
 else
 #    set cal2='mosfxa-NVSSJ133108+303032-1430-100'
-    set cal2='mosfxa-3c138-1430-100'
+    set cal2='mosfxc-3c138-2010-100'
 #    set cal3='mosfxc-NVSSJ084124+705341-2010-100'
 endif
 
