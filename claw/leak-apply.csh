@@ -12,10 +12,10 @@ set combine=1
 #set leakcal='../nvss-rm2/try5-1800/mosfxc-3c286-1800-100-flagged2'  # if leakages are calibrated externally
 #set antsel=select=ant'('1,4,5,6,7,8,10,11,12,13,14,33,37')('1,4,5,6,7,8,10,11,12,13,14,33,37')' # smaller leak in polcal2.uvaver.high
 #set antsel=select=ant'('16,17,25,26,27,29,30,31,32,34,35,36,37,40,41')('16,17,25,26,27,29,30,31,32,34,35,36,37,40,41')'
-#set antsel='select=-ant(5,8,16,26,42)'  # removes 1000 day2,3 large leaks
+set antsel='select=-ant(5,8,16,26,42)'  # removes 1000 day2,3 large leaks
 #set antsel='select=-ant(5,6,10,11,42)'  # removes 1800 day2,3 large leaks
 #set antsel='select=-ant(5,42)'  # removes 2010 day2 large leaks
-set antsel='select=-ant(6)'  # removes 1430 day1 large leak
+#set antsel='select=-ant(6)'  # removes 1430 day1 large leak
 #set antsel=''
 #set refant=16
 

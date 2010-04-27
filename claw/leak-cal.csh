@@ -9,14 +9,14 @@
 set visroot=$1
 set log=${1}.log
 set chans=5  # channels per frequency chunk.  
-set combine=1  # combine cal with other sources (hardcoded)?
-set leakcal=''  # if leakages are calibrated externally
-#set leakcal='../nvss-rm2/try5-1000/mosfxa-3c286-1000-100-flagged'  # if leakages are calibrated externally
-set leaks=1   # output leakage text files?
+set combine=0  # combine cal with other sources (hardcoded)?
+#set leakcal=''  # if leakages are calibrated externally
+set leakcal='../nvss-rm2/try7-1800-hires/mosfxc-3c286-1800-100-flagged2'  # if leakages are calibrated externally
+set leaks=0   # output leakage text files?
 #set antsel=select=ant'('1,4,5,6,7,8,10,11,12,13,14,33,37')('1,4,5,6,7,8,10,11,12,13,14,33,37')' # smaller leak in polcal2.uvaver.high
-#set antsel='select=-ant(5,6,10,11,42)'  # removes 1800 day2,3 large leaks
+set antsel='select=-ant(5,6,10,11,42)'  # removes 1800 day2,3 large leaks
 #set antsel='select=-ant(5,8,16,26,42)'  # removes 1000 day2,3 large leaks
-set antsel='select=-ant(5,16,42)'  # removes 2010 day1,2 large leaks
+#set antsel='select=-ant(5,16,42)'  # removes 2010 day1,2 large leaks
 #set antsel='select=-ant(6)'  # removes 1430 day1 large leak
 #set antsel=''
 
