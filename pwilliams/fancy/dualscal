@@ -145,7 +145,7 @@ def copylists (*names):
     for name in names:
         v = getattr (kws, name)
         if len (v):
-            setattr (task, name, ','.join (v))
+            setattr (task, name, ','.join (str (x) for x in v))
 
 
 def copyopts (*names):
