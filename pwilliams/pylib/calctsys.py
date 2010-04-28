@@ -139,13 +139,28 @@
 < vis
  Only a single input file is supported by CALCTSYS.
 
-< select
- 
+@ select
+ The standard MIRIAD UV-data selection keyword. For more information,
+ see "mirhelp select". CALCTSYS processes all selected visibilities
+ except same-antenna baselines, where "same-antenna" baselines include
+ for example both 6X-6X and 6X-6Y. Non-intensity-type polarizations
+ may be relatively more helpful for system temperature computations than
+ intensity-type ones since they will generally have a much smaller
+ signal (and for the purposes of this task any signal besides system 
+ noise is undesirable), but see the documentation for the "flux"
+ keyword below.
+
 @ flux
  The assumed flux of the source in Janskys, if the antenna gains in
  the input dataset are uncalibrated or are only relatively calibrated.
  Do not specify this keyword if the dataset has correct absolute
- antenna gains. See the discussion of the gain parameter G above.
+ antenna gains. See the discussion of the gain parameter G above. If
+ this keyword is specified and the processed data include 
+ non-intensity-type polarizations, a warning will be printed and
+ those data will be ignored -- this keyword specifies the Stokes I 
+ intensity of the source, and there is no way to indicate the polarized
+ flux of the source, so there's no way to correctly scale the
+ non-intensity-type baselines in this case.
  
 @ out
  The name of the output dataset. If given, the input dataset is
@@ -246,6 +261,13 @@
  'nopol'     Do not apply polarization leakage corrections when reading
              or writing the data.
 --
+
+FIXME: 
+ - save uncert information in textout:
+   report error-in-mean, npts, scale by rchisq
+ - enable plotting of tsys results.
+ - could enable flux keyword and non-intensity pols by allowing user
+   to specify an approximate polarized flux?
 """
 
 import sys, numpy as N
@@ -643,6 +665,8 @@ class DataProcessor (object):
         self.sts = SysTemps (flux, etaQ, hann, maxtsys, maxresid,
                              showpre, showall, showfinal)
         self.first = True
+        self.flux = flux
+        self.warnedFluxAndCrossPols = False
         self.solutions = []
 
     def _jyperk (self, rawval):
@@ -718,10 +742,16 @@ class DataProcessor (object):
         flags = flags[0:nread]
 
         bp = util.mir2aps (inp, preamble)
+        ants = util.decodeBaseline (preamble[4])
+        fcpdiscard = (self.flux is not None) and (not util.apsAreInten (bp))
 
-        if bp[0] != bp[1] and util.apsAreInten (bp):
-            # We only consider intensity-type cross-correlations ...
+        if fcpdiscard and not self.warnedFluxAndCrossPols:
+            print >>sys.stderr, 'Warning: flux keyword not compatible with ' \
+                'processing non-intensity polarizations; ignoring them.'
+            self.warnedFluxAndCrossPols = True
 
+        # drop both (eg) 6X-6X and 6X-6Y baselines.
+        if ants[0] != ants[1] and not fcpdiscard:
             if (time - tmin) > self.interval or (tmax - time) > self.interval:
                 self.solutions.append (self.sts.flush (self._jyperk (jyperk), sdf))
                 tmin = tmax = time
@@ -759,7 +789,7 @@ def dumpText (solutions, durDays, outfn):
             print >>f, 'sefd', util.fmtAP (ap), '%.3f' % (tsys * jyperk)
 
         for bp in badbps:
-            print >>f, 'badbp', util.fmtBP (bp)
+            print >>f, 'badbp', util.fmtAPs (bp)
 
         print >>f, 'endsolution'
 
