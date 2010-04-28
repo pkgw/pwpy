@@ -36,6 +36,18 @@
  and east are positive, and the offset is measured on the sky (i.e.,
  the RA offset is divided by cos(dec) when computing the equatorial
  coordinates of the point source).
+
+@ select
+ The standard UV-data selection keyword. For more help, see 
+ "mirhelp select".
+
+@ line
+ The standard channel selection keyword. For more help, see 
+ "mirhelp line".
+
+@ stokes
+ The standard Stokes/polarization parameter selection keyword.
+ For more help, see "mirhelp stokes".
 --
 
 FIXME: assuming a single source per UV data file!
@@ -64,6 +76,12 @@ class Fluxer (object):
         self.interval = interval
         self.offset = offset
         self.doOffset = (offset**2).sum () > 0
+        self.flushfunc = None
+
+
+    def onFlush (self, func):
+        self.flushfunc = func
+        return self
 
 
     lmn = None
@@ -108,7 +126,7 @@ class Fluxer (object):
 
             if tMin is None:
                 tMin = tMax = t
-            elif t - tMin > interval or tMax - t > interval:
+            elif t - tMin > self.interval or tMax - t > self.interval:
                 self.flush (tMin, tMax, byPol)
                 byPol = {}
                 tMin = tMax = t
@@ -150,15 +168,12 @@ class Fluxer (object):
 
 
     def flush (self, tMin, tMax, byPol):
-        pols = sorted (byPol.iterkeys (), key=lambda p: abs (p))
+        if self.flushfunc is None:
+            return
 
-        print 'Start/end times:', util.jdToFull (tMin), ';', util.jdToFull (tMax)
-        print 'Duration:', (tMax - tMin) * 24 * 60, 'min'
+        poldata = {}
 
-        for pol in pols:
-            pname = util.polarizationName (pol)
-            ddata, idata = byPol[pol]
-
+        for pol, (ddata, idata) in byPol.iteritems ():
             mreal = ddata[D_REAL] / ddata[D_TOTWT]
             mimag = ddata[D_IMAG] / ddata[D_TOTWT]
             u = 1. / N.sqrt (ddata[D_TOTWT])
@@ -170,11 +185,27 @@ class Fluxer (object):
             phdeg = ph * 180 / N.pi
             uphdeg = uph * 180 / N.pi
 
-            print '%s: real %f, imag %f, amp %f (+- %f), ph %f deg (+- %f) (%d items)' % \
-                (pname, mreal, mimag, amp, u, phdeg, uphdeg, idata[I_COUNT])
+            poldata[pol] = (mreal, mimag, amp, u, phdeg, uphdeg, idata[I_COUNT])
+
+        self.flushfunc (tMin, tMax, poldata)
 
 
 # Task
+
+def flushPrint (tMin, tMax, poldata):
+    print 'Start/end times:', util.jdToFull (tMin), ';', util.jdToFull (tMax)
+    print 'Duration:', (tMax - tMin) * 24 * 60, 'min'
+
+    pols = sorted (poldata.iterkeys (), key=lambda p: abs (p))
+
+    for pol in pols:
+        pname = util.polarizationName (pol)
+
+        mreal, mimag, amp, uamp, phdeg, uphdeg, count = poldata[pol]
+
+        print '%s: real %f, imag %f, amp %f (+- %f), ph %f deg (+- %f) (%d items)' % \
+            (pname, mreal, mimag, amp, uamp, phdeg, uphdeg, count)
+
 
 def task (argv):
     banner = util.printBannerSvn ('pwflux', 'calculate flux from UV data', SVNID)
@@ -199,7 +230,7 @@ def task (argv):
                              ' got'), opts.offset
         return 1
 
-    Fluxer (interval, offset).process ()
+    Fluxer (interval, offset).onFlush (flushPrint).process ()
     return 0
 
 
