@@ -10,6 +10,14 @@ import sys
 if len(sys.argv) < 3:
     print 'dude, give me a log and rmspectrum file.  wtf?'
     exit(1)
+elif len(sys.argv) == 4:
+    print 'will plot rmspectrum with 7sigma threshold.'
+elif len(sys.argv) == 5:
+    print 'i\'m afraid i can\'t do that, dave.'
+elif len(sys.argv) == 6:
+    print 'will plot two rmspectra with 7sigma threshold.'
+elif len(sys.argv) == 7:
+    print 'will save two rmspectra with 7sigma threshold.'
 
 import asciidata, numpy, pylab
 import matplotlib.pyplot as plt
@@ -37,39 +45,68 @@ lsq = numpy.array((3e-1/nu)**2)
 
 # now plot
 fig = plt.figure()
+fig.subplots_adjust(hspace=0.3)
 ax1 = fig.add_subplot(211)
+if len(sys.argv) == 7:
+    plt.title(sys.argv[6])
 ax1.plot(lsq, numpy.degrees(pola), 'b.')
 ax1.set_xlabel('Lambda^2 (m^2)')
-ax1.set_ylabel('Polarization Angle (degrees)',color='b')
-ax1.set_ylim(-180.,180.)
+ax1.set_ylabel('Pol. Angle (degrees)',color='b')
+ax1.set_ylim(-200.,95.)
+pylab.yticks(numpy.array([-90,-45,0,+45,+90]))
 for tl in ax1.get_yticklabels():
     tl.set_color('b')
 
-#pylab.axis([nu[0],nu[len(nu)-1],-180,180])
-#pylab.subplot(3,1,2)
-#pylab.plot(q,u)
-#pylab.errorbar(q,u,xerr=err,yerr=err,fmt='.-')
-#pylab.xlabel('Q (Jy)')
-#pylab.ylabel('U (Jy)')
-#meanp = numpy.mean(numpy.sqrt(q**2 + u**2))
-#ar = numpy.arange(100*2*3.14)/100.
-#pylab.plot(meanp*numpy.cos(ar), meanp*numpy.sin(ar),'--')
-#pylab.axis([-1.5*meanp,1.5*meanp,-1.5*meanp,1.5*meanp])
-#pylab.subplot(3,1,2)
 ax2 = ax1.twinx()
-sigmap = (q**2*err + u**2*err)/(q**2 + u**2)
-ax2.errorbar(lsq,numpy.sqrt(q**2 + u**2),yerr=sigmap,fmt='r*')
-ax2.set_ylabel('Polarized flux (Jy)', color='r')
+p = numpy.sqrt(q**2 + u**2)
+sigmap = (q**2*err + u**2*err)/p**2
+ax2.errorbar(lsq,p,yerr=sigmap,fmt='r*',linewidth=0.3)
+ax2.set_ylim(min(p) - 0.1*(max(p)-min(p)), 2.0*max(p))
+ax2.set_ylabel('Pol. flux (Jy)', color='r')
 #pylab.axis([nu[0],nu[len(nu)-1],0,2])
 for tl in ax2.get_yticklabels():
     tl.set_color('r')
 
-#ax1 = fig.add_subplot(211)
-pylab.subplot(2,1,2)
-pylab.plot(rm, numpy.sqrt(dirty_re**2 + dirty_im**2), 'b-', label='Dirty', linewidth=0.5)
-pylab.plot(rm, numpy.sqrt(clean_re**2 + clean_im**2), 'b-', label='Clean', linewidth=2)
-pylab.xlabel('RM (rad/m^2)')
-pylab.ylabel('Polarized flux (mJy/RM bin)')
-pylab.legend()
+ax3 = fig.add_subplot(413)
+#ax3.plot(rm, numpy.sqrt(dirty_re**2 + dirty_im**2), 'b--', label='Dirty', linewidth=0.3)
+ax3.plot(rm, numpy.sqrt(clean_re**2 + clean_im**2), 'b-', label='Clean', linewidth=2)
+#pylab.legend()
 
-plt.show()
+if len(sys.argv) > 3:
+    print 'loading ', sys.argv[3]
+    f = asciidata.AsciiData(sys.argv[3])
+    rms = float(numpy.array(f.columns[0]))
+    print 'loaded rms = %.3f' % (rms)
+    ax3.plot(rm, 5*rms*(numpy.ones(len(rm))), '-.')
+
+ax3.set_xlim(-5000.,5000.)
+
+if len(sys.argv) > 5:
+    # load files
+    print 'loading ', sys.argv[4]
+    f3 = asciidata.AsciiData(sys.argv[4], comment_char='#')
+    rm = numpy.array(f3.columns[1])
+    dirty_re = numpy.array(f3.columns[2])
+    dirty_im = numpy.array(f3.columns[3])
+    clean_re = numpy.array(f3.columns[4])
+    clean_im = numpy.array(f3.columns[5])
+
+    ax4 = fig.add_subplot(414)
+#    ax4.plot(rm, numpy.sqrt(dirty_re**2 + dirty_im**2), 'b--', label='Dirty', linewidth=0.3)
+    ax4.plot(rm, numpy.sqrt(clean_re**2 + clean_im**2), 'b-', label='Clean', linewidth=2)
+    ax4.set_xlabel('RM (rad/m^2)')
+    ax4.set_ylabel('Pol. flux (mJy/RM bin)',verticalalignment='bottom')
+#    pylab.legend()
+
+    print 'loading ', sys.argv[5]
+    f = asciidata.AsciiData(sys.argv[5])
+    rms = float(numpy.array(f.columns[0]))
+    print 'loaded rms = %.3f' % (rms)
+    ax4.plot(rm, 5*rms*(numpy.ones(len(rm))), '-.')
+    ax4.set_xlim(-90000.,90000.)
+
+if len(sys.argv) == 7:
+    print 'saving file to ', sys.argv[6]
+    plt.savefig('plotrm-'+ sys.argv[6] + '-nice.png')
+else:
+    plt.show()

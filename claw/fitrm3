@@ -2,17 +2,34 @@
 # wrapper to take input for fitrm-textout and python plot
 
 # clean up
-rm -f /tmp/tmp-pound /tmp/tmp-log /tmp/tmp-rmspectrum
+rm -f /tmp/tmp-pound /tmp/tmp-logall /tmp/tmp-rmspectrumall /tmp/tmp-rmsall
+rm -f /tmp/tmp-pound /tmp/tmp-log1430 /tmp/tmp-rmspectrum1430 /tmp/tmp-rms1430
 rm -f log rm_spectrum_1001.txt
 
 # create rm spectrum
+echo 'First do spectrum of all data over +-5000 rad/m2 (need to type /xs to move through)'
 cp $1 log
-fitrm-textout  
+set name = `echo $1:t:r | cut -c 5-`
+fitrm-5000 | grep 'RMS (obs)' | gawk '{printf("%10.3f\n",$6)}' > /tmp/tmp-rmsall
 
 # create files for python plotting
 echo -n '#' > /tmp/tmp-pound
-cat /tmp/tmp-pound $1 > /tmp/tmp-log
-cat /tmp/tt rm_spectrum_1001.txt > /tmp/tmp-rmspectrum
+cat /tmp/tmp-pound log > /tmp/tmp-logall
+cat /tmp/tmp-pound rm_spectrum_1001.txt > /tmp/tmp-rmspectrumall
+fitrmpeak.py /tmp/tmp-rmspectrumall /tmp/tmp-rmsall
+
+echo 'Next do spectrum of 1430 data over +-90000 rad/m2  (need to type /xs to move through)'
+cp $1:r.1430 log
+fitrm-textout | grep 'RMS (obs)' | gawk '{printf("%10.3f\n",$6)}' > /tmp/tmp-rms1430
+
+# create files for python plotting
+echo -n '#' > /tmp/tmp-pound
+cat /tmp/tmp-pound log > /tmp/tmp-log1430
+cat /tmp/tmp-pound rm_spectrum_1001.txt > /tmp/tmp-rmspectrum1430
+fitrmpeak.py /tmp/tmp-rmspectrum1430 /tmp/tmp-rms1430
 
 # python plot
-rm-est.py /tmp/tmp-log /tmp/tmp-rmspectrum
+rm-est.py /tmp/tmp-logall /tmp/tmp-rmspectrumall /tmp/tmp-rmsall /tmp/tmp-rmspectrum1430 /tmp/tmp-rms1430 $name
+#rm-est.py /tmp/tmp-log /tmp/tmp-rmspectrum plotrm-${name}.all.png
+convert plotrm-${name}-nice.png plotrm-${name}-nice.ps
+#mv rm_components.txt rmcomp-${name}.txt
