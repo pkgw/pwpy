@@ -21,6 +21,9 @@ end = 0
 print 'loading ', sys.argv[1]
 f2 = asciidata.AsciiData(sys.argv[1], comment_char='#')
 rm = numpy.array(f2.columns[1])
+dirty_re = numpy.array(f2.columns[2])
+dirty_im = numpy.array(f2.columns[3])
+dirty_am = numpy.sqrt(dirty_re**2 + dirty_im**2)
 clean_re = numpy.array(f2.columns[4])
 clean_im = numpy.array(f2.columns[5])
 clean_am = numpy.sqrt(clean_re**2 + clean_im**2)
@@ -40,6 +43,7 @@ while 1:
     print 'Need to identify range to fit...'
     pylab.figure(1)
     pylab.plot(rm, clean_am)
+    pylab.plot(rm, dirty_am)
     pylab.plot(rm, 5*rms*numpy.ones(len(rm)),'-.')
     pylab.plot(rm, 7*rms*numpy.ones(len(rm)),'--')
     pylab.show()
@@ -48,18 +52,19 @@ while 1:
     try:
         rmmin = float(raw_input('What is the min RM?\n'))
     except:
-        rmmin = numpy.min(rm)
+        rmmin = numpy.min(rm)-1
         print 'Using min of range'
     try:
         rmmax = float(raw_input('What is the max RM?\n'))
     except:
-        rmmax = numpy.max(rm)
+        rmmax = numpy.max(rm)+1
         print 'Using max of range'
 
-    fitindex = numpy.arange(numpy.where(rm>=rmmin)[0][0],numpy.where(rm>=rmmax)[0][0])
-#    fitindex = numpy.concatenate((fitindex[0:1700],fitindex[len(fitindex)-40:len(fitindex)]))  # hackalicious!
+    fitindex = numpy.arange(numpy.where(rm>=rmmin)[0][0],numpy.where(rm<=rmmax)[0][-1])
+#    fitindex = numpy.concatenate((fitindex[0:30000],fitindex[len(fitindex)-120:len(fitindex)]))  # hackalicious!
     rm = rm[fitindex]
     clean_am = clean_am[fitindex]
+    dirty_am = dirty_am[fitindex]
 
     try:
         amp = float(raw_input('amp?'))
