@@ -2,31 +2,36 @@
 # claw, 19jun09
 #
 # Script to calibrate ATA data with frequency dependent gains and leakages.
-# Also outputs leakages for plotting by 'plotleak-realimag.py', in mmm code repository.
-# Assumes the data is flagged.  Best to flag aggressively and remove any suspect antpols.
+# This is a wrapper script that splits the data in frequency and runs mfcal and gpcal.
+# It also outputs leakages for plotting by the python script 'plotleak-realimag.py'.
+# It is best to flag aggressively and remove any suspect antenna polarizations.
+# If parallacic angle coverage is poor, the calibration model can be simplified to improve reliability.
 
-# User parameters
-set visroot=$1
-set log=${1}.log
-set chans=50  # channels per frequency chunk.  
-set combine=0  # combine cal with other sources (hardcoded)?
-set leakcal=''  # if leakages are calibrated externally
-#set leakcal='../nvss-rm2/try7-1800-hires/mosfxc-3c286-1800-100-flagged2'  # if leakages are calibrated externally
-set leaks=1   # output leakage text files?
+## User parameters
+set visroot=$1   # input file name
+set log=${1}.log  # output log file
+set chans=50  # channels per frequency chunk;  each is calibrated independently
+set combine=0  # optionally can combine gain (not leakage) cal with other files to extend in time
+set leakcal=''  # optionally can apply leakages from other files;  sometimes useful for helping the fit converge
+set leaks=1   # optionally can output leakage text files
+
+# Filters for data;  useful to remove bad antennas
+set antsel=''
 #set antsel=select=ant'('1,4,5,6,7,8,10,11,12,13,14,33,37')('1,4,5,6,7,8,10,11,12,13,14,33,37')' # smaller leak in polcal2.uvaver.high
 #set antsel='select=-ant(5,6,10,11,42)'  # removes 1800 day2,3 large leaks
 #set antsel='select=-ant(5,8,16,26,42)'  # removes 1000 day2,3 large leaks
 #set antsel='select=-ant(5,16,42)'  # removes 2010 day1,2 large leaks
-set antsel='select=-ant(6)'  # removes 1430 day1 large leak
-#set antsel=''
+#set antsel='select=-ant(6)'  # removes 1430 day1 large leak
 
-# set refant, if you like
+## Parsing the inputs
+# set refant, if you like, defaults to number 1, which is often good
 if $#argv == 2 then
     set refant=$2
 else
     set refant=1
 endif
-# do second order phase correction with multiple files
+
+# if using secondary gain (not leakage) calibrator, if you need to extende gain in time
 if $#argv == 3 then
     set refant=$2
     set cal2=$3
@@ -37,7 +42,8 @@ else
 #    set cal3='mosfxc-NVSSJ084124+705341-2010-100'
 endif
 
-# put data in time, stokes order
+## Start processing
+# First, put data in (time, stokes) order required by gpcal.  Skip this is tmp file exists...
 if ( -e tmp-${visroot}-tmp ) then
     goto tmpexists
 else
@@ -51,12 +57,13 @@ endif
 
 tmpexists:
 
-# loop over frequency chunks
+# Loop over frequency chunks, split data and calibrate each chunk.
 #foreach piece (1 2 3 4 5 6 7 8)
 foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16)
 #foreach piece (9 10 11 12 13 14 15 16)
 #foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52  53  54  55  56  57  58  59  60  61  62  63  64 65  66  67  68  69  70  71  72  73  74  75  76  77 78  79  80  81  82  83  84  85  86  87  88  89  90 91  92  93  94  95  96  97  98  99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 129 130 131 132 133 134 135 136 137 138 139 140 141 142 143 144 145 146 147 148 149 150 151 152 153 154 155 156 157 158 159 160)
 
+    # Check that there is data in this chunk.  If not, skip it.
     if (${leakcal} != '') then
       if (! -e ${leakcal}-${piece}) then
 	echo 'Skipping channel '${piece} | tee -ia $log
@@ -65,23 +72,20 @@ foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16)
     endif
     echo 'Starting channel ' $piece | tee -ia $log
 
-    # define first channel number of frequency chunk
+    # Define first channel number of frequency chunk
     set startchan = `echo '100 + '${chans}' * ('${piece}'-1)' | bc`
 
-    # reorder data to keep pol data in order expected by other tools.  also split in frequency
+    # Reorder data to keep pol data in order expected by other tools.  also split in frequency
     uvaver vis=tmp-${visroot}-tmp out=${visroot}-${piece} line=ch,${chans},${startchan},1,1 interval=0.001 options=nocal,nopass,nopol $antsel | tee -ia $log
 
-    # these are a few obsolete steps
-    #puthd in=${visroot}${piece}/evector value=1.570796
-    #uvredo vis=${visroot}${piece} out=${visroot}${piece}.uvredo options=chi
-    #rm -rf ${visroot}${piece};  mv ${visroot}${piece}.uvredo ${visroot}${piece}
-
-    # now do cal steps.  mfcal for bandpass, gpcal for gains and leakages
+    # Do calibration:  mfcal for bandpass, gpcal for gains and leakages.
+    # If calibrating only with this file, run it alone...
     if ${leakcal} == '' then
 	echo 'Running gpcal...' | tee -ia $log
 	mfcal vis=${visroot}-${piece} refant=${refant} interval=60 tol=0.00001 | tee -ia $log
 	gpcal vis=${visroot}-${piece} refant=${refant} options=xyref,polref interval=999 | tee -ia $log # op | tee -ia $logtions=xyref,polref critical!
 	gpcal vis=${visroot}-${piece} refant=${refant} options=xyref,polref interval=60 tol=0.000001 | tee -ia $log
+    # If calibrating with help from another file, copy leaks over first...
     else
 	echo 'Copying leakage calbration from '${leakcal} | tee -ia $log
 	mfcal vis=${visroot}-${piece} refant=${refant} interval=60 tol=0.00001 | tee -ia $log
@@ -92,7 +96,7 @@ foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16)
 	gpcal vis=${visroot}-${piece} refant=${refant} options=xyref interval=60 tol=0.000001 xyphase=$xyphases | tee -ia $log
 # or loop through gpcal/mfcal to iterate to gain and leakage solution?
 
-# gpscal method:  some bad problem here.  not solving xyphase?
+# other, old method using gpscal method.  some bad problem here.  not solving xyphase?
 #	uvcat vis=${visroot}-${piece} out=tmp-${visroot}-${piece}
 #	rm -rf ${visroot}-${piece}
 #	mv tmp-${visroot}-${piece} ${visroot}-${piece}
@@ -102,9 +106,9 @@ foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16)
 #	cat tmp.flux
 #	gpscal vis=${visroot}-${piece} flux=`cat tmp.flux` refant=$refant interval=90 options=amplitude,xyref,noscale
 #	rm -f tmp.flux
-
     endif
 
+    # If extending gain calibration in time, apply first gain and leakage solutions, then calibration secondary cal.
     if ${combine} == 1 then
 	# apply main calibrator to others, selfcal others, then merge to single calibration file
 	# secondary cal
@@ -134,9 +138,12 @@ foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16)
 #	gpcopy mode=merge vis=${cal3}-${piece} out=${visroot}join-${piece}
 # alternatively
 #	cp -r ${visroot}-${piece} ${visroot}join-${piece}
+
+	# Finally merge the two gain solutions into a single file.  This file can be applied to target fields later.
 	gpcopy mode=merge vis=${cal2}-${piece} out=${visroot}-${piece} options=nopass,nopol | tee -ia $log
     endif
 
+    # One can optionally print out the leakage values to a text file for plotting with a python script.
     if $leaks == 1 then
 	# now output the leakages for visualization later
 	gpplt vis=${visroot}-${piece} options=polarization yaxis=amp log=${visroot}-leakamp${piece}.txt | tee -ia $log
@@ -160,7 +167,7 @@ foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16)
 
 end
 
-# clean up
+# Clean up
 rm -rf tmp-${visroot}-tmp | tee -ia $log
 rm -rf tmp-${cal2}-tmp | tee -ia $log
 #rm -rf tmp-${cal3}-tmp
