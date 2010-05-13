@@ -15,6 +15,8 @@
    in the usual way, and compute fluxes for each interval.
  - When computing fluxes, PWFLUX weights the contribution of each
    visibility by its variance. UVFLUX adds them up with equal weight.
+ - PWFLUX can write its output in a tabular format, while UVFLUX
+   cannot.
  - PWFLUX cannot handle more than one source per UV dataset, while
    UVFLUX can.
  - PWFLUX can only handle data with a single spectral window and
@@ -48,6 +50,10 @@
 @ stokes
  The standard Stokes/polarization parameter selection keyword.
  For more help, see "mirhelp stokes".
+
+@ textapp
+ Flux information is appended to the specified textual file in a
+ tabular format. FIXME specify it.
 --
 
 FIXME: assuming a single source per UV data file!
@@ -190,6 +196,37 @@ class Fluxer (object):
         self.flushfunc (tMin, tMax, poldata)
 
 
+class TabularAppender (object):
+    def __init__ (self, f):
+        assert f is not None
+        self.f = f
+
+
+    def append (self, tMin, tMax, poldata):
+        tCenter = 0.5 * (tMin + tMax)
+        dur = tMax - tMin
+
+        treal = 0.0
+        tweight = 0.0
+
+        for pol, data in poldata.iteritems ():
+            mreal, mimag, amp, u, phdeg, uphdeg, count = data
+
+            wt = u ** -2
+            treal += mreal * wt
+            tweight += wt
+
+        real = treal / tweight
+        uncert = 1 / N.sqrt (tweight)
+
+        print >>self.f, '%.8f\t%.8f\t%.8f\t%.8f' % (tCenter, dur, real, uncert)
+            
+
+    def appendAndPrint (self, tmin, tmax, poldata):
+        flushPrint (tmin, tmax, poldata)
+        self.append (tmin, tmax, poldata)
+
+
 # Task
 
 def flushPrint (tMin, tMax, poldata):
@@ -212,6 +249,7 @@ def task (argv):
 
     keys.keyword ('interval', 'd', 1)
     keys.keyword ('offset', 'd', None, 2)
+    keys.keyword ('textapp', 'f', ' ')
     keys.doUvdat ('dsl3w', True)
     opts = keys.process (argv)
 
@@ -229,8 +267,16 @@ def task (argv):
         print >>sys.stderr, ('Error: zero or two values must be specified for source offset;'
                              ' got'), opts.offset
         return 1
+    
+    f = Fluxer (interval, offset)
 
-    Fluxer (interval, offset).onFlush (flushPrint).process ()
+    if opts.textapp == ' ':
+        f.onFlush (flushPrint)
+    else:
+        appobj = TabularAppender (file (opts.textapp, 'a'))
+        f.onFlush (appobj.appendAndPrint )
+
+    f.process ()
     return 0
 
 
