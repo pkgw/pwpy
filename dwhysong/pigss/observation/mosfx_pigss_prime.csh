@@ -20,6 +20,7 @@ set inst1 = 'fx64a:fxa'
 set inst2 = 'fx64c:fxa'
 set subarray = "fxa"
 set ucat = /home/obs/dwhysong/pfhex.cat
+set scanlist = "pfhex-scans.log"
 echo "MOSFX Prime Set to Start!"
 onintr fail
 
@@ -256,6 +257,7 @@ foreach sou (`echo $soulist | tr ',' ' '`)
 	    set starttime2 = 0
 	endif
 	set currenttime = `date +%s`
+	echo "$sou" >> $scanlist
 	
 	sleep `echo $currenttime $starttime1 $starttime2 $dursou $inttime | awk '{if (($2 == 0 && $3 == 0) || ($2+$4 < $1+(2*$5) && $3+$4 < $1+(2*$5))) {print 0; next}; if ($2 > $3) {print $2+$4-$1-(2*$5); next}; if ($2 <= $3) {print $3+$4-$1-(2*$5); next}}'`
 	echo `date +%s`": Data in the pipe, moving targets..." >> timelog

@@ -2,8 +2,10 @@
 use ATA;
 use Getopt::Long;
 use POSIX;
+use Fcntl qw(:flock SEEK_END);
 
-# FIXME do I need to allow for a case where $targets is defined and $bad is set?
+# TODO:
+#	Possibly support case where $targets and $bad are both set
 
 sub read_fields {
 	my $fname = shift;
@@ -56,6 +58,8 @@ sub mywarn {
 
 $donefile="/home/obs/dwhysong/pigss2.done";
 $targetfilename="/home/obs/dwhysong/pigss.targets";
+$lockfile="/home/obs/dwhysong/.pigss_run";
+
 
 # Parse command line
 $end=-1;
@@ -72,11 +76,9 @@ GetOptions('end|e=f' => \$end,
 	   'field|f=s' => \$targets,
 	   'bad|b' => \$bad);
 
-@str=`ps -ef | grep pigss2.pl | grep -v vi | grep -v grep`;
-chomp(@str);
-if ((!$test) and (scalar @str > 1)) {
-	die "Error: another pigss2.pl process appears to be running.\n";
-}
+# Lock file to prevent multiple instances
+open($fh, ">>", $lockfile) or die "Cannot open $lockfile - $!\n";
+flock($fh, LOCK_EX|LOCK_NB) or die "Cannot lock $lockfile - $!. Another pigss2.pl process is likely running.\n";
 
 if ($restart + $bad + defined($nfields) + defined($targets) > 1) {
 	die("I'm confused. Please specify only one of --restart, --bad, --nfields, and --field.\n");
@@ -168,10 +170,10 @@ if (-f $targets) {
 	chomp($date);
 	system("cp $targetfilename observed/pigss2-$date") if ($test==0);
 }
-if (!$restart) {
-	print("Adding Lockman hole fields.\n");
-	$targets = "lockman" . "|" . $targets;
-}
+#if (!$restart) {
+#	print("Adding Lockman hole fields.\n");
+#	$targets = "lockman" . "|" . $targets;
+#}
 
 if (!defined($nfields)) {
 	$nfields=floor($duration * 4.7);	# Specific for PiGSS
@@ -227,8 +229,8 @@ else {
 	system("park.csh `slist.csh none`");
 
 	# Copy scan list to aster
-	#do this: cat timelog | grep pfhex | cut -f 5 -d ' '
-	#system("scp -n pfhex-scans.log dwhysong\@aster:pigss/");
+	# or do this: cat timelog | grep pfhex | cut -f 5 -d ' '
+	system("scp -n pfhex-scans.log dwhysong\@aster:pigss/");
 
 	# Log the completed fields
 	open(FILE, ">> $donefile") || die("Can\'t open $donefile: $!\n");
@@ -237,6 +239,8 @@ else {
 
 	# Initiate data reduction
 	#system("ssh -f obs\@pulsar-2 pigss2/autoreduce.sh");
+	flock($fh, LOCK_UN) or die "Cannot unlock $fh - $!\n";
+	close($fh);
 	print ("pigss2.pl exits: ",`date`);
 	exit(0);
 }

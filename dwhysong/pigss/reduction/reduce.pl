@@ -74,12 +74,10 @@ for ($i=0; $i<(scalar(@corrs)); $i++) {
 	@cals=getcals;
 	$corr=$corrs[$i];
 	$freq=@freqs[$i];
-	$master=$cals[0];
-	$masterfile="mosfx$corr-$master-$freq";
 	if ($docal) {
 		foreach $cal (@cals) {
 			$flux=getflux($cal,$freq);
-			$fname="mosfx$corr-$cal-$freq";
+			$fname=`ls -d mosfx$corr-$cal-$freq* 2> /dev/null`;
 			system("flag.sh $fname 2>&1");
 			system("newrfisweep.csh vis=$fname 2>&1");
 			system("newcalcal.csh vis=$fname flux=$flux 2>&1");
@@ -87,9 +85,9 @@ for ($i=0; $i<(scalar(@corrs)); $i++) {
 	}
 
 	foreach $pfx (@pfxs) {
-		@files=`ls -d mosfx$corr-$pfx*-$freq 2> /dev/null`;
-		print "ls -d mosfx$corr-$pfx*-$freq 2> /dev/null\n";
-		print `ls -d mosfx$corr-$pfx*-$freq 2> /dev/null\n`;
+		@files=`ls -d mosfx$corr-$pfx*-$freq* 2> /dev/null`;
+		print "ls -d mosfx$corr-$pfx*-$freq* 2> /dev/null\n";
+		print `ls -d mosfx$corr-$pfx*-$freq* 2> /dev/null\n`;
 		chomp @files;
 		print "Found these files to process:\n";
 		foreach $file (@files) { print "\t$file\n"; }

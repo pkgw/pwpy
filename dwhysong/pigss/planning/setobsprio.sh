@@ -18,6 +18,8 @@ else
   PRIO=0;
 fi
 for x in $FIELDS;
-  do echo Set priority $x = $PRIO
-  /home/dwhysong/pigss/schedule.pl -p "$x"="$PRIO" -f $PIGSS_DATABASE
+  do if [ "lockman" != $x ]; then
+    echo Set priority $x = $PRIO
+    /home/dwhysong/pigss/schedule.pl -p "$x"="$PRIO" -f $PIGSS_DATABASE
+  fi
 done
