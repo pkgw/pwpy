@@ -6,7 +6,7 @@
 import sys
 import miriad
 from miriad import VisData
-from mirexec import TaskInvert, TaskClean, TaskRestore
+from mirexec import TaskInvert, TaskClean, TaskRestore, CalledProcessError
 
 def _trace (cmd):
     print '+ %s' % (' '.join (cmd))
@@ -34,7 +34,7 @@ class ArgHandler (object):
     
 class ArgSetter (ArgHandler):
     def __call__ (self, values):
-        setattr (self.task, self.arg, ','.join (values))
+        setattr (self.task, self.arg, values)
 
 
 class ArgAppender (ArgHandler):
@@ -219,6 +219,9 @@ All of the supported options are:
                     print >>sys.stderr, 'Error: unknown keyword \'%s\'' % kw
                     sys.exit (1)
 
+                if len (vals) == 1:
+                    vals = vals[0]
+
                 self.argTable[kw] (vals)
             else:
                 self.argTable['vis'] ([arg])
@@ -310,6 +313,6 @@ q.parseArgs (sys.argv[1:])
 
 try:
     q.run ()
-except Exception:
+except CalledProcessError:
     # Error message will have been printed by the task
     sys.exit (1)

@@ -177,13 +177,11 @@ cleanup = []
 if precat:
     cattmp = out.vvis ('cat')
     cattmp.delete ()
-    mirexec.TaskUVCat (vis=','.join (str (x) for x in vises),
-                       out=cattmp).run ()
+    mirexec.TaskUVCat (vis=vises, out=cattmp).run ()
     vises = [cattmp]
     cleanup.append (cattmp)
 
-t = mirexec.TaskUVModel (vis=','.join (str (x) for x in vises))
-t.model = model
+t = mirexec.TaskUVModel (vis=vises, model=model)
 
 if mode == MODE_REPLACE:
     t.replace = True
