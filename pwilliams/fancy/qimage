@@ -243,7 +243,7 @@ All of the supported options are:
         if self.invert.stokes is None or len (self.invert.stokes) == 0:
             stokes = ['ii']
         else:
-            stokes = self.invert.stokes.split (',')
+            stokes = self.invert.stokes
 
         vis = [VisData (v) for v in self.vis]
 
