@@ -84,7 +84,7 @@
       By default these datasets are all deleted.
  '-t' Perform the post-modeling "touchup" step to make the format of
       the output dataset less unusual.
-
+ '-z' Pass the "zero" option to UVMODEL.
 --
 """
 
@@ -114,6 +114,7 @@ flux = None
 offset = '0,0'
 preserve = False
 touchup = False
+zero = False
 
 for arg in sys.argv[1:]:
     if arg.startswith ('out='):
@@ -141,6 +142,8 @@ for arg in sys.argv[1:]:
         preserve = True
     elif arg == '-t':
         touchup = True
+    elif arg == '-z':
+        zero = True
     elif arg.startswith ('clip='):
         clip = float (arg[5:])
     elif arg.startswith ('flux='):
@@ -175,7 +178,7 @@ if precat:
     cattmp = out.vvis ('cat')
     cattmp.delete ()
     mirexec.TaskUVCat (vis=','.join (str (x) for x in vises),
-                       out=cattmp).xrun ()
+                       out=cattmp).run ()
     vises = [cattmp]
     cleanup.append (cattmp)
 
@@ -198,13 +201,14 @@ t.clip = clip
 t.line = 'chan'
 t.flux = flux
 t.offset = offset
+t.zero = zero
 
 cmodel = []
 
 for pol, polcode in zip ('xy', (-6, -7)):
     pv = out.vvis ('mdl' + pol)
     pv.delete ()
-    t.setArgs (select='pol(%s)' % (pol * 2), out=pv).xrun ()
+    t.set (select='pol(%s)' % (pol * 2), out=pv).run ()
     cleanup.append (pv)
 
     # If the user is modeling with a point-source model, UVMODEL
@@ -231,26 +235,26 @@ for pol, polcode in zip ('xy', (-6, -7)):
 
     cv = out.vvis ('cal' + pol)
     cv.delete ()
-    mirexec.TaskUVCal (vis=pv, out=cv, polcode=polcode).xrun ()
+    mirexec.TaskUVCal (vis=pv, out=cv, polcode=polcode).run ()
     cmodel.append (cv)
     cleanup.append (cv)
 
 if not touchup:
     mirexec.TaskUVCat (vis=','.join (str (v) for v in cmodel),
-                       out=out).xrun ()
+                       out=out).run ()
 else:
     combined = out.vvis ('comb')
     combined.delete ()
     mirexec.TaskUVCat (vis=','.join (str (v) for v in cmodel),
-                       out=combined).xrun ()
+                       out=combined).run ()
     cleanup.append (combined)
 
     sorted = out.vvis ('sort')
     sorted.delete ()
-    mirexec.TaskUVSort (vis=combined, out=sorted).xrun ()
+    mirexec.TaskUVSort (vis=combined, out=sorted).run ()
     cleanup.append (sorted)
 
-    mirexec.TaskUVAver (vis=sorted, interval=1e-6, out=out).xrun ()
+    mirexec.TaskUVAver (vis=sorted, interval=1e-6, out=out).run ()
 
 if not preserve:
     for v in cleanup:

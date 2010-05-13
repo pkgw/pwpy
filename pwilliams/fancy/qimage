@@ -265,10 +265,9 @@ All of the supported options are:
                 mp.delete ()
 
             t = self.invert
-            t.setArgs (vis=','.join (self.vis),
-                       map=','.join (str (t[1]) for t in mapinfo),
-                       beam=bm, xint=True)
-            t.run ()
+            t.set (vis=','.join (self.vis),
+                   map=','.join (str (t[1]) for t in mapinfo),
+                   beam=bm, xint=True).run ()
 
         for pol, mp in mapinfo:
             if len (stokes) == 1:
@@ -283,25 +282,21 @@ All of the supported options are:
             if self.force or mp.mtime > cl.umtime or bm.mtime > cl.umtime:
                 cl.delete ()
 
-                t = self.clean
-                t.setArgs (map=mp, beam=bm, out=cl, xint=True)
-                t.run ()
+                self.clean.set (map=mp, beam=bm, out=cl, xint=True).run ()
 
             if self.force or (cl.mtime > rm.umtime or mp.mtime > rm.mtime or
                               bm.mtime > rm.umtime):
                 rm.delete ()
 
-                t = self.restore
-                t.setArgs (map=mp, beam=bm, model=cl, out=rm, mode='clean')
-                t.run ()
+                self.restore.set (map=mp, beam=bm, model=cl, out=rm, 
+                                  mode='clean').run ()
 
             if self.force or (cl.mtime > rr.umtime or mp.mtime > rr.mtime or
                               bm.mtime > rr.umtime):
                 rr.delete ()
 
-                t = self.restore
-                t.setArgs (map=mp, beam=bm, model=cl, out=rr, mode='residual')
-                t.run ()
+                self.restore.set (map=mp, beam=bm, model=cl, out=rr,
+                                  mode='residual').run ()
 
 
 q = QuickImager ()

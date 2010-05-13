@@ -145,7 +145,7 @@ def copylists (*names):
     for name in names:
         v = getattr (kws, name)
         if len (v):
-            setattr (task, name, ','.join (str (x) for x in v))
+            setattr (task, name, v)
 
 
 def copyopts (*names):
@@ -175,15 +175,12 @@ for pol in 'xx', 'yy':
     task.out = workset
 
     if kws.serial:
-        task.xrun ()
+        task.run ()
     else:
-        task.xint = True
-        task.launch ()
-        procs.append (task.proc)
+        procs.append (task.launch ())
 
-if not kws.serial:
-    for proc in procs:
-        proc.wait ()
+for proc in procs:
+    proc.checkwait ()
 
 src1 = worksets[0].open ('rw')
 src2 = worksets[1].open ('rw')

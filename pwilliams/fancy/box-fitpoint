@@ -47,5 +47,5 @@ t = mirexec.TaskImFit (in_=img, object='point')
 t.region = 'arcsec,b(%.0f,%.0f,%.0f,%.0f)' % (cra - wra, cdec - wdec, 
                                               cra + wra, cdec + wdec)
 t.spar = '1,%.0f,%.0f' % (cra, cdec)
-t.xrun ()
+t.run ()
 sys.exit (0)
