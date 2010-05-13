@@ -44,6 +44,8 @@ while [ $# -gt 0 ] ; do
 
 	[ ! -f "$vis/$b" ] && cp -p "$f" "$vis/$b"
     done
+
+    echo "UVLWCP: $src -> $vis" >>"$vis"/history
 done
 
 exit 0

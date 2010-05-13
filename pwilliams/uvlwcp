@@ -33,4 +33,6 @@ for i in "$1"/* ; do
     fi
 done
 
+echo "UVLWCP: $1 -> $2" >>"$2"/history
+
 exit 0
