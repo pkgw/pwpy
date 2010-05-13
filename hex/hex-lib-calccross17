@@ -1,11 +1,11 @@
 #!/usr/bin/env ruby
 
-# $Id: hex-lib-calchex7 668 2009-10-06 17:57:33Z pkwill $
+# $Id$
 #
-# Generate cross9 pointings for a given freq, ra, and dec.  Outputs 17 ras (in
+# Generate cross17 pointings for a given freq, ra, and dec.  Outputs 17 ras (in
 # decimal hours) followed by corresponding 17 decs (in decmial degrees).  First
-# ra and first dec are center pointing, the rest are at nominal half power
-# points.
+# ra and first dec are center pointing; then there are 8 pointings sweeping in
+# RA; then there are 8 sweeping in dec.
 
 raise "usage: #{File.basename($0)} HMSCALE MHZ RA DEC" unless ARGV.length == 4
 
