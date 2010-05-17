@@ -89,7 +89,7 @@ class QuickImager (object):
         skipArgs = set (('map', 'beam', 'model', 'out', 'vis', 'mode', 'fwhm'))
 
         for task in (self.invert, self.clean, self.restore):
-            for arg in task._params:
+            for arg in task._keywords:
                 if arg in skipArgs: continue
                 self._addArg (arg, ArgSetter (task, arg))
 
