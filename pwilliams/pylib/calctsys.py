@@ -129,6 +129,10 @@
    of the per-baseline measurements, the number is not a true reduced
    chi squared: it gives no absolute sense of how successful the fit
    was.
+ - Each solution may contain a line starting with the string 'jyperk',
+   then giving a floating-point Jy/K value that may be used to convert
+   the SEFDs in this solution interval into TSyses. This value is
+   merely advisory.
  - Each solution section may contain any number of lines beginning with
    the string 'sefd', followed by an antpol name (e.g., '12X'), followed
    by the system equivalent flux density (SEFD) of the antpol in that
@@ -803,6 +807,7 @@ def dumpText (solutions, durDays, outfn):
         print >>f, 'tstart', '%.10f' % tstart
         print >>f, 'duration', '%.10f' % durDays
         print >>f, 'prchisq', '%.10f' % rchisq
+        print >>f, 'jyperk', '%.10f' % jyperk
 
         # Write SEFDs since those are really the fundamental
         # piece of information that we've computed.
