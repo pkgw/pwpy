@@ -6,8 +6,9 @@
 
 import numpy, pylab, asciidata
 import scipy.optimize as opt
+import matplotlib.pyplot as plt
 
-f = asciidata.AsciiData('/Users/caseyjlaw/claw-paper-repository/ata-nvss-rm/rmtab3.txt')
+f = asciidata.AsciiData('/o/claw/rmtab3.txt')
 
 n = numpy.array(f.columns[0])
 fl = numpy.array(f.columns[1])
@@ -56,20 +57,31 @@ fitfunc = lambda p, x:  gaussian(p[0], x, p[1], p[2])
 errfunc = lambda p, x, y: fitfunc(p, x)**2 - y**2  # optimize including noise bias
 p0 = [3.,0.,100.]
 
+fig = plt.figure()
+fig.subplots_adjust(hspace=0.)
+pylab.subplot(211)
+pylab.ylabel('Relative flux')
+pylab.setp(pylab.gca(), xticklabels=[], xticks=(0.,-500.,500.))
+#pylab.setp(pylab.gca(), xticklabels=[], xticks=(0.,10.), yticks=[0.2,0.4,0.6,0.8,1.0])
 gauarr = numpy.zeros(2000)
 for i in range(len(rmarr)):
+    pylab.plot(rm, gaussian(flarr[i],rm,rmarr[i],sigma))
     gauarr = gauarr + gaussian(flarr[i],rm,rmarr[i],sigma)
 
-pylab.plot(rm,gauarr)
-pylab.show()
+pylab.axis([-1000,1000,0.0,1.07])
+
+gauarr = gauarr/max(gauarr)
 
 p1, success = opt.leastsq(errfunc, p0[:], args = (rm, gauarr))
 
+pylab.subplot(212)
 if success:
-    pylab.figure(2)
-    pylab.clf()
     print 'Fit successful!  Results:'
     print p1
-    pylab.plot(rm, fitfunc(p1, rm))
-    pylab.plot(rm, gauarr,)
+    pylab.plot(rm, fitfunc(p1, rm), '--')
+    pylab.plot(rm, gauarr)
+    pylab.xlabel('RM (rad/m2)')
+    pylab.ylabel('Relative flux')
+    pylab.axis([-1000,1000,0.0,1.07])
     pylab.show()
+

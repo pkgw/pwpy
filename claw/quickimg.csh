@@ -11,7 +11,7 @@ set cleanreg='-50,-50,50,50'
 set stokes=i
 rm -rf ${outroot}-${stokes}.*
 #image stokes i
-invert vis=${in} options=mfs map=${outroot}-${stokes}.mp beam=${outroot}-${stokes}.bm stokes=${stokes} robust=0
+invert vis=${in} options=mfs map=${outroot}-${stokes}.mp beam=${outroot}-${stokes}.bm stokes=${stokes} robust=0 imsize=250,250
 clean map=${outroot}-${stokes}.mp beam=${outroot}-${stokes}.bm out=${outroot}-${stokes}.cl niters=400 region='relpixel,boxes('${cleanreg}')'
 restor map=${outroot}-${stokes}.mp beam=${outroot}-${stokes}.bm out=${outroot}-${stokes}.rm model=${outroot}-${stokes}.cl
 
@@ -21,7 +21,7 @@ foreach stokes (q u v)
     rm -rf ${outroot}-${stokes}.*
 
     #image
-    invert vis=${in} options=mfs map=${outroot}-${stokes}.mp beam=${outroot}-${stokes}.bm stokes=${stokes} robust=-2 imsize=250,100
+    invert vis=${in} options=mfs map=${outroot}-${stokes}.mp beam=${outroot}-${stokes}.bm stokes=${stokes} robust=-2 imsize=250,250
     clean map=${outroot}-${stokes}.mp beam=${outroot}-${stokes}.bm out=${outroot}-${stokes}.cl niters=200 region='relpixel,boxes('${cleanreg}')'
     restor map=${outroot}-${stokes}.mp beam=${outroot}-${stokes}.bm out=${outroot}-${stokes}.rm model=${outroot}-${stokes}.cl
 end

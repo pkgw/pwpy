@@ -15,7 +15,7 @@ if len(sys.argv) != 3:
 import numpy,pylab,asciidata
 import scipy.optimize as opt
 
-show = 1
+interactive = 1
 end = 0
 
 print 'loading ', sys.argv[1]
@@ -39,39 +39,49 @@ fitfunc = lambda p, x:  gaussian(p[0], x, p[1], p[2])
 errfunc = lambda p, x, y: fitfunc(p, x)**2 - y**2 + rms**2  # optimize including noise bias
 
 while 1:
-    # identify rm range to fit
-    print 'Need to identify range to fit...'
-    pylab.figure(1)
-    pylab.plot(rm, clean_am)
-    pylab.plot(rm, dirty_am)
-    pylab.plot(rm, 5*rms*numpy.ones(len(rm)),'-.')
-    pylab.plot(rm, 7*rms*numpy.ones(len(rm)),'--')
-    pylab.show()
+    if interactive:
+        # identify rm range to fit
+        print 'Need to identify range to fit...'
+        pylab.figure(1)
+        pylab.plot(rm, clean_am)
+        pylab.plot(rm, dirty_am)
+        pylab.plot(rm, 5*rms*numpy.ones(len(rm)),'-.')
+        pylab.plot(rm, 7*rms*numpy.ones(len(rm)),'--')
+        pylab.show()
 
     # use input rm range to cut area for fit
-    try:
-        rmmin = float(raw_input('What is the min RM?\n'))
-    except:
+    if interactive:
+        try:
+            rmmin = float(raw_input('What is the min RM?\n'))
+        except:
+            rmmin = numpy.min(rm)-1
+            print 'Using min of range'
+        try:
+            rmmax = float(raw_input('What is the max RM?\n'))
+        except:
+            rmmax = numpy.max(rm)+1
+            print 'Using max of range'
+    else:
         rmmin = numpy.min(rm)-1
         print 'Using min of range'
-    try:
-        rmmax = float(raw_input('What is the max RM?\n'))
-    except:
         rmmax = numpy.max(rm)+1
         print 'Using max of range'
 
     fitindex = numpy.arange(numpy.where(rm>=rmmin)[0][0],numpy.where(rm<=rmmax)[0][-1])
-#    fitindex = numpy.concatenate((fitindex[0:30000],fitindex[len(fitindex)-120:len(fitindex)]))  # hackalicious!
+#    fitindex = numpy.concatenate((fitindex[0:2000],fitindex[len(fitindex)-30:len(fitindex)]))  # hackalicious!
     rm = rm[fitindex]
     clean_am = clean_am[fitindex]
     dirty_am = dirty_am[fitindex]
 
-    try:
-        amp = float(raw_input('amp?'))
-        center = float(raw_input('center?'))
-        width = float(raw_input('width?'))
-        p0 = [amp, center, width]
-    except:
+    if interactive:
+        try:
+            amp = float(raw_input('amp?'))
+            center = float(raw_input('center?'))
+            width = float(raw_input('width?'))
+            p0 = [amp, center, width]
+        except:
+            p0 = [max(clean_am), 0., 50.]  # initial guess of params
+    else:
         p0 = [max(clean_am), 0., 50.]  # initial guess of params
 
     print 'Using p0:', p0
@@ -79,9 +89,7 @@ while 1:
     # fit
     p1, success = opt.leastsq(errfunc, p0[:], args = (rm, clean_am))
 
-    if success and show == 1:
-        pylab.figure(2)
-        pylab.clf()
+    if success:
         print 'Fit successful!  Results:'
         print p1
         print
@@ -91,14 +99,20 @@ while 1:
         print 'RM 5sigma limit (poli/RMbeam)'
         print '%.1f/%.1f ' % (5*rms,p1[2])
         print
-        pylab.plot(rm, fitfunc(p1, rm), label='Fit')
-        pylab.plot(rm, clean_am, label='Cleaned')
-        pylab.legend()
-        pylab.show()
+        if interactive == 1:
+            pylab.figure(2)
+            pylab.clf()
+            pylab.plot(rm, fitfunc(p1, rm), label='Fit')
+            pylab.plot(rm, clean_am, label='Cleaned')
+            pylab.legend()
+            pylab.show()
 
-    try: 
-        end = int(raw_input('Done? (1 or enter for yes)'))
-    except:
+    if interactive:
+        try: 
+            end = int(raw_input('Done? (1 or enter for yes)'))
+        except:
+            end = 1
+    else:
         end = 1
 
     if end == 1:
