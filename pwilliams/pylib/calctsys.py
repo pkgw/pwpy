@@ -492,33 +492,41 @@ class SysTemps (object):
         self.rchisq = (self.resid**2).sum () / (self.nbp - self.nap)
         print '   Pseudo-RChiSq:', self.rchisq
 
+        self.rms = rms = N.ndarray (self.nap)
+        self.ncontrib = ncontrib = N.zeros (self.nap)
+
+        sa = StatsAccumulator ()
+
+        for i in xrange (self.nap):
+            sa.clear ()
+            for j in self.idxs:
+                if i not in ants[j]:
+                    continue
+                sa.add (self.resid[j])
+                ncontrib[i] += 1
+            rms[i] = sa.rms ()
+
+
     def _print (self):
         aps = self.aps
         tsyses = self.tsyses
         model = self.model
         soln = self.soln
+        rms = self.rms
         resid = self.resid
         ants = self.ants
-        
+
         print 'Solutions:'
 
         col = 0
-        sa = StatsAccumulator ()
         
         for i in xrange (0, self.nap):
-            # Compute RMS residual for this antpol
-            sa.clear ()
-            for j in self.idxs:
-                if i not in ants[j]: continue
-                sa.add (resid[j])
-            rms = sa.rms ()
-            
             if col == 0: print ' ',
             if col < 3:
-                print ' %3s %#6g (%#4g)' % (util.fmtAP (aps[i]), soln[i], rms),
+                print ' %3s %#.4g (%#.3g)' % (util.fmtAP (aps[i]), soln[i], rms[i]),
                 col += 1
             else:
-                print ' %3s %#6g (%#4g)' % (util.fmtAP (aps[i]), soln[i], rms)
+                print ' %3s %#.4g (%#.3g)' % (util.fmtAP (aps[i]), soln[i], rms[i])
                 col = 0
 
         # Make sure we end with a newline
@@ -652,7 +660,8 @@ class SysTemps (object):
         self.integData = {}
         self.tmin = None
 
-        return tmin, dict (zip (self.aps, self.soln)), allBadBps, jyperk
+        return (tmin, self.aps, self.soln, allBadBps, jyperk, self.rms,
+                self.ncontrib, self.rchisq)
 
 # Hooks up the SysTemp calculator to the reading of a dataset
 
@@ -766,7 +775,8 @@ class DataProcessor (object):
         self.solutions.sort (key = lambda t: t[0])
 
         # Sentinel entry to make rewriteData algorithm simpler.
-        self.solutions.append ((self.solutions[-1][0] + self.interval, None, None, None))
+        self.solutions.append ((self.solutions[-1][0] + self.interval, None, None, None,
+                                None, None, None, None))
 
 
 def dumpText (solutions, durDays, outfn):
@@ -777,16 +787,18 @@ def dumpText (solutions, durDays, outfn):
     # There's a final sentinel entry to ignore.
     print >>f, 'nsol', len (solutions) - 1
 
-    for tstart, systemps, badbps, jyperk in solutions[:-1]:
+    for tstart, aps, systemps, badbps, jyperk, rms, ncontrib, rchisq in solutions[:-1]:
         print >>f, 'startsolution'
         print >>f, 'tstart', '%.10f' % tstart
         print >>f, 'duration', '%.10f' % durDays
+        print >>f, 'prchisq', '%.10f' % rchisq
 
         # Write SEFDs since those are really the fundamental
         # piece of information that we've computed.
 
-        for ap, tsys in systemps.iteritems ():
-            print >>f, 'sefd', util.fmtAP (ap), '%.3f' % (tsys * jyperk)
+        for idx, ap in enumerate (aps):
+            print >>f, 'sefd', util.fmtAP (ap), '%.3f' % (systemps[idx] * jyperk), \
+                '%.3f' % (rms[idx] * jyperk), ncontrib[idx]
 
         for bp in badbps:
             print >>f, 'badbp', util.fmtAPs (bp)
@@ -831,6 +843,8 @@ def loadText (fn):
             if durDays is None:
                 print >>sys.stderr, 'Error: no duration for solution in file', fn
                 sys.exit (1)
+            # FIXME update to make sefds a pair of lists instead of a dict and
+            # add dummy RMS, ncontrib, & pseudo-rchisq values
             solutions.append ((tstart, sefds, badbps, 1.0))
             continue
 
@@ -864,7 +878,7 @@ def rewriteData (banner, vis, out, solutions, varyJyPerK, **kwargs):
     # FIXME: we don't write out npol!
 
     if varyJyPerK:
-        theSysTemp = solutions[0][1].values ()[0]
+        theSysTemp = solutions[0][2][0]
 
     for inp, preamble, data, flags, nread in vis.readLowlevel (False, **kwargs):
         if first:
@@ -963,9 +977,9 @@ def rewriteData (banner, vis, out, solutions, varyJyPerK, **kwargs):
         # Write a new systemp entry?
 
         if time >= solutions[nextSolnIdx][0]:
-            curSolns = solutions[nextSolnIdx][1]
-            badBps = solutions[nextSolnIdx][2]
-            curDataJyPerK = solutions[nextSolnIdx][3]
+            curSolns = dict (zip (solutions[nextSolnIdx][1], solutions[nextSolnIdx][2]))
+            badBps = solutions[nextSolnIdx][3]
+            curDataJyPerK = solutions[nextSolnIdx][4]
             assert curSolns is not None, 'Bizarre interval calculation issues?'
 
             if flaggedAps is not None:
@@ -1167,7 +1181,7 @@ def taskCalc ():
     print '  Quantization efficiency: %g' % etaQ
 
     if args.hann == 1:
-        print '  Not subtracted smoothed spectral data.'
+        print '  Not subtracting smoothed spectral data.'
     else:
         print '  Subtracting spectral data Hanning-smoothed with window size %d.' % args.hann
 
