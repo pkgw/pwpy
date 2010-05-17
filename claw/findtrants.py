@@ -1,10 +1,13 @@
-#
-# script to take "standard" uvfit output and find significant detections
-# major steps:
-# 1) plot s/n distribution
-# 2) set reasonable det threshold
-# 3) plot positions of candidates
-# ... profit?
+"""
+claw, 7aug09
+
+Script to take uvfit results from uvfitpulse.sh and find significant detections.
+Major steps:
+1) plot s/n distribution
+2) set reasonable det threshold
+3) plot positions of candidates
+... profit?
+"""
 
 import pylab,numpy,asciidata
 
