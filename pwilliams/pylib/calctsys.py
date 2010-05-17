@@ -234,9 +234,10 @@
  negative value, the jyperk value embedded in the UV stream is
  multiplied by the absolute value of this argument. Thus -1, which is
  the default value, means that the value of jyperk embedded in the file
- will be used. If jyperk=1, you will likely need to specify non-default
- values for the "maxtsys" and "maxresid" keywords to prevent all the
- data from being flagged.
+ will be used. If jyperk is set to a value significantly different than
+ the physically-correct value for the data (especially jyperk=1), you 
+ will likely need to specify non-default values for the "maxtsys" and
+ "maxresid" keywords to prevent all the data from being flagged.
 
 @ options
  Multiple options can be specified, separated by commas. Minimum-match
@@ -276,7 +277,6 @@ from miriad import *
 from mirtask import keys, util
 
 SVNID = '$Id$'
-# here is a demo change
 
 # Tables
 
