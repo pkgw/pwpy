@@ -122,10 +122,20 @@
  - Each solution section must also contain a line starting with the
    string 'duration', then giving a floating-point number giving the
    length of the solution interval in days.
+ - Each solution may contain a line starting with the string 'prchisq',
+   then giving a floating-point number giving a pseudo reduced chi 
+   squared value for the fit of per-antenna SEFDs to the per-baseline
+   assessments. Because there is no way to bootstrap the uncertainties
+   of the per-baseline measurements, the number is not a true reduced
+   chi squared: it gives no absolute sense of how successful the fit
+   was.
  - Each solution section may contain any number of lines beginning with
    the string 'sefd', followed by an antpol name (e.g., '12X'), followed
    by the system equivalent flux density (SEFD) of the antpol in that
-   solution, in Janskys.
+   solution, in Janskys. The SEFD measurement may be followed by the RMS
+   of the contributing baseline SEFD measurements against the antpol
+   value and an integer giving the number of baselines used in the
+   computation of the RMS.
  - Each solution section may contain any number of lines beginning with
    the string 'badbp', followed by a basepol name (e.g., '3Y-10Y'),
    indicating that the specified basepol should be flagged during this
@@ -264,11 +274,12 @@
 --
 
 FIXME: 
- - save uncert information in textout:
-   report error-in-mean, npts, scale by rchisq
  - enable plotting of tsys results.
  - could enable flux keyword and non-intensity pols by allowing user
    to specify an approximate polarized flux?
+ - Use SEFDs instead of TSyses in internal computations
+ - Clean up solution storage -- full class, not big tuple
+ - loadText () is currently broken.
 """
 
 import sys, numpy as N
