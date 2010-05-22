@@ -5,6 +5,7 @@
 require 'rbconfig'
 require 'dl'
 require 'narray'
+require 'astroutil'
 
 # Require the mirdl shared library
 mirdl_shared_lib = 'mirdl.' + Config::CONFIG['DLEXT']
@@ -98,5 +99,4 @@ require 'mirdl/uvio_na'
 require 'mirdl/uvdat_na'
 require 'mirdl/gains'
 require 'mirdl/bandpass'
-require 'mirdl/astroutil'
 require 'mirdl/task'
