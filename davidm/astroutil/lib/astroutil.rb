@@ -195,6 +195,17 @@ class DateTime
     now.to_utc
   end
 
+  class << self
+    # Undefine method from superclass
+    undef today if defined? today
+
+    # Create a +DateTime+ object corresponding to (local) today.
+    def today
+      n = self.now
+      n - n.day_fraction
+    end
+  end
+
   # (TAI - UTC) table (in days).
   TAI_UTC_TABLE = [
     # Add new leap seconds here
