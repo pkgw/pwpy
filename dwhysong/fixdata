@@ -1,21 +1,100 @@
 #!/bin/bash
+#
+# ATA Data fixup script, by David Whysong <dwhysong@gmail.com>
+#
+# REQUIRES:
+# Miriad installation, newrfisweep.csh, calinfo
+# Filenames must begin with the standard ATA format, i.e. mosfx?-$NAME-$FREQ
+#
+# TODO:
+# Statistical flagging: flag whole antennas if >X% of data are bad
+# Get someone to fix the ATA data catcher so it properly sorts visibilities
+
+SYSTEM=`uname`
+if [ $SYSTEM == SunOS ] ;
+  then TMPDIR=/tmp
+  echo "System is SunOS, using /tmp for temporary files"
+elif [ $SYSTEM == Linux ] ;
+  then TMPDIR=/dev/shm
+  echo "System is Linux, using /dev/shm for temporary files"
+else
+  echo "Unknown system, can't find a ramdisk. This will slow things down."
+  $TMPDIR = `pwd`  
+fi
+
+NITER=2
+TMP1=`mktemp -u $TMPDIR/atadata.XXXXXX`
+TMP2=`mktemp -u $TMPDIR/atadata.XXXXXX`
+TMP3=`mktemp -u $TMPDIR/atadata.XXXXXX`
+
+if [ ! -x `which calinfo` ] ; then
+  echo "Fatal error: calinfo not found! Get calinfo and calsdata from strato:/home/obs/mmm/karto/cals/"
+  exit 1
+fi
+if [ ! -x `which newrfisweep.csh` ] ; then
+  echo "Fatal error: newrfisweep.csh not found!"
+  exit 1
+fi
+if [ ! -x `which mfcal` ] ; then
+  echo "Fatal error: Miriad installation not found!"
+  exit 1
+fi
+
 for y in $@ ;
   do x=`dirname $y`\/`basename $y`
   echo "Processing $x"
-  
-  if [ $x == "*3[Cc]286*" ] ; then
-    echo "Correcting coordinates for 3C286"
-    puthd in="$x"/ra value=13:31:08.2879,hms
-    puthd in="$x"/dec value=30:30:32.958,dms
-    puthd in="$x"/obsra value=13:31:08.2879,hms
-    puthd in="$x"/obsdec value=30:30:32.958,dms
+  NAME=`echo $x | cut -f2 -d-`
+  FREQ=`echo $x | cut -f3 -d-`
+  DFREQ=`dc -e "4 k $FREQ 1000 / p"`
+  FLUX=`calinfo target=$NAME freq=$DFREQ | grep "Estimated flux" | cut -f 11 -d ' '`
+  if [ $? == 0 ] ; then CALIBRATOR=1 ; fi
+  MINFLUX=`dc -e "4 k $FLUX 2 - p"`
+  echo $MINFLUX | grep -v '-' > /dev/null	# Test for negative sign
+  if [ $? == 1 ] ; then MINFLUX=0; fi
+  MAXFLUX=`dc -e "4 k $FLUX 2 + p"`
+
+  if [ $CALIBRATOR ] ; then
+    echo "Observed $NAME at $DFREQ GHz"
+    echo "Flux limits: $MINFLUX $MAXFLUX"
   fi
 
-  uvaver vis="$x" interval=0.0000001 select="-auto" options=nocal,nopass,nopol out="$x".1 || exit
-  #multiflag.pl "$x".1
-  #uvflag vis="$x".1 flagval=f select="uvrange(0,0.08)"
-  newrfisweep.csh vis="$x".1 scans=999 subint=999 options=rescan,noseedcorr
-  uvaver vis="$x".1 stokes=xx,yy,xy,yx select="-auto" options=nocal,nopass,nopol out="$x".pol || exit
-  rm -rf "$x".1
-  fits in="$x".pol op=uvout out="$x".pol.fits
+  uvaver vis="$x" interval=0.000000001 options=nocal,nopass,nopol out=$TMP1 || exit
+  
+  if [[ $x =~ 3[Cc]286 ]] ; then
+    echo "Correcting coordinates for 3C286"
+    puthd in=$TMP1/ra value=13:31:08.2879,hms
+    puthd in=$TMP1/dec value=30:30:32.958,dms
+    puthd in=$TMP1/obsra value=13:31:08.2879,hms
+    puthd in=$TMP1/obsdec value=30:30:32.958,dms
+  fi
+
+  newrfisweep.csh vis=$TMP1 scans=999 subint=999 options=rescan,noseedcorr
+  if [ $CALIBRATOR == 1 ]; then
+    for i in `seq 1 $NITER`
+      do echo "Running mfcal in:" `pwd`
+      mfcal vis=$TMP1 refant=13 options=interpolate minants=4
+      if [ $? != 0 ]; then
+        echo "  mfcal failed, but don't worry - trying uvsort"
+        if [ -e $TMP1/bandpass -o -e $TMP1/gains ] ;
+          then echo "ERROR: Bandpass table exists but I haven't calibrated yet."
+          exit 1
+        fi
+        mv $TMP1 $TMP2
+        uvsort vis=$TMP2 out=$TMP1 # uvsort has no option to avoid applying calibration tables
+        rm -rf $TMP2
+        mfcal vis=$TMP1 refant=13 options=interpolate minants=4
+      fi
+      uvcat vis=$TMP1 out=$TMP2	# Apply cal tables; bandpass can't be applied simultaneously with channel averaging
+      uvaver vis=$TMP2 out=$TMP3 line=ch,1,1,1024 options=relax # channel average
+      uvflag vis=$TMP3 flagval=f select="-amplitude($MINFLUX,$MAXFLUX),pol(xx,yy)" phase=20
+      uvaflag vis=$TMP1 tvis=$TMP3 options=nopol,nofreq
+      rm -rf $TMP2
+      rm -rf $TMP3
+    done
+  else
+    uvaflag vis=$TMP1 options=nopol
+  fi
+  uvaver vis=$TMP1 stokes=xx,yy,xy,yx interval=0.333333333 select="-auto" options=nocal,nopass,nopol out="$x".pol || exit
+  rm -rf $TMP1
+  #fits in="$x".pol op=uvout out="$x".pol.fits
 done

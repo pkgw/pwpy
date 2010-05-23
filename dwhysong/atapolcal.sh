@@ -13,7 +13,7 @@ startch=100;
 endch=923
 while true ; do
 	case "$1" in
-		-h|--help) echo "atacalpol.sh [-r refant] [-n channels] [-h] datafile ..." ; shift ;;
+		-h|--help) echo "atacalpol.sh [-r refant] [-n channels] [-h] datafile ..." ; shift ; exit ;;
 		-r|--refant) refant=$2 ; shift 2 ;;
 		-n|--nchan) nchan=$2 ; shift 2 ;;
 		--) shift ; break ;;
