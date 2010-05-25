@@ -11,11 +11,11 @@ if len(sys.argv) < 3:
     print 'dude, give me a log and rmspectrum file.  wtf?'
     exit(1)
 elif len(sys.argv) == 4:
-    print 'will plot rmspectrum with 7sigma threshold.'
+    print 'will plot rmspectrum with 5sigma threshold.'
 elif len(sys.argv) == 5:
     print 'i\'m afraid i can\'t do that, dave.'
 elif len(sys.argv) == 6:
-    print 'will plot two rmspectra with 7sigma threshold.'
+    print 'will plot two rmspectra with 5sigma threshold.'
 elif len(sys.argv) == 7:
     print 'will save two rmspectra with 7sigma threshold.'
 
@@ -70,6 +70,8 @@ for tl in ax2.get_yticklabels():
 ax3 = fig.add_subplot(413)
 #ax3.plot(rm, numpy.sqrt(dirty_re**2 + dirty_im**2), 'b--', label='Dirty', linewidth=0.3)
 ax3.plot(rm, numpy.sqrt(clean_re**2 + clean_im**2), 'b-', label='Clean', linewidth=2)
+if len(sys.argv) == 3 or len(sys.argv) == 4:
+    ax3.set_xlabel('RM (rad/m^2)')
 #pylab.legend()
 
 if len(sys.argv) > 3:
