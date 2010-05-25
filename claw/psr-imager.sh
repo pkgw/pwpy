@@ -20,13 +20,13 @@
 #period=0.358738    # period for b1933
 #period=0.253065    # nominal period for b0950+08
 #period=0.25304    # period that works for b0950+08-0.15s-4000
-bin=0.10
-ints=3000
+bin=0.10        # integration bin size in seconds
+ints=3000       # number of integrations in file (3000 for j0332-0.1s)
 
 # time for j0332-0.1s:
-t0h=02
-t0m=05
-t0s=02.4
+t0h=02    # start hour
+t0m=05    # start minute
+t0s=02.4  # start second
 
 # time for b1933-0.1s:
 #t0h=19
@@ -44,13 +44,13 @@ t0s=02.4
 #t0s=35.7
 
 # output properties:
-phasebins=8
+phasebins=8  # number of bins per pulse profile
 outphases=1  # not yet implemented
 #suffix='tst'
 visroot='fxc-j0332-0.1s'
-imroot='j0332-0.1s'
+imroot='j0332-0.1s-test'
 frac='all'   # 'all', '1/3', '2/3', '2/2', etc.
-cleanup=1
+cleanup=1    # delete some of the intermediate files
 ######################
 
 set -e -x
@@ -60,17 +60,21 @@ for ((i=1; i<=1; i++))
   do
 #  period=`echo 0.25370-0.00002*${i} | bc`
   period=0.7536692
-  suffix=p${i}
+  suffix=p${i}      # add a suffix to the output files to identify different periods used.  not needed for one trial period.
   
-#clean up
+#clean up older files
   rm -rf ${imroot}-?-${suffix}-*.* ${imroot}-??-${suffix}-bin*.* ${imroot}-???-${suffix}-bin*.* ${imroot}-icube-${suffix}*.* time-${suffix}-bin*
 
+# create text file with time filter
   psr-timeselect.sh ${period} ${bin} ${phasebins} ${outphases} ${ints} ${t0h} ${t0m} ${t0s} ${suffix} ${frac}
 
+# invert the data with the time filter
   psr-invert.sh ${visroot} ${imroot} ${suffix} ${phasebins}
 
+# average pulse bins for each pulse
   psr-avsubcl.sh ${imroot} ${suffix} ${phasebins}
 
+# clean up again
   if [ $cleanup -eq 1 ]
       then
       rm -rf ${imroot}-?-${suffix}-*.* ${imroot}-??-${suffix}-bin*.* time-${suffix}-bin*
