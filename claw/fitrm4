@@ -1,0 +1,20 @@
+#!/usr/bin/env tcsh
+# wrapper to take input for fitrm-textout and python plot
+
+# clean up
+rm -f /tmp/tmp-pound /tmp/tmp-logall /tmp/tmp-rmspectrumall /tmp/tmp-rmsall
+rm -f /tmp/tmp-pound /tmp/tmp-log1430 /tmp/tmp-rmspectrum1430 /tmp/tmp-rms1430
+rm -f log rm_spectrum_1001.txt
+rm -f fitrm.log
+
+# create rm spectrum
+echo 'First do spectrum of all data over +-5000 rad/m2 (need to type /xs to move through)'
+cp $1 log
+fitrm-textout | tee -a fitrm.log
+grep 'RMS (obs)' fitrm.log | tail -n 1 | gawk '{printf("%10.3f\n",$6)}' > /tmp/tmp-rmsall
+
+# create files for python plotting
+echo -n '#' > /tmp/tmp-pound
+cat /tmp/tmp-pound log > /tmp/tmp-logall
+cat /tmp/tmp-pound rm_spectrum_1001.txt > /tmp/tmp-rmspectrumall
+fitrmpeak.py /tmp/tmp-rmspectrumall /tmp/tmp-rmsall  | tee -a results.txt
