@@ -17,7 +17,7 @@ elif len(sys.argv) == 5:
 elif len(sys.argv) == 6:
     print 'will plot two rmspectra with 5sigma threshold.'
 elif len(sys.argv) == 7:
-    print 'will save two rmspectra with 7sigma threshold.'
+    print 'will save two rmspectra with 5sigma threshold.'
 
 import asciidata, numpy, pylab
 import matplotlib.pyplot as plt

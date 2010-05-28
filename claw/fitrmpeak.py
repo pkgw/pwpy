@@ -94,7 +94,7 @@ while 1:
         print p1
         print
         print 'Peak, center +- err, SNR'
-        print '%.1f & %.2f +- %.2f & %d \\\\' % (p1[0],p1[1],p1[2]/(2*p1[0]/rms),p1[0]/rms)
+        print '%.1f & %.1f +- %.1f & %d \\\\' % (p1[0],p1[1],p1[2]/(2*p1[0]/rms),p1[0]/rms)
         print
         print 'RM 5sigma limit (poli/RMbeam)'
         print '%.1f/%.1f ' % (5*rms,p1[2])
