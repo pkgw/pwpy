@@ -66,6 +66,7 @@ for vis in sys.argv[3:]:
 # cos (el)
 
 f = lambda x: '%.8g' % x
+wrap = lambda t: ((t + N.pi) % (2 * N.pi)) - N.pi
 
 ra0, dec0 = coords[0][:2]
 
@@ -75,7 +76,7 @@ for ra, dec, az, el, lst, lat in coords[1:]:
     # We compute the deltas fairly blindly. Should look up
     # the detailed computation that handles poles, etc.
 
-    dra = (ra - ra0) * N.cos (dec0)
+    dra = wrap (ra - ra0) * N.cos (dec0)
     ddec = dec - dec0
 
     # The central az/el drifts with time as the source moves
@@ -84,7 +85,7 @@ for ra, dec, az, el, lst, lat in coords[1:]:
     # pointing.
 
     az0, el0 = util.equToHorizon (ra0, dec0, lst, lat)
-    daz = (az - az0) * N.cos (el0)
+    daz = wrap (az - az0) * N.cos (el0)
     d_el = el - el0
 
     print f(dra), f(ddec), f(daz), f(d_el)
