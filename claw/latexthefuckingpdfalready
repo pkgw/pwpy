@@ -1,0 +1,13 @@
+#!/usr/bin/env tcsh
+
+if $#argv != 1 then
+   echo 'wtf?  give me file root.'
+   exit(1)
+endif
+
+set file = $argv[1]
+
+latex ${file}.tex
+latex ${file}.tex
+dvips ${file}.dvi  -o ${file}.ps -t letter
+ps2pdf ${file}.ps
