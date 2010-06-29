@@ -22,7 +22,7 @@ def _uvd (inp, preamble, datum):
 def _ti (inp, preamble, datum):
     return preamble[3]
 
-def _ph (inp, preamble, datum):
+def _ph (theant, otherant, inp, preamble, datum):
     return N.arctan2 (datum.imag, datum.real) * 180 / N.pi
 
 def _amp (inp, preamble, datum):
@@ -32,7 +32,7 @@ def _partner (theant, otherant, inp, preamble, datum):
     return otherant
 
 funcs = { 'uvdistance': (_uvd, False),
-          'phase': (_ph, False),
+          'phase': (_ph, True), # antdep because BL ordering affects sign
           'amplitude': (_amp, False),
           'time': (_ti, False),
           'partner': (_partner, True) }
@@ -83,9 +83,12 @@ for dIn, p, d, f, n in uvdat.readAll ():
     if not yantdep: y = yfunc (dIn, p, d)
 
     if only > 0:
-        if only in bl:
-            if only == bp[0]: other = bp[1]
-            else: other = bp[0]
+        if only in bp:
+            if only == bp[0]: 
+                other = bp[1]
+            else:
+                other = bp[0]
+                d = d.conj ()
             
             if xantdep: x = xfunc (only, other, dIn, p, d)
             if yantdep: y = yfunc (only, other, dIn, p, d)
@@ -96,8 +99,8 @@ for dIn, p, d, f, n in uvdat.readAll ():
         byAp.accum (bp[0], (x, y))
     
         if bp[1] != bp[0]:
-            if xantdep: x = xfunc (bp[1], bp[0], dIn, p, d)
-            if yantdep: y = yfunc (bp[1], bp[0], dIn, p, d)
+            if xantdep: x = xfunc (bp[1], bp[0], dIn, p, d.conj ())
+            if yantdep: y = yfunc (bp[1], bp[0], dIn, p, d.conj ())
             byAp.accum (bp[1], (x, y))
     
 # Plot it
@@ -112,7 +115,8 @@ else:
 for ap in saps:
     arr = byAp[ap].finish ()
 
-    p = omega.quickXY (arr[:,0], arr[:,1], 'Antpol %s' % util.fmtAP (ap), lines=False)
+    p = omega.quickXY (arr[:,0], arr[:,1], 'Antpol %s' % util.fmtAP (ap), lines=False,
+                       nudgex=False, nudgey=False)
     p.setLabels (xaxis, yaxis)
 
     try:
