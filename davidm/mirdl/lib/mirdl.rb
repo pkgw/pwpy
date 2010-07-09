@@ -33,7 +33,7 @@ module Mirdl
   module_function :dlopen
 
   LIBMIR = dlopen("mir")
-  LIBMIR_UVIO = dlopen("mir_uvio")
+  LIBMIR_UVIO = dlopen("mir_uvio") rescue LIBMIR
   undef dlopen
 
   SYM = {}

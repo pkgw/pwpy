@@ -48,19 +48,26 @@ if d
 end
 exit unless have_header("miriad.h")
 
-# Check mir_uvio library
+# Check miriad libraries
 d = ENV['MIRLIB']
 $LDFLAGS << " -L#{d} " if d && test(?d, d)
-exit unless have_library('mir_uvio', 'bug_c')
+
+# Must have libmir
+exit unless have_library('mir', 'options_')
+
+# Might have uvio functions in either libmir library (new way) or libmir_uvio
+# (old way)
+exit unless have_library('mir', 'bug_c') || have_library('mir_uvio', 'bug_c')
+
+# Might have linpack functions in either libmir library (new way) or
+# libmir_linpack (old way)
+exit unless have_library('mir', 'sdot_') || have_library('mir_linpack', 'sdot_')
+
+have_library('png','png_init_io') # optional png library
+exit unless have_library('pgplot', 'pgpt_')
 
 # Check for new MIRIAD bug handler function
 have_func('bughandler_c', 'miriad.h')
-
-# Check mir library (also requires mir_linpack and pgplot libraries)
-exit unless have_library('mir_linpack', 'sdot_')
-have_library('png','png_init_io') # optional png library
-exit unless have_library('pgplot', 'pgpt_')
-exit unless have_library('mir', 'options_')
 
 # Generate Makefile
 create_makefile("mirdl")
