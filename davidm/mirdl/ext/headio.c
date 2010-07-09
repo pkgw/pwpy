@@ -15,7 +15,7 @@ static VALUE cComplex;
 static VALUE mirdl_hisopen(VALUE self, VALUE vtno, VALUE vstatus)
 {
   int tno = NUM2INT(vtno);
-  char * status = SYMSTR_PTR(vstatus);
+  char * status = (char *)SYMSTR_PTR(vstatus);
 
   switch(status[0]) {
     case 'a': status = "append"; break;
@@ -66,7 +66,7 @@ static VALUE mirdl_hisclose(VALUE self, VALUE vtno)
 VALUE mirdl_wrhdr(VALUE self, VALUE vtno, VALUE vkeyword, VALUE vvalue)
 {
   int tno = NUM2INT(vtno);
-  char * keyword = SYMSTR_PTR(vkeyword);
+  char * keyword = (char *)SYMSTR_PTR(vkeyword);
   double value = NUM2DBL(vvalue);
 
   wrhdr_c(tno, keyword, value);
@@ -78,7 +78,7 @@ VALUE mirdl_wrhdr(VALUE self, VALUE vtno, VALUE vkeyword, VALUE vvalue)
 VALUE mirdl_wrhdd(VALUE self, VALUE vtno, VALUE vkeyword, VALUE vvalue)
 {
   int tno = NUM2INT(vtno);
-  char * keyword = SYMSTR_PTR(vkeyword);
+  char * keyword = (char *)SYMSTR_PTR(vkeyword);
   double value = NUM2DBL(vvalue);
 
   wrhdd_c(tno, keyword, value);
@@ -90,7 +90,7 @@ VALUE mirdl_wrhdd(VALUE self, VALUE vtno, VALUE vkeyword, VALUE vvalue)
 VALUE mirdl_wrhdi(VALUE self, VALUE vtno, VALUE vkeyword, VALUE vvalue)
 {
   int tno = NUM2INT(vtno);
-  char * keyword = SYMSTR_PTR(vkeyword);
+  char * keyword = (char *)SYMSTR_PTR(vkeyword);
   int value = NUM2INT(vvalue);
 
   wrhdi_c(tno, keyword, value);
@@ -104,7 +104,7 @@ VALUE mirdl_wrhdi(VALUE self, VALUE vtno, VALUE vkeyword, VALUE vvalue)
 VALUE mirdl_wrhdc(VALUE self, VALUE vtno, VALUE vkeyword, VALUE vvalue)
 {
   int tno = NUM2INT(vtno);
-  char * keyword = SYMSTR_PTR(vkeyword);
+  char * keyword = (char *)SYMSTR_PTR(vkeyword);
   float value[2];
   VALUE vreal;
   VALUE vimag;
@@ -128,7 +128,7 @@ VALUE mirdl_wrhdc(VALUE self, VALUE vtno, VALUE vkeyword, VALUE vvalue)
 VALUE mirdl_wrhda(VALUE self, VALUE vtno, VALUE vkeyword, VALUE vvalue)
 {
   int tno = NUM2INT(vtno);
-  char * keyword = SYMSTR_PTR(vkeyword);
+  char * keyword = (char *)SYMSTR_PTR(vkeyword);
   char * value = StringValueCStr(vvalue);
 
   wrhda_c(tno, keyword, value);
@@ -253,7 +253,7 @@ VALUE mirdl_hdcopy(VALUE self, VALUE vtin, VALUE vtout, VALUE vkeyword)
 {
   int tin = NUM2INT(vtin);
   int tout = NUM2INT(vtout);
-  char * keyword = SYMSTR_PTR(vkeyword);
+  char * keyword = (char *)SYMSTR_PTR(vkeyword);
 
   hdcopy_c(tin, tout, keyword);
 
@@ -264,7 +264,7 @@ VALUE mirdl_hdcopy(VALUE self, VALUE vtin, VALUE vtout, VALUE vkeyword)
 VALUE mirdl_hdprsnt(VALUE self, VALUE vtno, VALUE vkeyword)
 {
   int tno = NUM2INT(vtno);
-  char * keyword = SYMSTR_PTR(vkeyword);
+  char * keyword = (char *)SYMSTR_PTR(vkeyword);
   int present;
 
   present = hdprsnt_c(tno, keyword);
@@ -276,7 +276,7 @@ VALUE mirdl_hdprsnt(VALUE self, VALUE vtno, VALUE vkeyword)
 VALUE mirdl_hdprobe(VALUE self, VALUE vtno, VALUE vkeyword)
 {
   int tno = NUM2INT(vtno);
-  char * keyword = SYMSTR_PTR(vkeyword);
+  char * keyword = (char *)SYMSTR_PTR(vkeyword);
   char descr[MAXSTRING+1] = {'\0'};
   char type[81] = {'\0'};
   int n;

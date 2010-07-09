@@ -40,7 +40,7 @@ static VALUE mirdl_hopen(VALUE self, VALUE vname, VALUE vstatus)
   int tno;
   int iostat = 0;
   char * name = StringValueCStr(vname);
-  char * status = SYMSTR_PTR(vstatus);
+  char * status = (char *)SYMSTR_PTR(vstatus);
 
   switch(status[0]) {
     case 'a': status = "append"; break;
@@ -96,7 +96,7 @@ static VALUE mirdl_hclose(VALUE self, VALUE tno)
 static VALUE mirdl_hdelete(VALUE self, VALUE tno, VALUE keyword)
 {
   int iostat = 0;
-  char * kwptr = SYMSTR_PTR(keyword);
+  char * kwptr = (char *)SYMSTR_PTR(keyword);
 
   hdelete_c(NUM2INT(tno), kwptr, &iostat);
   if(iostat) {
@@ -113,7 +113,7 @@ static VALUE mirdl_haccess(VALUE self, VALUE tno, VALUE keyword, VALUE vstatus)
   int ihandle;
   int iostat = 0;
   char * kwptr = StringValueCStr(keyword);
-  char * status = SYMSTR_PTR(vstatus);
+  char * status = (char *)SYMSTR_PTR(vstatus);
 
   switch(status[0]) {
     case 'a': status = "append"; break;
@@ -145,7 +145,7 @@ static VALUE mirdl_hmode(VALUE self, VALUE tno)
 static VALUE mirdl_hexists(VALUE self, VALUE tno, VALUE keyword)
 {
   int exists;
-  char * kwptr = SYMSTR_PTR(keyword);
+  char * kwptr = (char *)SYMSTR_PTR(keyword);
 
   exists = hexists_c(NUM2INT(tno), kwptr);
 

@@ -145,7 +145,7 @@ static VALUE bug_proc_ensure(VALUE args)
 
 // Define bug-handling callback
 #ifdef HAVE_BUGHANDLER_C
-static void bug_callback(char sev_c, char * msg)
+static void bug_callback(char sev_c, Const char * msg)
 #else
 static void bug_callback()
 #endif

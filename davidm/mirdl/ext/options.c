@@ -21,7 +21,7 @@ VALUE mirdl_options(int argc, VALUE *argv, VALUE self)
 
   Check_Type(opts_ary, T_ARRAY);
   nopt = RARRAY_LEN(opts_ary);
-  key = (argc < 2 ? "options" : SYMSTR_PTR(vkey));
+  key = (argc < 2 ? "options" : (char *)SYMSTR_PTR(vkey));
   present = ALLOCA_N(int, nopt);
   opts = ALLOCA_N(char *, nopt);
 
@@ -31,7 +31,7 @@ VALUE mirdl_options(int argc, VALUE *argv, VALUE self)
 
   for(i=0; i<nopt; i++) {
     present[i] = 0;
-    opts[i] = SYMSTR_PTR(rb_ary_entry(opts_ary, i));
+    opts[i] = (char *)SYMSTR_PTR(rb_ary_entry(opts_ary, i));
   }
 
   if(options_c(key, opts, present, nopt)) {
