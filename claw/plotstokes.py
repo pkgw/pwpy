@@ -94,6 +94,15 @@ def rotate(RAoffset,DECoffset,PARANG):
 	yy=RAoffset*numpy.sin(ANG)+DECoffset*numpy.cos(ANG)
 	return xx,yy
 
+def getrefpointing(outputpath):
+	for ind in range((len(outputpath)-1),1,-1):
+		if (outputpath[ind]=='p'):
+			if ((outputpath[ind+2]=='T')|(outputpath[ind+2]=='f')|(outputpath[ind+2]=='E')):
+				return int(outputpath[ind+1:ind+2])
+			elif ((outputpath[ind+3]=='T')|(outputpath[ind+3]=='f')|(outputpath[ind+3]=='E')):
+				return int(outputpath[ind+1:ind+3])
+	return 0
+	
 #counter clockwise rotation
 def normalrotate(x,y,theta):
 	ANG=theta*numpy.pi/180.0
@@ -120,9 +129,9 @@ def plotstokessnap(outputpath):
 	nQ=range(npointings)
 	nU=range(npointings)
 	nV=range(npointings)
-	II=range(ntime*npointings)
-	QQ=range(ntime*npointings)
-	UU=range(ntime*npointings)
+	II=[[0 for col in range(npointings)] for row in range(ntime)]
+	QQ=[[0 for col in range(npointings)] for row in range(ntime)]
+	UU=[[0 for col in range(npointings)] for row in range(ntime)]
 	xx=range(ntime*npointings)
 	yy=range(ntime*npointings)
 	dx=range(ntime*npointings)
@@ -131,8 +140,52 @@ def plotstokessnap(outputpath):
 	angle=range(ntime*npointings)
 	vectorlength=range(ntime*npointings)
 	vectorangle=range(ntime*npointings)
-	colouring=['k','r','m','g','b','c','y','k']
-	alphas=[1,1,1,1,1,1,1,0.5]
+	colouring=['k','r','m','g','b','c','y','k','k','r','m','g','b','c','y','k','k','r','m','g','b','c','y','k','k','r','m','g','b','c','y','k']
+	alphas=[1,1,1,1,1,1,1,0.5,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+		
+	pylab.figure(400)
+	for itime in range(ntime):
+		for pointing in range(npointings):
+			pylab.plot(LST[pointing][itime], PARANG[pointing][itime], marker='.', color=colouring[itime],alpha=alphas[itime],lw=0)
+	pylab.xlabel('LST')
+	pylab.ylabel('Parallactic angle')
+	pylab.savefig('%sparanglst.png' % (outputpath))
+	pylab.figure(401)
+	for itime in range(ntime):
+		for pointing in range(npointings):
+			pylab.plot(pointing, PARANG[pointing][itime], marker='.', color=colouring[itime],alpha=alphas[itime], lw=0)
+	pylab.xlabel('Pointing')
+	pylab.ylabel('Parallactic angle')
+	pylab.savefig('%sparangpoint.png' % (outputpath))
+	pylab.figure(402)
+	for itime in range(ntime):
+		for pointing in range(npointings):
+			pylab.plot(itime, PARANG[pointing][itime], marker='.', color=colouring[itime],alpha=alphas[itime], lw=0)
+	pylab.xlabel('itime')
+	pylab.ylabel('Parallactic angle')
+	pylab.savefig('%sparangitime.png' % (outputpath))
+	pylab.figure(403)
+	for pointing in range(npointings):
+		pylab.plot(RAoffset[pointing],DECoffset[pointing], lw=1)
+		pylab.text(RAoffset[pointing],DECoffset[pointing],str(pointing))
+
+#	pylab.axis([-1400,1400,-1100,1100])
+	pylab.axis([-1400*2.5,1400*2.5,-1100*2.5,1100*2.5])
+	pylab.xlabel('RA offset [arcsec]')
+	pylab.ylabel('DEC offset [arcsec]')
+	pylab.savefig('%spointing.png'%outputpath)
+
+#	parser.error('exiting')
+	refpointing=getrefpointing(outputpath)
+	
+	pointingII0=range(npointings)
+	for pointing in range(npointings):
+		Iacc=0
+		for itime in range(ntime):
+			for explodedpiece in range(nexplodedpieces):
+				Iacc=Iacc+peakIQUV[pointing][itime][explodedpiece][0]
+		pointingII0[pointing]=Iacc/ntime
+	
 	cnt=0
 	for itime in range(ntime):
 		for pointing in range(npointings):
@@ -145,63 +198,123 @@ def plotstokessnap(outputpath):
 				Qacc=Qacc+peakIQUV[pointing][itime][explodedpiece][1]
 				Uacc=Uacc+peakIQUV[pointing][itime][explodedpiece][2]
 				Vacc=Vacc+peakIQUV[pointing][itime][explodedpiece][3]
-			II[cnt]=Iacc
-			QQ[cnt]=Qacc
-			UU[cnt]=Uacc
+			II[itime][pointing]=Iacc
+			QQ[itime][pointing]=Qacc
+			UU[itime][pointing]=Uacc
+			
+		II0=II[itime][refpointing]
+		QQ0=QQ[itime][refpointing]
+		UU0=UU[itime][refpointing]
+		for pointing in range(npointings):
 			[xx[cnt],yy[cnt]]=rotate(RAoffset[pointing],DECoffset[pointing],PARANG[pointing][itime])
-			II0=II[itime*npointings]
-			QQ0=QQ[itime*npointings]
-			UU0=UU[itime*npointings]
-			length=pylab.sqrt((QQ[cnt]/Iacc-QQ0/II0)**2+(UU[cnt]/Iacc-UU0/II0)**2);
-			posangle=0.5*numpy.arctan2(UU[cnt]/Iacc-UU0/II0,QQ[cnt]/Iacc-QQ0/II0)
-#			length=pylab.sqrt((QQ[cnt]/II0-QQ0/II0)**2+(UU[cnt]/II0-UU0/II0)**2);
-#			posangle=0.5*numpy.arctan2(UU[cnt]/II0-UU0/II0,QQ[cnt]/II0-QQ0/II0)
+
+			thisII=II[itime][pointing]
+			thisQQ=QQ[itime][pointing]
+			thisUU=UU[itime][pointing]
+
+			length=pylab.sqrt((thisQQ/thisII-QQ0/II0)**2+(thisUU/thisII-UU0/II0)**2);
+			posangle=0.5*numpy.arctan2(thisUU/thisII-UU0/II0,thisQQ/thisII-QQ0/II0)
+#				length=pylab.sqrt((QQ[cnt]/II0-QQ0/II0)**2+(UU[cnt]/II0-UU0/II0)**2);
+#				posangle=0.5*numpy.arctan2(UU[cnt]/II0-UU0/II0,QQ[cnt]/II0-QQ0/II0)
+#			QUERRlength=pylab.sqrt((QQ[cnt]/Iacc-QQ0/II0)**2+(UU[cnt]/Iacc-UU0/II0)**2);
+#			QUERRposangle=0.5*numpy.arctan2(UU[cnt]/Iacc-UU0/II0,QQ[cnt]/Iacc-QQ0/II0)
+			QUERRlength=pylab.sqrt((thisQQ/thisII*II0-QQ0)**2+(thisUU/thisII*II0-UU0)**2)
+			QUERRposangle=0.5*numpy.arctan2(thisUU/thisII*II0-UU0,thisQQ/thisII*II0-QQ0)
+#			QUERRlength=pylab.sqrt((QQ[cnt]-QQ0)**2+(UU[cnt]-UU0)**2)
+#			QUERRposangle=0.5*numpy.arctan2(UU[cnt]-UU0,QQ[cnt]-QQ0)
 
 			dx[cnt]=length*numpy.cos(posangle)
 			dy[cnt]=length*numpy.sin(posangle)
 			pylab.figure(1)			
-#			pylab.arrow(xx[cnt],yy[cnt],dx[cnt]*4000.0,dy[cnt]*4000.0,linewidth=0.5,head_width=0.5,color=colouring[itime],alpha=alphas[itime])	
+			pylab.arrow(xx[cnt],yy[cnt],dx[cnt]*4000.0,dy[cnt]*4000.0,linewidth=0.5,head_width=0.5,color=colouring[itime],alpha=alphas[itime])	
 #			pylab.arrow(xx[cnt],yy[cnt],dx[cnt]*16000.0,dy[cnt]*16000.0,linewidth=0.5,head_width=0.5,color=colouring[itime],alpha=alphas[itime])	
 			
+			#derotated stokes error in Q,U
 			newrelQ=numpy.cos(2.0*(posangle-PARANG[pointing][itime]*numpy.pi/180.0))
 			newrelU=numpy.sin(2.0*(posangle-PARANG[pointing][itime]*numpy.pi/180.0))
+			#Zeta++, Epsilon-+
+			derotQerr=QUERRlength*numpy.cos(2.0*(QUERRposangle-PARANG[pointing][itime]*numpy.pi/180.0))
+			derotUerr=QUERRlength*numpy.sin(2.0*(QUERRposangle-PARANG[pointing][itime]*numpy.pi/180.0))
+			derotQUposangle=0.5*numpy.arctan2(derotUerr,derotQerr)
+			zeta=-2.0*QUERRlength/II0*numpy.cos(derotQUposangle)
+			epsilon=-2.0*QUERRlength/II0*numpy.sin(derotQUposangle)
+
+#			zeta=-2.0/II0*derotQerr
+#			epsilon=-2.0/II0*derotUerr
+			
 			posangle=0.5*numpy.arctan2(newrelU,newrelQ)
 			radius[cnt]=numpy.sqrt(xx[cnt]*xx[cnt]+yy[cnt]*yy[cnt])
 			angle[cnt]=numpy.arctan2(yy[cnt],xx[cnt])*180.0/numpy.pi
 			vectorlength[cnt]=length
 			vectorangle[cnt]=posangle*180.0/numpy.pi
+
+			if (1):
+				if radius[cnt]<800.0:
+					vectorangle[cnt]=numpy.inf
+				if (angle[cnt]<-100):
+					vectorangle[cnt]=vectorangle[cnt]+180
+				if (angle[cnt]>100):
+					vectorangle[cnt]=vectorangle[cnt]-180
+			if (0):
+#				posangle=(-0.83*angle[cnt]-25.0)*numpy.pi/180.0
+				posangle=(-1*angle[cnt]-25.0)*numpy.pi/180.0
+				length=0.05
 			
 			dx[cnt]=length*numpy.cos(posangle)
 			dy[cnt]=length*numpy.sin(posangle)
 						
-			pylab.figure(2)			
-#			pylab.arrow(xx[cnt],yy[cnt],dx[cnt]*4000.0,dy[cnt]*4000.0,linewidth=0.5,head_width=0.5,color=colouring[itime],alpha=alphas[itime])	
+			pylab.figure(2)
+			pylab.arrow(xx[cnt],yy[cnt],dx[cnt]*4000.0,dy[cnt]*4000.0,linewidth=0.5,head_width=0.5,color=colouring[itime],alpha=alphas[itime])	
 #			pylab.arrow(xx[cnt],yy[cnt],dx[cnt]*16000.0,dy[cnt]*16000.0,linewidth=0.5,head_width=0.5,color=colouring[itime],alpha=alphas[itime])	
 #				pylab.text(xx[cnt],yy[cnt],'p%dt%d'%(pointing,itime),fontsize=8,color=colouring[itime],alpha=alphas[itime])
 #				pylab.text(xx[cnt],yy[cnt],'p%dt%dL%d'%(pointing,itime,PARANG[pointing][itime]),fontsize=8,color=colouring[itime],alpha=alphas[itime])
 #				pylab.plot(xx[cnt], yy[cnt], marker='o', color='c', lw=0)
 
+			if (pointing==refpointing):				
+				pylab.text(xx[cnt],yy[cnt],' p%dt%d'%(pointing,itime),fontsize=8,color=colouring[itime],alpha=alphas[itime])
+				pylab.figure(6)
+				print dx[cnt], dy[cnt]
+				pylab.arrow(xx[cnt],yy[cnt],dx[cnt]*40000.0,dy[cnt]*40000.0,linewidth=0.5,head_width=0.5,color=colouring[itime],alpha=alphas[itime])	
+				pylab.text(xx[cnt],yy[cnt],'  p%dt%d'%(pointing,itime),fontsize=8,color=colouring[itime],alpha=alphas[itime])
+				
+			pylab.figure(3)
+			pylab.arrow(xx[cnt],yy[cnt],zeta*4000.0,epsilon*4000.0,linewidth=0.5,head_width=0.5,color=colouring[itime],alpha=alphas[itime])	
+			
+			pylab.figure(7)
+#			pylab.text(xx[cnt],yy[cnt],'%g'%(dx[cnt]),color=colouring[itime],alpha=alphas[itime])
+			pylab.arrow(xx[cnt],yy[cnt],dx[cnt]*4000.0,0,linewidth=0.5,head_width=0.5,color=colouring[itime],alpha=alphas[itime])	
+			pylab.figure(8)
+#			pylab.text(xx[cnt],yy[cnt],'%g'%(dy[cnt]),color=colouring[itime],alpha=alphas[itime])
+			pylab.arrow(xx[cnt],yy[cnt],0,dy[cnt]*4000.0,linewidth=0.5,head_width=0.5,color=colouring[itime],alpha=alphas[itime])	
+			
 			cnt=cnt+1
 	
+	maxextent=max([max(xx),max(yy)])
 	pylab.figure(1)
-	pylab.axis([-1400,1400,-1100,1100])
+	pylab.axis([-maxextent*1.4,maxextent*1.4,-maxextent*1.2,maxextent*1.2])
 	pylab.xlabel('Relative AZ [arcsec]')
 	pylab.ylabel('Relative EL [arcsec]')
 	pylab.title('%s Q,U error' % (outputpath[:-1]))
 	pylab.savefig('%scoverage.png'%outputpath)
 	pylab.figure(2)
-	pylab.axis([-1400,1400,-1100,1100])
+	pylab.axis([-maxextent*1.4,maxextent*1.4,-maxextent*1.2,maxextent*1.2])
 	pylab.xlabel('Relative AZ [arcsec]')
 	pylab.ylabel('Relative EL [arcsec]')
 	pylab.title('%s Q,U error, after PA correction' % (outputpath[:-1]))
 	pylab.savefig('%scoveragePA.png'%outputpath)
 	pylab.figure(3)
+	pylab.axis([-maxextent*1.4,maxextent*1.4,-maxextent*1.2,maxextent*1.2])
+	pylab.xlabel('Relative AZ [arcsec]')
+	pylab.ylabel('Relative EL [arcsec]')
+	pylab.title('%s Zeta,Epsilon after PA correction' % (outputpath[:-1]))
+	pylab.savefig('%szetaepsilon.png'%outputpath)
+	pylab.figure(4)
 	pylab.plot(angle, vectorangle, marker='o', lw=0)
 	pylab.xlabel('Relative angle [degrees]')
 	pylab.ylabel('QU error angle')
 	pylab.title('%s Q,U error' % (outputpath[:-1]))
 	pylab.savefig('%sangleQU.png'%outputpath)
-	pylab.figure(4)
+	pylab.figure(5)
 	pylab.plot(numpy.array(radius)/1000.0*freq/3.140*0.5, vectorlength, marker='o', lw=0)
 	pylab.ylim([0,0.03])
 	pylab.xlim([0,0.51])
@@ -209,6 +322,24 @@ def plotstokessnap(outputpath):
 	pylab.ylabel('QU error magnitude')
 	pylab.title('%s Q,U error' % (outputpath[:-1]))
 	pylab.savefig('%sradiusQU.png'%outputpath)
+	pylab.figure(6)
+	pylab.axis([-maxextent*1.4,maxextent*1.4,-maxextent*1.2,maxextent*1.2])
+	pylab.xlabel('Relative AZ [arcsec]')
+	pylab.ylabel('Relative EL [arcsec]')
+	pylab.title('%s Q,U error @refpointing, after PA correction' % (outputpath[:-1]))
+	pylab.savefig('%scoveragePArefpointing.png'%outputpath)
+	pylab.figure(7)
+	pylab.axis([-maxextent*1.4,maxextent*1.4,-maxextent*1.2,maxextent*1.2])
+	pylab.xlabel('Relative AZ [arcsec]')
+	pylab.ylabel('Relative EL [arcsec]')
+	pylab.title('%s Zeta' % (outputpath[:-1]))
+	pylab.savefig('%smapzeta.png'%outputpath)
+	pylab.figure(8)
+	pylab.axis([-maxextent*1.4,maxextent*1.4,-maxextent*1.2,maxextent*1.2])
+	pylab.xlabel('Relative AZ [arcsec]')
+	pylab.ylabel('Relative EL [arcsec]')
+	pylab.title('%s Epsilon' % (outputpath[:-1]))
+	pylab.savefig('%smapepsilon.png'%outputpath)
 	
 	for itime in range(ntime):
 		maxparang=-1e10
@@ -443,7 +574,7 @@ def plotstokessnapOld(outputpath):
 			QQ[cnt]=Qacc/Iacc
 			UU[cnt]=Uacc/Iacc
 			#ax=x
-			LAT=40.81*numpy.pi/180.0
+			LAT=40.817360*numpy.pi/180.0
 			D0=pDEC[0]
 			H0=pRA[0]-LST[pointing][itime]*360.0/24.0
 			D=pDEC[pointing]
@@ -503,7 +634,7 @@ def plotstokessnapOld(outputpath):
 #					pylab.arrow(xx[cnt],yy[cnt],ddx*4000,ddy*4000,linewidth=0.5,head_width=10)	
 
 
-#				pylab.arrow(xx[cnt],yy[cnt],dx[cnt]*4000.0,dy[cnt]*4000.0,linewidth=0.5,head_width=10,color=colouring[itime],alpha=alphas[itime])	
+				pylab.arrow(xx[cnt],yy[cnt],dx[cnt]*4000.0,dy[cnt]*4000.0,linewidth=0.5,head_width=10,color=colouring[itime],alpha=alphas[itime])	
 #				pylab.text(xx[cnt],yy[cnt],'p%dt%d'%(pointing,itime),fontsize=8,color=colouring[itime],alpha=alphas[itime])
 #				pylab.text(xx[cnt],yy[cnt],'p%dt%dL%d'%(pointing,itime,PARANG[pointing][itime]),fontsize=8,color=colouring[itime],alpha=alphas[itime])
 #				pylab.plot(xx[cnt], yy[cnt], marker='o', color='c', lw=0)

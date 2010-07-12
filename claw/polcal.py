@@ -25,7 +25,7 @@ def ensureoutputpath(parser):
 		if outputpath[-1]!='/':
 			outputpath+='/'
 	if len(options.remant):
-		sappend='s%s' % (options.remant)
+		sappend='s%d' % (len(options.remant.split(',')))
 	else:
 		sappend=''
 	if (options.imagepertimepiece):
@@ -101,6 +101,23 @@ def readgpplt(outputpath,pointing,piece,nant,axis):
 		line = f.readline();
 	f.close()
 	return numpy.array(dataX, dtype='d'), numpy.array(dataY, dtype='d')
+
+#interprets prthd to read the number of pixels in dirty image
+#returns number of pixels for RA, DEC
+def readprthd(prthdoutput):
+	lines=prthdoutput[1].split('\n')
+	if len(lines)<18:
+		print lines
+		parser.error("Error reading prthd")
+		return '1000'
+	for index in range(7,10):
+		line=lines[index].split()
+		if (len(line)>2):
+			if ((line[0]=='Type')&(line[1]=='Pixels')):
+				linera=lines[index+1].split()
+				linedec=lines[index+2].split()
+				return int(linera[1]),int(linedec[1])
+	return 0,0
 
 #interprets imfit output - extracts peak value from image
 def readimfit(imfitoutput):
@@ -218,7 +235,7 @@ def readTime(inputpath,visfilename,outputpath,pointing):
 	f = open('%sp%dtime.txt' % (outputpath,pointing),"r")
 	line = f.readline()		
 	line = f.readline()		
-	basetime=line.split()[4].split(':')[0] #should be eg '10MAY16'
+	basetime=line.split()[4].split(':')[0] #should be eg '10MAY16' ie YYMMMDD, have verified this!
 	line = f.readline()		
 	line = f.readline()		
 	line = f.readline()		
@@ -287,6 +304,53 @@ def LoadPointingInfo(outputpath):
 	results.close()
 	return RA,DEC,RAoffset,DECoffset,AZ,EL,CHI,LST,starttime,stoptime,utstarttime,utstoptime,freq,nant
 
+#combine snapshot time samples
+#reduction=1 or 2 or 3 is integer
+def combinesnaptime(reduction,CHI,LST,starttime,stoptime,utstarttime,utstoptime):
+	newntime=(len(CHI[0])/reduction)*reduction;
+	npointings=len(CHI)
+	nCHI=range(npointings)
+	nLST=range(npointings)
+	nstarttime=range(npointings)
+	nstoptime=range(npointings)
+	nutstarttime=range(npointings)
+	nutstoptime=range(npointings)
+	for ipointing in range(npointings):
+		nCHI[ipointing]=0.5*(CHI[ipointing][:newntime:reduction]+CHI[ipointing][1:newntime:reduction])
+		nLST[ipointing]=0.5*(LST[ipointing][:newntime:reduction]+LST[ipointing][1:newntime:reduction])
+		nstarttime[ipointing]=starttime[ipointing][:newntime:reduction]
+		nstoptime[ipointing]=stoptime[ipointing][1:newntime:reduction]
+		nutstarttime[ipointing]=utstarttime[ipointing][:newntime:reduction]
+		nutstoptime[ipointing]=utstoptime[ipointing][1:newntime:reduction]
+	nCHI=numpy.array(nCHI)
+	nLST=numpy.array(nLST)
+	nstarttime=numpy.array(nstarttime)
+	nstoptime=numpy.array(nstoptime)
+	nutstarttime=numpy.array(nutstarttime)
+	nutstoptime=numpy.array(nutstoptime)
+	return nCHI,nLST,nstarttime,nstoptime,nutstarttime,nutstoptime
+	
+def ReducePointingInfo(reduction,outputpath,RA,DEC,RAoffset,DECoffset,AZ,EL,CHI,LST,starttime,stoptime,utstarttime,utstoptime,freq,nant):
+	if (reduction>1):
+		[CHI,LST,starttime,stoptime,utstarttime,utstoptime]=combinesnaptime(reduction,CHI,LST,starttime,stoptime,utstarttime,utstoptime)
+	output=open('%spointinginfo' % (outputpath), 'wb')#overwrite values in local directory
+	pickle.dump(RA,output)
+	pickle.dump(DEC,output)
+	pickle.dump(RAoffset,output)
+	pickle.dump(DECoffset,output)
+	pickle.dump(AZ,output)
+	pickle.dump(EL,output)
+	pickle.dump(CHI,output)
+	pickle.dump(LST,output)
+	pickle.dump(starttime,output)
+	pickle.dump(stoptime,output)
+	pickle.dump(utstarttime,output)
+	pickle.dump(utstoptime,output)
+	pickle.dump(freq,output)	
+	pickle.dump(nant,output)	
+	output.close()
+	return RA,DEC,RAoffset,DECoffset,AZ,EL,CHI,LST,starttime,stoptime,utstarttime,utstoptime,freq,nant
+	
 #tries to load pointing info if exists, else read it from vis files
 def GetPointingInfo(parser,inputpath,outputpath,visfilename0,visfilename1,npointings):	
 	tmplog=commands.getstatusoutput('ls %spointinginfo' % (outputpath))
@@ -350,6 +414,22 @@ def GetPointingInfo(parser,inputpath,outputpath,visfilename0,visfilename1,npoint
 	commands.getstatusoutput('cp %spointinginfo %s' % (inputpath,outputpath))
 	return RA,DEC,RAoffset,DECoffset,AZ,EL,CHI,LST,starttime,stoptime,utstarttime,utstoptime,freq,nant
 
+#makes regions based on dirty image size
+def makeregions(npixxy):
+	fitmax=15 #specifies distance in pixels away from origin (in x,y direction) in which fit is performed
+	noiseextra=5 #specifies extra buffer zone around fit region to avoid when determining noise
+	defaultmax=50 #default region size (distance away from origin in x,y directions)
+	maxx=(npixxy[0]-1)/2
+	maxy=(npixxy[1]-1)/2
+	if (maxx>defaultmax):
+		maxx=defaultmax
+	if (maxy>defaultmax):
+		maxy=defaultmax
+	region='relpixel,boxes(-%d,-%d,%d,%d)' % (maxx,maxy,maxx,maxy)
+	fitregion='relpixel,boxes(-%d,-%d,%d,%d)' % (fitmax,fitmax,fitmax,fitmax)
+	noiseregion='relpixel,boxes(-%d,-%d,%d,-%d)' % (maxx,maxy,maxx,fitmax+noiseextra)
+	return region, fitregion, noiseregion
+
 #image IQUV by combining all frequency pieces using MFS - this corresponds to option f (frequency)
 def imageIQUV(outputpath,pointing,convergeFail):
 	npieces=len(convergeFail)
@@ -358,10 +438,6 @@ def imageIQUV(outputpath,pointing,convergeFail):
 	stokes=['i','q','u','v']
 	robust=[0,-2,-2,-2]
 	niters=[400,200,200,200]
-	regionsize=50
-	fitregionsize=15
-	region='relpixel,boxes(-%d,-%d,%d,%d)' % (regionsize,regionsize,regionsize,regionsize)
-	fitregion='relpixel,boxes(-%d,-%d,%d,%d)' % (fitregionsize,fitregionsize,fitregionsize,fitregionsize)
 	imagingnamelist=''
 	for piece in range(npieces):
 		if (convergeFail[piece]):
@@ -373,12 +449,17 @@ def imageIQUV(outputpath,pointing,convergeFail):
 		
 	for count in range(4):
 		executelog('invert vis=%sp%df%d options=mfs map=%sp%df%d-%s.mp beam=%sp%df%d-%s.bm stokes=%s robust=%d' % (outputpath,pointing,piece,outputpath,pointing,piece,stokes[count],outputpath,pointing,piece,stokes[count],stokes[count],robust[count]));
+		[region,fitregion,noiseregion]=makeregions(readprthd(executelog('prthd in=%sp%df%d-%s.mp' % (outputpath,pointing,piece,stokes[count]))));
 		executelog('clean map=%sp%df%d-%s.mp beam=%sp%df%d-%s.bm out=%sp%df%d-%s.cl niters=%d region="%s"' % (outputpath,pointing,piece,stokes[count],outputpath,pointing,piece,stokes[count],outputpath,pointing,piece,stokes[count],niters[count],region));
 		executelog('restor map=%sp%df%d-%s.mp beam=%sp%df%d-%s.bm out=%sp%df%d-%s.rm model=%sp%df%d-%s.cl' % (outputpath,pointing,piece,stokes[count],outputpath,pointing,piece,stokes[count],outputpath,pointing,piece,stokes[count],outputpath,pointing,piece,stokes[count]));
-		peakIQUV[0][0][count]=readimfit(executelog('imfit in=%sp%df%d-%s.rm object=point region="%s"' % (outputpath,pointing,piece,stokes[count], fitregion)))
-		noiseIQUV[0][0][count]=readimstat(executelog('imstat in=%sp%df%d-%s.rm region="relpixel,boxes(-50,-50,50,-20)"' % (outputpath,pointing,piece,stokes[count])))
+		peakIQUV[0][0][count]=readimfit(executelog('imfit in=%sp%df%d-%s.rm object=point region="%s"' % (outputpath,pointing,piece,stokes[count],fitregion)))
+		noiseIQUV[0][0][count]=readimstat(executelog('imstat in=%sp%df%d-%s.rm region="%s"' % (outputpath,pointing,piece,stokes[count],noiseregion)))
+		executelog('rm -rf "%sp%df%d-%s.mp"' % (outputpath,pointing,piece,stokes[count]));
+		executelog('rm -rf "%sp%df%d-%s.bm"' % (outputpath,pointing,piece,stokes[count]));
+		executelog('rm -rf "%sp%df%d-%s.cl"' % (outputpath,pointing,piece,stokes[count]));
+		executelog('rm -rf "%sp%df%d-%s.rm"' % (outputpath,pointing,piece,stokes[count]));
 	return numpy.array(peakIQUV, dtype='d'), numpy.array(noiseIQUV, dtype='d')
-
+	
 #image IQUV for each frequency piece individually - this corresponds to option E (for eXplode)
 def imageIQUVperpiece(outputpath,pointing,convergeFail):
 	npieces=len(convergeFail)
@@ -387,20 +468,21 @@ def imageIQUVperpiece(outputpath,pointing,convergeFail):
 	stokes=['i','q','u','v']
 	robust=[0,-2,-2,-2]
 	niters=[400,200,200,200]
-	regionsize=50
-	fitregionsize=15
-	region='relpixel,boxes(-%d,-%d,%d,%d)' % (regionsize,regionsize,regionsize,regionsize)
-	fitregion='relpixel,boxes(-%d,-%d,%d,%d)' % (fitregionsize,fitregionsize,fitregionsize,fitregionsize)
 
 	for piece in range(npieces):
 		if (convergeFail[piece]):
 			continue
 		for count in range(4):
 			executelog('invert vis=%sp%df%d options=mfs map=%sp%df%d-%s.mp beam=%sp%df%d-%s.bm stokes=%s robust=%d' % (outputpath,pointing,piece,outputpath,pointing,piece,stokes[count],outputpath,pointing,piece,stokes[count],stokes[count],robust[count]));
+			[region,fitregion,noiseregion]=makeregions(readprthd(executelog('prthd in=%sp%df%d-%s.mp' % (outputpath,pointing,piece,stokes[count]))));
 			executelog('clean map=%sp%df%d-%s.mp beam=%sp%df%d-%s.bm out=%sp%df%d-%s.cl niters=%d region="%s"' % (outputpath,pointing,piece,stokes[count],outputpath,pointing,piece,stokes[count],outputpath,pointing,piece,stokes[count],niters[count],region));
 			executelog('restor map=%sp%df%d-%s.mp beam=%sp%df%d-%s.bm out=%sp%df%d-%s.rm model=%sp%df%d-%s.cl' % (outputpath,pointing,piece,stokes[count],outputpath,pointing,piece,stokes[count],outputpath,pointing,piece,stokes[count],outputpath,pointing,piece,stokes[count]));
-			peakIQUV[0][piece][count]=readimfit(executelog('imfit in=%sp%df%d-%s.rm object=point region="%s"' % (outputpath,pointing,piece,stokes[count], fitregion)))
-			noiseIQUV[0][piece][count]=readimstat(executelog('imstat in=%sp%df%d-%s.rm region="relpixel,boxes(-50,-50,50,-20)"' % (outputpath,pointing,piece,stokes[count])))
+			peakIQUV[0][piece][count]=readimfit(executelog('imfit in=%sp%df%d-%s.rm object=point region="%s"' % (outputpath,pointing,piece,stokes[count],fitregion)))
+			noiseIQUV[0][piece][count]=readimstat(executelog('imstat in=%sp%df%d-%s.rm region="%s"' % (outputpath,pointing,piece,stokes[count],noiseregion)))
+			executelog('rm -rf "%sp%df%d-%s.mp"' % (outputpath,pointing,piece,stokes[count]));
+			executelog('rm -rf "%sp%df%d-%s.bm"' % (outputpath,pointing,piece,stokes[count]));
+			executelog('rm -rf "%sp%df%d-%s.cl"' % (outputpath,pointing,piece,stokes[count]));
+			executelog('rm -rf "%sp%df%d-%s.rm"' % (outputpath,pointing,piece,stokes[count]));
 	print "----------------------------------------------------------"
 	print "PEAKIQUV",peakIQUV
 	print "NOISEIQUV",noiseIQUV
@@ -414,10 +496,6 @@ def imageIQUVsnapperpiece(outputpath,pointing,convergeFail,starttime,stoptime):
 	stokes=['i','q','u','v']
 	robust=[0,-2,-2,-2]
 	niters=[400,200,200,200]
-	regionsize=50
-	fitregionsize=15
-	region='relpixel,boxes(-%d,-%d,%d,%d)' % (regionsize,regionsize,regionsize,regionsize)
-	fitregion='relpixel,boxes(-%d,-%d,%d,%d)' % (fitregionsize,fitregionsize,fitregionsize,fitregionsize)
 
 	peakIQUV =[[ [numpy.inf,numpy.inf,numpy.inf,numpy.inf] for piece in range(npieces)] for itime in range(len(starttime))]
 	noiseIQUV=[[ [numpy.inf,numpy.inf,numpy.inf,numpy.inf] for piece in range(npieces)] for itime in range(len(starttime))]
@@ -433,18 +511,25 @@ def imageIQUVsnapperpiece(outputpath,pointing,convergeFail,starttime,stoptime):
 				continue
 			for count in range(4):
 				executelog('invert vis=%sp%df%dt%d options=mfs map=%sp%df%dt%d-%s.mp beam=%sp%df%dt%d-%s.bm stokes=%s robust=%d' % (outputpath,pointing,piece,itime,outputpath,pointing,piece,itime,stokes[count],outputpath,pointing,piece,itime,stokes[count],stokes[count],robust[count]));
+				[region,fitregion,noiseregion]=makeregions(readprthd(executelog('prthd in=%sp%df%dt%d-%s.mp' % (outputpath,pointing,piece,itime,stokes[count]))));
 				executelog('clean map=%sp%df%dt%d-%s.mp beam=%sp%df%dt%d-%s.bm out=%sp%df%dt%d-%s.cl niters=%d region="%s"' % (outputpath,pointing,piece,itime,stokes[count],outputpath,pointing,piece,itime,stokes[count],outputpath,pointing,piece,itime,stokes[count],niters[count],region));
 				executelog('restor map=%sp%df%dt%d-%s.mp beam=%sp%df%dt%d-%s.bm out=%sp%df%dt%d-%s.rm model=%sp%df%dt%d-%s.cl' % (outputpath,pointing,piece,itime,stokes[count],outputpath,pointing,piece,itime,stokes[count],outputpath,pointing,piece,itime,stokes[count],outputpath,pointing,piece,itime,stokes[count]));
 				print 'analyzing %sp%df%dt%d-%s.rm' % (outputpath,pointing,piece,itime,stokes[count])
-				peakIQUV[itime][piece][count]=readimfit(executelog('imfit in=%sp%df%dt%d-%s.rm object=point region="%s"' % (outputpath,pointing,piece,itime,stokes[count], fitregion)))
-				noiseIQUV[itime][piece][count]=readimstat(executelog('imstat in=%sp%df%dt%d-%s.rm region="relpixel,boxes(-50,-50,50,-20)"' % (outputpath,pointing,piece,itime,stokes[count])))
+				peakIQUV[itime][piece][count]=readimfit(executelog('imfit in=%sp%df%dt%d-%s.rm object=point region="%s"' % (outputpath,pointing,piece,itime,stokes[count],fitregion)))
+				noiseIQUV[itime][piece][count]=readimstat(executelog('imstat in=%sp%df%dt%d-%s.rm region="%s"' % (outputpath,pointing,piece,itime,stokes[count],noiseregion)))
+				executelog('rm -rf "%sp%df%dt%d-%s.mp"' % (outputpath,pointing,piece,itime,stokes[count]));
+				executelog('rm -rf "%sp%df%dt%d-%s.bm"' % (outputpath,pointing,piece,itime,stokes[count]));
+				executelog('rm -rf "%sp%df%dt%d-%s.cl"' % (outputpath,pointing,piece,itime,stokes[count]));
+				executelog('rm -rf "%sp%df%dt%d-%s.rm"' % (outputpath,pointing,piece,itime,stokes[count]));
+			executelog('rm -rf "%sp%df%dt%d"' % (outputpath,pointing,piece,itime));
+				
 
 	return numpy.array(peakIQUV, dtype='d'), numpy.array(noiseIQUV, dtype='d')
 	
 #do all processing for given pointing
 def processpointing(inputpath,outputpath,visfilename,pointing,refpointing,npieces,imageperpiece,imagepertimepiece,refant,remant,nant,starttime,stoptime):
 	# First, put data in order required by gpcal
-	executelog('uvaver vis=%s%s out=%stmp-p%d-tmp interval=0.001 options=nocal,nopass,nopol' % (inputpath,visfilename,outputpath,pointing));
+	executelog('uvaver vis="%s%s" out="%stmp-p%d-tmp" interval=0.001 options=nocal,nopass,nopol' % (inputpath,visfilename,outputpath,pointing));
 
 	ngroupedchannels=800/npieces
 	if len(remant):
@@ -462,13 +547,13 @@ def processpointing(inputpath,outputpath,visfilename,pointing,refpointing,npiece
 
 		# Reorder data to keep pol data in order expected by other tools.  also split in frequency
 
-		executelog('uvaver vis=%stmp-p%d-tmp out=%sp%df%d line=ch,%d,%d,1,1 interval=0.001 options=nocal,nopass,nopol %s' % (outputpath,pointing,outputpath,pointing,piece,ngroupedchannels,startchannel,antsel));
+		executelog('uvaver vis="%stmp-p%d-tmp" out="%sp%df%d" line=ch,%d,%d,1,1 interval=0.001 options=nocal,nopass,nopol %s' % (outputpath,pointing,outputpath,pointing,piece,ngroupedchannels,startchannel,antsel));
 		if refpointing>=0: #copy calibration parameters from calfile dataset
-			executelog('gpcopy vis=%sp%df%d out=%sp%df%d' % (outputpath,refpointing,piece,outputpath,pointing,piece));
+			executelog('gpcopy vis="%sp%df%d" out="%sp%df%d"' % (outputpath,refpointing,piece,outputpath,pointing,piece));
 		else:	#calibrate this dataset
-			executelog('mfcal vis=%sp%df%d refant=%d interval=60 tol=0.0001' % (outputpath,pointing,piece,refant));
-			executelog('gpcal vis=%sp%df%d refant=%d options=xyref,polref interval=999' % (outputpath,pointing,piece,refant));
-			executelog('gpcal vis=%sp%df%d refant=%d options=xyref,polref interval=60 tol=0.000001' % (outputpath,pointing,piece,refant));
+			executelog('mfcal vis="%sp%df%d" refant=%d interval=60 tol=0.0001' % (outputpath,pointing,piece,refant));
+			executelog('gpcal vis="%sp%df%d" refant=%d options=xyref,polref interval=999' % (outputpath,pointing,piece,refant));
+			executelog('gpcal vis="%sp%df%d" refant=%d options=xyref,polref interval=60 tol=0.000001' % (outputpath,pointing,piece,refant));
 
 		if (1):
 			[leakX,leakY]=readleakage(outputpath,pointing,piece,nant)
@@ -489,7 +574,7 @@ def processpointing(inputpath,outputpath,visfilename,pointing,refpointing,npiece
 	elif (imageperpiece):
 		[peakIQUV, noiseIQUV]=imageIQUVperpiece(outputpath,pointing,convergeFail)
 	else:
-		[peakIQUV, noiseIQUV]=imageIQUV(outputpath,pointing,convergeFail)
+		[peakIQUV, noiseIQUV]=imageIQUV(outputpath,pointing,convergeFail)		
 
 	#print leakagePiecesX
 	#print leakagePiecesY
@@ -497,7 +582,7 @@ def processpointing(inputpath,outputpath,visfilename,pointing,refpointing,npiece
 	print peakIQUV
 	print noiseIQUV
 
-	executelog('rm -rf %stmp-p%d-tmp' % (outputpath,pointing));
+	executelog('rm -rf "%stmp-p%d-tmp"' % (outputpath,pointing));
 
 	return leakagePiecesX, leakagePiecesY, peakIQUV, noiseIQUV, convergeFail, nactiveAntennas
 
@@ -544,9 +629,9 @@ if (dataset=='hex7'):
 	visfilename1='-2000.uvaver'
 	npointings=7
 elif (dataset=='crossa'):
-	inputpath='/big_scr2/claw/data/ata/polcal-cross-mp/'
-	visfilename0='cross17mp-p'
-	visfilename1='-3140a_c'
+	inputpath='/Users/mattieu/Berk/data/crossa/'
+	visfilename0='cross17-p'
+	visfilename1='-3140_c'
 	npointings=17
 	#warning: had to fix dataset by overwriting J2000 phase center using J2000 phase center of vis data of pointing 0
 	#uvedit vis=cross17-p1-3140 source=3c286 ra=13,31,08.289 dec=30,30,32.945
@@ -581,7 +666,9 @@ elif (dataset=='mos1800'):
 	npointings=1
 else:
 	parser.error('Dataset %s unknown' % (dataset))
-
+#1,3,4,7,8,11,12,13,15, 17, 19, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 39, 40, 41]
+#B:3,7,11,13,17,23,25,27,29,31,33,35,39,41
+#A:4,8,12,15,19,24,26,28,30,32,34,36,40,41
 leakageX=range(npointings);
 leakageY=range(npointings);
 peakIQUV=range(npointings);
@@ -590,6 +677,9 @@ convergeFail=range(npointings);
 nactiveAntennas=range(npointings);
 
 [RA,DEC,RAoffset,DECoffset,AZ,EL,CHI,LST,starttime,stoptime,utstarttime,utstoptime,freq,nant]=GetPointingInfo(parser,inputpath,outputpath,visfilename0,visfilename1,npointings)
+if (len(CHI[0])>20):
+	reduction=2
+	[RA,DEC,RAoffset,DECoffset,AZ,EL,CHI,LST,starttime,stoptime,utstarttime,utstoptime,freq,nant]=ReducePointingInfo(reduction,outputpath,RA,DEC,RAoffset,DECoffset,AZ,EL,CHI,LST,starttime,stoptime,utstarttime,utstoptime,freq,nant)
 
 #ensures the reference pointing is evaluated first, because its leakage values may be copied over to other pointings
 if (options.refpointing>=0):
