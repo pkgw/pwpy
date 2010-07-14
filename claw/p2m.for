@@ -66,6 +66,10 @@ c	Integration time for each record. Also used as the time increment
 c	for each record written. default  inttime=26.21571072 seconds.
 c	N+1 frames/period * 128 spectra/frame * 1024 sample/spectrum / 100 MHz
 c
+c@ nints
+c	Total number of integrations in file.  Probably a smarter way to do
+c	this, but hey...
+c
 c@ freq
 c   Frequency and Bandwidth in GHz.  Default 0.200,-0.05 GHz.
 c	The first spectral channel is centered at frequency. The spectral channel 
@@ -89,424 +93,322 @@ c      jul06 dcb 3.1: insert conj fixit for 6 antenna --> remove for 26jul06
 c    30jul06 dcb 3.2: back to conjugating for 8 ant; a1=1,2,3,4; a2>4,5,6,7, resp.
 c    08jul10 cjl 1.0:  convert to p2m, script for reading PoCoBI data and applying fringe rotation
 c------------------------------------------------------------------------
-      character version*(*)
-      parameter(version = 'P2M: ver 1.0 10jul08')
+	character version*(*)
+	parameter(version = 'P2M: ver 1.0 10jul08')
 
-      include 'maxdim.h'
-      include 'maxnax.h'
-      include 'mirconst.h'
+	include 'maxnax.h'
+	include 'mirconst.h'
  
 c  Externals.
-      logical Inc3More,FitBlank                 !FITS stuff
-      integer*4 tinNext
-      double precision antbas
+	integer*4 tinNext
 
 c PoCoBI data format
 	integer pkt_num, bnum
-	integer*2 ivis(2,64,36)
-
-c from xyin routine in fits.for
-      logical allgood,doflag                    !FITS stuff
-      integer nsize(MAXNAX),axes(MAXNAX),naxis  !FITS stuff
-      integer lu,ii,jj                          !FITS stuff
-      real array(MAXDIM)                        !FITS stuff
+c	integer*2 ivis(2,64,36)      ! maybe works for 16b data?
+	real ivis(2,64,36)          ! works for 32b data!
 
 c these belong in .h file
-      integer*4 MAXREC,MAXCHANBASE,MAXRFI,MAXFILES
-      parameter (MAXREC=50,MAXCHANBASE=MAXCHAN*MAXBASE,MAXRFI=100,
-     *  MAXFILES=100000)
+	parameter (MAXREC=10000000,MAXRFI=100,maxchan=64,
+	* maxbase=36,maxant=8)
 
-      logical flags(MAXCHAN,MAXBASE,MAXREC),wflags
-      logical xflags(2*MAXCHAN), rfiflags(MAXCHAN), dosun,exsun
-      integer*4 nchan,nwide,munit,nvis,nave
-      integer*4 i,j,n,nant,nrfi
-      integer*4 b,c,t,a1,a2,b_1,b_2,count,maxcount
-      integer*4 num(MAXCHAN,MAXBASE)
-      integer*4 ns,nsbc,n16,n50,n67,n84,nsd
-      integer*4 bs(2,MAXBASE),rfi(2,MAXRFI)
-      real inttime,x,z,wfreq,wwidth
-      real selcb(MAXREC),s,ss,thresh(MAXCHAN,MAXBASE)
-      real delay(MAXANT)
-      double precision visR,visI
-      double precision bxx,byy,bzz
-      double precision sinha,cosha,HA,tpi,phase
-      double precision preamble(5),sdf,antpos(3*MAXANT),times(MAXREC)
-      complex wide
-      complex vis(MAXCHAN,MAXBASE,MAXREC),bias(MAXCHAN,MAXBASE)
-c make copy for miriad call
-      complex xvis(MAXCHAN)
+	logical flags(MAXCHAN,MAXBASE),wflags
+	logical xflags(2*MAXCHAN), rfiflags(MAXCHAN)
+	integer*4 nwide,munit,nvis,nave,nints
+	integer*4 i,j,n,nant,nrfi
+	integer*4 b,c,d,ri,t,a1,a2,b_1,b_2,count,maxcount
+	integer*4 num(MAXCHAN,MAXBASE)
+	integer*4 ns,nsbc,n16,n50,n67,n84,nsd
+	integer*4 bs(2,MAXBASE),rfi(2,MAXRFI)
+	real inttime,x,z,wfreq,wwidth
+	real selcb(MAXREC),s,ss,thresh(MAXCHAN,MAXBASE)
+	real delay(MAXANT)
+	double precision bxx,byy,bzz
+	real baseline_order(36)/ 257, 258, 514, 259, 515,
+	* 771, 260, 516, 772, 1028, 261, 517, 773, 1029,
+        * 1285, 518, 774, 1030, 1286, 1542, 775, 1031, 
+        * 1287, 1543, 1799, 1032, 1288, 1544, 1800, 2056, 
+        * 262, 263, 264, 519, 520, 776 /
+	double precision sinha,cosha,HA,tpi,phase
+	double precision preamble(5),sdf,times(MAXREC)
+	complex wide
+	complex vis(MAXCHAN,MAXBASE),bias(MAXCHAN,MAXBASE)
+c       make copy for miriad call
+	complex xvis(MAXCHAN)
 
-c setup now for CASPER/8
-      data tpi/6.283185307d0/
-      data dosun/.false./,exsun/.false./
-c set all true to pass all data
-      data rfiflags/MAXCHAN*.true./
-
-c  Parameters from the user.
-      character sfile*80,outfile*80,antfile*80,rfifile*80
-      character files(MAXFILES)*80,temp*80
-c define/setup abase array for CASPER/8 correlator
-      character umsg*80,line*80,cbase*2,chant*8,abase(36)*2
-      integer ipol
-      real baseunit
-      real b1(MAXANT),b2(MAXANT),b3(MAXANT)
-      real sind,cosd,sinl,cosl
-      double precision along,alat,ra,dec,sra,sdec,obsra,obsdec
-      double precision jd2000,lst,timeout,sfreq,bandwidth
-c n.b., can get these from FITS header...someday
-      data abase/'aa','bb','cc','dd','ee','ff','gg','hh',
-     *                'ab','ac','ad','ae','af','ag','ah',
-     *                     'bc','bd','be','bf','bg','bh',
-     *                          'cd','ce','cf','cg','ch',
-     *                               'de','df','dg','dh',
-     *                                    'ef','eg','eh',
-     *                                         'fg','fh',
-     *                                              'gh'/
-      data chant/'abcdefgh'/
+c       setup now for CASPER/8
+	data tpi/6.283185307d0/
+c       set all true to pass all data
+	data rfiflags/MAXCHAN*.true./
+	
+c       Parameters from the user.
+	character sfile*80,outfile*80,antfile*80,rfifile*80
+c       define/setup abase array for CASPER/8 correlator
+	character umsg*80,line*80,cbase*2,chant*8,abase(36)*2
+	integer ipol
+	real baseunit
+	real b1(MAXANT),b2(MAXANT),b3(MAXANT)
+	real sind,cosd,sinl,cosl
+	double precision along,alat,ra,dec,sra,sdec,obsra,obsdec
+	double precision jd2000,lst,timeout,sfreq,bandwidth
  
+!================================================================
 !  Get command line arguments.
-      call output( version )
-      call keyini
+!================================================================
 
-      call keya('in',sfile,' ')
-      if (sfile .eq. ' ') call bug('f','An input file must be given')
-      call keya('out',outfile,' ')
-      if (outfile .eq. ' ')
+	call output( version )
+	call keyini
+
+	call keya('in',sfile,' ')
+	if (sfile .eq. ' ') call bug('f','An input file must be given')
+	call keya('out',outfile,' ')
+	if (outfile .eq. ' ')
      *	  call bug('f','Output file must be given')
-      call keya('ant',antfile,' ')
-      if (antfile .eq. ' ') 
+	call keya('ant',antfile,' ')
+	if (antfile .eq. ' ') 
      *    call bug('f','An antenna table must be given')
-      call keyi('pol',ipol,-1)
-      if (ipol .eq. -1) 
+	call keyi('pol',ipol,-1)
+	if (ipol .eq. -1) 
      *    call bug('f','A polarization must be selected (1,2)')
 
-      call keyr('baseunit',baseunit,1.0)
-! 10jul08 update to ATA at HCRO: -121:28:18.49,40:49:02.50
-      call keyt('longlat',along,'dms',-2.1200829068d0)
-      call keyt('longlat',alat,'dms',0.71239734336d0)
-      call keyt('radec',sra,'hms',0.d0)
-      call keyt('radec',sdec,'dms',alat)
-      write(*,*) 'SRA,SDEC:',sra,sdec
-! 06jun18 - dcb - require rfi file; bug
-      call keya('rfi',rfifile,' ')
-      write(*,'(1x,a80)') rfifile
-! get start time (GMT=UTC from paper0 cpu clock --> filename)
-! 06jun18 - dcb - input starttime of first integration "time="
-      call keyt('time',timeout,'atime',0.d0)
-      if (timeout.le.1)
+	call keyr('baseunit',baseunit,1.0)
+
+!       10jul08 update to ATA at HCRO: -121:28:18.49,40:49:02.50
+	call keyt('longlat',along,'dms',-2.1200829068d0)
+	call keyt('longlat',alat,'dms',0.71239734336d0)
+	call keyt('radec',sra,'hms',0.d0)
+	call keyt('radec',sdec,'dms',alat)
+	write(*,*) 'SRA,SDEC:',sra,sdec
+
+!       06jun18 - dcb - require rfi file; bug
+	call keya('rfi',rfifile,' ')
+	write(*,'(1x,a80)') rfifile
+
+!       get start time (GMT=UTC from paper0 cpu clock --> filename)
+!       06jun18 - dcb - input starttime of first integration "time="
+	call keyt('time',timeout,'atime',0.d0)
+	if (timeout.le.1)
      *    call dayjul('06JUN17.00',timeout)
-!06jun19 - dcb - exact value of inttime from Aaron
-      call keyr('inttime',inttime,0.001)
-      call keyd('freq',sfreq,0.700d0)
-      write(*,*) 'Start time = Julian day ',timeout
-      call keyd('freq',bandwidth,0.100d0)
-      call GetOpt(dosun)
-      call GetOpt(exsun)
-      if (dosun .and. exsun) stop 'you can not do sun and ex sun'
 
-      call keyfin
+!       06jun19 - dcb - exact value of inttime from Aaron
+	call keyr('inttime',inttime,0.001)
+	call keyi('nints',nints,100)
+	call keyd('freq',sfreq,0.700d0)
+	write(*,*) 'Start time = Julian day ',timeout
+	call keyd('freq',bandwidth,0.100d0)
+	call keyfin
  
-!  convert inputs to useful parameters
-      sinl = sin(alat)
-      cosl = cos(alat)
+!       convert inputs to useful parameters
+	sinl = sin(alat)
+	cosl = cos(alat)
  
+!================================================================
 !  Read the antenna positions and cable delays file.
-      call output('Antenna positions/cable delays:')
-! mute for now as output db not open yet
-!     call hiswrite(munit,'P2M: Antenna positions/cable delays :')
-      nant = 0
-      call tinOpen(antfile,' ')
-      do while (tinNext() .gt. 0)
-        nant = nant + 1
-        if (nant .gt. MAXANT) call bug('f','Too many antennas')
-        call tinGetr(b1(nant),0.0)
-        call tinGetr(b2(nant),0.0)
-        call tinGetr(b3(nant),0.0)
-c        call tinGetr(delay(nant),0.0)
+!================================================================
+	call output('Antenna positions/cable delays:')
+	nant = 0
+	call tinOpen(antfile,' ')
+	do while (tinNext() .gt. 0)
+	   nant = nant + 1
+	   if (nant .gt. MAXANT) call bug('f','Too many antennas')
+	   call tinGetr(b1(nant),0.0)
+	   call tinGetr(b2(nant),0.0)
+	   call tinGetr(b3(nant),0.0)
+	   call tinGetr(delay(nant),0.0)
  
-! Convert to equatorial coordinates.
-        if (baseunit .lt. 0.) then
-          x = b1(nant)
-          z = b3(nant)
-          b1(nant) = -x * sinl + z * cosl
-          b3(nant) =  x * cosl + z * sinl
-        endif
+!       Convert to equatorial coordinates.
+	   if (baseunit .lt. 0.) then
+	      x = b1(nant)
+	      z = b3(nant)
+	      b1(nant) = -x * sinl + z * cosl
+	      b3(nant) =  x * cosl + z * sinl
+	   endif
 
-! Convert to nanosecs.
-        if (baseunit .ne. 0.) then
-          b1(nant) = abs(baseunit) * b1(nant)
-          b2(nant) = abs(baseunit) * b2(nant)
-          b3(nant) = abs(baseunit) * b3(nant)
-        endif
-        write(line,'(a,4f15.4)') 'Equatorial b(ns):',
+!       Convert to nanosecs.
+	   if (baseunit .ne. 0.) then
+	      b1(nant) = abs(baseunit) * b1(nant)
+	      b2(nant) = abs(baseunit) * b2(nant)
+	      b3(nant) = abs(baseunit) * b3(nant)
+	   endif
+	   write(line,'(a,4f15.4)') 'Equatorial b(ns):',
      *              b1(nant),b2(nant),b3(nant),delay(nant)
-        call output(line)
-      enddo
-      call tinClose !antenna file
-
-!load up antpos.
-      do i=1,nant
-        antpos(i) = b1(i)
-        antpos(i+nant) = b2(i)
-        antpos(i+nant*2) = b3(i)
-      enddo
+	   call output(line)
+	enddo
+	call tinClose		!antenna file
 
 ! Get RFI channels to delete if file exists.
 ! 06jun18 - dcb - this may not work?? i.e., must have rfifile
-      if (rfifile .ne. ' ') then
-        call output('RFI Channels:')
-! mute for now as output db not open yet
-!       call hiswrite(munit,'P2M: RFI Channels :')
-        nrfi = 0
-        call tinOpen(rfifile,' ')
-        do while (tinNext() .gt. 0)
-          nrfi = nrfi + 1
-          if (nrfi .gt. MAXRFI) call bug('f','Too many rfi channels for 
-     *       deletion')
-          call tinGeti(rfi(1,nrfi),0)
-          call tinGeti(rfi(2,nrfi),0)
-          if (rfi(2,nrfi) .eq. 0) rfi(2,nrfi)=rfi(1,nrfi)
-          write(*,*) nrfi,rfi(1,nrfi),rfi(2,nrfi)
+	if (rfifile .ne. ' ') then
+	   call output('RFI Channels:')
+	   nrfi = 0
+	   call tinOpen(rfifile,' ')
+	   do while (tinNext() .gt. 0)
+	      nrfi = nrfi + 1
+	      if (nrfi .gt. MAXRFI) call bug('f','Too many rfi channels
+	      * for deletion')
+           call tinGeti(rfi(1,nrfi),0)
+           call tinGeti(rfi(2,nrfi),0)
+	   if (rfi(2,nrfi) .eq. 0) rfi(2,nrfi)=rfi(1,nrfi)
+	   write(*,*) nrfi,rfi(1,nrfi),rfi(2,nrfi)
         enddo
-        call tinClose !rfi file
+        call tinClose		!rfi file
 ! now setup rfiflags logical file.
         do i = 1, nrfi
-          do c = rfi(1,i), rfi(2,i)
-            rfiflags(c) = .false.
+	   do c = rfi(1,i), rfi(2,i)
+	      rfiflags(c) = .false.
           enddo
         enddo
 !       do c = 1, rfi(2,nrfi)
 !         write(*,*) c,rfiflags(c)
 !       enddo
-      endif !rfi file exists
+	endif			!rfi file exists
+
+!================================================================
+!  Open the output dataset
+!================================================================
+	call uvopen(munit,outfile,'new')
+	call uvset(munit,'preamble','uvw/time/baseline',0,0.,0.,0.)
+
+	call hisopen(munit,'write')
+	call hiswrite(munit,'P2M: Miriad '//version)
+	call hisinput(munit,'P2M')
+ 
+c  Write some header information and uvvariables to describe the data .
+	call wrhda(munit,'obstype','crosscorrelation')
+	call uvputvra(munit,'source',sfile)
+	call uvputvra(munit,'operator','P2M')
+	call uvputvra(munit,'version',version)
+	call uvputvra(munit,'telescop','ATA')
+c  frequency
+	call uvputvrd(munit,'freq',sfreq,1)
+	call uvputvrd(munit,'freqif',0.d0,1)
+
+	call uvputvrr(munit,'inttime',inttime,1)
+	call uvputvrr(munit,'vsource',0.,1)
+	call uvputvrr(munit,'veldop',0.,1)
+	call uvputvri(munit,'nants',nant,8)
+
+c Spectral channels; nchan & maxcount ought to be in .h file!!
+c 10jul08 - cjl - PoCoBI-8 correlator: hardwire 64 chan
+	maxcount = 0.8 * maxchan
+	sdf = bandwidth/maxchan
+	call uvputvri(munit,'nchan',maxchan,1)
+	call uvputvri(munit,'nspect',1,1)
+	call uvputvrd(munit,'sfreq',sfreq,1)
+	call uvputvrd(munit,'sdf',sdf,1)
+	call uvputvri(munit,'ischan',1,1)
+	call uvputvri(munit,'nschan',maxchan,1)
+	call uvputvrd(munit,'restfreq',sfreq,1)
+
+! Wideband channels
+	nwide = 1
+	wfreq = sfreq + bandwidth/2.
+	wwidth = abs(bandwidth)
+	call uvputvri(munit,'nwide',nwide,1)
+	call uvputvrr(munit,'wfreq',wfreq,nwide)
+	call uvputvrr(munit,'wwidth',wwidth,nwide)
+
+	call uvputvri(munit,'npol',1,1)
+	call uvputvri(munit,'pol',1,1)
 
 !================================================================
 ! READ IN THE ENTIRE P2M DATA FILE TO DATA CUBE
 !================================================================
 ! Initialize number of spectra counter in file
-      ns = 0
  
-c       goto 1220
-! Open and read the input file of fits files to be processed as block
-      write(*,*) ' ',sfile
-      open(unit=20,file=sfile,form='unformatted',status='old')
-      write(*,*) ' ',sfile
-1000  read(20) pkt_num, ivis
-	print *, pkt_num, ivis
-      goto 1220
-1001  continue
-      close(20)
+! Open and read the input pocorx file.  recl=18436 for 32b data, 9220 for 16b
+	write(*,*) 'Opening Pocorx file, ',sfile
+	open(unit=20,file=sfile,form='unformatted',status='old',
+	* access='direct', recl=18436)
 
-! get integration number from FITS filename
-        temp = files(n)
-! format differs for 06jun16 (5:8, i4) and 06jun17+ (5:9, i5)
-        read(temp(5:9),'(i5)') t
-! for 06jul26-27
-!       read(temp(5:8),'(i4)') t
-!       write(*,*) 'reading file:',temp(1:20)
-! open the input FITS file
-        lu=20
-        call fxyopen(lu,temp,'old',MAXNAX,nsize)
-!       write(*,*) ' ',files(n),' opened'
-! needed? clear flags?
-!       doflag = FitBlank(10,.false.)
-! bomb if too big
-        if (nsize(1) .gt. maxdim)
-     *    call bug('f','Image too big to handle')
-! read header var number of axes; get others such as time!!
-        call fitrdhdi(lu,'NAXIS',naxis,0)
-!       write(*,*) 'naxis:',naxis
-        if (naxis .le. 0) call bug('f','Weird bug')
-        naxis = min(naxis,MAXNAX)
-!       allgood = .true.
-        call IncIni(naxis,nsize,axes)
-! this loops through other dimensions: correlations and polarizations
-        do while (Inc3More(naxis,nsize,axes))
-!         write(*,*) '--naxis, t, axes:',naxis,t,axes
-          if (naxis.gt.2) then
-            call fxysetpl(lu,naxis-2,axes(3))
-          endif
-! define baseline pair and individual antennas
-          cbase = abase(axes(4))
-          a1 = index(chant,cbase(1:1))
-          a2 = index(chant,cbase(2:2))
-          b = 256*a1 + a2
-!         write(*,*) '--',axes(4),' ',cbase,' ',a1,a2,b
-! save for later recall by b 
-          bs(1,b) = a1
-          bs(2,b) = a2
-! calculate start time of this integration (GMT=UTC)
-!   n is index of integration # in this block of integrations
-!   t is index of integration # since start of observation (timeout)
-          times(n) = timeout + t*inttime/24./3600.
-!         write(*,*) '--times:',n,t,timeout,inttime,times(n)
-!         write(*,*) '--antennas',a1,a2,' baseline',b,' time',times(n)
-          ns = ns + 1
-! read "columns" of image, which is spectrum channels
-          do j = 1, nsize(2)/2
-! read "row" of image, which is real/imag data axis
-            call fxyread(lu,j,array)
-            if (axes(3) .eq. ipol) then
-!             if (axes(4).lt.4) write(*,*) j,array(1),array(2)
-              visR = array(1)
-! conjugate most of 06jun16-18 data:
-              visI = -array(2)
-! This was added to correct the 06jun16-18 data to "uniform" conjugation
-! state. Aaron has now put the following in his python driver of correlator
-! so don't do here. The conjugation above is to meet MIRIAD std; tested; working.
-! n.b. see also below.
-! but don't conjugate:
-              if (a1 .eq. 1 .and. a2 .gt. 4 .or.
-     *            a1 .eq. 2 .and. a2 .gt. 5 .or.
-     *            a1 .eq. 3 .and. a2 .gt. 6 .or.
-     *            a1 .eq. 4 .and. a2 .gt. 7) visR = -visR
-! calculate channel, c, swapping spectrum halves owing to FITS <xyin> convention
-              c = j + nsize(2)/2
-! scaling of acfs & ccfs; beware sign convention R,I
-!             if (c .gt. 120 .and. c .lt. 200)
-!    *          write(*,*) '----store c,b,n:',c,b,n,visR/1e3,visI/1e3
-              if (a1 .eq. a2) then
-                vis(c,b,n) = cmplx(visR,visI)/10000.0
-              else
-                vis(c,b,n) = cmplx(visR,visI)/100.0 
-              endif     !scaling
-!           else
-!             if (j .lt. 5)
-!    *        write(*,*) '----skipping other pol',j
-            endif       !poln
-          enddo         !spectrum 1st half
-! n.b., fits puts positive pixels of "image" ahead of negative; undo
-          do j = nsize(2)/2+1,nsize(2)
-! read "row" of image, which is real/imag data axis
-            call fxyread(lu,j,array)
-            if (axes(3) .eq. ipol) then
-              visR = array(1)
-! conjugate most of 06jun16-18 data:
-              visI = -array(2)
-! but don't conjugate:
-              if (a1 .eq. 1 .and. a2 .gt. 4 .or.
-     *            a1 .eq. 2 .and. a2 .gt. 5 .or.
-     *            a1 .eq. 3 .and. a2 .gt. 6 .or.
-     *            a1 .eq. 4 .and. a2 .gt. 7) visR = -visR
-! calculate channel, c, swapping spectrum halves owing to FITS <xyin> convention
-              c = j - nsize(2)/2
-! scaling of acfs & ccfs; beware sign convention R,I
-!             if (c .gt. 120 .and. c .lt. 200)
-!    *          write(*,*) '----store c,b,n:',c,b,n,visR/1e3,visI/1e3
-              if (a1 .eq. a2) then
-                vis(c,b,n) = cmplx(visR,visI)/10000.0
-              else
-                vis(c,b,n) = cmplx(visR,visI)/100.0 
-              endif     !scaling
-!           else
-!             if (j .lt. 5)
-!    *        write(*,*) '----skipping other pol',j
-            endif       !poln
-          enddo         !spectrum 2nd half
-        enddo           !all baselines & polarizations this file
-        call fxyclose(lu)
-      write(*,*) ' read in:',ns,' spectra and',nsbc,' records'
+! Loop over integrations
+	do ns = 2, nints
+	   read(20,rec=ns) pkt_num, ivis
+ 	   print *, ns, ': read pkt_num ', pkt_num
 
-! xxxxxxxxxxxxxxxxxxx -- old fx.for for ATA4 correlator
-!     ns = 0
-!     nvis = 0
-!     do while (tinNext().gt.0 .and. ns/nsi.lt.MAXREC)
-!       call tinGeti(t,0) -- parse from filename(5:9); done
-!       call tinGeta(cbase,'AA') -- extract from array initialized; done
-!       call tinGeti(c,1) -- "j" index; done, simply
-!       call tinGetd(visR,0.0) -- in array(1); done, simply
-!       call tinGetd(visI,0.0) -- in array(2); done, simply
-!       a1 = index(chant,cbase(1:1)); done
-!       a2 = index(chant,cbase(2:2)); done
-! save all data; don't need to conjugate & invert order now,
-! owing to storage in cube with correct order (1:10 w 1=>1-1 and 10=>4:4)
-!       b = offset(a1) + a2; done
-! save for later recall by b 
-!       bs(1,b) = a1; done
-!       bs(2,b) = a2; done
-! scale acfs by 100 to avoid 32k limit yielding quantization of ccfs
-! and scale ccfs by 10
-!
-! 05may16: reverse sign of raw phase
-!       if (a1 .eq. a2) then
-!         vis(c,b,ns/nsi+1) = cmplx(visR,-visI)/100.0 --> not clear
-!       else
-! 05jul06: scale ccf's by 100 too owing to Sun
-!         vis(c,b,ns/nsi+1) = cmplx(visR,-visI)/100.0 -->
-!                  acfs 2E6-5E5; ccfs 3E4-3E3; scale acf by 1000;ccf by 10
-!       endif 
-!       ns = ns + 1
-! calculate start time of this integration (GMT=UTC)
-!       times(ns/nsi+1) = timeout + t*inttime/24./3600.
-!       write(*,*) 'times:',ns,ns/nsi+1,t,timeout,inttime,
-!    &    times(ns/nsi+1)
-!     enddo
-! calculate number of records: # spectra per baseline per channel in file
-!     nsbc = ns/nsi
-!write(*,*) ' read in:',ns,' spectra and',nsbc,' records'
+! Define output visibilities	   
+	   times(ns) = timeout + (ns-1)*inttime/24./3600.
+	   preamble(4) = times(ns)
+	   call Jullst(preamble(4),along,lst)
+!       Apparent RA and DEC of phase center at time of observation.
+	   call precess(jd2000,ra,dec,preamble(4),obsra,obsdec) 
+!       put this info out in header
+	   call uvputvrd(munit,'ra',ra,1)
+	   call uvputvrd(munit,'dec',dec,1)
+	   call uvputvrr(munit,'epoch',2000.,1)
+	   call uvputvrd(munit,'obsra',obsra,1)
+	   call uvputvrd(munit,'obsdec',obsdec,1)
+	   call uvputvrd(munit,'lst',lst,1)
+	   call uvputvrd(munit,'longitu',along,1)
+	   HA = lst - obsra
+	   if (ns .eq. 1) write(*,*) ' LST,OBSRA,OBSDEC:',lst,obsra,
+	   * obsdec
+	   
+!       setting  HA = lst-obsra = 0. makes phase tracking center at zenith
+	   sinha = sin(HA)
+	   cosha = cos(HA)
+	   sind = sin(obsdec)
+	   cosd = cos(obsdec)
 
-!  default RA and DEC at epoch and constant
-      ra = sra
-      dec = sdec
-      call dayjul('00jan01.00',jd2000)
+	   do b = 1,maxbase
+	      preamble(5) = baseline_order(b)
+	      call basant(preamble(5),a1,a2)
+	      bxx = b1(a1) - b1(a2)
+	      byy = b2(a1) - b2(a2)
+	      bzz = b3(a1) - b3(a2)
+!	      print *, 'a1,a2,b,preamble(5),bxx,byy,bzz',a1, a2, b
+!	      * , preamble(5), bxx, byy, bzz
+!  get u,v,w
+	      preamble(1) =  bxx * sinha + byy * cosha
+	      preamble(2) = -(bxx * cosha - byy * sinha)*sind + bzz*cosd
+	      preamble(3) = (bxx * cosha - byy * sinha)*cosd + bzz*sind
+	      preamble(5) = 256*a1 + a2
 
-1220       continue
-!================================================================
-!  Open the output dataset
-!================================================================
-      call uvopen(munit,outfile,'new')
-      call uvset(munit,'preamble','uvw/time/baseline',0,0.,0.,0.)
+! Write out data and flags
+	      do c=1,maxchan
+		 xvis(c) = cmplx(ivis(1,c,b), ivis(2,c,b))
+		 xflags(c) = .true.
 
-      call hisopen(munit,'write')
-      call hiswrite(munit,'P2M: Miriad '//version)
-      call hisinput(munit,'P2M')
- 
-c  Write some header information and uvvariables to describe the data .
-      call wrhda(munit,'obstype','crosscorrelation')
-      call uvputvra(munit,'source',sfile)
-      call uvputvra(munit,'operator','P2M')
-      call uvputvra(munit,'version',version)
-      call uvputvra(munit,'telescop','ATA')
-c  antenna positions
-      call uvputvrd(munit,'antpos',antpos,nant*3)
-c  frequency
-      call uvputvrd(munit,'freq',sfreq,1)
-      call uvputvrd(munit,'freqif',0.d0,1)
+		 if (sra .ne. 0.) then
+!  Rotate phases to RA DEC if given by user
+! n.b., GHz & ns mix ok here..not SI, of course
+		    phase = tpi * (sfreq+(c-1)*sdf) * (preamble(3) +
+     &            delay(bs(1,b)) - delay(bs(2,b)))
+		    phase = dmod(phase,tpi)
+		    xvis(c) = xvis(c) * cmplx(dcos(phase),-dsin(phase))
+		 else		! just apply delays
+! n.b., GHz & ns mix ok here..not SI, of course
+!		    phase = tpi * (sfreq+(c-1)*sdf) * 
+!     &           (delay(bs(1,b)) - delay(bs(2,b)))
+!		    phase = dmod(phase,tpi)
+!		    xvis(c) = xvis(c) * cmplx(dcos(phase),-dsin(phase))
+		 endif
+		 print *, xvis(c)
+	      enddo		!c
 
-c ATA4 correlator:
-c (20000+1) frames/period * 128 spectra/frame * 1024 sample/spectrum / 100 MHz
-c	inttime = 26.21571072
-      call uvputvrr(munit,'inttime',inttime,1)
-      call uvputvrr(munit,'vsource',0.,1)
-      call uvputvrr(munit,'veldop',0.,1)
-      call uvputvri(munit,'nants',nant,1)
+	      call uvwrite(munit,preamble,xvis,xflags,maxchan)
+	      nvis = nvis + 1
 
-c Spectral channels; nchan & maxcount ought to be in .h file!!
-c 10jul08 - cjl - PoCoBI-8 correlator: hardwire 64 chan
-      nchan = 64
-      maxcount = 0.8 * nchan
-      sdf = bandwidth/nchan
-      call uvputvri(munit,'nchan',nchan,1)
-      call uvputvri(munit,'nspect',1,1)
-      call uvputvrd(munit,'sfreq',sfreq,1)
-      call uvputvrd(munit,'sdf',sdf,1)
-      call uvputvri(munit,'ischan',1,1)
-      call uvputvri(munit,'nschan',nchan,1)
-      call uvputvrd(munit,'restfreq',sfreq,1)
+	   enddo		!b
+	enddo    !ns
+	close(20)
 
-! Wideband channels
-      nwide = 1
-      wfreq = sfreq + bandwidth/2.
-      wwidth = abs(bandwidth)
-      call uvputvri(munit,'nwide',nwide,1)
-      call uvputvrr(munit,'wfreq',wfreq,nwide)
-      call uvputvrr(munit,'wwidth',wwidth,nwide)
-!
-      call uvputvri(munit,'npol',1,1)
-      call uvputvri(munit,'pol',1,1)
+! Tidy up and close Miriad file
+	write(line,'(i9,a)')  ns-1,' records read from P2M'
+	call output(line)
+	umsg = 'P2M: '//line
+	call hiswrite(munit, umsg )
+	write(line,'(i9,a)')  nvis,' records written to Miriad '
+	call output(line)
+	umsg = 'P2M: '//line
+	call hiswrite(munit, umsg )
 
-c Skip stats calculation.  Not needed for PoCoBI work.
-          goto 1230
+	call hisclose(munit)
+	call uvclose(munit)
+
+	goto 10000       ! jump to end
+
+
+c Can skip stats calculation.  Not needed for PoCoBI work.(?)
 
 !================================================================
 ! READ DATA done, now GENERATE STATS via sorted amp-selected data
@@ -517,290 +419,158 @@ c Skip stats calculation.  Not needed for PoCoBI work.
       n84 = nsbc * 0.835
       nsd = n67 - n16 + 1
 !     write(*,*) '#  numbers:',ns,nsbc,n16,n50,n67,n84
-      do b = 1, MAXBASE
+!      do b = 1, MAXBASE
 ! only need acf stats for threshold testing (for now)
-        if (bs(1,b) .eq. bs(2,b)) then
-          do c = 1, nchan
+!        if (bs(1,b) .eq. bs(2,b)) then
+!          do c = 1, maxchan
 ! do stats here: select time sequence of chan,base; sort; then stats
-            do t = 1, nsbc
-              selcb(t) = cabs(vis(c,b,t))
-            enddo
-            call sort(nsbc,selcb)
-            s = 0.0
-            ss = 0.0
-            do t = n16, n67
-              s = s + selcb(t)
-              ss = ss + selcb(t)*selcb(t)
-            enddo
-            s = s / nsd
-            ss = sqrt(ss/nsd - s*s)
+!            do t = 1, maxrec
+!              selcb(t) = cabs(vis(c,b,t))
+!            enddo
+!            call sort(nsbc,selcb)
+!            s = 0.0
+!            ss = 0.0
+!            do t = n16, n67
+!              s = s + selcb(t)
+!              ss = ss + selcb(t)*selcb(t)
+!            enddo
+!            s = s / nsd
+!            ss = sqrt(ss/nsd - s*s)
 ! create threshold for use in BIAS determination
 ! 05jun13 -- set thresh down to + 4 sigma
-            thresh(c,b) = (s + 4.0*ss)
+!            thresh(c,b) = (s + 4.0*ss)
 !           if (c .eq. 153) write(*,*) ' threshold for ch',c,
 !    &        ' and baseline',b,':',thresh(c,b),s,ss
 !         if ((c/32)*32 .eq. c) write(*,*) ' threshold for ch',c,
 !    &      ' and baseline',b,':',thresh(c,b)
-          enddo !c
-        endif !acf
-      enddo !b
+!          enddo !c
+!        endif !acf
+!      enddo !b
 
 !================================================================
 ! STATS done, now FIND BIAS spectra
 !================================================================
-      write(*,*) ' BIAS'
-      do t = 1, nsbc
+!      write(*,*) ' BIAS'
+!      do t = 1, nsbc
 ! set all flags to false
-        do b = 1, MAXBASE
-          do c = 1, nchan
-            flags(c,b,t) = .false.
-          enddo
-        enddo
+!        do b = 1, MAXBASE
+!          do c = 1, maxchan
+!            flags(c,b,t) = .false.
+!          enddo
+!        enddo
 ! go through all ccfs
-        do a1 = 1, MAXANT-1
-          do a2 = a1+1, MAXANT
+!        do a1 = 1, MAXANT-1
+!          do a2 = a1+1, MAXANT
 ! form baseline index 
-            b = 256*(a1) + a2
+!            b = 256*(a1) + a2
 ! now increment bias spectrum if total powers are above mean(n16:n67) + N*sigm
-            do c = 1, nchan
+!            do c = 1, maxchan
 ! require both acfs to pass threshold test; n.b., thresholds of acfs are scaled by 100
 !             if (c.eq.2 .and. b_1.eq.1) write(*,*) t,thresh(c,b_1)
-              if (cabs(vis(c,b_1,t)) .lt. thresh(c,b_1) .and.
-     &            cabs(vis(c,b_2,t)) .lt. thresh(c,b_2)) then
+!              if (cabs(vis(c,b_1,t)) .lt. thresh(c,b_1) .and.
+!     &            cabs(vis(c,b_2,t)) .lt. thresh(c,b_2)) then
 !             if (c .eq. 153) write(*,*) t,a1,a2,cabs(vis(c,b_1,t)),
 !    &            thresh(c,b_1), cabs(vis(c,b_2,t)),thresh(c,b_2)
-                bias(c,b) = bias(c,b) + vis(c,b,t)
-                num(c,b) = num(c,b) + 1
+!                bias(c,b) = bias(c,b) + vis(c,b,t)
+!                num(c,b) = num(c,b) + 1
 ! while we are in this loop, set ccf/acf data valid flags for MIRIAD
-                flags(c,b,t) = .true.
+!                flags(c,b,t) = .true.
 ! a little redundancy in acf flagging here as we go through all cases
-                flags(c,b_1,t) = .true.
-                flags(c,b_2,t) = .true.
-              endif
-            enddo !c
-          enddo !a2
-        enddo !a1
-      enddo !t
+!                flags(c,b_1,t) = .true.
+!                flags(c,b_2,t) = .true.
+!              endif
+!            enddo !c
+!          enddo !a2
+!        enddo !a1
+!      enddo !t
 
 ! Normalize
-      do b = 1, MAXBASE
-        do c = 1, nchan
-          if (num(c,b) .gt. 0) then
-            bias(c,b) = bias(c,b)/num(c,b)
+!      do b = 1, MAXBASE
+!        do c = 1, maxchan
+!          if (num(c,b) .gt. 0) then
+!            bias(c,b) = bias(c,b)/num(c,b)
 !           write(*,*) b,c,bias(c,b),num(c,b)
-          else
-            bias(c,b) = (0.,0.)
-          endif
-        enddo !c
-      enddo !b
+!          else
+!            bias(c,b) = (0.,0.)
+!          endif
+!        enddo !c
+!      enddo !b
 
 !================================================================
-!  WRITE MIRIAD DATA for each time record
+!  working with DATA as individual visibilities
 !================================================================
 
-1230       continue
-	print *, 'TEST'
-! loop through all time records
-! could modify to include read also.  PoCoBI would read 32b packet number + 2304, 32b visibilities
-
-        nsbc = 1            ! write one record to TEST
-      do t = 1, nsbc
-
-! The default is to set RA = LST, and DEC = latitude for
-!   a transit observation.  Setting RA and DEC via cmd line will change 
-!   the phase center to the RA and DEC (precessed) specified.
-        preamble(4) = times(t)
-        call Jullst(preamble(4),along,lst)
-        if ((sra .eq. 0.d0) .and. .not. dosun ) then
-!         write(*,*) 'if zenith:',t,times(t),sra,dosun
-          ra = lst
-          obsra = lst
-          obsdec = alat
-        else if (dosun) then
-          write(*,*) 'if sun:',t,sra,dosun
-! get ra,dec of Sun and precess for phase center at time of observation.
-          call sunradec(preamble(4),ra,dec)
-	  write(10,*) preamble(4),24.0d0*ra/tpi,360.0d0*dec/tpi
-          call precess(jd2000,ra,dec,preamble(4),obsra,obsdec) 
-! do not forget; this is a flag used to fork code below.
-          sra = ra
-        else
-! Apparent RA and DEC of phase center at time of observation.
-          call precess(jd2000,ra,dec,preamble(4),obsra,obsdec) 
-        endif
-! put this info out in header
-        call uvputvrd(munit,'ra',ra,1)
-        call uvputvrd(munit,'dec',dec,1)
-        call uvputvrr(munit,'epoch',2000.,1)
-        call uvputvrd(munit,'obsra',obsra,1)
-        call uvputvrd(munit,'obsdec',obsdec,1)
-        call uvputvrd(munit,'lst',lst,1)
-        call uvputvrd(munit,'longitu',along,1)
-        HA = lst - obsra
-        if (t .eq. 1) write(*,*) ' LST,OBSRA,OBSDEC:',lst,obsra,obsdec
- 
-! setting  HA = lst-obsra = 0. makes phase tracking center at zenith
-        sinha = sin(HA)
-        cosha = cos(HA)
-        sind = sin(obsdec)
-        cosd = cos(obsdec)
-
-! now dump out each baseline of data with preamble header info
-!   antpos bx*maxant->by*maxant->bz*maxant; bs(1/2,b) is ant 1/2 of baseline b
-! 
-! 05may16: reverse 2<->1 in next 5 lines; do not change antbas/preamble(5);
-!  that is, bx is "2 - 1" and antbas is "1,2" which is 256*1 + 2.
-c        do b = 1, MAXBASE
-        do a2 = 1, 8
-	   do a1 = 1, a2
-	      b = 256*a1 + a2
-	      print *, 'a1,a2,b',a1, a2, b
-          bxx = antpos(bs(2,b))-antpos(bs(1,b))
-          byy = antpos(bs(2,b)+MAXANT)-antpos(bs(1,b)+MAXANT)
-          bzz = antpos(bs(2,b)+2*MAXANT)-antpos(bs(1,b)+2*MAXANT)
-!  get u,v,w
-          preamble(1) =  bxx * sinha + byy * cosha
-          preamble(2) = -(bxx * cosha - byy * sinha)*sind + bzz*cosd
-          preamble(3) = (bxx * cosha - byy * sinha)*cosd + bzz*sind
-          preamble(5) = b
-	  print *, 'preamble', preamble
-!         if (b.eq.3)
-!    &      write(*,*) bs(1,b),bs(2,b),preamble(5),HA,bxx,byy,bzz
-!         print *, t,cbase,preamble,c,visR,visI,vis(c)
-
-	  goto 2040
+!	do b = 1,MAXBASE
 
 ! create wide band data
-          wide = (0.,0.)
-          nave = 0
-          wflags = .false.
-          do c = 1, nchan
-            if (flags(c,b,t)) then
-              wide = wide + vis(c,b,t)
-              nave = nave+1
-            endif
-          enddo
-          if (nave .gt. 0) then
-            wide = wide/nave
-            wflags = .true.
-          endif
+!          wide = (0.,0.)
+!          nave = 0
+!          wflags = .false.
+!          do c = 1, maxchan
+!            if (flags(c,b,t)) then
+!              wide = wide + vis(c,b,t)
+!              nave = nave+1
+!            endif
+!          enddo
+!          if (nave .gt. 0) then
+!            wide = wide/nave
+!            wflags = .true.
+!          endif
 c         write(*,*) ' wide =',wide,' for ',nave,' good data pts',t,b
  
 ! remove bias, limit amplitude and flag, transfer to 1D arrays
-          count = 0
-          do c = 1, nchan
-            xvis(c) = vis(c,b,t) - bias(c,b)
-            xflags(c) = flags(c,b,t)
+!          count = 0
+!          do c = 1, maxchan
+!            xvis(c) = vis(c,b,t) - bias(c,b)
+!            xflags(c) = flags(c,b,t)
+! fringe rotation
+!	      if (ra .ne. 0.) then
+!		 phase = tpi * wfreq * (preamble(3) +
+!     &            delay(bs(1,b)) - delay(bs(2,b)))
+!		 wide = wide * cmplx(dcos(phase),-dsin(phase))
+!	      else
+!		 phase = tpi * wfreq * (delay(bs(1,b)) - delay(bs(2,b)))
+!		 wide = wide * cmplx(dcos(phase),-dsin(phase))
 ! may not be necessary with acf scaling, but strong correlation could still come in
 ! ok, so do this; check on real & imag separately.  
 ! 05jun11 - add in channel-based rfiflags check
-            if (abs(real(xvis(c))) .gt. 32000.0 
-     &         .or. abs(imag(xvis(c))) .gt. 32000.0
-     &         .or. (.not. rfiflags(c))) then
-              xvis(c) = cmplx(0.,0.)
-              xflags(c) = .false.
-            endif
-            if (.not. xflags(c)) count = count + 1
-          enddo
+!            if (abs(real(xvis(c))) .gt. 32000.0 
+!     &         .or. abs(imag(xvis(c))) .gt. 32000.0
+!     &         .or. (.not. rfiflags(c))) then
+!              xvis(c) = cmplx(0.,0.)
+!              xflags(c) = .false.
+!            endif
+!            if (.not. xflags(c)) count = count + 1
+!          enddo
 ! dump whole spectrum if count exceeds maxcount (probably should be all baselines too)
-          if (count .gt. maxcount) then
-            do c = 1, nchan
-              xvis(c) = cmplx(0.,0.)
-              xflags(c) = .false.
-            enddo
-          endif
+!          if (count .gt. maxcount) then
+!            do c = 1, maxchan
+!              xvis(c) = cmplx(0.,0.)
+!              xflags(c) = .false.
+!            enddo
+!          endif
 
-!  Rotate phases to RA DEC if given by user
-          if (sra .ne. 0.) then
-            do c = 1, nchan
-! n.b., GHz & ns mix ok here..not SI, of course
-              phase = tpi * (sfreq+(c-1)*sdf) * (preamble(3) +
-     &            delay(bs(1,b)) - delay(bs(2,b)))
-              phase = dmod(phase,tpi)
-!             if (c .eq. 153) write(*,*) ha,' base ',b,phase,
-!    &            atan2(imag(xvis(c)),real(xvis(c)))
-              xvis(c) = xvis(c) * cmplx(dcos(phase),-dsin(phase))
-            enddo
-            phase = tpi * wfreq * (preamble(3) +
-     &            delay(bs(1,b)) - delay(bs(2,b)))
-            wide = wide * cmplx(dcos(phase),-dsin(phase))
-          else ! just apply delays
-            do c = 1, nchan
-! n.b., GHz & ns mix ok here..not SI, of course
-              phase = tpi * (sfreq+(c-1)*sdf) * 
-     &           (delay(bs(1,b)) - delay(bs(2,b)))
-              phase = dmod(phase,tpi)
-              xvis(c) = xvis(c) * cmplx(dcos(phase),-dsin(phase))
-            enddo
-            phase = tpi * wfreq * (delay(bs(1,b)) - delay(bs(2,b)))
-            wide = wide * cmplx(dcos(phase),-dsin(phase))
-          endif
-
-2040	  continue
 
 C DEBUGGGGGGGGGGGGGGGGGGGGG
 c     if (t .ge. 75 .and. t .le. 80) then
-c       do c=1,nchan
+c       do c=1,maxchan
 c         write(10,*) ' t',t,' b',b,' c',c,xvis(c)/1000.0,xflags(c),
 c    &      thresh(c,b)/1000.0
 c       enddo
 c     endif
 C DEBUGGGGGGGGGGGGGGGGGGGGG
-c       do c=1,nchan
+c       do c=1,maxchan
 c         if (.not.xflags(c)) write(10,*) ' t',t,' b',b,' c',c
 c       enddo
 
 c Write Miriad data
 c          call uvwwrite(munit,wide,wflags,nwide)
 
-	  do bnum=1,36
-	     do c=1,nchan
-		xvis(c) = cmplx(ivis(1,c,bnum), ivis(2,c,bnum))
-		xflags(c) = .true.
-	     enddo
-	  enddo
+!        enddo			!b
 
-	 call uvwrite(munit,preamble,xvis,xflags,nchan)
-          nvis = nvis + 1
-        enddo !a1
-        enddo !a2
-      enddo !t
- 
-c  All done. Summarize, tidy up and exit.
-      write(line,'(i9,a)')  ns,' records read from P2M'
-      call output(line)
-      umsg = 'P2M: '//line
-      call hiswrite(munit, umsg )
-      write(line,'(i9,a)')  nvis,' records written to Miriad '
-      call output(line)
-      umsg = 'P2M: '//line
-      call hiswrite(munit, umsg )
+10000	continue
+	end
 
-      call hisclose(munit)
-      call uvclose(munit)
-
-      end
-c********1*********2*********3*********4*********5*********6*********7*c
-      subroutine GetOpt(dosun)
-c
-      implicit none
-      logical dosun
-c
-c  Determine extra processing options.
-c
-c  Output:
-c    dosun	If true, rotate phases to ra,dec of Sun
-c------------------------------------------------------------------------
-      integer nopt
-      parameter(nopt=1)
-      character opts(nopt)*9
-      logical present(nopt)
-      data opts/'dosun    '/
-
-      call options('options',opts,present,nopt)
-      dosun   = present(1)
-
-      end
 c********1*********2*********3*********4*********5*********6*********7*c
       SUBROUTINE SORT(N,RA)
       DIMENSION RA(N)
