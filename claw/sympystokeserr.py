@@ -43,3 +43,4 @@ ds = -1*(PS2 * dR * PS)
 
 # show that for theta=0, the equation reduces to Sault et al. (1996) values
 print ds.subs(x,0)
+
