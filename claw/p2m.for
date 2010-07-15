@@ -102,23 +102,25 @@ c------------------------------------------------------------------------
 c  Externals.
 	integer*4 tinNext
 
-c PoCoBI data format
-	integer pkt_num, bnum
-c	integer*2 ivis(2,64,36)      ! maybe works for 16b data?
-	real ivis(2,64,36)          ! works for 32b data!
-
 c these belong in .h file
 	parameter (MAXREC=10000000,MAXRFI=100,maxchan=64,
 	* maxbase=36,maxant=8)
+
+c PoCoBI data format
+	integer pkt_num, bnum
+c	integer*2 vis(2,64,36)      ! maybe works for 16b data?
+	real vis(2,maxchan*maxbase)          ! works for 32b data!
+	real ivis(2,maxchan,maxbase)          ! works for 32b data!
 
 	logical flags(MAXCHAN,MAXBASE),wflags
 	logical xflags(2*MAXCHAN), rfiflags(MAXCHAN)
 	integer*4 nwide,munit,nvis,nave,nints
 	integer*4 i,j,n,nant,nrfi
-	integer*4 b,c,d,ri,t,a1,a2,b_1,b_2,count,maxcount
+	integer*4 b,c,d,t,a1,a2,b_1,b_2,count,maxcount
 	integer*4 num(MAXCHAN,MAXBASE)
 	integer*4 ns,nsbc,n16,n50,n67,n84,nsd
 	integer*4 bs(2,MAXBASE),rfi(2,MAXRFI)
+	integer*4 cs,bl,cg,ri
 	real inttime,x,z,wfreq,wwidth
 	real selcb(MAXREC),s,ss,thresh(MAXCHAN,MAXBASE)
 	real delay(MAXANT)
@@ -131,7 +133,7 @@ c these belong in .h file
 	double precision sinha,cosha,HA,tpi,phase
 	double precision preamble(5),sdf,times(MAXREC)
 	complex wide
-	complex vis(MAXCHAN,MAXBASE),bias(MAXCHAN,MAXBASE)
+	complex bias(MAXCHAN,MAXBASE)
 c       make copy for miriad call
 	complex xvis(MAXCHAN)
 
@@ -311,7 +313,7 @@ c 10jul08 - cjl - PoCoBI-8 correlator: hardwire 64 chan
 	call uvputvri(munit,'pol',1,1)
 
 !================================================================
-! READ IN THE ENTIRE P2M DATA FILE TO DATA CUBE
+! READ IN pocorx data
 !================================================================
 ! Initialize number of spectra counter in file
  
@@ -321,9 +323,22 @@ c 10jul08 - cjl - PoCoBI-8 correlator: hardwire 64 chan
 	* access='direct', recl=18436)
 
 ! Loop over integrations
-	do ns = 2, nints
-	   read(20,rec=ns) pkt_num, ivis
+	do ns = 2, nints    ! skip first int (always?)
+	   read(20,rec=ns) pkt_num, vis
  	   print *, ns, ': read pkt_num ', pkt_num
+
+! Reorder data into chan,baseline order
+	   do cs = 1,4
+	      do bl = 1,maxbase
+		 do cg = 1,16
+		    do ri= 1,2
+		       print *, cs,bl,cg,ri
+		       ivis(ri,cs+(cg-1)*4,bl) = 
+		       * vis(ri,cs+4*(bl-1)+(cg-1)*4*36)
+		    enddo
+		 enddo
+	      enddo
+	   enddo
 
 ! Define output visibilities	   
 	   times(ns) = timeout + (ns-1)*inttime/24./3600.
@@ -375,14 +390,14 @@ c 10jul08 - cjl - PoCoBI-8 correlator: hardwire 64 chan
      &            delay(bs(1,b)) - delay(bs(2,b)))
 		    phase = dmod(phase,tpi)
 		    xvis(c) = xvis(c) * cmplx(dcos(phase),-dsin(phase))
-		 else		! just apply delays
+!		 else		! just apply delays
 ! n.b., GHz & ns mix ok here..not SI, of course
 !		    phase = tpi * (sfreq+(c-1)*sdf) * 
 !     &           (delay(bs(1,b)) - delay(bs(2,b)))
 !		    phase = dmod(phase,tpi)
 !		    xvis(c) = xvis(c) * cmplx(dcos(phase),-dsin(phase))
 		 endif
-		 print *, xvis(c)
+		 print *, 'xvis(',c,',',b,') ',xvis(c)
 	      enddo		!c
 
 	      call uvwrite(munit,preamble,xvis,xflags,maxchan)
