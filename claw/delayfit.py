@@ -32,7 +32,7 @@ delay = n.array([0.,0.,0.,0.,0.,0.,0.,0.])  # first guess at delays
 
 # create phase and rotation functions to rotate visibilities
 delayphase = lambda delay1,delay2:  2 * n.pi * (sfreq+n.arange(nchan)*sdf) * (delay1 - delay2)   # calc delay phase for delay time diff
-## ddelay off?!
+## ddelay off?!  units ok?
 ddelay = lambda phaseperch:  phaseperch / (2 * n.pi * sdf)     # calc delay time diff for given phase change per channel (e.g., from fit)
 rot = lambda ph: [n.complex(n.cos(n.degrees([ph[i]]), -n.sin(n.degrees([ph[i]])))) for i in range(nchan)]
 
