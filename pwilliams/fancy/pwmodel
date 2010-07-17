@@ -70,8 +70,8 @@
 
 @ offset
  If not using a model image, the RA and dec. offsets to apply to the
- position of the point source model. North and east are positive offsets,
- respectively. The default is no offset (i.e., 0,0).
+ position of the point source model, in arcseconds. North and east are
+ positive offsets, respectively. The default is no offset (i.e., 0,0).
 
 @ options
  PWMODEL accepts some Unix-style command-line flags. They cannot be
