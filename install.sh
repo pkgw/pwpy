@@ -7,5 +7,5 @@ fi
 
 dest=`cat instdest`
 dest=`eval echo $dest`
-set -e -x
-cp -v *.py *.glade $dest
+set -e
+cp -vp *.py *.glade $dest
