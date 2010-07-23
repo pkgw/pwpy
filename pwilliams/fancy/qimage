@@ -6,7 +6,7 @@
 import sys
 import miriad
 from miriad import VisData
-from mirexec import TaskInvert, TaskClean, TaskRestore, CalledProcessError
+from mirexec import TaskInvert, TaskClean, TaskRestore, TaskFailError
 
 def _trace (cmd):
     print '+ %s' % (' '.join (cmd))
@@ -313,6 +313,6 @@ q.parseArgs (sys.argv[1:])
 
 try:
     q.run ()
-except CalledProcessError:
+except TaskFailError:
     # Error message will have been printed by the task
     sys.exit (1)
