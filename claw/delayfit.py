@@ -128,7 +128,7 @@ def adjustphases(da,delay):
 #            print 'rot(delayphase(a1,a2))', rot(delayphase(delay[a1-1],delay[a2-1]))
 #            da2[blindex] = da[blindex] * rot(delayphase(delay[a1-1],delay[a2-1]))
             if (a1 == a2):
-                da2[blindex] = da[blindex]
+                da2[blindex] = da[blindex]  # **why not cut this?**
             else:
                 da2[blindex] = da[blindex] * rot(delayphase(delay[a1-1],delay[a2-1]))
 
@@ -136,16 +136,19 @@ def adjustphases(da,delay):
 
 # analysis
 phases = adjustphases(da,delay)    #  initial phases (observed values for delays=0)
+delaymatrix = n.array(8,8)
 
 for a1 in range(1,9):             # loop to adjust delays
     for a2 in range(a1+1,9):
         blindex = n.where(baseline_order == a1*256 + a2)[0][0]
         p1 = fitdelay(phases[blindex])
         print 'Need to adjust ',a1,a2,' by ',ddelay(p1[1]), 'ns'
-        delay[a2-1] = delay[a2-1] - ddelay(p1[1])
+#        delay[a2-1] = delay[a2-1] - ddelay(p1[1])
 
-    print 'delay: ', delay
-    phases = adjustphases(da,delay)
+        delaymatrix[a1-1,a2-1] = ddelay(p1[1])
+
+print 'delay: ', delay
+phases = adjustphases(da,delay)
 display(phases)
 
 sys.exit (0)

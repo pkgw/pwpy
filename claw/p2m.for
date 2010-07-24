@@ -61,6 +61,14 @@ c   The default is 04DEC23.00
 c   With the unix date command you can use
 c                date +%y%b%d:%H:%M:%S | tr '[A-Z]' '[a-z]'
 c
+c@ timeref
+c   Time of delay cal of the observation.  This is in the form
+c     yymmmdd.ddd
+c   or
+c     yymmmdd:hh:mm:ss.s
+c
+c   If set, all geometric delays are zero at this time.
+c
 c@ inttime
 c	Integration time for each record. Also used as the time increment
 c	for each record written. default  inttime=26.21571072 seconds.
@@ -69,6 +77,10 @@ c
 c@ nints
 c	Total number of integrations in file.  Probably a smarter way to do
 c	this, but hey...
+c
+c@ int0
+c	Starting integration to write to file.  Default is 2, since first
+c	integration not guaranteeed to have all data.
 c
 c@ freq
 c   Frequency and Bandwidth in GHz.  Default 0.200,-0.05 GHz.
@@ -114,7 +126,7 @@ c	integer*2 vis(2,64,36)      ! maybe works for 16b data?
 
 	logical flags(MAXCHAN,MAXBASE),wflags
 	logical xflags(2*MAXCHAN), rfiflags(MAXCHAN)
-	integer*4 nwide,munit,nvis,nave,nints
+	integer*4 nwide,munit,nvis,nave,nints,int0
 	integer*4 i,j,n,nant,nrfi
 	integer*4 b,c,d,t,a1,a2,b_1,b_2,count,maxcount
 	integer*4 num(MAXCHAN,MAXBASE)
@@ -125,11 +137,17 @@ c	integer*2 vis(2,64,36)      ! maybe works for 16b data?
 	real selcb(MAXREC),s,ss,thresh(MAXCHAN,MAXBASE)
 	real delay(MAXANT)
 	double precision bxx,byy,bzz
-	real baseline_order(36)/ 257, 258, 514, 259, 515,
-	* 771, 260, 516, 772, 1028, 261, 517, 773, 1029,
-        * 1285, 518, 774, 1030, 1286, 1542, 775, 1031, 
-        * 1287, 1543, 1799, 1032, 1288, 1544, 1800, 2056, 
-        * 262, 263, 264, 519, 520, 776 /
+	real baseline_order(36)/ 257, 258, 514, 261, 517,
+	* 1285, 262, 518, 1286, 1542, 259, 515, 773,
+        * 774, 771, 516, 1029, 1030, 772, 1028, 1287,
+        * 1543, 775, 1031, 1799, 1544, 776, 1032, 1800,
+        * 2056, 260, 263, 264, 519, 520, 1288 /
+c wrong order used first!
+c	real baseline_order(36)/ 257, 258, 514, 259, 515,
+c	* 771, 260, 516, 772, 1028, 261, 517, 773, 1029,
+c        * 1285, 518, 774, 1030, 1286, 1542, 775, 1031, 
+c        * 1287, 1543, 1799, 1032, 1288, 1544, 1800, 2056, 
+c        * 262, 263, 264, 519, 520, 776 /
 	double precision sinha,cosha,HA,tpi,phase
 	double precision preamble(5),sdf,times(MAXREC)
 	complex wide
@@ -151,7 +169,8 @@ c       define/setup abase array for CASPER/8 correlator
 	real b1(MAXANT),b2(MAXANT),b3(MAXANT)
 	real sind,cosd,sinl,cosl
 	double precision along,alat,ra,dec,sra,sdec,obsra,obsdec
-	double precision jd2000,lst,timeout,sfreq,bandwidth
+	double precision jd2000,lst,timeout,timerel,time0,lst0
+	double precision sfreq,bandwidth
  
 !================================================================
 !  Get command line arguments.
@@ -168,11 +187,8 @@ c       define/setup abase array for CASPER/8 correlator
 	call keya('ant',antfile,' ')
 	if (antfile .eq. ' ') 
      *    call bug('f','An antenna table must be given')
-	call keyi('pol',ipol,-1)
-	if (ipol .eq. -1) 
-     *    call bug('f','A polarization must be selected (1,2)')
 
-	call keyr('baseunit',baseunit,1.0)
+	call keyr('baseunit',baseunit,-3.33564)  ! ata default is topocentric in meters
 
 !       10jul08 update to ATA at HCRO: -121:28:18.49,40:49:02.50
 	call keyt('longlat',along,'dms',-2.1200829068d0)
@@ -188,15 +204,21 @@ c       define/setup abase array for CASPER/8 correlator
 !       get start time (GMT=UTC from paper0 cpu clock --> filename)
 !       06jun18 - dcb - input starttime of first integration "time="
 	call keyt('time',timeout,'atime',0.d0)
-	if (timeout.le.1)
-     *    call dayjul('06JUN17.00',timeout)
+	call keyt('time0',time0,'atime',0.d0)
+	if (timeout.le.1) then
+	   call dayjul('06JUN17.00',timeout)
+	   call dayjul('06JUN17.00',time0)
+	endif
 
 !       06jun19 - dcb - exact value of inttime from Aaron
 	call keyr('inttime',inttime,0.001)
-	call keyi('nints',nints,100)
+	call keyi('nints',nints,1)
+	call keyi('int0',int0,2)
 	call keyd('freq',sfreq,0.700d0)
 	write(*,*) 'Start time = Julian day ',timeout
-	call keyd('freq',bandwidth,0.100d0)
+	write(*,*) 'Ref time = Julian day ',time0
+	call keyd('freq',bandwidth,0.104d0)
+	write(*,*) 'Freq, Bandwidth ',sfreq, bandwidth
 	call keyfin
  
 !       convert inputs to useful parameters
@@ -253,15 +275,17 @@ c       define/setup abase array for CASPER/8 correlator
 	   write(*,*) nrfi,rfi(1,nrfi),rfi(2,nrfi)
         enddo
         call tinClose		!rfi file
+
 ! now setup rfiflags logical file.
-        do i = 1, nrfi
-	   do c = rfi(1,i), rfi(2,i)
-	      rfiflags(c) = .false.
-          enddo
-        enddo
+!        do i = 1, nrfi
+!	   do c = rfi(1,i), rfi(2,i)
+!	      rfiflags(c) = .false.
+!          enddo
+!        enddo
 !       do c = 1, rfi(2,nrfi)
 !         write(*,*) c,rfiflags(c)
 !       enddo
+
 	endif			!rfi file exists
 
 !================================================================
@@ -319,22 +343,44 @@ c 10jul08 - cjl - PoCoBI-8 correlator: hardwire 64 chan
  
 ! Open and read the input pocorx file.  recl=18436 for 32b data, 9220 for 16b
 	write(*,*) 'Opening Pocorx file, ',sfile
+	write(*,*) 'Reading from int ',int0,' a total of ',nints,' ints'
 	open(unit=20,file=sfile,form='unformatted',status='old',
 	* access='direct', recl=18436)
 
 ! Loop over integrations
-	do ns = 2, nints    ! skip first int (always?)
+	do ns = int0, int0+nints-1
 	   read(20,rec=ns) pkt_num, vis
- 	   print *, ns, ': read pkt_num ', pkt_num
+! 	   print *, ns, ': read pkt_num ', pkt_num
 
 ! Reorder data into chan,baseline order
 	   do cs = 1,4
 	      do bl = 1,maxbase
 		 do cg = 1,16
 		    do ri= 1,2
-		       print *, cs,bl,cg,ri
-		       ivis(ri,cs+(cg-1)*4,bl) = 
+! conj error for 7, 32, 33, 34, 35, 27?
+c		       if (((bl .eq. 7) .or. (bl .eq. 27) .or. 
+c		       * (bl .ge. 32 .and. bl .le. 35 )) .and. ri .eq. 
+c		       * 2) then
+c			  ivis(ri,cs+(cg-1)*4,bl) = 
+c		       * -vis(ri,cs+4*(bl-1)+(cg-1)*4*36)
+c		       else
+c or conj error for 31-36?		      
+		       if (bl .ge. 31 .and. ri .eq. 2) then
+			  ivis(ri,cs+(cg-1)*4,bl) = 
+		       * -vis(ri,cs+4*(bl-1)+(cg-1)*4*36)
+		       else if (bl .ge. 13 .and. bl .le. 14 .and. 
+			  * ri .eq. 2) then
+			  ivis(ri,cs+(cg-1)*4,bl) = 
+		       * -vis(ri,cs+4*(bl-1)+(cg-1)*4*36)
+		    else if (bl .ge. 17 .and. bl .le. 18 .and. 
+                          * ri .eq. 2) then
+			  ivis(ri,cs+(cg-1)*4,bl) = 
+		       * -vis(ri,cs+4*(bl-1)+(cg-1)*4*36)
+c or no conj error?
+		       else
+			  ivis(ri,cs+(cg-1)*4,bl) = 
 		       * vis(ri,cs+4*(bl-1)+(cg-1)*4*36)
+		       endif
 		    enddo
 		 enddo
 	      enddo
@@ -342,10 +388,12 @@ c 10jul08 - cjl - PoCoBI-8 correlator: hardwire 64 chan
 
 ! Define output visibilities	   
 	   times(ns) = timeout + (ns-1)*inttime/24./3600.
+
 	   preamble(4) = times(ns)
 	   call Jullst(preamble(4),along,lst)
+           call dayjul('00jan01.00',jd2000)
 !       Apparent RA and DEC of phase center at time of observation.
-	   call precess(jd2000,ra,dec,preamble(4),obsra,obsdec) 
+	   call precess(jd2000,sra,sdec,preamble(4),obsra,obsdec) 
 !       put this info out in header
 	   call uvputvrd(munit,'ra',ra,1)
 	   call uvputvrd(munit,'dec',dec,1)
@@ -354,17 +402,29 @@ c 10jul08 - cjl - PoCoBI-8 correlator: hardwire 64 chan
 	   call uvputvrd(munit,'obsdec',obsdec,1)
 	   call uvputvrd(munit,'lst',lst,1)
 	   call uvputvrd(munit,'longitu',along,1)
-	   HA = lst - obsra
-	   if (ns .eq. 1) write(*,*) ' LST,OBSRA,OBSDEC:',lst,obsra,
-	   * obsdec
-	   
-!       setting  HA = lst-obsra = 0. makes phase tracking center at zenith
-	   sinha = sin(HA)
-	   cosha = cos(HA)
-	   sind = sin(obsdec)
-	   cosd = cos(obsdec)
+
+
+	   if (ns .eq. int0 .and. time0 .ne. 0) then
+	      call Jullst(time0,along,lst0)
+	      HA0 = lst0 - obsra
+	      sinha0 = sin(HA0)
+	      cosha0 = cos(HA0)
+	      sind0 = sin(obsdec)
+	      cosd0 = cos(obsdec)
+	   endif
 
 	   do b = 1,maxbase
+	      HA = lst - obsra
+	      if (ns .eq. 2 .and. b .eq. 1) then
+		 write(*,*) ' LST,OBSRA,OBSDEC,HA, pre(4):'
+		 * ,lst,obsra, obsdec, HA, preamble(4)
+	      endif
+	   
+	      sinha = sin(HA)
+	      cosha = cos(HA)
+	      sind = sin(obsdec)
+	      cosd = cos(obsdec)
+
 	      preamble(5) = baseline_order(b)
 	      call basant(preamble(5),a1,a2)
 	      bxx = b1(a1) - b1(a2)
@@ -377,6 +437,10 @@ c 10jul08 - cjl - PoCoBI-8 correlator: hardwire 64 chan
 	      preamble(2) = -(bxx * cosha - byy * sinha)*sind + bzz*cosd
 	      preamble(3) = (bxx * cosha - byy * sinha)*cosd + bzz*sind
 	      preamble(5) = 256*a1 + a2
+	      if (ns .eq. int0 .and. time0 .ne. 0) then
+		 phase0 = (bxx * cosha0 - byy * sinha0)*cosd0 + bzz*sind0
+		 print *, 'phase0', phase0
+	      endif
 
 ! Write out data and flags
 	      do c=1,maxchan
@@ -387,32 +451,40 @@ c 10jul08 - cjl - PoCoBI-8 correlator: hardwire 64 chan
 !  Rotate phases to RA DEC if given by user
 ! n.b., GHz & ns mix ok here..not SI, of course
 		    phase = tpi * (sfreq+(c-1)*sdf) * (preamble(3) +
-     &            delay(bs(1,b)) - delay(bs(2,b)))
+     &            delay(a1) - delay(a2))
+		 if (time0 .ne. 0) then
+		    phase = tpi * (sfreq+(c-1)*sdf) * (preamble(3) -
+	*		phase0 + delay(a1) - delay(a2))
+	         endif
+		 phase = dmod(phase,tpi)
+		 xvis(c) = xvis(c) * cmplx(dcos(phase),-dsin(phase))
+		 else		! just apply delays
+! n.b., GHz & ns mix ok here..not SI, of course
+		    phase = tpi * (sfreq+(c-1)*sdf) * 
+     &           (delay(a1) - delay(a2))
+!		    print *, 'phase ', phase, sfreq, sdf, delay(a1)
+!     &	     ,delay(a2), a1, a2
 		    phase = dmod(phase,tpi)
 		    xvis(c) = xvis(c) * cmplx(dcos(phase),-dsin(phase))
-!		 else		! just apply delays
-! n.b., GHz & ns mix ok here..not SI, of course
-!		    phase = tpi * (sfreq+(c-1)*sdf) * 
-!     &           (delay(bs(1,b)) - delay(bs(2,b)))
-!		    phase = dmod(phase,tpi)
-!		    xvis(c) = xvis(c) * cmplx(dcos(phase),-dsin(phase))
 		 endif
-		 print *, 'xvis(',c,',',b,') ',xvis(c)
+!		 print *, 'xvis(',c,',',b,') ',xvis(c)
 	      enddo		!c
+	      if (a1 .eq. 1) then
+!		 print *, 'a1, a2, geo delay, relphase, pre(3)', a1, a2, 
+!		 * preamble(3), relphase, preamble(3)
+	      endif
 
+! write out data
 	      call uvwrite(munit,preamble,xvis,xflags,maxchan)
+!             call uvwwrite(munit,wide,wflags,nwide)
 	      nvis = nvis + 1
 
 	   enddo		!b
 	enddo    !ns
-	close(20)
+	close(20)      ! finished reading pocorx file
 
 ! Tidy up and close Miriad file
-	write(line,'(i9,a)')  ns-1,' records read from P2M'
-	call output(line)
-	umsg = 'P2M: '//line
-	call hiswrite(munit, umsg )
-	write(line,'(i9,a)')  nvis,' records written to Miriad '
+	write(line,'(i9,a)')  ns-int0,' records read and written'
 	call output(line)
 	umsg = 'P2M: '//line
 	call hiswrite(munit, umsg )
@@ -420,171 +492,8 @@ c 10jul08 - cjl - PoCoBI-8 correlator: hardwire 64 chan
 	call hisclose(munit)
 	call uvclose(munit)
 
-	goto 10000       ! jump to end
-
-
-c Can skip stats calculation.  Not needed for PoCoBI work.(?)
-
-!================================================================
-! READ DATA done, now GENERATE STATS via sorted amp-selected data
-!================================================================
-      n16 = nsbc * 0.165
-      n50 = nsbc * 0.50
-      n67 = nsbc * 0.667
-      n84 = nsbc * 0.835
-      nsd = n67 - n16 + 1
-!     write(*,*) '#  numbers:',ns,nsbc,n16,n50,n67,n84
-!      do b = 1, MAXBASE
-! only need acf stats for threshold testing (for now)
-!        if (bs(1,b) .eq. bs(2,b)) then
-!          do c = 1, maxchan
-! do stats here: select time sequence of chan,base; sort; then stats
-!            do t = 1, maxrec
-!              selcb(t) = cabs(vis(c,b,t))
-!            enddo
-!            call sort(nsbc,selcb)
-!            s = 0.0
-!            ss = 0.0
-!            do t = n16, n67
-!              s = s + selcb(t)
-!              ss = ss + selcb(t)*selcb(t)
-!            enddo
-!            s = s / nsd
-!            ss = sqrt(ss/nsd - s*s)
-! create threshold for use in BIAS determination
-! 05jun13 -- set thresh down to + 4 sigma
-!            thresh(c,b) = (s + 4.0*ss)
-!           if (c .eq. 153) write(*,*) ' threshold for ch',c,
-!    &        ' and baseline',b,':',thresh(c,b),s,ss
-!         if ((c/32)*32 .eq. c) write(*,*) ' threshold for ch',c,
-!    &      ' and baseline',b,':',thresh(c,b)
-!          enddo !c
-!        endif !acf
-!      enddo !b
-
-!================================================================
-! STATS done, now FIND BIAS spectra
-!================================================================
-!      write(*,*) ' BIAS'
-!      do t = 1, nsbc
-! set all flags to false
-!        do b = 1, MAXBASE
-!          do c = 1, maxchan
-!            flags(c,b,t) = .false.
-!          enddo
-!        enddo
-! go through all ccfs
-!        do a1 = 1, MAXANT-1
-!          do a2 = a1+1, MAXANT
-! form baseline index 
-!            b = 256*(a1) + a2
-! now increment bias spectrum if total powers are above mean(n16:n67) + N*sigm
-!            do c = 1, maxchan
-! require both acfs to pass threshold test; n.b., thresholds of acfs are scaled by 100
-!             if (c.eq.2 .and. b_1.eq.1) write(*,*) t,thresh(c,b_1)
-!              if (cabs(vis(c,b_1,t)) .lt. thresh(c,b_1) .and.
-!     &            cabs(vis(c,b_2,t)) .lt. thresh(c,b_2)) then
-!             if (c .eq. 153) write(*,*) t,a1,a2,cabs(vis(c,b_1,t)),
-!    &            thresh(c,b_1), cabs(vis(c,b_2,t)),thresh(c,b_2)
-!                bias(c,b) = bias(c,b) + vis(c,b,t)
-!                num(c,b) = num(c,b) + 1
-! while we are in this loop, set ccf/acf data valid flags for MIRIAD
-!                flags(c,b,t) = .true.
-! a little redundancy in acf flagging here as we go through all cases
-!                flags(c,b_1,t) = .true.
-!                flags(c,b_2,t) = .true.
-!              endif
-!            enddo !c
-!          enddo !a2
-!        enddo !a1
-!      enddo !t
-
-! Normalize
-!      do b = 1, MAXBASE
-!        do c = 1, maxchan
-!          if (num(c,b) .gt. 0) then
-!            bias(c,b) = bias(c,b)/num(c,b)
-!           write(*,*) b,c,bias(c,b),num(c,b)
-!          else
-!            bias(c,b) = (0.,0.)
-!          endif
-!        enddo !c
-!      enddo !b
-
-!================================================================
-!  working with DATA as individual visibilities
-!================================================================
-
-!	do b = 1,MAXBASE
-
-! create wide band data
-!          wide = (0.,0.)
-!          nave = 0
-!          wflags = .false.
-!          do c = 1, maxchan
-!            if (flags(c,b,t)) then
-!              wide = wide + vis(c,b,t)
-!              nave = nave+1
-!            endif
-!          enddo
-!          if (nave .gt. 0) then
-!            wide = wide/nave
-!            wflags = .true.
-!          endif
-c         write(*,*) ' wide =',wide,' for ',nave,' good data pts',t,b
- 
-! remove bias, limit amplitude and flag, transfer to 1D arrays
-!          count = 0
-!          do c = 1, maxchan
-!            xvis(c) = vis(c,b,t) - bias(c,b)
-!            xflags(c) = flags(c,b,t)
-! fringe rotation
-!	      if (ra .ne. 0.) then
-!		 phase = tpi * wfreq * (preamble(3) +
-!     &            delay(bs(1,b)) - delay(bs(2,b)))
-!		 wide = wide * cmplx(dcos(phase),-dsin(phase))
-!	      else
-!		 phase = tpi * wfreq * (delay(bs(1,b)) - delay(bs(2,b)))
-!		 wide = wide * cmplx(dcos(phase),-dsin(phase))
-! may not be necessary with acf scaling, but strong correlation could still come in
-! ok, so do this; check on real & imag separately.  
-! 05jun11 - add in channel-based rfiflags check
-!            if (abs(real(xvis(c))) .gt. 32000.0 
-!     &         .or. abs(imag(xvis(c))) .gt. 32000.0
-!     &         .or. (.not. rfiflags(c))) then
-!              xvis(c) = cmplx(0.,0.)
-!              xflags(c) = .false.
-!            endif
-!            if (.not. xflags(c)) count = count + 1
-!          enddo
-! dump whole spectrum if count exceeds maxcount (probably should be all baselines too)
-!          if (count .gt. maxcount) then
-!            do c = 1, maxchan
-!              xvis(c) = cmplx(0.,0.)
-!              xflags(c) = .false.
-!            enddo
-!          endif
-
-
-C DEBUGGGGGGGGGGGGGGGGGGGGG
-c     if (t .ge. 75 .and. t .le. 80) then
-c       do c=1,maxchan
-c         write(10,*) ' t',t,' b',b,' c',c,xvis(c)/1000.0,xflags(c),
-c    &      thresh(c,b)/1000.0
-c       enddo
-c     endif
-C DEBUGGGGGGGGGGGGGGGGGGGGG
-c       do c=1,maxchan
-c         if (.not.xflags(c)) write(10,*) ' t',t,' b',b,' c',c
-c       enddo
-
-c Write Miriad data
-c          call uvwwrite(munit,wide,wflags,nwide)
-
-!        enddo			!b
-
-10000	continue
 	end
+
 
 c********1*********2*********3*********4*********5*********6*********7*c
       SUBROUTINE SORT(N,RA)
