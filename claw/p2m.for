@@ -149,6 +149,7 @@ c        * 1285, 518, 774, 1030, 1286, 1542, 775, 1031,
 c        * 1287, 1543, 1799, 1032, 1288, 1544, 1800, 2056, 
 c        * 262, 263, 264, 519, 520, 776 /
 	double precision sinha,cosha,HA,tpi,phase
+	double precision sinha0,cosha0,HA0,delayref
 	double precision preamble(5),sdf,times(MAXREC)
 	complex wide
 	complex bias(MAXCHAN,MAXBASE)
@@ -167,7 +168,7 @@ c       define/setup abase array for CASPER/8 correlator
 	integer ipol
 	real baseunit
 	real b1(MAXANT),b2(MAXANT),b3(MAXANT)
-	real sind,cosd,sinl,cosl
+	real sind,cosd,sinl,cosl,sind0,cosd0
 	double precision along,alat,ra,dec,sra,sdec,obsra,obsdec
 	double precision jd2000,lst,timeout,timerel,time0,lst0
 	double precision sfreq,bandwidth
@@ -415,7 +416,7 @@ c or no conj error?
 
 	   do b = 1,maxbase
 	      HA = lst - obsra
-	      if (ns .eq. 2 .and. b .eq. 1) then
+	      if (ns .eq. int0 .and. b .eq. 1) then
 		 write(*,*) ' LST,OBSRA,OBSDEC,HA, pre(4):'
 		 * ,lst,obsra, obsdec, HA, preamble(4)
 	      endif
@@ -437,9 +438,9 @@ c or no conj error?
 	      preamble(2) = -(bxx * cosha - byy * sinha)*sind + bzz*cosd
 	      preamble(3) = (bxx * cosha - byy * sinha)*cosd + bzz*sind
 	      preamble(5) = 256*a1 + a2
-	      if (ns .eq. int0 .and. time0 .ne. 0) then
-		 phase0 = (bxx * cosha0 - byy * sinha0)*cosd0 + bzz*sind0
-		 print *, 'phase0', phase0
+	      if (time0 .ne. 0) then
+		 delayref = (bxx * cosha0 - byy * sinha0)*cosd0 + bzz
+       *         *sind0
 	      endif
 
 ! Write out data and flags
@@ -454,8 +455,12 @@ c or no conj error?
      &            delay(a1) - delay(a2))
 		 if (time0 .ne. 0) then
 		    phase = tpi * (sfreq+(c-1)*sdf) * (preamble(3) -
-	*		phase0 + delay(a1) - delay(a2))
+     &                    delayref + delay(a1) - delay(a2))
 	         endif
+!		 if (ns .eq. int0+nints-1) then
+!		    print *, 'ns, p(3), delayref', ns, preamble(3)
+!     &              ,delayref
+!		 endif
 		 phase = dmod(phase,tpi)
 		 xvis(c) = xvis(c) * cmplx(dcos(phase),-dsin(phase))
 		 else		! just apply delays
@@ -469,10 +474,10 @@ c or no conj error?
 		 endif
 !		 print *, 'xvis(',c,',',b,') ',xvis(c)
 	      enddo		!c
-	      if (a1 .eq. 1) then
+!	      if (a1 .eq. 1) then
 !		 print *, 'a1, a2, geo delay, relphase, pre(3)', a1, a2, 
 !		 * preamble(3), relphase, preamble(3)
-	      endif
+!	      endif
 
 ! write out data
 	      call uvwrite(munit,preamble,xvis,xflags,maxchan)
