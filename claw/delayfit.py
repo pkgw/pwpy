@@ -25,18 +25,22 @@ opts = keys.process ()
 
 # initialize
 nchan = 64
-chans = n.arange(5,50)
+chans = n.arange(10,50)
 nbl = 36
-sfreq = 0.7   # freq for first channel in GHz
-sdf = 0.1/nchan   # dfreq per channel in GHz
-baseline_order = n.array([257, 258, 514, 259, 515, 771, 260, 516, 772, 1028, 261, 517, 773, 1029, 1285, 518, 774, 1030, 1286, 1542, 775, 1031, 1287, 1543, 1799, 1032, 1288, 1544, 1800, 2056, 262, 263, 264, 519, 520, 776])
-delay = n.array([30.,30.,10.,10.,55.,55.,30.,30.])  # first guess at delays in ns
+sfreq = 0.77  # freq for first channel in GHz
+sdf = 0.104/nchan   # dfreq per channel in GHz
+baseline_order = n.array([ 257, 258, 514, 261, 517, 1285, 262, 518, 1286, 1542, 259, 515, 773, 774, 771, 516, 1029, 1030, 772, 1028, 1287, 1543, 775, 1031, 1799, 1544, 776, 1032, 1800, 2056, 260, 263, 264, 519, 520, 1288])   # second iteration of bl nums
+#baseline_order = n.array([257, 258, 514, 259, 515, 771, 260, 516, 772, 1028, 261, 517, 773, 1029, 1285, 518, 774, 1030, 1286, 1542, 775, 1031, 1287, 1543, 1799, 1032, 1288, 1544, 1800, 2056, 262, 263, 264, 519, 520, 776])   # wrong first guess?
+delay = n.array([0.,0.,0.,0.,0.,0.,0.,0.])  # first guess at delays in ns
+#delay = n.array([0.,0.,-20.,-20.,0.,0.,20.,20.])  # first guess at delays in noise source data (tfl8)
 font= FontProperties(size='x-small');
 
 # create phase and rotation functions to rotate visibilities
 delayphase = lambda delay1,delay2:  (2 * n.pi * (sfreq+n.arange(nchan)*sdf) * (delay1 - delay2))  # calc delay phase for delay time diff
 ddelay = lambda phaseperch:  phaseperch / (360. * sdf)     # calc delay time diff for given phase change per channel (e.g., from fit)
 rot = lambda ph: [n.complex(n.cos([ph[i]]), -n.sin([ph[i]])) for i in range(nchan)]  # function to phase rotate a spectrum
+
+#print [divmod(x,256) for x in baseline_order]
 
 # read in data and create arrays
 i = 0
@@ -63,16 +67,16 @@ for inp, preamble, data, flags, nread in uvdat.readAll ():
 # End of loop.
 
 # visualize phases
-def display(phases,showbl=[-1]):
+def display(phases,fig=1,showbl=[-1]):
     print ''
     print 'Plotting phases...'
     for a1 in range(1,9):
         for a2 in range(a1,9):
             if (showbl == [-1]):
                 blindex = n.where(baseline_order == a1*256 + a2)[0][0]
-                p.figure(1)
+                p.figure(fig)
                 p.subplot(6,6,blindex+1)
-                p.plot(phases[blindex,chans],label=str(bl[blindex]))
+                p.plot(phases[blindex,chans],'.',label=str(bl[blindex]))
                 p.axis([0,len(chans),-180,180])
                 p.legend(prop=font)
             else:
@@ -130,25 +134,26 @@ def adjustphases(da,delay):
             if (a1 == a2):
                 da2[blindex] = da[blindex]  # **why not cut this?**
             else:
+#                if blindex in conj:
+#                    da2[blindex] = n.conj(da[blindex]) * rot(delayphase(delay[a1-1],delay[a2-1]))
+#                else:
                 da2[blindex] = da[blindex] * rot(delayphase(delay[a1-1],delay[a2-1]))
 
     return n.angle(da2,deg=True)    # original phase values
 
 # analysis
 phases = adjustphases(da,delay)    #  initial phases (observed values for delays=0)
-delaymatrix = n.array(8,8)
+display(phases,fig=1)
 
-for a1 in range(1,9):             # loop to adjust delays
+for a1 in range(1,2):             # loop to adjust delays
     for a2 in range(a1+1,9):
         blindex = n.where(baseline_order == a1*256 + a2)[0][0]
         p1 = fitdelay(phases[blindex])
         print 'Need to adjust ',a1,a2,' by ',ddelay(p1[1]), 'ns'
-#        delay[a2-1] = delay[a2-1] - ddelay(p1[1])
-
-        delaymatrix[a1-1,a2-1] = ddelay(p1[1])
+        delay[a2-1] = delay[a2-1] - ddelay(p1[1])
 
 print 'delay: ', delay
 phases = adjustphases(da,delay)
-display(phases)
+display(phases,fig=2)
 
 sys.exit (0)

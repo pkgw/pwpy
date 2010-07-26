@@ -61,7 +61,7 @@ c   The default is 04DEC23.00
 c   With the unix date command you can use
 c                date +%y%b%d:%H:%M:%S | tr '[A-Z]' '[a-z]'
 c
-c@ timeref
+c@ time0
 c   Time of delay cal of the observation.  This is in the form
 c     yymmmdd.ddd
 c   or
@@ -474,10 +474,10 @@ c or no conj error?
 		 endif
 !		 print *, 'xvis(',c,',',b,') ',xvis(c)
 	      enddo		!c
-!	      if (a1 .eq. 1) then
-!		 print *, 'a1, a2, geo delay, relphase, pre(3)', a1, a2, 
-!		 * preamble(3), relphase, preamble(3)
-!	      endif
+	      if (a1 .eq. 1) then
+		 print *, 'a1, a2, geo delay, relphase, pre(3)', a1, a2, 
+		 * preamble(3), relphase, preamble(3)
+	      endif
 
 ! write out data
 	      call uvwrite(munit,preamble,xvis,xflags,maxchan)
