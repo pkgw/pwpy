@@ -474,10 +474,10 @@ c or no conj error?
 		 endif
 !		 print *, 'xvis(',c,',',b,') ',xvis(c)
 	      enddo		!c
-	      if (a1 .eq. 1) then
-		 print *, 'a1, a2, geo delay, relphase, pre(3)', a1, a2, 
-		 * preamble(3), relphase, preamble(3)
-	      endif
+!	      if (a1 .eq. 1) then
+!		 print *, 'a1, a2, geo delay, relphase, pre(3)', a1, a2, 
+!		 * preamble(3), relphase, preamble(3)
+!	      endif
 
 ! write out data
 	      call uvwrite(munit,preamble,xvis,xflags,maxchan)
