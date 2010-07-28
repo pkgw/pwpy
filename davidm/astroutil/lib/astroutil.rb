@@ -197,7 +197,7 @@ class DateTime
 
   class << self
     # Undefine method from superclass
-    undef today if defined? today
+    undef today rescue nil
 
     # Create a +DateTime+ object corresponding to (local) today.
     def today
@@ -448,6 +448,9 @@ class DateTime
     end
   end
   alias :ut12gps :ut1_to_gps
+
+  # Avoid warning about redefining to_s
+  undef to_s rescue nil
 
   # Format +self+ as String with (optional) fractional seconds
   def to_s(prec=0)
