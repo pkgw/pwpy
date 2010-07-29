@@ -24,6 +24,13 @@ module Mirdl
       self.flags_p = DL::PtrData.new(flags.ptr, flags.bsize)
     end
 
+    def u; preamble[0]; end
+    def v; preamble[1]; end
+    def w; preamble[2]; end
+    def time; preamble[3]; end
+    def baseline; preamble[4]; end
+    def basant; Mirdl.basant(baseline); end
+
     private
     def preamble=; end
     def data=; end
