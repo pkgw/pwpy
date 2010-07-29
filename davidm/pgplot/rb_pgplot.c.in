@@ -1088,7 +1088,7 @@ static VALUE
   if (argc>0 && TYPE(argv[argc-1]) == T_HASH)
     val = argv[--argc];
   rb_scan_kw_args( val, "tickl", &tickl, "tickr", &tickr,
-		   "disp", &disp, "orient", &orient, 0);
+		   "disp", &disp, "orient", &orient, (char *)0);
   rb_scan_args(argc,argv, "51", &x1,&y1, &x2,&y2, &v, &vstr);
 
   if (tickl ==Qnil)  tickl = INT2FIX(0);
@@ -1183,7 +1183,7 @@ static VALUE
   rb_scan_kw_args( val, 
 		   "opt",&vopt, "step",&step, "nsub",&nsub,
 		   "tickl",&tickl, "tickr",&tickr,
-		   "frac",&vfrac, "disp",&disp, "orient",&orient, 0);
+		   "frac",&vfrac, "disp",&disp, "orient",&orient, (char *)0);
   rb_scan_args(argc,argv, "60", &x1,&y1, &x2,&y2, &v1,&v2);
 
   if (step  ==Qnil)  step  = INT2FIX(0);
