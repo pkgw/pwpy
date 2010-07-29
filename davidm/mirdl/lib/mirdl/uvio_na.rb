@@ -42,6 +42,8 @@ module Mirdl
              end
     r, rs = SYM[:uvopen][0, name, status]
     tno = rs[0]
+    uvset(tno, "preamble", "uvw/time/baseline")
+    uvset(tno, "coord", "nanosec")
     if status == 'old'
       # Read in first "frame" of uv variables
       uvnext(tno)
@@ -444,7 +446,7 @@ module Mirdl
 
   # void uvset_c    (int tno, Const char *object, Const char *type, int n, double p1, double p2, double p3);
   SYM[:uvset] = LIBMIR_UVIO['uvset_c', '0ISSIDDD']
-  def uvset(tno, object, type, n, p1, p2, p3)
+  def uvset(tno, object, type, n=0, p1=0.0, p2=0.0, p3=0.0)
     SYM[:uvset][tno, object.to_s, type.to_s, n, p1, p2, p3]
   end
   module_function :uvset

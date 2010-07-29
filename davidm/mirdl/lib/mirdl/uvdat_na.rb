@@ -31,6 +31,8 @@ module Mirdl
     r, rs = SYM[:uvDatOpn][0]
     return nil if r == 0
     tno = rs[0]
+    uvset(tno, "preamble", "uvw/time/baseline")
+    uvset(tno, "coord", "nanosec")
     # Read in first "frame" of uv variables
     uvnext(tno)
     uvrewind(tno)
