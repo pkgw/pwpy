@@ -1,10 +1,10 @@
 #! /usr/bin/env python
 
-"""= delayfit.py - a skeleton task
+"""= pocovis.py - a skeleton task
 & claw
 : Unknown
 +
- Script to fit delays in a miriad data set.
+ Script to load and visualize poco data
 --
 """
 
@@ -20,10 +20,9 @@ from matplotlib.font_manager import fontManager, FontProperties
 # with support for select=, line=, stokes=,
 # options=nocal,nopass,nopol
 
-keys.doUvdat ('dsl3', True)
-opts = keys.process ()
-
-# initialize
+# initialize'
+file = 'poco_crab_candpulse.mir'
+sys.argv.append('vis='+file)
 nchan = 64
 chans = n.arange(10,50)
 nbl = 36
@@ -44,30 +43,50 @@ for a1 in range(1,9):             # loop to adjust delays
         else:
             noautos.append(blindex)
 
+def load():
 # read in data and create arrays
-i = 0
-for inp, preamble, data, flags, nread in uvdat.readAll ():
-    # Reduce these arrays to the correct size
-    data = data[0:nread]
-#    flags = flags[0:nread]
+    keys.doUvdat ('dsl3', True)
+    opts = keys.process ()
+
+    i = 0
+    initsize=50000
+    da = n.zeros((initsize,nchan),dtype='complex64')
+    fl = n.zeros((initsize,nchan),dtype='complex64')
+    ti = n.zeros((initsize),dtype='complex64')
+    for inp, preamble, data, flags, nread in uvdat.readAll ():
+
+   # Reduce these arrays to the correct size
+        data = data[0:nread]
+        flags = flags[0:nread]
 
     # Decode the preamble
-    u, v, w = preamble[0:3]
-    time = preamble[3]
-    baseline = util.decodeBaseline (preamble[4])
+#        u, v, w = preamble[0:3]
+        time = preamble[3]
+#        baseline = util.decodeBaseline (preamble[4])
 
 #    pol = uvdat.getPol ()
     
-#    initialize arrays for later manipulation.  gotta be a better way...
-    if i == 0:
-        bl = n.array([baseline])
-        da = n.array([data])
-        ti = n.array([time])
-    else:
-        bl = n.concatenate((bl,[baseline]))
-        da = n.concatenate((da,[data]))
-        ti = n.concatenate((ti,[time]))
-    i = i+1
+        if i < initsize:
+            ti[i] = time
+            da[i] = data
+            fl[i] = flags
+        else:
+            da = n.concatenate((da,[data]))
+            ti = n.concatenate((ti,[time]))
+            fl = n.concatenate((fl,[flags]))
+#            bl = n.concatenate((bl,[baseline]))
+        i = i+1
+
+    if i <= initsize:
+        da = da[0:i]
+        fl = fl[0:i]
+        ti = ti[0:i]
+
+    da = da.reshape(i/nbl,nbl,nchan)
+    fl = fl.reshape(i/nbl,nbl,nchan)
+    ti = ti[::nbl]
+    return ti,da,fl
+
 # End of loop.
 
 def debug(da):
@@ -78,18 +97,24 @@ def debug(da):
             print da[0,blindex]
 
 
+def vis(da,chans=chans):
 #reorganize into dimensions of integration, baseline, channel
-da = da.reshape(i/36,36,64)
-print 'Data type, shape: ', type(da), ', ', da.shape
+    print 'Original data type and shape: ', type(da), ', ', da.shape
 
-autoflux = n.abs(da[:,autos][:,:,chans].mean(axis=1))
+    abs = n.abs(da[:,noautos][:,:,chans].mean(axis=1))
 
-print 'Data type, shape: ', type(autoflux), ', ', autoflux.shape
-autoflux[0,0] = 10
+    p.figure(1)
+    day0 = int(time[0])
+    ax = p.imshow(abs, aspect='auto')
+#    ax = p.imshow(abs, aspect='auto', extent=(0,max(chans),max(time-day0),min(time-day0)))
 
-p.figure(1, figsize=(7,7))
-ax = p.imshow(autoflux, interpolation='nearest')
-p.colorbar(ax)
-p.show()
+#    p.axis([-0.5,len(chans)+0.5,100,0])
+    p.colorbar(ax)
 
-sys.exit (0)
+#def dedisperse(da):
+    
+
+# default stuff
+time,data,flags = load()
+data2 = data*flags
+vis(data2)
