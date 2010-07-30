@@ -14,6 +14,8 @@ by a text editor.
 import sys
 import miriad, mirexec
 
+miriad.basicTrace ()
+
 boxfn = sys.argv[1]
 img = miriad.ImData (sys.argv[2])
 boxnum = int (sys.argv[3])
