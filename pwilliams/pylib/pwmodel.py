@@ -90,6 +90,7 @@
       the output dataset less unusual.
  '-z' Pass the "zero" option to UVMODEL.
  '-a' Pass the "autoscale" option to UVMODEL.
+ '-s' Run the modeling tasks serially, rather than in parallel.
 --
 """
 
@@ -124,6 +125,7 @@ class Modeler (object):
     flux = None
     preserve = False
     touchup = False
+    serial = False
     defaultModelMisc = {'mfs': True, 'line': 'chan'}
     defaultSelect = []
 
@@ -174,9 +176,10 @@ class Modeler (object):
 
         cmodel = []
 
-        # Run the two model tasks in parallel. (One task for each pol.)  There
-        # are several steps to execute serially for each pol, so instead of
-        # running the MIRIAD tasks asynchronously, which would add a few extra
+        # We need to run one model task for each pol. Do so in
+        # parallel unless self.serial is True. There are several steps
+        # to execute serially for each pol, so instead of running the
+        # MIRIAD tasks asynchronously, which would add a few extra
         # sync points to the processing, we actually spawn a couple of
         # threads, since it's not very complicated to do so.
 
@@ -221,9 +224,12 @@ class Modeler (object):
         threads = []
 
         for pol, polcode in zip ('xy', (-6, -7)):
-            thread = Thread (target=doone, args=(deepcopy (t), pol, polcode))
-            thread.start ()
-            threads.append (thread)
+            if self.serial:
+                doone (deepcopy (t), pol, polcode)
+            else:
+                thread = Thread (target=doone, args=(deepcopy (t), pol, polcode))
+                thread.start ()
+                threads.append (thread)
 
         for thread in threads:
             thread.join ()
@@ -290,6 +296,8 @@ def task (argv):
             m.preserve = True
         elif arg == '-t':
             m.touchup = True
+        elif arg == '-s':
+            m.serial = True
         elif arg.startswith ('flux='):
             m.flux = float (arg[5:])
         elif arg.startswith ('select='):
