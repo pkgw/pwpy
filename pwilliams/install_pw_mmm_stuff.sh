@@ -76,6 +76,7 @@ pylib/hhaa.dat
 pylib/multiflag.py
 pylib/multiflag2.py
 pylib/pwflux.py
+pylib/pwmodel.py
 '
 
 set -e
