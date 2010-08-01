@@ -31,7 +31,7 @@ class poco:
         self.autos = []
         self.noautos = []
         self.dmarr = n.arange(10,200,10)       # dm trial range in pc/cm3
-        self.tarr = n.arange(-500.,500)/500.   # time trial range in seconds
+        self.tarr = n.arange(-500.,500)/1000.   # time trial range in seconds
         for a1 in range(1,9):             # loop to adjust delays
             for a2 in range(a1,9):
                 self.blindex = n.where(self.baseline_order == a1*256 + a2)[0][0]
@@ -197,8 +197,10 @@ class poco:
         tarr = self.tarr
         dmarr = self.dmarr
         arr = self.dmt0arr
-        mean = arr[5:10,100:200].mean()   # need to fix this!  sometimes falls in empty area!
-        std = arr[5:10,100:200].std()
+        ind0c = arr.shape[0]/2
+        ind1c = arr.shape[1]/2
+        mean = arr[ind0c-5:ind0c+5, ind1c-100:ind1c+100].mean()   # need to fix this!  sometimes falls in empty area!
+        std = arr[ind0c-5:ind0c+5, ind1c-100:ind1c+100].std()
 
         time = 24*3600*(self.time - self.time[0])     # relative time array in seconds
 
