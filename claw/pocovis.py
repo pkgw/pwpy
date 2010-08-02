@@ -23,7 +23,7 @@ class poco:
     def __init__(self,file):
         # initialize'
         self.nchan = 64
-        self.chans = n.arange(30,50)
+        self.chans = n.arange(6,58)
         self.nbl = 36
         self.sfreq = 0.77  # freq for first channel in GHz
         self.sdf = 0.104/self.nchan   # dfreq per channel in GHz
@@ -54,7 +54,7 @@ class poco:
         nchan = self.nchan
         nbl = self.nbl
         i = 0
-        initsize=50000
+        initsize=360000
         da = n.zeros((initsize,nchan),dtype='complex64')
         fl = n.zeros((initsize,nchan),dtype='bool')
         ti = n.zeros((initsize),dtype='float64')
