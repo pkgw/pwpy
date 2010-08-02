@@ -406,6 +406,7 @@ c or no conj error?
 
 
 	   if (ns .eq. int0 .and. time0 .ne. 0) then
+	      print *, 'int0=0 and time0!=0.'
 	      call Jullst(time0,along,lst0)
 	      HA0 = lst0 - obsra
 	      sinha0 = sin(HA0)
@@ -438,9 +439,15 @@ c or no conj error?
 	      preamble(2) = -(bxx * cosha - byy * sinha)*sind + bzz*cosd
 	      preamble(3) = (bxx * cosha - byy * sinha)*cosd + bzz*sind
 	      preamble(5) = 256*a1 + a2
+
 	      if (time0 .ne. 0) then
 		 delayref = (bxx * cosha0 - byy * sinha0)*cosd0 + bzz
-       *         *sind0
+     &           *sind0
+		 if (ns .eq. int0) then
+		    print *, 'ns=int0.'
+		    print *, 'a1, a2, ns, p(3), delayref', a1, a2, ns, 
+     &       	       preamble(3), delayref
+		 endif
 	      endif
 
 ! Write out data and flags
@@ -451,32 +458,27 @@ c or no conj error?
 		 if (sra .ne. 0.) then
 !  Rotate phases to RA DEC if given by user
 ! n.b., GHz & ns mix ok here..not SI, of course
-		    phase = tpi * (sfreq+(c-1)*sdf) * (preamble(3) +
-     &            delay(a1) - delay(a2))
-		 if (time0 .ne. 0) then
-		    phase = tpi * (sfreq+(c-1)*sdf) * (preamble(3) -
+		    if (time0 .ne. 0) then
+		       phase = tpi * (sfreq+(c-1)*sdf) * (preamble(3) -
      &                    delayref + delay(a1) - delay(a2))
-	         endif
-!		 if (ns .eq. int0+nints-1) then
-!		    print *, 'ns, p(3), delayref', ns, preamble(3)
-!     &              ,delayref
-!		 endif
-		 phase = dmod(phase,tpi)
-		 xvis(c) = xvis(c) * cmplx(dcos(phase),-dsin(phase))
+		    else
+		       phase = tpi * (sfreq+(c-1)*sdf) * (preamble(3) +
+     &                    delay(a1) - delay(a2))
+		    endif
 		 else		! just apply delays
 ! n.b., GHz & ns mix ok here..not SI, of course
 		    phase = tpi * (sfreq+(c-1)*sdf) * 
      &           (delay(a1) - delay(a2))
 !		    print *, 'phase ', phase, sfreq, sdf, delay(a1)
 !     &	     ,delay(a2), a1, a2
-		    phase = dmod(phase,tpi)
-		    xvis(c) = xvis(c) * cmplx(dcos(phase),-dsin(phase))
 		 endif
+		 phase = dmod(phase,tpi)
+		 xvis(c) = xvis(c) * cmplx(dcos(phase),-dsin(phase))
 !		 print *, 'xvis(',c,',',b,') ',xvis(c)
 	      enddo		!c
 !	      if (a1 .eq. 1) then
-!		 print *, 'a1, a2, geo delay, relphase, pre(3)', a1, a2, 
-!		 * preamble(3), relphase, preamble(3)
+!		 print *, 'a1, a2, delayref, pre(3)', a1, a2, 
+!		 * delayref, preamble(3)
 !	      endif
 
 ! write out data
