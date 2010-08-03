@@ -168,7 +168,7 @@ c       define/setup abase array for CASPER/8 correlator
 	integer ipol
 	real baseunit
 	real b1(MAXANT),b2(MAXANT),b3(MAXANT)
-	real sind,cosd,sinl,cosl,sind0,cosd0
+	double precision sind,cosd,sinl,cosl,sind0,cosd0
 	double precision along,alat,ra,dec,sra,sdec,obsra,obsdec
 	double precision jd2000,lst,timeout,timerel,time0,lst0
 	double precision sfreq,bandwidth
@@ -404,7 +404,6 @@ c or no conj error?
 	   call uvputvrd(munit,'lst',lst,1)
 	   call uvputvrd(munit,'longitu',along,1)
 
-
 	   if (ns .eq. int0 .and. time0 .ne. 0) then
 	      print *, 'int0=0 and time0!=0.'
 	      call Jullst(time0,along,lst0)
@@ -444,7 +443,6 @@ c or no conj error?
 		 delayref = (bxx * cosha0 - byy * sinha0)*cosd0 + bzz
      &           *sind0
 		 if (ns .eq. int0) then
-		    print *, 'ns=int0.'
 		    print *, 'a1, a2, ns, p(3), delayref', a1, a2, ns, 
      &       	       preamble(3), delayref
 		 endif
@@ -500,41 +498,3 @@ c or no conj error?
 	call uvclose(munit)
 
 	end
-
-
-c********1*********2*********3*********4*********5*********6*********7*c
-      SUBROUTINE SORT(N,RA)
-      DIMENSION RA(N)
-      L=N/2+1
-      IR=N
-10    CONTINUE
-        IF(L.GT.1)THEN
-          L=L-1
-          RRA=RA(L)
-        ELSE
-          RRA=RA(IR)
-          RA(IR)=RA(1)
-          IR=IR-1
-          IF(IR.EQ.1)THEN
-            RA(1)=RRA
-            RETURN
-          ENDIF
-        ENDIF
-        I=L
-        J=L+L
-20      IF(J.LE.IR)THEN
-          IF(J.LT.IR)THEN
-            IF(RA(J).LT.RA(J+1))J=J+1
-          ENDIF
-          IF(RRA.LT.RA(J))THEN
-            RA(I)=RA(J)
-            I=J
-            J=J+J
-          ELSE
-            J=IR+1
-          ENDIF
-        GO TO 20
-        ENDIF
-        RA(I)=RRA
-      GO TO 10
-      END
