@@ -251,7 +251,7 @@ class Modeler (object):
             mirexec.TaskUVSort (vis=combined, out=sortvis).run ()
             cleanup.append (sortvis)
 
-            mirexec.TaskUVAver (vis=sorted, interval=1e-6, out=self.out).run ()
+            mirexec.TaskUVAver (vis=sortvis, interval=1e-6, out=self.out).run ()
 
         if not self.preserve:
             for v in cleanup:
