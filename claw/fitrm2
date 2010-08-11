@@ -2,4 +2,4 @@
 
 # wrapper to take input for fitrm
 cp $1 log
-fitrm-fullres
+fitrm-5000

@@ -8,7 +8,7 @@ import numpy, pylab, asciidata
 import scipy.optimize as opt
 import matplotlib.pyplot as plt
 
-hammer=1
+hammer=0
 
 f = asciidata.AsciiData('/big_scr3/claw/data/ata/nvss-rm-best/RM-hires-join2.txt')
 
@@ -38,14 +38,14 @@ for name in n:
         for i in range(len(rmcomps[0])):
             print rmvla[rmcomps]
             print rmvla[rmcomps][i]
-            pylab.plot([rmvla[rmcomps][i]],[rm[rmcomps][i]],'k*',ms=15*frfl[i],alpha=0.5,mew=1.0,mec='r')
+            pylab.plot([rmvla[rmcomps][i]],[rm[rmcomps][i]],'k*',ms=15*frfl[i],alpha=0.2,mew=1.0,mec='r')
         pylab.plot([rmvla[rmcomps][i],rmvla[rmcomps][i]],[min(rm[rmcomps]),max(rm[rmcomps])],'k:')
         rm[rmcomps][0] = meanrm
 
     oldn = name
 
 pylab.plot([-5000,5000],[-5000,5000],'k-')
-pylab.xlabel('VLA RM (rad/m2)')
+pylab.xlabel('T09 RM (rad/m2)')
 pylab.ylabel('ATA RM (rad/m2)')
 #pylab.show()
 
@@ -68,4 +68,5 @@ if hammer == 1:
         else:
             pylab.plot(numpy.radians([-1*l[i]]), numpy.radians([b[i]]), 'x', markersize=abs(rm2/2.), color='blue', alpha=0.9)
         print i
-    pylab.show()
+
+pylab.show()

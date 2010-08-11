@@ -10,7 +10,7 @@ rm -f fitrm.log
 # create rm spectrum
 echo 'First do spectrum of all data over +-5000 rad/m2 (need to type /xs to move through)'
 cp $1 log
-fitrm-textout | tee -a fitrm.log
+fitrm-5000 | tee -a fitrm.log
 grep 'RMS (obs)' fitrm.log | tail -n 1 | gawk '{printf("%10.3f\n",$6)}' > /tmp/tmp-rmsall
 
 # create files for python plotting

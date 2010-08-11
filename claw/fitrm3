@@ -11,18 +11,18 @@ rm -f fitrm.log
 #echo 'First do spectrum of all data over +-5000 rad/m2 (need to type /xs to move through)'
 cp $1 log
 set name = `echo $1:t:r | cut -c 5-`
-#fitrm-5000 | tee -a fitrm$name.log
-#grep 'RMS (obs)' fitrm$name.log | tail -n 1 | gawk '{printf("%10.3f\n",$6)}' > /tmp/tmp-rmsall$name
+fitrm-5000 | tee -a fitrm$name.log
+grep 'RMS (obs)' fitrm$name.log | tail -n 1 | gawk '{printf("%10.3f\n",$6)}' > /tmp/tmp-rmsall$name
 
 # create files for python plotting
-#echo -n '#' > /tmp/tmp-pound
-#cat /tmp/tmp-pound log > /tmp/tmp-logall$name
-#cat /tmp/tmp-pound rm_spectrum_1001.txt > /tmp/tmp-rmspectrumall$name
-#fitrmpeak.py /tmp/tmp-rmspectrumall$name /tmp/tmp-rmsall$name  | tee -a results.txt
+echo -n '#' > /tmp/tmp-pound
+cat /tmp/tmp-pound log > /tmp/tmp-logall$name
+cat /tmp/tmp-pound rm_spectrum_1001.txt > /tmp/tmp-rmspectrumall$name
+fitrmpeak.py /tmp/tmp-rmspectrumall$name /tmp/tmp-rmsall$name  | tee -a results.txt
 
 #echo 'Next do spectrum of 1430 data over +-90000 rad/m2  (need to type /xs to move through)'
-#cp $1:r.1430 log
-fitrm-5000 | tee -a fitrm$name.log
+cp $1:r.1430 log
+fitrm-textout | tee -a fitrm$name.log
 grep 'RMS (obs)' fitrm$name.log | tail -n 1 | gawk '{printf("%10.3f\n",$6)}' > /tmp/tmp-rms1430$name
 
 # create files for python plotting
@@ -32,9 +32,8 @@ cat /tmp/tmp-pound rm_spectrum_1001.txt > /tmp/tmp-rmspectrum1430$name
 fitrmpeak.py /tmp/tmp-rmspectrum1430$name /tmp/tmp-rms1430$name  | tee -a results.txt
 
 # python plot
-#rm-est.py /tmp/tmp-logall$name /tmp/tmp-rmspectrumall$name /tmp/tmp-rmsall$name /tmp/tmp-rmspectrum1430$name /tmp/tmp-rms1430$name $name | tee -a results.txt
-#rm-est.py /tmp/tmp-log /tmp/tmp-rmspectrum plotrm-${name}.all.png
-#convert plotrm-${name}-nice.png plotrm-${name}-nice.ps
-#mv rm_components.txt rmcomp-${name}.txt
+rm-est.py /tmp/tmp-logall$name /tmp/tmp-rmspectrumall$name /tmp/tmp-rmsall$name /tmp/tmp-rmspectrum1430$name /tmp/tmp-rms1430$name $name | tee -a results.txt
+convert plotrm-${name}-nice.png plotrm-${name}-nice.ps
+mv rm_components.txt rmcomp-${name}.txt
 
 

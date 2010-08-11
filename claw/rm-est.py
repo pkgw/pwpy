@@ -77,9 +77,9 @@ if len(sys.argv) == 3 or len(sys.argv) == 4:
 if len(sys.argv) > 3:
     print 'loading ', sys.argv[3]
     f = asciidata.AsciiData(sys.argv[3])
-    rms = float(numpy.array(f.columns[0]))
-    print 'loaded rms = %.3f' % (rms)
-    ax3.plot(rm, 5*rms*(numpy.ones(len(rm))), '-.')
+    rms1 = float(numpy.array(f.columns[0]))
+    print 'loaded rms = %.3f' % (rms1)
+    ax3.plot(rm, 5*rms1*(numpy.ones(len(rm))), '-.')
 
 ax3.set_xlim(-5000.,5000.)
 
@@ -102,10 +102,20 @@ if len(sys.argv) > 5:
 
     print 'loading ', sys.argv[5]
     f = asciidata.AsciiData(sys.argv[5])
-    rms = float(numpy.array(f.columns[0]))
-    print 'loaded rms = %.3f' % (rms)
-    ax4.plot(rm, 5*rms*(numpy.ones(len(rm))), '-.')
+    rms2 = float(numpy.array(f.columns[0]))
+    print 'loaded rms = %.3f' % (rms2)
+    ax4.plot(rm, 5*rms2*(numpy.ones(len(rm))), '-.')
     ax4.set_xlim(-90000.,90000.)
+
+fwhmhigh = 2.*numpy.sqrt(3.)/numpy.abs((3e-1/nu[len(nu)-1])**2-(3e-1/nu[0])**2)
+
+# need fwhm of 1.4 and 2.0 bands
+nu = nu[numpy.where((nu >= 1.2) & (nu <= 1.5))]
+fwhmlow = 2.*numpy.sqrt(3.)/numpy.abs((3e-1/nu[len(nu)-1])**2-(3e-1/nu[0])**2)
+
+if len(sys.argv) > 5:
+    print 'highres 5sig, fwhm, lowres 5sig, fwhm:'
+    print '%d & %d & %d & %d' % (5*rms1, fwhmhigh, 5*rms2, fwhmlow)
 
 if len(sys.argv) == 7:
     print 'saving file to ', sys.argv[6]

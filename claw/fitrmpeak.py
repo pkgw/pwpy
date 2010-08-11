@@ -68,7 +68,7 @@ while 1:
         print 'Using max of range'
 
     fitindex = numpy.arange(numpy.where(rm>=rmmin)[0][0],numpy.where(rm<=rmmax)[0][-1])
-#    fitindex = numpy.concatenate((fitindex[0:2000],fitindex[len(fitindex)-30:len(fitindex)]))  # hackalicious!
+#    fitindex = numpy.concatenate((fitindex[0:2000],fitindex[len(fitindex)-20:len(fitindex)]))  # hackalicious!
     rm = rm[fitindex]
     clean_am = clean_am[fitindex]
     dirty_am = dirty_am[fitindex]

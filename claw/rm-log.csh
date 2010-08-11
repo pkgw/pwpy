@@ -19,6 +19,7 @@ set srctot = 1002
 set filename = log.qu.$id.x
 set b0 = 0
 set shortsource = `echo $source | sed '{s/[a-Z-]*//g}' | cut -c-13`
+set suffix = ''
 
 echo $id
 \rm $filename
@@ -56,12 +57,12 @@ echo $x0 $y0 $p0 $rms $shortsource > $filename
 set n=1
 while ($n <= $nchan)
 
-if (-d $source-$n.ucln) then
+if (-d $source-$n.ucln${suffix}) then
 
 #     set freq = `uvlist vis=$source-$freqname-$n options=variables,full | grep sfreq | cut -c62-70`  # hack to get freq instead of vlsr.  this may be freq of chan1, so could be off by half chan width
-     set freq = `gethd in=$source-$n.ucln/crval3`
-     set q0 = `imlist in=$source-$n.qcln options=stat "region=abspix,box($x0,$y0,$x0,$y0)" | tail -1 | awk '{print $4}' `
-     set u0 = `imlist in=$source-$n.ucln options=stat "region=abspix,box($x0,$y0,$x0,$y0)" | tail -1 | awk '{print $4}' `
+     set freq = `gethd in=$source-$n.ucln${suffix}/crval3`
+     set q0 = `imlist in=$source-$n.qcln${suffix} options=stat "region=abspix,box($x0,$y0,$x0,$y0)" | tail -1 | awk '{print $4}' `
+     set u0 = `imlist in=$source-$n.ucln${suffix} options=stat "region=abspix,box($x0,$y0,$x0,$y0)" | tail -1 | awk '{print $4}' `
 
 #    set q0 = `histo in=$source-$n.qcln "region=abspix,box($xmin,$ymin,$xmax,$ymax)" | grep Flux | awk '{print $6}' `
 #    set u0 = `histo in=$source-$n.ucln "region=abspix,box($xmin,$ymin,$xmax,$ymax)" | grep Flux | awk '{print $6}' `
