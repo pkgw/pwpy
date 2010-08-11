@@ -1,3 +1,3 @@
 #! /bin/sh
-exec mirargmerge smauvspec device=1/xs axis=ch,bo line=chan,824,101 nxy=4,3 \
+exec mirargmerge smauvspec device=1/xs axis=ch,bo nxy=4,3 \
   select='-auto' "$@"
