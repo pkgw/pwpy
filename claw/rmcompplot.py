@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 hammer=0
 
-f = asciidata.AsciiData('/big_scr3/claw/data/ata/nvss-rm-best/RM-hires-join2.txt')
+f = asciidata.AsciiData('/big_scr3/claw/data/ata/nvss-rm-best/RM-hires-join3.txt')
 
 n = numpy.array(f.columns[0])
 fl = numpy.array(f.columns[1])
@@ -29,7 +29,7 @@ for name in n:
     if name != oldn:
         print 'Working with %s' % (name)
 
-        rmcomps = numpy.where((n == name) & (abs(rm) <= 500.))
+        rmcomps = numpy.where(n == name)
         print n[rmcomps], fl[rmcomps], rm[rmcomps], flvla[rmcomps], rmvla[rmcomps]
         frfl = fl[rmcomps]/max(fl[rmcomps])
 #        pylab.errorbar(rmvla[rmcomps],rm[rmcomps],xerr=ermvla[rmcomps],yerr=erm[rmcomps],fmt='bo')
@@ -40,7 +40,7 @@ for name in n:
             print rmvla[rmcomps][i]
             pylab.plot([rmvla[rmcomps][i]],[rm[rmcomps][i]],'k*',ms=15*frfl[i],alpha=0.2,mew=1.0,mec='r')
         pylab.plot([rmvla[rmcomps][i],rmvla[rmcomps][i]],[min(rm[rmcomps]),max(rm[rmcomps])],'k:')
-        rm[rmcomps][0] = meanrm
+#        rm[rmcomps][0] = meanrm
 
     oldn = name
 
