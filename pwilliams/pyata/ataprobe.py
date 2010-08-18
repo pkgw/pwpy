@@ -50,7 +50,11 @@ class SlurpError (EnvironmentError):
     def __init__ (self, args, code, stdout, stderr, subexc):
         args = list (args)
         code = int (code)
-        super (SlurpError, self).__init__ (args, code, stdout, stderr, subexc)
+        # We used to use some semantics of EnvironmentError.__init__()
+        # that were inconsistent between Python 2.5 and later versions.
+        # The following should be robust.
+        super (SlurpError, self).__init__ (0, 'temp')
+        self.args = (args, code, stdout, stderr, subexc)
 
 
 def _slurp (args, checkCode=True):

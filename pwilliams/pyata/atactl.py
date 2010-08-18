@@ -167,10 +167,14 @@ def logAbort (exc_info):
         else:
             for l in stderr:
                 log ('- stderr: ' + l)
-        log ('- Sub-exception: %s: %s', eobj.__class__.__name__,
-             str (eobj))
+        log ('- Sub-exception: %s: %s' % (eobj.__class__.__name__, 
+                                          str (eobj)))
 
-    log ('Aborting after %.2f hours elapsed' % ((time.time () - _startTime) / 3600.0))
+    if _startTime is None:
+        log ('Aborting; elapsed time unknown')
+    else:
+        log ('Aborting after %.2f hours elapsed' % ((time.time () - _startTime) /
+                                                    3600.0))
 
 
 import ataprobe
