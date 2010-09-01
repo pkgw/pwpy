@@ -30,7 +30,7 @@ class poco:
         self.baseline_order = n.array([ 257, 258, 514, 261, 517, 1285, 262, 518, 1286, 1542, 259, 515, 773, 774, 771, 516, 1029, 1030, 772, 1028, 1287, 1543, 775, 1031, 1799, 1544, 776, 1032, 1800, 2056, 260, 263, 264, 519, 520, 1288])   # second iteration of bl nums
         self.autos = []
         self.noautos = []
-        self.dmarr = n.arange(10,200,10)       # dm trial range in pc/cm3
+        self.dmarr = n.arange(30,80,3)       # dm trial range in pc/cm3
         self.tarr = n.arange(-500.,500)/1000.   # time trial range in seconds
         for a1 in range(1,9):             # loop to adjust delays
             for a2 in range(a1,9):
