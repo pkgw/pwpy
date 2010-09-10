@@ -161,22 +161,22 @@ def plotstokessnap(outputpath):
 	for itime in range(ntime):
 		for pointing in range(npointings):
 			pylab.plot(itime, PARANG[pointing][itime], marker='.', color=colouring[itime],alpha=alphas[itime], lw=0)
+	pylab.xlim([-0.1,7.1])
 	pylab.xlabel('itime')
 	pylab.ylabel('Parallactic angle')
 	pylab.savefig('%sparangitime.png' % (outputpath))
 	pylab.figure(403)
 	for pointing in range(npointings):
 		pylab.plot(RAoffset[pointing],DECoffset[pointing], lw=1)
-		pylab.text(RAoffset[pointing],DECoffset[pointing],str(pointing))
+		pylab.text(RAoffset[pointing],DECoffset[pointing],'p%d'%(pointing),va='center',ha='center')
 
-#	pylab.axis([-1400,1400,-1100,1100])
-	pylab.axis([-1400*2.5,1400*2.5,-1100*2.5,1100*2.5])
+	pylab.axis([-1400,1400,-1100,1100])
 	pylab.xlabel('RA offset [arcsec]')
 	pylab.ylabel('DEC offset [arcsec]')
 	pylab.savefig('%spointing.png'%outputpath)
 
 #	parser.error('exiting')
-	refpointing=getrefpointing(outputpath)
+	refpointing=0#getrefpointing(outputpath)
 	
 	pointingII0=range(npointings)
 	for pointing in range(npointings):
@@ -226,7 +226,7 @@ def plotstokessnap(outputpath):
 			dx[cnt]=length*numpy.cos(posangle)
 			dy[cnt]=length*numpy.sin(posangle)
 			pylab.figure(1)			
-			pylab.arrow(xx[cnt],yy[cnt],dx[cnt]*4000.0,dy[cnt]*4000.0,linewidth=0.5,head_width=0.5,color=colouring[itime],alpha=alphas[itime])	
+			pylab.arrow(xx[cnt],yy[cnt],dx[cnt]*4000.0,dy[cnt]*4000.0,linewidth=2,head_width=2,color=colouring[itime],alpha=alphas[itime])	
 #			pylab.arrow(xx[cnt],yy[cnt],dx[cnt]*16000.0,dy[cnt]*16000.0,linewidth=0.5,head_width=0.5,color=colouring[itime],alpha=alphas[itime])	
 			
 			#derotated stokes error in Q,U
@@ -264,13 +264,13 @@ def plotstokessnap(outputpath):
 			dy[cnt]=length*numpy.sin(posangle)
 						
 			pylab.figure(2)
-			pylab.arrow(xx[cnt],yy[cnt],dx[cnt]*4000.0,dy[cnt]*4000.0,linewidth=0.5,head_width=0.5,color=colouring[itime],alpha=alphas[itime])	
+			pylab.arrow(xx[cnt],yy[cnt],dx[cnt]*4000.0,dy[cnt]*4000.0,linewidth=2,head_width=2,color=colouring[itime],alpha=alphas[itime])	
 #			pylab.arrow(xx[cnt],yy[cnt],dx[cnt]*16000.0,dy[cnt]*16000.0,linewidth=0.5,head_width=0.5,color=colouring[itime],alpha=alphas[itime])	
 #				pylab.text(xx[cnt],yy[cnt],'p%dt%d'%(pointing,itime),fontsize=8,color=colouring[itime],alpha=alphas[itime])
 #				pylab.text(xx[cnt],yy[cnt],'p%dt%dL%d'%(pointing,itime,PARANG[pointing][itime]),fontsize=8,color=colouring[itime],alpha=alphas[itime])
 #				pylab.plot(xx[cnt], yy[cnt], marker='o', color='c', lw=0)
 
-			if (pointing==refpointing):				
+			if (0):#pointing==refpointing):				
 				pylab.text(xx[cnt],yy[cnt],' p%dt%d'%(pointing,itime),fontsize=8,color=colouring[itime],alpha=alphas[itime])
 				pylab.figure(6)
 				print dx[cnt], dy[cnt]
@@ -468,6 +468,70 @@ def plotstokessnap(outputpath):
 		pylab.grid()
 		pylab.legend()
 		pylab.savefig('%sstokesIQUVsNorm%d.png' % (outputpath,itime))
+		
+		
+		for explodedpiece in range (nexplodedpieces):
+			for pointing in range(npointings):
+				I[pointing]=peakIQUV[pointing][itime][explodedpiece][0]
+				Q[pointing]=peakIQUV[pointing][itime][explodedpiece][1]
+				U[pointing]=peakIQUV[pointing][itime][explodedpiece][2]
+				V[pointing]=peakIQUV[pointing][itime][explodedpiece][3]
+		
+			I=numpy.array(I,dtype='d')	
+			Q=numpy.array(Q,dtype='d')	
+			U=numpy.array(U,dtype='d')	
+			V=numpy.array(V,dtype='d')	
+
+			fig=pylab.figure(400)
+			a=pylab.subplot(2,1,1)
+			pylab.plot(x, I, color='c')
+			a=pylab.subplot(2,1,2)
+			pylab.plot(x, Q, color='b')
+			pylab.plot(x, U, color='r')
+			pylab.plot(x,V, color='g')
+			fig=pylab.figure(500)
+			a=pylab.subplot(2,1,1)
+			pylab.plot(x, I/I*I[0], color='c')
+			a=pylab.subplot(2,1,2)
+			pylab.plot(x, Q/I*I[0], color='b')
+			pylab.plot(x, U/I*I[0], color='r')
+			pylab.plot(x,V/I*I[0], color='g')
+		
+		fig=pylab.figure(400)
+		a=pylab.subplot(2,1,1)
+		a.axis([0,npointings-1,7.5,10])
+		a.set_ylabel('I')
+		a = pylab.subplot(2, 1, 2)
+		a.axis([0,npointings-1,-0.2,1.2])
+		a.set_xlabel('Pointing')
+		a.set_ylabel('V             Q                      U')
+		pylab.gcf().text(0.5, 0.95, '%s IQUV' % (outputpath[:-1]), ha='center', size='x-large')
+		pylab.subplots_adjust(left=0.1, right=0.95, bottom=0.1, top=0.9, wspace=0.05, hspace=0.1)
+		fig.set_size_inches(8,8)
+		pylab.savefig('%sIQUV.png'%(outputpath))
+		fig=pylab.figure(500)
+		a=pylab.subplot(2,1,1)
+		a.axis([0,npointings-1,7.5,10])
+		a.set_ylabel('I')
+		a = pylab.subplot(2, 1, 2)
+		a.axis([0,npointings-1,-0.2,1.2])
+		a.set_xlabel('Pointing')
+		a.set_ylabel('V             Q                      U')
+		pylab.gcf().text(0.5, 0.95, '%s IQUV normalized by I' % (outputpath[:-1]), ha='center', size='x-large')
+		pylab.subplots_adjust(left=0.1, right=0.95, bottom=0.1, top=0.9, wspace=0.05, hspace=0.1)
+		fig.set_size_inches(8,8)
+		pylab.savefig('%sIQUVnormalized.png'%(outputpath))
+		fig=pylab.figure(501)
+		for pointing in range(npointings):
+			pylab.plot(RAoffset[pointing],DECoffset[pointing], lw=1)
+			pylab.text(RAoffset[pointing],DECoffset[pointing],'p%d'%(pointing),va='center',ha='center')
+
+		pylab.axis([-1100,1100,-1100,1100])
+		pylab.xlabel('RA offset [arcsec]')
+		pylab.ylabel('DEC offset [arcsec]')
+		fig.set_size_inches(4.5,4)
+		pylab.savefig('%spointing.png'%outputpath)
+		
 	
 #not used
 def plotstokessnapOld(outputpath):
@@ -872,6 +936,7 @@ def plotfreqleakage(outputpath,pointing):
 	nfreq=len(leakageX[0])
 	nant=len(leakageX[0][0])
 	
+	colours=['b','g','r','c','m','y','k']
 	pylab.figure(1)
 	for iant in range(nant):
 		fleakageX=numpy.array(range(nfreq),dtype='complex')
@@ -889,9 +954,9 @@ def plotfreqleakage(outputpath,pointing):
 #		print iant,numpy.real(fleakageX), numpy.imag(fleakageX)
 
 		pylab.figure(1)
-		pylab.plot(numpy.real(fleakageX), numpy.imag(fleakageX), marker='o', lw=1, label=r'%d' %(iant+1))
+		h=pylab.plot(numpy.real(fleakageX), numpy.imag(fleakageX), marker='o', lw=1, label=r'%d' %(iant+1),color=colours[iant%7])
 		if (firstfinitepiece>=0):
-			pylab.text(numpy.real(fleakageX[firstfinitepiece]), numpy.imag(fleakageX[firstfinitepiece]),str(iant+1))
+			pylab.text(numpy.real(fleakageX[firstfinitepiece]), numpy.imag(fleakageX[firstfinitepiece]),str(iant+1),backgroundcolor=colours[iant%7],color='w',fontweight='bold')
 		pylab.figure(2)
 		pylab.plot(numpy.real(fleakageY), numpy.imag(fleakageY), marker='o', lw=1, label=r'%d' %(iant+1))
 		if (firstfinitepiece>=0):
@@ -902,7 +967,7 @@ def plotfreqleakage(outputpath,pointing):
 	pylab.ylabel('Imaginary')
 	pylab.title('%s leakageX-p%d for %d antennas' % (outputpath[:-1],pointing,len(validant)))
 	pylab.grid()
- 	pylab.xlim((-0.2, 0.2))
+ 	pylab.xlim((-0.25, 0.25))
 	pylab.ylim((-0.2, 0.2))
 	pylab.savefig('%sleakageX-p%d.png' % (outputpath,pointing))
 
@@ -928,9 +993,17 @@ def plotantleakage(outputpath,iant):#iant starts at 1
 	
 	linewidth=[1,4,3,2,1,1,2,3,4,4,3,2,1,1,2,3,4]
 	markers=['o','>','>','>','>','<','<','<','<','^','^','^','^','v','v','v','v']
+	markerx=0.05*numpy.array([0,0.05,0.05,0.05,0.05,-0.05,-0.05,-0.05,-0.05,0,0,0,0,0,0,0,0])
+	markery=0.05*numpy.array([0,0,0,0,0,0,0,0,0,0.05,0.05,0.05,0.05,-0.05,-0.05,-0.05,-0.05])
+	markersz=4+numpy.array([1,4,3,2,1,1,2,3,4,4,3,2,1,1,2,3,4])
 	colouring=['k','r','r','r','r','r','r','r','r','b','b','b','b','b','b','b','b']
 #	colouring=['k','r','m','g','b','b','g','m','r','r','m','g','b','b','g','m','r']
 	pylab.figure(1)
+#	pylab.axis('equal')
+	qx=[]
+	qy=[]
+	qdx=[]
+	qdy=[]
 	for pointing in range(npointings):
 		fleakageX=numpy.array(range(nfreq),dtype='complex')
 		fleakageY=numpy.array(range(nfreq),dtype='complex')
@@ -939,8 +1012,17 @@ def plotantleakage(outputpath,iant):#iant starts at 1
 			fleakageY[ifreq]=leakageY[pointing][ifreq][iant-1];
 		
 #		pylab.subplot(121)
-		pylab.plot(numpy.real(fleakageX),numpy.imag(fleakageX), markersize=6,marker=markers[pointing], lw=linewidth[pointing], color=colouring[pointing])
-		pylab.text(numpy.real(fleakageX[0]),numpy.imag(fleakageX[0]),str(pointing))
+#		pylab.plot(numpy.real(fleakageX),numpy.imag(fleakageX), markersize=markersz[pointing],marker=markers[pointing], lw=linewidth[pointing], color=colouring[pointing],markerfacecolor='k')
+		pylab.plot(numpy.real(fleakageX),numpy.imag(fleakageX),marker='', lw=linewidth[pointing], color=colouring[pointing],zorder=1)
+		for c in range(len(fleakageX)):
+			qx.append(numpy.real(fleakageX[c]))
+			qy.append(numpy.imag(fleakageX[c]))
+			qdx.append(markerx[pointing]*linewidth[pointing])
+			qdy.append(markery[pointing]*linewidth[pointing])
+#		pylab.quiver(numpy.real(fleakageX),numpy.imag(fleakageX), markerx[pointing]*markersz[pointing],markery[pointing]*markersz[pointing],color='k',pivot='tail')
+#		for c in range(len(fleakageX)):
+#			pylab.arrow(numpy.real(fleakageX[c])-markerx[pointing],numpy.imag(fleakageX[c])-markery[pointing], markerx[pointing],markery[pointing],color='k')
+		pylab.text(numpy.real(fleakageX[0]),numpy.imag(fleakageX[0]),str(pointing),fontsize=11,backgroundcolor=colouring[pointing],va='center',ha='center',color='w',fontweight='bold')
 #		pylab.subplot(122)
 #		pylab.plot(numpy.real(fleakageY),numpy.imag(fleakageY), markersize=6,marker=markers[pointing], lw=linewidth[pointing], color=colouring[pointing])
 #		pylab.text(numpy.real(fleakageY[0]),numpy.imag(fleakageY[0]),str(pointing))
@@ -951,14 +1033,16 @@ def plotantleakage(outputpath,iant):#iant starts at 1
 #		pylab.plot(numpy.real(fleakageY), numpy.imag(fleakageY), marker='o', lw=1, label=r'%d' %(iant+1))
 
 
+	pylab.quiver(qx,qy,qdx,qdy,color='k',pivot='tail',scale=0.4,zorder=2)
+
 	pylab.figure(1)
 #	pylab.subplot(121)
 	pylab.xlabel('Real')
 	pylab.ylabel('Imaginary')
 	pylab.title('%s leakageX-a%d, for %d pointings' % (outputpath[:-1],iant,npointings))
 	pylab.grid()
-#	pylab.xlim((-0.1, 0.3))
-#	pylab.ylim((-0.05, 0.1))
+	pylab.xlim((-0.36, 0.36))
+	pylab.ylim((-0.13, 0.13))
 #	pylab.subplot(122)
 #	pylab.xlabel('Real')
 #	pylab.ylabel('Imaginary')
@@ -969,14 +1053,17 @@ def plotantleakage(outputpath,iant):#iant starts at 1
 	
 	pylab.savefig('%sleakageX-a%d.png' % (outputpath,iant))
 
-	pylab.figure(2)
+	fig=pylab.figure(2)
 	for pointing in range(npointings):
 		pylab.plot(RAoffset[pointing],DECoffset[pointing], marker=markers[pointing],color=colouring[pointing], lw=1)
-		pylab.text(RAoffset[pointing],DECoffset[pointing],str(pointing))
+		pylab.text(RAoffset[pointing],DECoffset[pointing]+40,str(pointing),fontsize=11,ha='center')
 
+	fig.set_size_inches(4.5,4)
+	pylab.title('%s pointings' % (outputpath[:-1]))
 	pylab.xlabel('Relative RA (arcsec)')
 	pylab.ylabel('Relative DEC (arcsec)')
-	pylab.title('%s pointings' % (outputpath[:-1]))
+	pylab.ylim([-1200,1200])
+	pylab.xlim([-1200,1200])
 	pylab.savefig('%spointings.png' % (outputpath))
 #	pylab.show()
 	

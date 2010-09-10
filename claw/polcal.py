@@ -3,6 +3,8 @@
 from struct import unpack
 import optparse, commands, sys, numpy, pickle#, pylab
 
+deletefiles=0
+
 # ================================ Helper functions ================================
 #execute unix command and record stdio to log file
 def executelog(cmd):
@@ -454,10 +456,11 @@ def imageIQUV(outputpath,pointing,convergeFail):
 		executelog('restor map=%sp%df%d-%s.mp beam=%sp%df%d-%s.bm out=%sp%df%d-%s.rm model=%sp%df%d-%s.cl' % (outputpath,pointing,piece,stokes[count],outputpath,pointing,piece,stokes[count],outputpath,pointing,piece,stokes[count],outputpath,pointing,piece,stokes[count]));
 		peakIQUV[0][0][count]=readimfit(executelog('imfit in=%sp%df%d-%s.rm object=point region="%s"' % (outputpath,pointing,piece,stokes[count],fitregion)))
 		noiseIQUV[0][0][count]=readimstat(executelog('imstat in=%sp%df%d-%s.rm region="%s"' % (outputpath,pointing,piece,stokes[count],noiseregion)))
-		executelog('rm -rf "%sp%df%d-%s.mp"' % (outputpath,pointing,piece,stokes[count]));
-		executelog('rm -rf "%sp%df%d-%s.bm"' % (outputpath,pointing,piece,stokes[count]));
-		executelog('rm -rf "%sp%df%d-%s.cl"' % (outputpath,pointing,piece,stokes[count]));
-		executelog('rm -rf "%sp%df%d-%s.rm"' % (outputpath,pointing,piece,stokes[count]));
+		if (deletefiles):
+			executelog('rm -rf "%sp%df%d-%s.mp"' % (outputpath,pointing,piece,stokes[count]));
+			executelog('rm -rf "%sp%df%d-%s.bm"' % (outputpath,pointing,piece,stokes[count]));
+			executelog('rm -rf "%sp%df%d-%s.cl"' % (outputpath,pointing,piece,stokes[count]));
+			executelog('rm -rf "%sp%df%d-%s.rm"' % (outputpath,pointing,piece,stokes[count]));
 	return numpy.array(peakIQUV, dtype='d'), numpy.array(noiseIQUV, dtype='d')
 	
 #image IQUV for each frequency piece individually - this corresponds to option E (for eXplode)
@@ -479,10 +482,11 @@ def imageIQUVperpiece(outputpath,pointing,convergeFail):
 			executelog('restor map=%sp%df%d-%s.mp beam=%sp%df%d-%s.bm out=%sp%df%d-%s.rm model=%sp%df%d-%s.cl' % (outputpath,pointing,piece,stokes[count],outputpath,pointing,piece,stokes[count],outputpath,pointing,piece,stokes[count],outputpath,pointing,piece,stokes[count]));
 			peakIQUV[0][piece][count]=readimfit(executelog('imfit in=%sp%df%d-%s.rm object=point region="%s"' % (outputpath,pointing,piece,stokes[count],fitregion)))
 			noiseIQUV[0][piece][count]=readimstat(executelog('imstat in=%sp%df%d-%s.rm region="%s"' % (outputpath,pointing,piece,stokes[count],noiseregion)))
-			executelog('rm -rf "%sp%df%d-%s.mp"' % (outputpath,pointing,piece,stokes[count]));
-			executelog('rm -rf "%sp%df%d-%s.bm"' % (outputpath,pointing,piece,stokes[count]));
-			executelog('rm -rf "%sp%df%d-%s.cl"' % (outputpath,pointing,piece,stokes[count]));
-			executelog('rm -rf "%sp%df%d-%s.rm"' % (outputpath,pointing,piece,stokes[count]));
+			if (deletefiles):
+				executelog('rm -rf "%sp%df%d-%s.mp"' % (outputpath,pointing,piece,stokes[count]));
+				executelog('rm -rf "%sp%df%d-%s.bm"' % (outputpath,pointing,piece,stokes[count]));
+				executelog('rm -rf "%sp%df%d-%s.cl"' % (outputpath,pointing,piece,stokes[count]));
+				executelog('rm -rf "%sp%df%d-%s.rm"' % (outputpath,pointing,piece,stokes[count]));
 	print "----------------------------------------------------------"
 	print "PEAKIQUV",peakIQUV
 	print "NOISEIQUV",noiseIQUV
@@ -517,11 +521,14 @@ def imageIQUVsnapperpiece(outputpath,pointing,convergeFail,starttime,stoptime):
 				print 'analyzing %sp%df%dt%d-%s.rm' % (outputpath,pointing,piece,itime,stokes[count])
 				peakIQUV[itime][piece][count]=readimfit(executelog('imfit in=%sp%df%dt%d-%s.rm object=point region="%s"' % (outputpath,pointing,piece,itime,stokes[count],fitregion)))
 				noiseIQUV[itime][piece][count]=readimstat(executelog('imstat in=%sp%df%dt%d-%s.rm region="%s"' % (outputpath,pointing,piece,itime,stokes[count],noiseregion)))
-				executelog('rm -rf "%sp%df%dt%d-%s.mp"' % (outputpath,pointing,piece,itime,stokes[count]));
-				executelog('rm -rf "%sp%df%dt%d-%s.bm"' % (outputpath,pointing,piece,itime,stokes[count]));
-				executelog('rm -rf "%sp%df%dt%d-%s.cl"' % (outputpath,pointing,piece,itime,stokes[count]));
-				executelog('rm -rf "%sp%df%dt%d-%s.rm"' % (outputpath,pointing,piece,itime,stokes[count]));
-			executelog('rm -rf "%sp%df%dt%d"' % (outputpath,pointing,piece,itime));
+				if (deletefiles):
+					executelog('rm -rf "%sp%df%dt%d-%s.mp"' % (outputpath,pointing,piece,itime,stokes[count]));
+					executelog('rm -rf "%sp%df%dt%d-%s.bm"' % (outputpath,pointing,piece,itime,stokes[count]));
+					executelog('rm -rf "%sp%df%dt%d-%s.cl"' % (outputpath,pointing,piece,itime,stokes[count]));
+					executelog('rm -rf "%sp%df%dt%d-%s.rm"' % (outputpath,pointing,piece,itime,stokes[count]));
+					
+			if (deletefiles):
+				executelog('rm -rf "%sp%df%dt%d"' % (outputpath,pointing,piece,itime));
 				
 
 	return numpy.array(peakIQUV, dtype='d'), numpy.array(noiseIQUV, dtype='d')
@@ -582,7 +589,8 @@ def processpointing(inputpath,outputpath,visfilename,pointing,refpointing,npiece
 	print peakIQUV
 	print noiseIQUV
 
-	executelog('rm -rf "%stmp-p%d-tmp"' % (outputpath,pointing));
+	if (deletefiles):
+		executelog('rm -rf "%stmp-p%d-tmp"' % (outputpath,pointing));
 
 	return leakagePiecesX, leakagePiecesY, peakIQUV, noiseIQUV, convergeFail, nactiveAntennas
 
@@ -669,6 +677,15 @@ else:
 #1,3,4,7,8,11,12,13,15, 17, 19, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 39, 40, 41]
 #B:3,7,11,13,17,23,25,27,29,31,33,35,39,41
 #A:4,8,12,15,19,24,26,28,30,32,34,36,40,41
+#crossap0T8a1s14A valid antennas: [1, 3, 7, 11, 13, 17, 23, 25, 27, 29, 31, 33, 35, 39]
+#crossap0T8a1s14B valid antennas: [1, 4, 8, 12, 15, 19, 24, 26, 28, 30, 32, 34, 36, 40]
+#crossap0T8a1s15A #-s4,8,12,15,19,24,26,28,30,32,34,36,40,41,27
+#crossap0T8a1s16A #-s4,8,12,15,19,24,26,28,30,32,34,36,40,41,27,7
+#crossap0T8a1s15C #-s4,8,12,15,19,24,26,28,30,32,34,36,40,41,23
+#crossap0T8a1s16C #-s4,8,12,15,19,24,26,28,30,32,34,36,40,41,23,7
+#need to do tests to see if it is possible to determine individual antenna patterns using this technique
+#rather than only an effective array pattern.
+
 leakageX=range(npointings);
 leakageY=range(npointings);
 peakIQUV=range(npointings);

@@ -194,6 +194,7 @@ def rotate(RAoffset,DECoffset,PARANG):
 	yy=RAoffset*numpy.sin(ANG)+DECoffset*numpy.cos(ANG)
 	return xx,yy
 
+
 #period=360 or 2*pi
 #unwrapped=(angle+0.5*period) % period -0.5*period
 
@@ -493,6 +494,192 @@ def solvefitevenlesszetaepsilon(x,y,I,Q,U,V,I_harpoon,Q_harpoon,U_harpoon,V_harp
 
 	return numpy.array(epsilon_zeta).reshape(7,)
 
+#
+def solvefitevenevenlesszetaepsilon(x,y,I,Q,U,V,I_harpoon,Q_harpoon,U_harpoon,V_harpoon,xx,yy,chi,maxextent,sigma):
+	ndata=len(chi)
+	w=numpy.exp(-0.5*(numpy.sqrt((xx-x)**2+(yy-y)**2))/(sigma)**2)
+	
+	m=[w[c]*numpy.array([I_harpoon[c],Q_harpoon[c],U_harpoon[c],V_harpoon[c]]) for c in range(ndata)]
+	m=numpy.array(m).reshape(4*ndata,1)
+	
+	range06=numpy.array(range(0,6))
+	range03=numpy.array(range(0,3))
+	X=numpy.zeros([4*ndata,7*ndata])
+	XY=numpy.zeros([7*ndata,6*7-3*5])
+	for c in range(ndata):
+		X[4*c][(7*c):(7*c+7)]=w[c]*numpy.array([I,Q*numpy.cos(2.0*chi[c])+U*numpy.sin(2.0*chi[c]),0,U*numpy.cos(2.0*chi[c])-Q*numpy.sin(2.0*chi[c]),0,0,-V])
+		X[4*c+1][(7*c):(7*c+7)]=w[c]*numpy.array([Q,I*numpy.cos(2.0*chi[c]),U,-I*numpy.sin(2.0*chi[c]),-V*numpy.sin(2.0*chi[c]),-V*numpy.cos(2.0*chi[c]),0])
+		X[4*c+2][(7*c):(7*c+7)]=w[c]*numpy.array([U,I*numpy.sin(2.0*chi[c]),-Q,I*numpy.cos(2.0*chi[c]),V*numpy.cos(2.0*chi[c]),-V*numpy.sin(2.0*chi[c]),0])
+		X[4*c+3][(7*c):(7*c+7)]=w[c]*numpy.array([V,0,0,0,Q*numpy.sin(2.0*chi[c])-U*numpy.cos(2.0*chi[c]),Q*numpy.cos(2.0*chi[c])+U*numpy.sin(2.0*chi[c]),-I])		
+		XY[7*c+0][6*0+range06]=[xx[c]**2, xx[c], xx[c]*yy[c], yy[c], yy[c]**2, 1]#1/2*epp+1
+		XY[7*c+1][6*1+range06]=[xx[c]**2, xx[c], xx[c]*yy[c], yy[c], yy[c]**2, 1]#1/2*enp
+		XY[7*c+2][6*2]=1#1/2*znp
+		XY[7*c+3][6*3-5+range06]=[xx[c]**2, xx[c], xx[c]*yy[c], yy[c], yy[c]**2, 1]#1/2*zpp
+		XY[7*c+4][6*4-5]=1#1/2*ennj***
+		XY[7*c+5][6*5-10]=1#1/2*zpnj***
+		XY[7*c+6][6*6-15+range06]=[xx[c]**2, xx[c], xx[c]*yy[c], yy[c], yy[c]**2, 1]#1/2*znnj
+
+	X=numpy.array(X)
+	XY=numpy.array(XY)
+#	W*m=W*X*XY*A
+#	m=X*XY*A
+#   A=pinv(X*XY)*m
+#a[0]*x^2+a[1]*x+a[2]*x*y+a[3]*y+a[4]*y^2+a[5]
+	#A=numpy.zeros(6*7)
+	#A=[a0epp,a1epp,a2epp,a3epp,a4epp,a5epp, a0enp,a1enp,a2enp,a3enp,a4enp,a5enp,  a0ezp,a1ezp,a2ezp,a3ezp,a4ezp,a5ezp,...]'
+	A=numpy.dot(numpy.linalg.pinv(numpy.dot(X,XY)),m)
+	#now evaluate A at x,y
+	thisXY=numpy.zeros([7,6*7-3*5])
+	thisXY[0][6*0+range06]=[x**2, x, x*y, y, y**2, 1]#1/2*epp+1
+	thisXY[1][6*1+range06]=[x**2, x, x*y, y, y**2, 1]#1/2*enp
+	thisXY[2][6*2]=1#1/2*znp
+	thisXY[3][6*3-5+range06]=[x**2, x, x*y, y, y**2, 1]#1/2*zpp
+	thisXY[4][6*4-5]=1#1/2*ennj***
+	thisXY[5][6*5-10]=1#1/2*zpnj***
+	thisXY[6][6*6-15+range06]=[x**2, x, x*y, y, y**2, 1]#1/2*znnj
+	epsilon_zeta=numpy.dot(thisXY,A)
+
+	return numpy.array(epsilon_zeta).reshape(7,)
+#
+def solvefitevenevenlesslinzetaepsilon(x,y,I,Q,U,V,I_harpoon,Q_harpoon,U_harpoon,V_harpoon,xx,yy,chi,maxextent,sigma):
+	ndata=len(chi)
+	w=numpy.exp(-0.5*(numpy.sqrt((xx-x)**2+(yy-y)**2))/(sigma)**2)
+	
+	m=[w[c]*numpy.array([I_harpoon[c],Q_harpoon[c],U_harpoon[c],V_harpoon[c]]) for c in range(ndata)]
+	m=numpy.array(m).reshape(4*ndata,1)
+	
+	range06=numpy.array(range(0,6))
+	range03=numpy.array(range(0,3))
+	X=numpy.zeros([4*ndata,7*ndata])
+	XY=numpy.zeros([7*ndata,6*7-3*5-3])
+	for c in range(ndata):
+		X[4*c][(7*c):(7*c+7)]=w[c]*numpy.array([I,Q*numpy.cos(2.0*chi[c])+U*numpy.sin(2.0*chi[c]),0,U*numpy.cos(2.0*chi[c])-Q*numpy.sin(2.0*chi[c]),0,0,-V])
+		X[4*c+1][(7*c):(7*c+7)]=w[c]*numpy.array([Q,I*numpy.cos(2.0*chi[c]),U,-I*numpy.sin(2.0*chi[c]),-V*numpy.sin(2.0*chi[c]),-V*numpy.cos(2.0*chi[c]),0])
+		X[4*c+2][(7*c):(7*c+7)]=w[c]*numpy.array([U,I*numpy.sin(2.0*chi[c]),-Q,I*numpy.cos(2.0*chi[c]),V*numpy.cos(2.0*chi[c]),-V*numpy.sin(2.0*chi[c]),0])
+		X[4*c+3][(7*c):(7*c+7)]=w[c]*numpy.array([V,0,0,0,Q*numpy.sin(2.0*chi[c])-U*numpy.cos(2.0*chi[c]),Q*numpy.cos(2.0*chi[c])+U*numpy.sin(2.0*chi[c]),-I])		
+		XY[7*c+0][6*0+range06]=[xx[c]**2, xx[c], xx[c]*yy[c], yy[c], yy[c]**2, 1]#1/2*epp+1
+		XY[7*c+1][6*1+range06]=[xx[c]**2, xx[c], xx[c]*yy[c], yy[c], yy[c]**2, 1]#1/2*enp
+		XY[7*c+2][6*2]=1#1/2*znp
+		XY[7*c+3][6*3-5+range06]=[xx[c]**2, xx[c], xx[c]*yy[c], yy[c], yy[c]**2, 1]#1/2*zpp
+		XY[7*c+4][6*4-5]=1#1/2*ennj***
+		XY[7*c+5][6*5-10]=1#1/2*zpnj***
+		XY[7*c+6][6*6-15+range03]=[xx[c], yy[c], 1]#1/2*znnj
+
+	X=numpy.array(X)
+	XY=numpy.array(XY)
+#	W*m=W*X*XY*A
+#	m=X*XY*A
+#   A=pinv(X*XY)*m
+#a[0]*x^2+a[1]*x+a[2]*x*y+a[3]*y+a[4]*y^2+a[5]
+	#A=numpy.zeros(6*7)
+	#A=[a0epp,a1epp,a2epp,a3epp,a4epp,a5epp, a0enp,a1enp,a2enp,a3enp,a4enp,a5enp,  a0ezp,a1ezp,a2ezp,a3ezp,a4ezp,a5ezp,...]'
+	A=numpy.dot(numpy.linalg.pinv(numpy.dot(X,XY)),m)
+	#now evaluate A at x,y
+	thisXY=numpy.zeros([7,6*7-3*5-3])
+	thisXY[0][6*0+range06]=[x**2, x, x*y, y, y**2, 1]#1/2*epp+1
+	thisXY[1][6*1+range06]=[x**2, x, x*y, y, y**2, 1]#1/2*enp
+	thisXY[2][6*2]=1#1/2*znp
+	thisXY[3][6*3-5+range06]=[x**2, x, x*y, y, y**2, 1]#1/2*zpp
+	thisXY[4][6*4-5]=1#1/2*ennj***
+	thisXY[5][6*5-10]=1#1/2*zpnj***
+	thisXY[6][6*6-15+range03]=[x, y, 1]#1/2*znnj
+	epsilon_zeta=numpy.dot(thisXY,A)
+
+	return numpy.array(epsilon_zeta).reshape(7,)
+
+#
+def solvefitleastzetaepsilon(x,y,I,Q,U,V,I_harpoon,Q_harpoon,U_harpoon,V_harpoon,xx,yy,chi,maxextent,sigma):
+	ndata=len(chi)
+	w=numpy.exp(-0.5*(numpy.sqrt((xx-x)**2+(yy-y)**2))/(sigma)**2)
+	
+	m=[w[c]*numpy.array([I_harpoon[c],Q_harpoon[c],U_harpoon[c],V_harpoon[c]]) for c in range(ndata)]
+	m=numpy.array(m).reshape(4*ndata,1)
+	
+	range06=numpy.array(range(0,6))
+	range03=numpy.array(range(0,3))
+	X=numpy.zeros([4*ndata,7*ndata])
+	XY=numpy.zeros([7*ndata,6*7-4*5])
+	for c in range(ndata):
+		X[4*c][(7*c):(7*c+7)]=w[c]*numpy.array([I,Q*numpy.cos(2.0*chi[c])+U*numpy.sin(2.0*chi[c]),0,U*numpy.cos(2.0*chi[c])-Q*numpy.sin(2.0*chi[c]),0,0,-V])
+		X[4*c+1][(7*c):(7*c+7)]=w[c]*numpy.array([Q,I*numpy.cos(2.0*chi[c]),U,-I*numpy.sin(2.0*chi[c]),-V*numpy.sin(2.0*chi[c]),-V*numpy.cos(2.0*chi[c]),0])
+		X[4*c+2][(7*c):(7*c+7)]=w[c]*numpy.array([U,I*numpy.sin(2.0*chi[c]),-Q,I*numpy.cos(2.0*chi[c]),V*numpy.cos(2.0*chi[c]),-V*numpy.sin(2.0*chi[c]),0])
+		X[4*c+3][(7*c):(7*c+7)]=w[c]*numpy.array([V,0,0,0,Q*numpy.sin(2.0*chi[c])-U*numpy.cos(2.0*chi[c]),Q*numpy.cos(2.0*chi[c])+U*numpy.sin(2.0*chi[c]),-I])		
+		XY[7*c+0][6*0+range06]=[xx[c]**2, xx[c], xx[c]*yy[c], yy[c], yy[c]**2, 1]#1/2*epp+1
+		XY[7*c+1][6*1+range06]=[xx[c]**2, xx[c], xx[c]*yy[c], yy[c], yy[c]**2, 1]#1/2*enp
+		XY[7*c+2][6*2]=1#1/2*znp
+		XY[7*c+3][6*3-5+range06]=[xx[c]**2, xx[c], xx[c]*yy[c], yy[c], yy[c]**2, 1]#1/2*zpp
+		XY[7*c+4][6*4-5]=1#1/2*ennj***
+		XY[7*c+5][6*5-10]=1#1/2*zpnj***
+		XY[7*c+6][6*6-15]=1#1/2*znnj
+
+	X=numpy.array(X)
+	XY=numpy.array(XY)
+#	W*m=W*X*XY*A
+#	m=X*XY*A
+#   A=pinv(X*XY)*m
+#a[0]*x^2+a[1]*x+a[2]*x*y+a[3]*y+a[4]*y^2+a[5]
+	#A=numpy.zeros(6*7)
+	#A=[a0epp,a1epp,a2epp,a3epp,a4epp,a5epp, a0enp,a1enp,a2enp,a3enp,a4enp,a5enp,  a0ezp,a1ezp,a2ezp,a3ezp,a4ezp,a5ezp,...]'
+	A=numpy.dot(numpy.linalg.pinv(numpy.dot(X,XY)),m)
+	#now evaluate A at x,y
+	thisXY=numpy.zeros([7,6*7-4*5])
+	thisXY[0][6*0+range06]=[x**2, x, x*y, y, y**2, 1]#1/2*epp+1
+	thisXY[1][6*1+range06]=[x**2, x, x*y, y, y**2, 1]#1/2*enp
+	thisXY[2][6*2]=1#1/2*znp
+	thisXY[3][6*3-5+range06]=[x**2, x, x*y, y, y**2, 1]#1/2*zpp
+	thisXY[4][6*4-5]=1#1/2*ennj***
+	thisXY[5][6*5-10]=1#1/2*zpnj***
+	thisXY[6][6*6-15]=1#1/2*znnj
+	epsilon_zeta=numpy.dot(thisXY,A)
+
+	return numpy.array(epsilon_zeta).reshape(7,)
+
+#
+def solvefitconstantzetaepsilon(x,y,I,Q,U,V,I_harpoon,Q_harpoon,U_harpoon,V_harpoon,xx,yy,chi,maxextent,sigma):
+	ndata=len(chi)
+	w=numpy.exp(-0.5*(numpy.sqrt((xx-x)**2+(yy-y)**2))/(sigma)**2)
+	
+	m=[w[c]*numpy.array([I_harpoon[c],Q_harpoon[c],U_harpoon[c],V_harpoon[c]]) for c in range(ndata)]
+	m=numpy.array(m).reshape(4*ndata,1)
+	
+	range06=numpy.array(range(0,6))
+	X=numpy.zeros([4*ndata,7*ndata])
+	XY=numpy.zeros([7*ndata,6+6])
+	for c in range(ndata):
+		X[4*c][(7*c):(7*c+7)]=w[c]*numpy.array([I,Q*numpy.cos(2.0*chi[c])+U*numpy.sin(2.0*chi[c]),0,U*numpy.cos(2.0*chi[c])-Q*numpy.sin(2.0*chi[c]),0,0,-V])
+		X[4*c+1][(7*c):(7*c+7)]=w[c]*numpy.array([Q,I*numpy.cos(2.0*chi[c]),U,-I*numpy.sin(2.0*chi[c]),-V*numpy.sin(2.0*chi[c]),-V*numpy.cos(2.0*chi[c]),0])
+		X[4*c+2][(7*c):(7*c+7)]=w[c]*numpy.array([U,I*numpy.sin(2.0*chi[c]),-Q,I*numpy.cos(2.0*chi[c]),V*numpy.cos(2.0*chi[c]),-V*numpy.sin(2.0*chi[c]),0])
+		X[4*c+3][(7*c):(7*c+7)]=w[c]*numpy.array([V,0,0,0,Q*numpy.sin(2.0*chi[c])-U*numpy.cos(2.0*chi[c]),Q*numpy.cos(2.0*chi[c])+U*numpy.sin(2.0*chi[c]),-I])		
+		XY[7*c+0][6*0+range06]=[xx[c]**2, xx[c], xx[c]*yy[c], yy[c], yy[c]**2, 1]#1/2*epp+1
+		XY[7*c+1][6+0]=1#1/2*enp
+		XY[7*c+2][6+1]=1#1/2*znp
+		XY[7*c+3][6+2]=1#1/2*zpp
+		XY[7*c+4][6+3]=1#1/2*ennj***
+		XY[7*c+5][6+4]=1#1/2*zpnj***
+		XY[7*c+6][6+5]=1#1/2*znnj
+
+	X=numpy.array(X)
+	XY=numpy.array(XY)
+#	W*m=W*X*XY*A
+#	m=X*XY*A
+#   A=pinv(X*XY)*m
+#a[0]*x^2+a[1]*x+a[2]*x*y+a[3]*y+a[4]*y^2+a[5]
+	#A=numpy.zeros(6*7)
+	#A=[a0epp,a1epp,a2epp,a3epp,a4epp,a5epp, a0enp,a1enp,a2enp,a3enp,a4enp,a5enp,  a0ezp,a1ezp,a2ezp,a3ezp,a4ezp,a5ezp,...]'
+	A=numpy.dot(numpy.linalg.pinv(numpy.dot(X,XY)),m)
+	#now evaluate A at x,y
+	thisXY=numpy.zeros([7,6+6])
+	thisXY[0][6*0+range06]=[x**2, x, x*y, y, y**2, 1]#1/2*epp+1
+	thisXY[1][6+0]=1#1/2*enp
+	thisXY[2][6+1]=1#1/2*znp
+	thisXY[3][6+2]=1#1/2*zpp
+	thisXY[4][6+3]=1#1/2*ennj***
+	thisXY[5][6+4]=1#1/2*zpnj***
+	thisXY[6][6+5]=1#1/2*znnj
+	epsilon_zeta=numpy.dot(thisXY,A)
+
+	return numpy.array(epsilon_zeta).reshape(7,)
+
 #given measured IQUV values, parallactic angle and epsilon_zeta terms, calculate the true (estimated) IQUV values
 #epsilon_zeta=[1/2*epsilon_pp+1;
 #	 1/2*epsilon_np;
@@ -628,6 +815,112 @@ def solve6fitlesszetaepsilon(x,y,I,Q,U,V,I_harpoon,Q_harpoon,U_harpoon,V_harpoon
 
 	return numpy.array(epsilon_zeta).reshape(7,)
 
+#fits epsilon zeta to smooth surface of form a[0]*x^2+a[1]*x+a[2]*x*y+a[3]*y+a[4]*y^2+a[5]
+#except e_nn and z_pn are modeled as planes only!
+#then evaluate epsilon zetas at given location
+def solve6fitevenlesszetaepsilon(x,y,I,Q,U,V,I_harpoon,Q_harpoon,U_harpoon,V_harpoon,xx,yy,chi,maxextent,sigma):
+	ndata=len(chi)
+	w=numpy.exp(-0.5*(numpy.sqrt((xx-x)**2+(yy-y)**2))/(sigma)**2)
+	w_for_epp1=numpy.exp(-0.5*((xx-x)**2+(yy-y)**2)/(0.00001)**2)
+	
+#	epp1=(I_harpoon[c]*I-Q_harpoon[c]*Q-U_harpoon[c]*U-V_harpoon[c]*V)/(I**2-Q**2-U**2-V**2)
+	wepp1=[w_for_epp1[c]*numpy.array((I_harpoon[c]*I-Q_harpoon[c]*Q-U_harpoon[c]*U-V_harpoon[c]*V)/(I**2-Q**2-U**2-V**2)) for c in range(ndata)]
+	smoothepp1=numpy.sum(wepp1)/numpy.sum(w_for_epp1)
+	
+	m=[w[c]*numpy.array([I_harpoon[c]-I*(I_harpoon[c]*I-Q_harpoon[c]*Q-U_harpoon[c]*U-V_harpoon[c]*V)/(I**2-Q**2-U**2-V**2),Q_harpoon[c]-Q*(I_harpoon[c]*I-Q_harpoon[c]*Q-U_harpoon[c]*U-V_harpoon[c]*V)/(I**2-Q**2-U**2-V**2),U_harpoon[c]-U*(I_harpoon[c]*I-Q_harpoon[c]*Q-U_harpoon[c]*U-V_harpoon[c]*V)/(I**2-Q**2-U**2-V**2),V_harpoon[c]-V*(I_harpoon[c]*I-Q_harpoon[c]*Q-U_harpoon[c]*U-V_harpoon[c]*V)/(I**2-Q**2-U**2-V**2)]) for c in range(ndata)]
+	m=numpy.array(m).reshape(4*ndata,1)
+
+	range06=numpy.array(range(0,6))
+	range03=numpy.array(range(0,3))
+	X=numpy.zeros([4*ndata,6*ndata])
+	XY=numpy.zeros([6*ndata,6*6-2*5])
+	for c in range(ndata):
+		X[4*c][(6*c):(6*c+6)]=w[c]*numpy.array([Q*numpy.cos(2.0*chi[c])+U*numpy.sin(2.0*chi[c]),0,U*numpy.cos(2.0*chi[c])-Q*numpy.sin(2.0*chi[c]),0,0,-V])
+		X[4*c+1][(6*c):(6*c+6)]=w[c]*numpy.array([I*numpy.cos(2.0*chi[c]),U,-I*numpy.sin(2.0*chi[c]),-V*numpy.sin(2.0*chi[c]),-V*numpy.cos(2.0*chi[c]),0])
+		X[4*c+2][(6*c):(6*c+6)]=w[c]*numpy.array([I*numpy.sin(2.0*chi[c]),-Q,I*numpy.cos(2.0*chi[c]),V*numpy.cos(2.0*chi[c]),-V*numpy.sin(2.0*chi[c]),0])
+		X[4*c+3][(6*c):(6*c+6)]=w[c]*numpy.array([0,0,0,Q*numpy.sin(2.0*chi[c])-U*numpy.cos(2.0*chi[c]),Q*numpy.cos(2.0*chi[c])+U*numpy.sin(2.0*chi[c]),-I])		
+		XY[6*c+0][6*0+range06]=[xx[c]**2, xx[c], xx[c]*yy[c], yy[c], yy[c]**2, 1]#1/2*enp
+		XY[6*c+1][6*1+range06]=[xx[c]**2, xx[c], xx[c]*yy[c], yy[c], yy[c]**2, 1]#1/2*znp
+		XY[6*c+2][6*2+range06]=[xx[c]**2, xx[c], xx[c]*yy[c], yy[c], yy[c]**2, 1]#1/2*zpp
+		XY[6*c+3][6*3]=1#1/2*ennj***
+		XY[6*c+4][6*4-5]=1#1/2*zpnj***
+		XY[6*c+5][6*5-10+range06]=[xx[c]**2, xx[c], xx[c]*yy[c], yy[c], yy[c]**2, 1]#1/2*znnj
+
+	X=numpy.array(X)
+	XY=numpy.array(XY)
+#	W*m=W*X*XY*A
+#	m=X*XY*A
+#   A=pinv(X*XY)*m
+#a[0]*x^2+a[1]*x+a[2]*x*y+a[3]*y+a[4]*y^2+a[5]
+	#A=numpy.zeros(6*7)
+	#A=[a0epp,a1epp,a2epp,a3epp,a4epp,a5epp, a0enp,a1enp,a2enp,a3enp,a4enp,a5enp,  a0ezp,a1ezp,a2ezp,a3ezp,a4ezp,a5ezp,...]'
+	A=numpy.dot(numpy.linalg.pinv(numpy.dot(X,XY)),m)
+	#now evaluate A at x,y
+	thisXY=numpy.zeros([6,6*6-2*5])
+	thisXY[0][6*0+range06]=[x**2, x, x*y, y, y**2, 1]#1/2*enp
+	thisXY[1][6*1+range06]=[x**2, x, x*y, y, y**2, 1]#1/2*znp
+	thisXY[2][6*2+range06]=[x**2, x, x*y, y, y**2, 1]#1/2*zpp
+	thisXY[3][6*3]=1#1/2*ennj***
+	thisXY[4][6*4-5]=1#1/2*zpnj***
+	thisXY[5][6*5-10+range06]=[x**2, x, x*y, y, y**2, 1]#1/2*znnj
+
+	epsilon_zeta=range(7)
+	epsilon_zeta[0]=smoothepp1
+	epsilon_zeta[1:]=numpy.dot(thisXY,A)
+
+	return numpy.array(epsilon_zeta).reshape(7,)
+
+#
+def solve6fitconstantzetaepsilon(x,y,I,Q,U,V,I_harpoon,Q_harpoon,U_harpoon,V_harpoon,xx,yy,chi,maxextent,sigma):
+	ndata=len(chi)
+	w=numpy.exp(-0.5*(numpy.sqrt((xx-x)**2+(yy-y)**2))/(sigma)**2)
+	w_for_epp1=numpy.exp(-0.5*((xx-x)**2+(yy-y)**2)/(0.00001)**2)
+	
+#	epp1=(I_harpoon[c]*I-Q_harpoon[c]*Q-U_harpoon[c]*U-V_harpoon[c]*V)/(I**2-Q**2-U**2-V**2)
+	wepp1=[w_for_epp1[c]*numpy.array((I_harpoon[c]*I-Q_harpoon[c]*Q-U_harpoon[c]*U-V_harpoon[c]*V)/(I**2-Q**2-U**2-V**2)) for c in range(ndata)]
+	smoothepp1=numpy.sum(wepp1)/numpy.sum(w_for_epp1)
+	
+	m=[w[c]*numpy.array([I_harpoon[c]-I*(I_harpoon[c]*I-Q_harpoon[c]*Q-U_harpoon[c]*U-V_harpoon[c]*V)/(I**2-Q**2-U**2-V**2),Q_harpoon[c]-Q*(I_harpoon[c]*I-Q_harpoon[c]*Q-U_harpoon[c]*U-V_harpoon[c]*V)/(I**2-Q**2-U**2-V**2),U_harpoon[c]-U*(I_harpoon[c]*I-Q_harpoon[c]*Q-U_harpoon[c]*U-V_harpoon[c]*V)/(I**2-Q**2-U**2-V**2),V_harpoon[c]-V*(I_harpoon[c]*I-Q_harpoon[c]*Q-U_harpoon[c]*U-V_harpoon[c]*V)/(I**2-Q**2-U**2-V**2)]) for c in range(ndata)]
+	m=numpy.array(m).reshape(4*ndata,1)
+
+	X=numpy.zeros([4*ndata,6*ndata])
+	XY=numpy.zeros([6*ndata,6])
+	for c in range(ndata):
+		X[4*c][(6*c):(6*c+6)]=w[c]*numpy.array([Q*numpy.cos(2.0*chi[c])+U*numpy.sin(2.0*chi[c]),0,U*numpy.cos(2.0*chi[c])-Q*numpy.sin(2.0*chi[c]),0,0,-V])
+		X[4*c+1][(6*c):(6*c+6)]=w[c]*numpy.array([I*numpy.cos(2.0*chi[c]),U,-I*numpy.sin(2.0*chi[c]),-V*numpy.sin(2.0*chi[c]),-V*numpy.cos(2.0*chi[c]),0])
+		X[4*c+2][(6*c):(6*c+6)]=w[c]*numpy.array([I*numpy.sin(2.0*chi[c]),-Q,I*numpy.cos(2.0*chi[c]),V*numpy.cos(2.0*chi[c]),-V*numpy.sin(2.0*chi[c]),0])
+		X[4*c+3][(6*c):(6*c+6)]=w[c]*numpy.array([0,0,0,Q*numpy.sin(2.0*chi[c])-U*numpy.cos(2.0*chi[c]),Q*numpy.cos(2.0*chi[c])+U*numpy.sin(2.0*chi[c]),-I])		
+		XY[6*c+0][0]=1#1/2*enp
+		XY[6*c+1][1]=1#1/2*znp
+		XY[6*c+2][2]=1#1/2*zpp
+		XY[6*c+3][3]=1#1/2*ennj***
+		XY[6*c+4][4]=1#1/2*zpnj***
+		XY[6*c+5][5]=1#1/2*znnj
+
+	X=numpy.array(X)
+	XY=numpy.array(XY)
+#	W*m=W*X*XY*A
+#	m=X*XY*A
+#   A=pinv(X*XY)*m
+#a[0]*x^2+a[1]*x+a[2]*x*y+a[3]*y+a[4]*y^2+a[5]
+	#A=numpy.zeros(6*7)
+	#A=[a0epp,a1epp,a2epp,a3epp,a4epp,a5epp, a0enp,a1enp,a2enp,a3enp,a4enp,a5enp,  a0ezp,a1ezp,a2ezp,a3ezp,a4ezp,a5ezp,...]'
+	A=numpy.dot(numpy.linalg.pinv(numpy.dot(X,XY)),m)
+	#now evaluate A at x,y
+	thisXY=numpy.zeros([6,6])
+	thisXY[0][0]=1#1/2*enp
+	thisXY[1][1]=1#1/2*znp
+	thisXY[2][2]=1#1/2*zpp
+	thisXY[3][3]=1#1/2*ennj***
+	thisXY[4][4]=1#1/2*zpnj***
+	thisXY[5][5]=1#1/2*znnj
+
+	epsilon_zeta=range(7)
+	epsilon_zeta[0]=smoothepp1
+	epsilon_zeta[1:]=numpy.dot(thisXY,A)
+
+	return numpy.array(epsilon_zeta).reshape(7,)
+	
 #[0.5*e.pp+1,0.5*e.np,0.5*z.pp,-0.5*z.nn*j;
 #0.5*e.np,0.5*e.pp+1,0.5*z.np,-0.5*z.pn*j;
 #0.5*z.pp,-0.5*z.np,0.5*e.pp+1,0.5*e.nn*j;
@@ -675,7 +968,7 @@ def plotMueller(title,epsilonzeta,maxextent):
 		plt.colorbar(cset, cax=plt.axes([0.9, 0.1, 0.02, 0.8]), format='%d')
 		plt.gcf().text(0.96, 0.5, 'dB')
 	fig.set_size_inches((10.24, 7.68))
-	plt.savefig('%smueller%s.png'%(outputpath,title))
+	plt.savefig('%smueller%s.eps'%(outputpath,title))
 	plt.clf()
 	
 def mygriddata(xx,yy,zz,xgrid,ygrid):
@@ -699,10 +992,88 @@ def mygriddata(xx,yy,zz,xgrid,ygrid):
 #	return mlab.griddata(xx+0.000001*numpy.random.rand(len(xx)),yy+0.000001*numpy.random.rand(len(xx)),zz,xgrid,ygrid)
 	return mlab.griddata(xx,yy,zz,xgrid,ygrid)
 	
-def plotmap(outputpath):
+#using equations that determines az,el,parang from RA,DEC,LAT,LST
+#calculate the az el coordinate of a pointing at particular time WRT where pointing 0 would be at that time
+def getRelAZEL(RA,DEC,RAoffset,DECoffset,AZ,EL,CHI,LST):
+	pointingRA=RAoffset/numpy.cos(DEC*numpy.pi/180.0)*24.0/(60.0*60.0*360.0)+RA
+	pointingDEC=DECoffset/(60.0*60.0)+DEC
+	print 'pointingRA',pointingRA
+	print 'pointingDEC',pointingDEC
+	print 'LST',LST
+	ra=pointingRA*numpy.pi/12.0
+	lst=LST*numpy.pi/12.0
+	dec=pointingDEC*numpy.pi/180.0
+	
+	relAZ=numpy.array(LST)
+	relEL=numpy.array(LST)
+	[npointings,ntime]=numpy.shape(LST)
+	lat=40.817360*numpy.pi/180.0
+	itime=0
+	for itime in range(ntime):
+		ha0=numpy.array(ra[0])-numpy.array(lst[:,itime])
+		dec0=dec[0]
+		el0=numpy.arcsin(numpy.sin(dec0)*numpy.sin(lat)+numpy.cos(dec0)*numpy.cos(lat)*numpy.cos(ha0))*180.0/numpy.pi
+		az0=360.0-numpy.arctan2(-numpy.sin(ha0)*numpy.cos(dec0),numpy.sin(dec0)*numpy.cos(lat)-numpy.cos(dec0)*numpy.sin(lat)*numpy.cos(ha0))*180.0/numpy.pi
+		ha=numpy.array(ra)-numpy.array(lst[:,itime])
+		el=numpy.arcsin(numpy.sin(dec)*numpy.sin(lat)+numpy.cos(dec)*numpy.cos(lat)*numpy.cos(ha))*180.0/numpy.pi
+		az=360.0-numpy.arctan2(-numpy.sin(ha)*numpy.cos(dec),numpy.sin(dec)*numpy.cos(lat)-numpy.cos(dec)*numpy.sin(lat)*numpy.cos(ha))*180.0/numpy.pi
+#		parang=-numpy.arctan2(numpy.sin(ha)*numpy.cos(lat),numpy.sin(lat)*numpy.cos(dec)-numpy.sin(dec)*numpy.cos(lat)*numpy.cos(ha))*180.0/numpy.pi
+	
+		relAZ[:,itime]=(((az-az0)+180.0)%360-180)*numpy.cos(el*numpy.pi/180.0)
+		relEL[:,itime]=((el-el0)+180.0)%360-180
+#		print 'az',(az+180.0)%360-180
+#		print 'AZ',(AZ[:,itime]+180.0)%360-180
+#	print 'relAZ',relAZ[:,0]
+#	print 'relEL',relEL[:,0]
+	
+	colouring=['k','r','m','g','b','c','y','k','k','r','m','g','b','c','y','k','k','r','m','g','b','c','y','k','k','r','m','g','b','c','y','k']
+	alphas=[1,1,1,1,1,1,1,0.5,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+	fig=plt.figure(4)
+	plt.clf()
+	for itime in range(ntime):
+		for pointing in range(npointings):
+			plt.text(relAZ[pointing][itime]*60.0*60.0,relEL[pointing][itime]*60.0*60.0,'p%dt%d'%(pointing,itime),rotation=CHI[pointing][itime]-90.0,ha='center',va='center',fontweight='light',color=colouring[itime],alpha=alphas[itime],zorder=itime)
+	fig.set_size_inches(8,7)
+	maxextent=958.854195011
+	plt.axis([-maxextent*1.2,maxextent*1.2,-maxextent*1.2,maxextent*1.2])
+	plt.xlabel('Relative azimuth [arcsec]')
+	plt.ylabel('Relative elevation [arcsec]')
+#	plt.title('%s Coverage of pointings' % (outputpath[:-1]))
+	plt.savefig('%srelazel.eps'%(outputpath))
+	fig=plt.figure(4)
+	plt.clf()
+	for pointing in range(npointings):
+			plt.text(RAoffset[pointing],DECoffset[pointing],'p%d'%(pointing),ha='center',va='center',fontweight='light',color='k')
+	fig.set_size_inches(8,7)
+	maxextent=958.854195011
+	plt.axis([-maxextent*1.2,maxextent*1.2,-maxextent*1.2,maxextent*1.2])
+	plt.xlabel('Right ascension offset [arcsec]')
+	plt.ylabel('Declination offset [arcsec]')
+	#	plt.title('%s Coverage of pointings' % (outputpath[:-1]))
+	plt.savefig('%spointing.eps'%(outputpath))
+	
+
+def writeepsilonzeta(outputpath,xx,yy,epsilonzeta):
+	output=open('%sepsilonzeta' % (outputpath), 'wb')
+	pickle.dump(xx,output)
+	pickle.dump(yy,output)
+	pickle.dump(epsilonzeta,output)
+	output.close();
+	
+def readepsilonzeta(outputpath):
+	results=open('%sepsilonzeta' % (outputpath), 'rb')
+	xx=pickle.load(results)
+	yy=pickle.load(results)
+	epsilonzeta=pickle.load(results)
+	results.close()
+	return xx,yy,epsilonzeta	
+	
+def plotmap(outputpath,freqchannels):
 	[RA,DEC,RAoffset,DECoffset,AZ,EL,CHI,LST,starttime,stoptime,utstarttime,utstoptime,freq,nant]=LoadPointingInfo(outputpath)
 	[leakageX,leakageY,peakIQUV,noiseIQUV,convergeFail,nactiveAntennas,validant]=readresults(outputpath)
 
+	getRelAZEL(RA,DEC,RAoffset,DECoffset,AZ,EL,CHI,LST)
+	
 	PARANG=numpy.array(CHI,dtype='double')-90.0 #parang=CHI-90
 
 	npointings=len(peakIQUV)
@@ -742,18 +1113,23 @@ def plotmap(outputpath):
 			Iacc=0
 			Qacc=0
 			Uacc=0
-			Vacc=0			
-			for explodedpiece in range(nexplodedpieces):
-				Iacc=Iacc+peakIQUV[pointing][itime][explodedpiece][0]
-				Qacc=Qacc+peakIQUV[pointing][itime][explodedpiece][1]
-				Uacc=Uacc+peakIQUV[pointing][itime][explodedpiece][2]
-				Vacc=Vacc+peakIQUV[pointing][itime][explodedpiece][3]
-#				if (pointing==0):
-#					print peakIQUV[pointing][itime][explodedpiece][0],peakIQUV[pointing][itime][explodedpiece][1],peakIQUV[pointing][itime][explodedpiece][2],peakIQUV[pointing][itime][explodedpiece][3]
-			II[itime][pointing]=Iacc/nexplodedpieces
-			QQ[itime][pointing]=Qacc/nexplodedpieces
-			UU[itime][pointing]=Uacc/nexplodedpieces
-			VV[itime][pointing]=Vacc/nexplodedpieces
+			Vacc=0
+			if (freqchannels>=0 and freqchannels<nexplodedpieces):
+				II[itime][pointing]=peakIQUV[pointing][itime][freqchannels][0]
+				QQ[itime][pointing]=peakIQUV[pointing][itime][freqchannels][1]
+				UU[itime][pointing]=peakIQUV[pointing][itime][freqchannels][2]
+				VV[itime][pointing]=peakIQUV[pointing][itime][freqchannels][3]
+#				print II[itime][pointing],QQ[itime][pointing],UU[itime][pointing],VV[itime][pointing]
+			else:
+				for explodedpiece in range(nexplodedpieces):
+					Iacc=Iacc+peakIQUV[pointing][itime][explodedpiece][0]
+					Qacc=Qacc+peakIQUV[pointing][itime][explodedpiece][1]
+					Uacc=Uacc+peakIQUV[pointing][itime][explodedpiece][2]
+					Vacc=Vacc+peakIQUV[pointing][itime][explodedpiece][3]
+				II[itime][pointing]=Iacc/nexplodedpieces
+				QQ[itime][pointing]=Qacc/nexplodedpieces
+				UU[itime][pointing]=Uacc/nexplodedpieces
+				VV[itime][pointing]=Vacc/nexplodedpieces
 		I_true=I_true+II[itime][0]
 		Q_true=Q_true+QQ[itime][0]
 		U_true=U_true+UU[itime][0]
@@ -763,8 +1139,7 @@ def plotmap(outputpath):
 	Q_true=Q_true/(ntime)
 	U_true=U_true/(ntime)
 	V_true=V_true/(ntime)
-	print 'Stokes IQUV: ',I_true,Q_true,U_true,V_true, ' f: ',freq
-		
+	
 	cnt=0
 	for itime in range(ntime):
 		for pointing in range(npointings):
@@ -802,27 +1177,51 @@ def plotmap(outputpath):
 			ody[cnt]=length*numpy.sin(posangle)
 
 			cnt=cnt+1
-
+			
+			
+#
+	fig=plt.figure(4)
+	plt.clf()
+	cnt=0
+	for itime in range(ntime):
+		for pointing in range(npointings):
+			plt.text(xx[cnt],yy[cnt],'p%dt%d'%(pointing,itime),rotation=PARANG[pointing][itime],ha='center',va='center',fontweight='light',color=colouring[itime],alpha=alphas[itime],zorder=itime)
+			cnt=cnt+1
+	fig.set_size_inches(8,7)
+	maxextent=max(max(xx),max(yy))
+	print 'maxextent',maxextent
+	plt.axis([-maxextent*1.2,maxextent*1.2,-maxextent*1.2,maxextent*1.2])
+	plt.savefig('%spointingtimingchi.eps'%(outputpath))
+	
+	
 	xx=0.5*numpy.array(xx)/1000.0*freq/3.14
 	yy=0.5*numpy.array(yy)/1000.0*freq/3.14
 	
 	sz=50
 	labels=['1/2*e.pp+1','1/2*e.np','1/2*z.np','1/2*z.pp','1/2*e.nn*j','1/2*z.pn*j','1/2*z.nn*j']
-	purelabels=['e.pp','e.np','z.np','z.pp','e.nn*j','z.pn*j','z.nn*j']
+	purelabels=['$\epsilon_{pp}$','$\epsilon_{np}$','$\zeta_{np}$','$\zeta_{pp}$','$\mathrm{j}\epsilon_{nn}$','$\mathrm{j}\zeta_{pn}$','$\mathrm{j}\zeta_{nn}$']
 	
 	maxextent=max(max(xx),max(yy))
 	xax=numpy.linspace(-maxextent,maxextent,sz)
 	yax=numpy.linspace(-maxextent,maxextent,sz)
 	cset=0
-#	method='7'
-#	method='6'
-#	method='fitlinear'
-#	method='fit'
-#	method='fitless'
-#	method='fitevenless'
-	method='6fitless'
+#	method='7'	#no model, blur by neighbourhood
+#	method='6'	#epp calculated directly, no model for other epsilon zeta maps
+#	method='fitlinear'		#lllllll
+#	method='fit'			#qqqqqqq
+#	method='fitless'		#qqqqllq
+	method='fitevenless'	#qqqqccq
+#	method='fitevenevenless'#qqcqccq
+#	method='fitevenevenlesslin'#qqcqccl
+#	method='fitleast'		#qqcqccc
+#	method='6fitless'		#Xqqqllq
+#	method='6fitevenless'	#Xqqqccq
+#	method='6fitconstant'	#Xcccccc
+#	method='fitconstant'	#qcccccc
+#	method='none'
+	
 	if 1:
-		factor=0.5
+		factor=10
 		sigma=maxextent*factor
 #		epsilonzeta6=[numpy.array(numpy.zeros([sz,sz])) for c in range(7)]
 		epsilonzetacnt=[numpy.array(numpy.zeros(len(xx))) for c in range(7)]
@@ -842,12 +1241,28 @@ def plotmap(outputpath):
 				rv=solvefitlesszetaepsilon(xx[cnt],yy[cnt],I_true,Q_true,U_true,V_true,mI,mQ,mU,mV,xx,yy,chi,maxextent,sigma)
 			elif (method=='fitevenless'):
 				rv=solvefitevenlesszetaepsilon(xx[cnt],yy[cnt],I_true,Q_true,U_true,V_true,mI,mQ,mU,mV,xx,yy,chi,maxextent,sigma)
+			elif (method=='fitevenevenless'):
+				rv=solvefitevenevenlesszetaepsilon(xx[cnt],yy[cnt],I_true,Q_true,U_true,V_true,mI,mQ,mU,mV,xx,yy,chi,maxextent,sigma)
+			elif (method=='fitevenevenlesslin'):
+				rv=solvefitevenevenlesslinzetaepsilon(xx[cnt],yy[cnt],I_true,Q_true,U_true,V_true,mI,mQ,mU,mV,xx,yy,chi,maxextent,sigma)
+			elif (method=='fitleast'):
+				rv=solvefitleastzetaepsilon(xx[cnt],yy[cnt],I_true,Q_true,U_true,V_true,mI,mQ,mU,mV,xx,yy,chi,maxextent,sigma)
+			elif (method=='fitconstant'):
+				rv=solvefitconstantzetaepsilon(xx[cnt],yy[cnt],I_true,Q_true,U_true,V_true,mI,mQ,mU,mV,xx,yy,chi,maxextent,sigma)
 			elif (method=='6fitless'):
 				rv=solve6fitlesszetaepsilon(xx[cnt],yy[cnt],I_true,Q_true,U_true,V_true,mI,mQ,mU,mV,xx,yy,chi,maxextent,sigma)
+			elif (method=='6fitevenless'):
+				rv=solve6fitevenlesszetaepsilon(xx[cnt],yy[cnt],I_true,Q_true,U_true,V_true,mI,mQ,mU,mV,xx,yy,chi,maxextent,sigma)
+			elif (method=='6fitconstant'):
+				rv=solve6fitconstantzetaepsilon(xx[cnt],yy[cnt],I_true,Q_true,U_true,V_true,mI,mQ,mU,mV,xx,yy,chi,maxextent,sigma)
 			else:
-				exit('unknown method')
-
-			rvest=estimatetrueIQUV(mI[cnt],mQ[cnt],mU[cnt],mV[cnt],rv,chi[cnt])
+				rv=numpy.zeros([7,1])
+#				exit('unknown method')
+			
+			if (method=='none'):
+				rvest=numpy.array([mI[cnt],mQ[cnt],mU[cnt],mV[cnt]]).reshape(4,1)
+			else:
+				rvest=estimatetrueIQUV(mI[cnt],mQ[cnt],mU[cnt],mV[cnt],rv,chi[cnt])
 			mIQUV[0][cnt]=mI[cnt]
 			mIQUV[1][cnt]=mQ[cnt]
 			mIQUV[2][cnt]=mU[cnt]
@@ -860,8 +1275,14 @@ def plotmap(outputpath):
 				estIQUV[iq][cnt]=rvest[iq]
 			for iez in range(7):
 				epsilonzetacnt[iez][cnt]=rv[iez]
+
+		if (freqchannels>=0):
+			method=method+'_f%d'%(freqchannels)
 		xgrid=maxextent*numpy.linspace(-1,1,200)
 		ygrid=maxextent*numpy.linspace(-1,1,200)
+
+		epsilonzetacnt=numpy.array(epsilonzetacnt)
+		writeepsilonzeta(outputpath,xx,yy,epsilonzetacnt)		
 		
 		fig=plt.figure(1)
 		fig.set_size_inches(5.5,4)
@@ -869,39 +1290,150 @@ def plotmap(outputpath):
 #		plt.imshow(zgrid,extent=[-maxextent,maxextent,-maxextent,maxextent],vmin=numpy.min(numpy.min(zgrid)),vmax=numpy.max(numpy.max(zgrid)),origin='lower')
 		plt.imshow(zgrid,extent=[-maxextent,maxextent,-maxextent,maxextent],vmin=0.7,vmax=1,origin='lower')
 		plt.colorbar()
-		plt.title('%s e.pp, %s, f=%g'%(outputpath[:-1],method,factor))
+		plt.title('%s $\epsilon_{pp}$, %s, $\sigma$=%g [hpp]'%(outputpath[:-1],method,factor))
 		a=plt.gca()
-		a.set(xlabel='az (hpp)',ylabel='el (hpp)')
-		plt.savefig('%smap%s_epp_%.2f.png'%(outputpath,method,factor))
-				
+		a.set(xlabel='az [hpp]',ylabel='el [hpp]')
+		plt.savefig('%smap%s_epp_%.2f.eps'%(outputpath,method,factor))
 		fig=plt.figure(2)
 		plt.clf()
-		for iez in range(6):
-			zgrid=mygriddata(xx,yy,(numpy.array(epsilonzetacnt[iez+1])),xgrid,ygrid)
+#		for iez in range(6):
+		for iez in range(7):
+#			zgrid=mygriddata(xx,yy,(numpy.array(epsilonzetacnt[iez+1])),xgrid,ygrid)
+			zgrid=mygriddata(xx,yy,(numpy.array(epsilonzetacnt[iez])),xgrid,ygrid)
+			if (iez==0):
+				zgrid=zgrid-1.0
 			zgrid=zgrid*2
 			plt.figure(2)
-			a=plt.subplot(1,6,iez+1)
+			a=plt.subplot(1,7,iez+1)
 #			plt.imshow(zgrid,extent=[-maxextent,maxextent,-maxextent,maxextent],vmin=numpy.min(numpy.min(zgrid)),vmax=numpy.max(numpy.max(zgrid)),origin='lower')
 #			plt.colorbar()
 			
 			cset=plotPattern('', xgrid, ygrid, zgrid.transpose(), plt)
 			for tick in a.xaxis.majorTicks:
 				tick.label.set_fontsize('small')			
-			plt.title('%s' % (purelabels[iez+1]))
-			a.set(xlabel='az (hpp)')
+#			plt.title('%s' % (purelabels[iez+1]))
+			plt.title('%s' % (purelabels[iez]))
+#			a.set(xlabel='az [hpp]')
+			a.set(xlabel='')
 			if (iez>0):
 				a.set(ylabel='', yticks=[])
 			else:
-				a.set(ylabel='el (hpp)')
+				a.set(ylabel='Relative elevation [hpp]')
 				for tick in a.yaxis.majorTicks:
 					tick.label.set_fontsize('small')			
-		plt.gcf().text(0.5, 0.9, '%s epsilon zeta maps, %s, f=%g' % (outputpath[:-1],method,factor), ha='center', size='x-large')
+		plt.gcf().text(0.5, 0.025, 'Relative azimuth [hpp]',ha='center')
+#		plt.gcf().text(0.5, 0.9, '%s $\epsilon$ $\zeta$ maps, %s, $\sigma$=%g [hpp]' % (outputpath[:-1],method,factor), ha='center', size='x-large')
 		plt.subplots_adjust(left=0.07, right=0.9, bottom=0.02, top=0.9, wspace=0.05, hspace=0.05)
+		if (cset):
+			cax=plt.axes([0.91, 0.16, 0.015, 0.6])
+			plt.colorbar(cset, cax=cax, format='%d')			
+			plt.gcf().text(0.915, 0.045, '[dB]')
+		fig.set_size_inches(14,2.8)
+		plt.savefig('%smap%s_%.2f.eps'%(outputpath,method,factor))
+
+#labels=['1/2*e.pp+1','1/2*e.np','1/2*z.np','1/2*z.pp','1/2*e.nn*j','1/2*z.pn*j','1/2*z.nn*j']
+#re(Dx)=0.5*(1/2*z.pp+1/2*z.np), im(Dx)=-0.5*(1/2*z.nn*j+1/2*z.pn*j)
+#re(Dy)=0.5*(1/2*z.pp-1/2*z.np), im(Dy)=+0.5*(1/2*z.nn*j-1/2*z.pn*j)
+#re(Ex)=0.5*(1/2*e.pp+1/2*e.np), im(Ex)=0
+#re(Ey)=0.5*(1/2*e.pp-1/2*e.np), im(Ey)=1/2*e.nn*j
+#Gx=Gxnom*(1+Ex), Gy=Gynom*(1+Ey)
+#co polar response in x,y feeds = Gx, Gy;crosspolar response in x,y feeds = Gx*Dx, Gy*Dy, which = Dx, Dy to first order
+#plot abs(Gx),abs(Gy),abs(Dx),abs(Dy)
+#    phase(Gx),phase(Gy),phase(Dx),phase(Dy)
+
+		reDx=0.5*(epsilonzetacnt[3]+epsilonzetacnt[2])
+		imDx=-0.5*(epsilonzetacnt[6]+epsilonzetacnt[5])
+		reDy=0.5*(epsilonzetacnt[3]-epsilonzetacnt[2])
+		imDy=0.5*(epsilonzetacnt[6]-epsilonzetacnt[5])
+		reEx=0.5*((epsilonzetacnt[0]-1.0)+epsilonzetacnt[1])
+		imEx=0
+		reEy=0.5*((epsilonzetacnt[0]-1.0)-epsilonzetacnt[1])
+		imEy=epsilonzetacnt[4]
+
+		fig=plt.figure(2)
+		plt.clf()
+		a=plt.subplot(2,4,1)#abs(Gx)
+		zgrid=mygriddata(xx,yy,numpy.sqrt((reEx+1.0)**2+(imEx)**2),xgrid,ygrid)
+		plt.imshow(zgrid,extent=[-maxextent,maxextent,-maxextent,maxextent],vmin=numpy.min(numpy.min(zgrid)),vmax=numpy.max(numpy.max(zgrid)),origin='lower')
+		print numpy.min(numpy.min(zgrid)),numpy.max(numpy.max(zgrid))
+		plt.colorbar()			
+#		cset=plotPattern('', xgrid, ygrid, zgrid.transpose(), plt)
+		for tick in a.xaxis.majorTicks:
+			tick.label.set_fontsize('small')			
+		plt.title('abs(Co pol x)')
+		a=plt.subplot(2,4,2)#abs(Gy)
+		zgrid=mygriddata(xx,yy,numpy.sqrt((reEy+1.0)**2+(imEy)**2),xgrid,ygrid)
+		plt.imshow(zgrid,extent=[-maxextent,maxextent,-maxextent,maxextent],vmin=numpy.min(numpy.min(zgrid)),vmax=numpy.max(numpy.max(zgrid)),origin='lower')
+		print numpy.min(numpy.min(zgrid)),numpy.max(numpy.max(zgrid))
+		plt.colorbar()			
+#		cset=plotPattern('', xgrid, ygrid, zgrid.transpose(), plt)
+		for tick in a.xaxis.majorTicks:
+			tick.label.set_fontsize('small')			
+		plt.title('abs(Co pol y)')
+		a=plt.subplot(2,4,3)#abs(Dx)
+		zgrid=mygriddata(xx,yy,numpy.sqrt((reDx)**2+(imDx)**2),xgrid,ygrid)
+		plt.imshow(zgrid,extent=[-maxextent,maxextent,-maxextent,maxextent],vmin=numpy.min(numpy.min(zgrid)),vmax=numpy.max(numpy.max(zgrid)),origin='lower')
+		print numpy.min(numpy.min(zgrid)),numpy.max(numpy.max(zgrid))
+		plt.colorbar()			
+#		cset=plotPattern('', xgrid, ygrid, zgrid.transpose(), plt)
+		for tick in a.xaxis.majorTicks:
+			tick.label.set_fontsize('small')			
+		plt.title('abs(Cross pol x)')
+		a=plt.subplot(2,4,4)#abs(Dy)
+		zgrid=mygriddata(xx,yy,numpy.sqrt((reDy)**2+(imDy)**2),xgrid,ygrid)
+		plt.imshow(zgrid,extent=[-maxextent,maxextent,-maxextent,maxextent],vmin=numpy.min(numpy.min(zgrid)),vmax=numpy.max(numpy.max(zgrid)),origin='lower')
+		print numpy.min(numpy.min(zgrid)),numpy.max(numpy.max(zgrid))
+		plt.colorbar()			
+#		cset=plotPattern('', xgrid, ygrid, zgrid.transpose(), plt)
+		for tick in a.xaxis.majorTicks:
+			tick.label.set_fontsize('small')			
+		plt.title('abs(Cross pol y)')
+#
+		a=plt.subplot(2,4,5)#arg(Gx)
+		zgrid=mygriddata(xx,yy,(numpy.arctan2(imEx,reEx+1.0)+numpy.pi)%(2.0*numpy.pi)-numpy.pi,xgrid,ygrid)
+		plt.imshow(zgrid,extent=[-maxextent,maxextent,-maxextent,maxextent],vmin=numpy.min(numpy.min(zgrid)),vmax=numpy.max(numpy.max(zgrid)),origin='lower')
+		print numpy.min(numpy.min(zgrid)),numpy.max(numpy.max(zgrid))
+		plt.colorbar()
+#		cset=plotPattern('', xgrid, ygrid, zgrid.transpose(), plt)
+		for tick in a.xaxis.majorTicks:
+			tick.label.set_fontsize('small')			
+		plt.title('arg(Co pol x)')
+		a=plt.subplot(2,4,6)#arg(Gy)
+		zgrid=mygriddata(xx,yy,(numpy.arctan2(imEy,reEy+1.0)+numpy.pi)%(2.0*numpy.pi)-numpy.pi,xgrid,ygrid)
+		plt.imshow(zgrid,extent=[-maxextent,maxextent,-maxextent,maxextent],vmin=numpy.min(numpy.min(zgrid)),vmax=numpy.max(numpy.max(zgrid)),origin='lower')
+		print numpy.min(numpy.min(zgrid)),numpy.max(numpy.max(zgrid))
+		plt.colorbar()
+#		cset=plotPattern('', xgrid, ygrid, zgrid.transpose(), plt)
+		for tick in a.xaxis.majorTicks:
+			tick.label.set_fontsize('small')			
+		plt.title('arg(Co pol y)')
+		a=plt.subplot(2,4,7)#arg(Dx)
+		zgrid=mygriddata(xx,yy,(numpy.arctan2(imDx,reDx)+numpy.pi)%(2.0*numpy.pi)-numpy.pi,xgrid,ygrid)
+		plt.imshow(zgrid,extent=[-maxextent,maxextent,-maxextent,maxextent],vmin=numpy.min(numpy.min(zgrid)),vmax=numpy.max(numpy.max(zgrid)),origin='lower')
+		print numpy.min(numpy.min(zgrid)),numpy.max(numpy.max(zgrid))
+		plt.colorbar()			
+#		cset=plotPattern('', xgrid, ygrid, zgrid.transpose(), plt)
+		for tick in a.xaxis.majorTicks:
+			tick.label.set_fontsize('small')			
+		plt.title('arg(Cross pol x)')
+		a=plt.subplot(2,4,8)#arg(Dy)
+		zgrid=mygriddata(xx,yy,(numpy.arctan2(imDy,reDy)+numpy.pi)%(2.0*numpy.pi)-numpy.pi,xgrid,ygrid)
+		plt.imshow(zgrid,extent=[-maxextent,maxextent,-maxextent,maxextent],vmin=numpy.min(numpy.min(zgrid)),vmax=numpy.max(numpy.max(zgrid)),origin='lower')
+		print numpy.min(numpy.min(zgrid)),numpy.max(numpy.max(zgrid))
+		plt.colorbar()			
+#		cset=plotPattern('', xgrid, ygrid, zgrid.transpose(), plt)
+		for tick in a.xaxis.majorTicks:
+			tick.label.set_fontsize('small')			
+		plt.title('arg(Cross pol y)')
+		
+		plt.gcf().text(0.5, 0.95, '%s Co an cross pol beams, %s, f=%g' % (outputpath[:-1],method,factor), ha='center', size='x-large')
+		plt.subplots_adjust(left=0.05, right=0.9, bottom=0.05, top=0.9, wspace=0.1, hspace=0.1)
 		if (cset):
 			plt.colorbar(cset, cax=plt.axes([0.92, 0.1, 0.02, 0.8]), format='%d')
 			plt.gcf().text(0.97, 0.5, 'dB')
-		fig.set_size_inches(10,2.5)
-		plt.savefig('%smap%s_%.2f.png'%(outputpath,method,factor))
+		fig.set_size_inches(8,5)
+		plt.savefig('%sbeam%s_%.2f.eps'%(outputpath,method,factor))
+		
 
 		fig=plt.figure(3)
 		plt.clf()
@@ -922,30 +1454,32 @@ def plotmap(outputpath):
 			for tick in a.xaxis.majorTicks:
 				tick.label.set_fontsize('small')			
 #			plt.title('%s m=%f s=%f' % (iqlabel[iq],zcnt.mean(),zcnt.std()),fontsize=8)
-			plt.title('%s rms=%f' % (iqlabel[iq],numpy.sqrt((zcnt**2).mean())),fontsize=8)
-			a.set(xlabel='az (hpp)')
+			plt.title('%s RMSE=%f' % (iqlabel[iq],numpy.sqrt((zcnt**2).mean())),fontsize=11)
+#			a.set(xlabel='az [hpp]')
+			a.set(xlabel='')
 			if (iq>0):
 				a.set(ylabel='', yticks=[])
 			else:
-				a.set(ylabel='el (hpp)')
+				a.set(ylabel='Relative elevation [hpp]')
 				for tick in a.yaxis.majorTicks:
 					tick.label.set_fontsize('small')			
 
 				
+		plt.gcf().text(0.5, 0.01, 'Relative azimuth [hpp]',ha='center')
 		plt.subplots_adjust(left=0.07, right=0.9, bottom=0.02, top=0.9, wspace=0.05, hspace=0.05)
 		if (cset):
-			plt.colorbar(cset, cax=plt.axes([0.92, 0.1, 0.02, 0.8]), format='%d')
-			plt.gcf().text(0.97, 0.5, 'dB')
-		fig.set_size_inches(9,2.8)
+			plt.colorbar(cset, cax=plt.axes([0.91, 0.115, 0.02, 0.691]), format='%d')
+			plt.gcf().text(0.92, 0.03, '[dB]')
+		fig.set_size_inches(12,3.5)
 		if (erroption==0):
-			plt.gcf().text(0.5, 0.9, '%s remaining error, %s, f=%g' % (outputpath[:-1],method,factor), ha='center', size='x-large')
-			plt.savefig('%smaperr%s_%.2f.png'%(outputpath,method,factor))
+#			plt.gcf().text(0.5, 0.9, '%s remaining error, %s, f=%g' % (outputpath[:-1],method,factor), ha='center', size='x-large')
+			plt.savefig('%smaperr%s_%.2f.eps'%(outputpath,method,factor))
 		elif (erroption==1):
-			plt.gcf().text(0.5, 0.9, '%s remaining error (simple normalization)' % (outputpath[:-1]), ha='center', size='x-large')
-			plt.savefig('%smaperr_norm.png'%(outputpath))
+#			plt.gcf().text(0.5, 0.9, '%s remaining error (simple normalization)' % (outputpath[:-1]), ha='center', size='x-large')
+			plt.savefig('%smaperr_norm.eps'%(outputpath))
 		else:
-			plt.gcf().text(0.5, 0.9, '%s remaining error (no correction)' % (outputpath[:-1]), ha='center', size='x-large')
-			plt.savefig('%smaperr_nocor.png'%(outputpath))
+#			plt.gcf().text(0.5, 0.9, '%s remaining error (no correction)' % (outputpath[:-1]), ha='center', size='x-large')
+			plt.savefig('%smaperr_nocor.eps'%(outputpath))
 			
 	if 0:
 		epsilonzeta6=[numpy.array(numpy.zeros([sz,sz])) for c in range(7)]
@@ -961,7 +1495,7 @@ def plotmap(outputpath):
 			plt.xlabel('Relative AZ [Beam HPP]')
 			plt.ylabel('Relative EL [Beam HPP]')
 			plt.title('%s %s' % (outputpath[:-1],labels[iez]))
-			plt.savefig('%smapimage6_%d.png'%(outputpath,iez))
+			plt.savefig('%smapimage6_%d.eps'%(outputpath,iez))
 			plt.clf()
 		plotMueller('6',epsilonzeta6,maxextent)
 		
@@ -979,7 +1513,7 @@ def plotmap(outputpath):
 			plt.xlabel('Relative AZ [Beam HPP]')
 			plt.ylabel('Relative EL [Beam HPP]')
 			plt.title('%s %s' % (outputpath[:-1],labels[iez]))
-			plt.savefig('%smapimage_%d.png'%(outputpath,iez))
+			plt.savefig('%smapimage_%d.eps'%(outputpath,iez))
 			plt.clf()
 		plotMueller('',epsilonzeta,maxextent)
 	
@@ -989,7 +1523,7 @@ def plotmap(outputpath):
 	plt.xlabel('Relative AZ [Beam HPP]')
 	plt.ylabel('Relative EL [Beam HPP]')
 	plt.title('%s z_pp vs e_np z_np=%f' % (outputpath[:-1],z_np))
-	plt.savefig('%smap_posangle%f.png'%(outputpath,z_np))
+	plt.savefig('%smap_posangle%f.eps'%(outputpath,z_np))
 
 	plt.figure(2)
 	plt.quiver(xx,yy,odx,ody,headlength=0,headwidth=1,pivot='middle')
@@ -997,7 +1531,7 @@ def plotmap(outputpath):
 	plt.xlabel('Relative AZ [Beam HPP]')
 	plt.ylabel('Relative EL [Beam HPP]')
 	plt.title('%s e_pp' % (outputpath[:-1]))
-	plt.savefig('%smap_posangleOld.png'%outputpath)
+	plt.savefig('%smap_posangleOld.eps'%outputpath)
 	
 	#plot e_pp
 	xgrid=maxextent*numpy.linspace(-1,1,200)
@@ -1009,7 +1543,7 @@ def plotmap(outputpath):
 	plt.xlabel('Relative AZ [Beam HPP]')
 	plt.ylabel('Relative EL [Beam HPP]')
 	plt.title('%s e_pp' % (outputpath[:-1]))
-	plt.savefig('%smapimage_e_pp.png'%outputpath)
+	plt.savefig('%smapimage_e_pp.eps'%outputpath)
 	#plot z_pp
 	zgrid=mygriddata(xx,yy,(numpy.array(z_pp)),xgrid,ygrid)
 	plt.figure(4)
@@ -1018,7 +1552,7 @@ def plotmap(outputpath):
 	plt.xlabel('Relative AZ [Beam HPP]')
 	plt.ylabel('Relative EL [Beam HPP]')
 	plt.title('%s z_pp' % (outputpath[:-1]))
-	plt.savefig('%smapimage_z_pp.png'%outputpath)
+	plt.savefig('%smapimage_z_pp.eps'%outputpath)
 	#plot e_np
 	zgrid=mygriddata(xx,yy,(numpy.array(e_np)),xgrid,ygrid)
 	plt.figure(5)
@@ -1027,13 +1561,23 @@ def plotmap(outputpath):
 	plt.xlabel('Relative AZ [Beam HPP]')
 	plt.ylabel('Relative EL [Beam HPP]')
 	plt.title('%s e_np' % (outputpath[:-1]))
-	plt.savefig('%smapimage_e_np.png'%outputpath)
+	plt.savefig('%smapimage_e_np.eps'%outputpath)
+
 	
 #	parser.exit('exiting')
 	fig=plt.figure(4)
 	plt.clf()
+	fig=plt.figure(5)
+	plt.clf()
+	fig=plt.figure(6)
+	plt.clf()
+
 
 	#predict data
+	apredI=[]
+	apredQ=[]
+	apredU=[]
+	apredV=[]
 	cnt=0
 	for itime in range(ntime):
 		pcnt=0
@@ -1049,8 +1593,8 @@ def plotmap(outputpath):
 		predV=range(npointings)
 		normV=range(npointings)
 		dataV=range(npointings)
+#		a = plt.subplot(2, 1, 1)				
 		for pointing in range(npointings):
-			chi=PARANG[pointing][itime]
 			I_harpoon=II[itime][pointing]
 			Q_harpoon=QQ[itime][pointing]
 			U_harpoon=UU[itime][pointing]
@@ -1073,16 +1617,22 @@ def plotmap(outputpath):
 #			normV[pcnt]=V_harpoon/I_harpoon*II[itime][0]
 			normV[pcnt]=V_harpoon/I_harpoon*I_true
 			predV[pcnt]=estIQUV[3][cnt]#QQ0*e_pp_1+II0*(-z_pp[cnt]*numpy.sin(2.0*chi)+e_np[cnt]*numpy.cos(2.0*chi))
+#			plt.text(pointing,predI[pcnt],'t%d'%(itime))
+			apredI.append(predI[pcnt])
+			apredQ.append(predQ[pcnt])
+			apredU.append(predU[pcnt])
+			apredV.append(predV[pcnt])
 			
 			pcnt=pcnt+1
 			cnt=cnt+1
-		a = plt.subplot(2, 1, 1)				
 #		plt.clf()
+		fig=plt.figure(4)
+		a = plt.subplot(2, 1, 1)				
 ##		plt.plot(range(npointings),numpy.array(normI),color='y')
 		plt.plot(range(npointings),dataI,color='r')
 		plt.plot(range(npointings),numpy.array(predI),color='k')
 #		plt.title('%s pred_I' % (outputpath[:-1]))
-#		plt.savefig('%spred_I_%d.png'%(outputpath,itime))
+#		plt.savefig('%spred_I_%d.eps'%(outputpath,itime))
 		a = plt.subplot(2, 1, 2)
 #		plt.clf()
 ##		plt.plot(range(npointings),numpy.array(normQ),color='y')
@@ -1090,7 +1640,7 @@ def plotmap(outputpath):
 		plt.plot(range(npointings),numpy.array(predQ),color='k')
 #		plt.axis([0,npointings,-0.1,1])
 #		plt.title('%s pred_Q' % (outputpath[:-1]))
-#		plt.savefig('%spred_Q_%d.png'%(outputpath,itime))
+#		plt.savefig('%spred_Q_%d.eps'%(outputpath,itime))
 #		plt.figure(4)
 #		plt.clf()
 ##		plt.plot(range(npointings),numpy.array(normU),color='y')
@@ -1098,7 +1648,7 @@ def plotmap(outputpath):
 		plt.plot(range(npointings),numpy.array(predU),color='k')
 #		plt.axis([0,npointings,-0.1,1])
 #		plt.title('%s pred_U' % (outputpath[:-1]))
-#		plt.savefig('%spred_U_%d.png'%(outputpath,itime))
+#		plt.savefig('%spred_U_%d.eps'%(outputpath,itime))
 #		plt.figure(5)
 #		plt.clf()
 ##		plt.plot(range(npointings),numpy.array(normV),color='y')
@@ -1106,21 +1656,84 @@ def plotmap(outputpath):
 		plt.plot(range(npointings),numpy.array(predV),color='k')
 #		plt.axis([0,npointings,-0.1,1])
 #		plt.title('%s pred_V' % (outputpath[:-1]))
-#		plt.savefig('%spred_V_%d.png'%(outputpath,itime))
+#		plt.savefig('%spred_V_%d.eps'%(outputpath,itime))
+		fig=plt.figure(5)
+		a = plt.subplot(2, 1, 1)				
+		plt.plot(range(npointings),dataI,color=colouring[itime])
+		a = plt.subplot(2, 1, 2)
+		plt.plot(range(npointings),dataQ,color=colouring[itime])
+		plt.plot(range(npointings),dataU,color=colouring[itime])
+		plt.plot(range(npointings),dataV,color=colouring[itime])
+		fig=plt.figure(6)
+		a = plt.subplot(2, 1, 1)				
+		plt.plot(range(npointings),numpy.array(predI),color=colouring[itime])
+		a = plt.subplot(2, 1, 2)
+		plt.plot(range(npointings),numpy.array(predQ),color=colouring[itime])
+		plt.plot(range(npointings),numpy.array(predU),color=colouring[itime])
+		plt.plot(range(npointings),numpy.array(predV),color=colouring[itime])
 
+#
+	print 'Stokes IQUV: ',I_true,Q_true,U_true,V_true, ' f: ',freq
+	[p0rmsI,p0rmsQ,p0rmsU,p0rmsV]=[numpy.sqrt(numpy.mean((numpy.array(apredI)-I_true)**2)),numpy.sqrt(numpy.mean((numpy.array(apredQ)-Q_true)**2)),numpy.sqrt(numpy.mean((numpy.array(apredU)-U_true)**2)),numpy.sqrt(numpy.mean((numpy.array(apredV)-V_true)**2))]
+	[p0maxI,p0maxQ,p0maxU,p0maxV]=[(numpy.max(numpy.abs(numpy.array(apredI)-I_true))),(numpy.max(numpy.abs(numpy.array(apredQ)-Q_true))),(numpy.max(numpy.abs(numpy.array(apredU)-U_true))),(numpy.max(numpy.abs(numpy.array(apredV)-V_true)))]
+	print 'p0 RMS IQUV',p0rmsI,p0rmsQ,p0rmsU,p0rmsV
+	print 'p0 RMS IQU %.2f%% %.2f%% %.2f%%'%(p0rmsI/I_true*100.0,p0rmsQ/Q_true*100.0,p0rmsU/U_true*100.0)
+	print 'p0 RMS IQUV wrt I %.2f%% %.2f%% %.2f%% %.2f%%'%(p0rmsI/I_true*100.0,p0rmsQ/I_true*100.0,p0rmsU/I_true*100.0,p0rmsV/I_true*100.0)
+	print 'p0 MAXERR IQUV',p0maxI,p0maxQ,p0maxU,p0maxV
+	print 'p0 MAXERR IQUV wrt I %.2f%% %.2f%% %.2f%% %.2f%%'%(p0maxI/I_true*100.0,p0maxQ/I_true*100.0,p0maxU/I_true*100.0,p0maxV/I_true*100.0)
+
+	fig=plt.figure(4)
 	a = plt.subplot(2, 1, 1)				
 	a.axis([0,npointings-1,7.5,10])
+#	a.axis([0,npointings-1,13,15])	
+#	a.axis([0,npointings-1,3,8])	
 	a.set_ylabel('I')
 	a = plt.subplot(2, 1, 2)
 	a.axis([0,npointings-1,-0.2,1.2])
+#	a.axis([0,npointings-1,-0.2,1.4])
+#	a.axis([0,npointings-1,-0.5,0.6])
 	a.set_xlabel('Pointing')
-	a.set_ylabel('Q,U,V')
+	a.set_ylabel('V             Q                      U')
 	plt.gcf().text(0.5, 0.95, '%s predicted IQUV, %s, f=%g' % (outputpath[:-1],method,factor), ha='center', size='x-large')
 	plt.gcf().text(0.5, 0.91, '(red=uncorrected, black=%s f=%g)'%(method,factor), ha='center')
 	plt.gcf().text(0.5, 0.01, 'Lines are for different time intervals (different parallactic angles), averaged over frequency.', ha='center')
 	plt.subplots_adjust(left=0.1, right=0.95, bottom=0.1, top=0.9, wspace=0.05, hspace=0.1)
 	fig.set_size_inches(8,8)
-	plt.savefig('%spred_IQUV_%s_%.2f.png'%(outputpath,method,factor))
+	plt.savefig('%spredmeasured_IQUV_%s_%.2f.eps'%(outputpath,method,factor))
+
+	fig=plt.figure(5)
+	a = plt.subplot(2, 1, 1)				
+	a.axis([0,npointings-1,7.5,10])
+#	a.axis([0,npointings-1,13,15])	
+#	a.axis([0,npointings-1,3,8])	
+	a.set_ylabel('I')
+	a = plt.subplot(2, 1, 2)
+	a.axis([0,npointings-1,-0.2,1.2])
+#	a.axis([0,npointings-1,-0.2,1.4])
+#	a.axis([0,npointings-1,-0.5,0.6])
+	a.set_xlabel('Pointing')
+	a.set_ylabel('V             Q                      U')
+#	plt.gcf().text(0.5, 0.95, '%s measured IQUV' % (outputpath[:-1]), ha='center', size='x-large')
+	plt.subplots_adjust(left=0.1, right=0.95, bottom=0.075, top=0.925, wspace=0.05, hspace=0.1)
+	fig.set_size_inches(8,8)
+	plt.savefig('%smeasured_IQUV.eps'%(outputpath))
+
+	fig=plt.figure(6)
+	a = plt.subplot(2, 1, 1)				
+	a.axis([0,npointings-1,7.5,10])
+#	a.axis([0,npointings-1,13,15])	
+#	a.axis([0,npointings-1,3,8])	
+	a.set_ylabel('I')
+	a = plt.subplot(2, 1, 2)
+	a.axis([0,npointings-1,-0.2,1.2])
+#	a.axis([0,npointings-1,-0.2,1.4])
+#	a.axis([0,npointings-1,-0.5,0.6])
+	a.set_xlabel('Pointing')
+	a.set_ylabel('V             Q                      U')
+#	plt.gcf().text(0.5, 0.95, '%s predicted IQUV, %s, f=%g' % (outputpath[:-1],method,factor), ha='center', size='x-large')
+	plt.subplots_adjust(left=0.1, right=0.95, bottom=0.075, top=0.925, wspace=0.05, hspace=0.1)
+	fig.set_size_inches(8,8)
+	plt.savefig('%spred_IQUV_%s_%.2f.eps'%(outputpath,method,factor))
 
 # ================================ Main function ================================
 # Parse command-line options and arguments
@@ -1129,6 +1742,9 @@ parser = optparse.OptionParser(usage="%prog [options] path",
                                             stored at a given path. Either leakages are plotted at a specified\
 											pointing; or leakages for different pointings for the specified antenna\
 											is plotted. Without specified options, the stokes I,Q,U,V results are plotted.")
+parser.set_defaults(freqchannels=-1)
+parser.add_option("-f", "--frequency", dest="freqchannels", type=int, \
+              	help="frequency channel, default is all")
 (options, args) = parser.parse_args()
 
 if len(args) < 1:
@@ -1136,4 +1752,4 @@ if len(args) < 1:
 
 outputpath=ensurepathformat(args[0])
 
-plotmap(outputpath)
+plotmap(outputpath,options.freqchannels)
