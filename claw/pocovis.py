@@ -25,13 +25,13 @@ class poco:
         self.nchan = 64
         self.chans = n.arange(6,58)
         self.nbl = 36
-        self.sfreq = 0.77  # freq for first channel in GHz
+        self.sfreq = 0.92  # freq for first channel in GHz
         self.sdf = 0.104/self.nchan   # dfreq per channel in GHz
         self.baseline_order = n.array([ 257, 258, 514, 261, 517, 1285, 262, 518, 1286, 1542, 259, 515, 773, 774, 771, 516, 1029, 1030, 772, 1028, 1287, 1543, 775, 1031, 1799, 1544, 776, 1032, 1800, 2056, 260, 263, 264, 519, 520, 1288])   # second iteration of bl nums
         self.autos = []
         self.noautos = []
-        self.dmarr = n.arange(30,80,3)       # dm trial range in pc/cm3
-        self.tarr = n.arange(-500.,500)/1000.   # time trial range in seconds
+        self.dmarr = n.arange(50,75,2)       # dm trial range in pc/cm3
+        self.tarr = n.arange(-200.,500)/1000.   # time trial range in seconds
         for a1 in range(1,9):             # loop to adjust delays
             for a2 in range(a1,9):
                 self.blindex = n.where(self.baseline_order == a1*256 + a2)[0][0]
@@ -199,17 +199,20 @@ class poco:
         arr = self.dmt0arr
         ind0c = arr.shape[0]/2
         ind1c = arr.shape[1]/2
-        mean = arr[ind0c-5:ind0c+5, ind1c-100:ind1c+100].mean()   # need to fix this!  sometimes falls in empty area!
-        std = arr[ind0c-5:ind0c+5, ind1c-100:ind1c+100].std()
+        mean = arr[ind0c-5:ind0c+5, ind1c-10:ind1c+10].mean()   # need to fix this!  sometimes falls in empty area!
+        std = arr[ind0c-5:ind0c+5, ind1c-10:ind1c+10].std()
 
         time = 24*3600*(self.time - self.time[0])     # relative time array in seconds
 
+        print 'mean, sig, std:  ', mean, sig, std
         if sig:
             peaks = n.where(arr > (mean + sig*std))   # this is probably biased
             scaling = std*sig
 
-            for i in range(len(peaks[1])):
-                p.plot(tarr[peaks[1][i]], dmarr[peaks[0][i]], 'bo', markersize=arr[peaks[0][i],peaks[1][i]]/scaling)
+            print 'peaks:  ', peaks
+            if peaks:
+                for i in range(len(peaks[1])):
+                    p.plot([tarr[peaks[1][i]]], [dmarr[peaks[0][i]]], 'bo', markersize=arr[peaks[0][i],peaks[1][i]]/scaling)
 
         else:
             ax = p.imshow(arr, aspect='auto', interpolation='nearest', extent=(min(tarr),max(tarr),max(dmarr),min(dmarr)))
