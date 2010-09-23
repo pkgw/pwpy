@@ -215,7 +215,7 @@ c       define/setup abase array for CASPER/8 correlator
 	call keyr('inttime',inttime,0.001)
 	call keyi('nints',nints,1)
 	call keyi('int0',int0,2)
-	call keyd('freq',sfreq,0.700d0)
+	call keyd('freq',sfreq,0.718d0)
 	write(*,*) 'Start time = Julian day ',timeout
 	write(*,*) 'Ref time = Julian day ',time0
 	call keyd('freq',bandwidth,0.104d0)
