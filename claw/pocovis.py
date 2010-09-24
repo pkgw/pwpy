@@ -30,8 +30,8 @@ class poco:
         self.baseline_order = n.array([ 257, 258, 514, 261, 517, 1285, 262, 518, 1286, 1542, 259, 515, 773, 774, 771, 516, 1029, 1030, 772, 1028, 1287, 1543, 775, 1031, 1799, 1544, 776, 1032, 1800, 2056, 260, 263, 264, 519, 520, 1288])   # second iteration of bl nums
         self.autos = []
         self.noautos = []
-        self.dmarr = n.arange(50,70,2)       # dm trial range in pc/cm3
-        self.tarr = n.arange(-200.,900)/1000.   # time trial range in seconds
+        self.dmarr = n.arange(40,70,2)       # dm trial range in pc/cm3
+        self.tarr = n.arange(-200.,100000)/1000.   # time trial range in seconds
         self.usedmmask = False    # algorithm for summing over dm track.  'dmmask' is data-shaped array with True/False values, else is 2xn array where track is.
         for a1 in range(1,9):             # loop to adjust delays
             for a2 in range(a1,9):
@@ -55,7 +55,7 @@ class poco:
         nchan = self.nchan
         nbl = self.nbl
         i = 0
-        initsize=360000
+        initsize=36000000
         da = n.zeros((initsize,nchan),dtype='complex64')
         fl = n.zeros((initsize,nchan),dtype='bool')
         ti = n.zeros((initsize),dtype='float64')
@@ -85,6 +85,8 @@ class poco:
                 fl = n.concatenate((fl,[flags]))
         #            bl = n.concatenate((bl,[baseline]))
             i = i+1
+            if not (i % 100000):
+                print 'Read integration ', str(i)
 
         if i <= initsize:
             print 'Array smaller than initialized array.  Trimming.'
