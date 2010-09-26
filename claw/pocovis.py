@@ -203,7 +203,7 @@ class poco:
 
 
     def dedisperse(self):
-        """Integrates over data*dmmask or data at dmtrack for each pair of elements in dmarr, tarr.
+        """Integrates over data*dmmask or data at dmtrack for each pair of elements in dmarr, time.
         Not threaded.  Uses dmmask or dmthread directly.
         """
 
@@ -228,7 +228,7 @@ class poco:
                     dmtrack = self.dmtrack(dm=dmarr[i], t0=reltime[j])
                     if len(dmtrack[0]) >= 5:               # ignore tiny, noise-dominated tracks
                         dmt0arr[i,j] = n.mean(n.abs (self.data[dmtrack[0],dmtrack[1]]))
-#            print 'dedispersed for ', dmarr[i]
+            print 'dedispersed for ', dmarr[i]
 
         self.dmt0arr = dmt0arr
 
@@ -237,8 +237,8 @@ class poco:
 
 
     def dedisperse2(self):
-        """Integrates over data*dmmask or data at dmtrack for each pair of elements in dmarr, tarr.
-        Uses threading.  
+        """Integrates over data*dmmask or data at dmtrack for each pair of elements in dmarr, time.
+        Uses threading.  SLOWER than serial.
         """
 
         dmarr = self.dmarr
@@ -257,7 +257,7 @@ class poco:
                 proc = worker(self, i, j)
                 threadlist.append(proc)
                 proc.start()
-            print 'dedispersed for ', dmarr[j]
+            print 'submitted for dm= ', dmarr[i]
         for proc in threadlist:
             proc.join()
 
@@ -292,26 +292,26 @@ class poco:
             ax = p.imshow(arr, aspect='auto', interpolation='nearest', extent=(min(reltime),max(reltime),max(dmarr),min(dmarr)))
 
 
-class worker(Thread):
-    
-    def __init__(self, pv, i, j):
-        Thread.__init__(self)
-        self.pv = pv
-        self.i = i
-        self.j = j
-
-    def run(self):
-        """Threadable unit for dedisperse2.
-        """
-
-        if self.pv.usedmmask:    # slower by factor of 2 than dmtracks
-            dmmask = self.pv.dmmask(dm=self.pv.dmarr[self.i], t0=self.pv.reltime[self.j])
-            if dmmask.sum() >= 5:               # ignore tiny, noise-dominated tracks
-                self.pv.dmt0arr[self.i,self.j] = n.mean(n.abs (self.pv.data * dmmask)[n.where(dmmask == True)])
-        else:
-            dmtrack = self.pv.dmtrack(dm=self.pv.dmarr[self.i], t0=self.pv.reltime[self.j])
-            if len(dmtrack[0]) >= 5:               # ignore tiny, noise-dominated tracks
-                self.pv.dmt0arr[self.i,self.j] = n.mean(n.abs (self.pv.data[dmtrack[0],dmtrack[1]]))
+#class worker(Thread):
+#    
+#    def __init__(self, pv, i, j):
+#        Thread.__init__(self)
+#        self.pv = pv
+#        self.i = i
+#        self.j = j
+#
+#    def run(self):
+#        """Threadable unit for dedisperse2.
+#        """
+#
+#        if self.pv.usedmmask:    # slower by factor of 2 than dmtracks
+#            dmmask = self.pv.dmmask(dm=self.pv.dmarr[self.i], t0=self.pv.reltime[self.j])
+#            if dmmask.sum() >= 5:               # ignore tiny, noise-dominated tracks
+#                self.pv.dmt0arr[self.i,self.j] = n.mean(n.abs (self.pv.data * dmmask)[n.where(dmmask == True)])
+#        else:
+#            dmtrack = self.pv.dmtrack(dm=self.pv.dmarr[self.i], t0=self.pv.reltime[self.j])
+#            if len(dmtrack[0]) >= 5:               # ignore tiny, noise-dominated tracks
+#                self.pv.dmt0arr[self.i,self.j] = n.mean(n.abs (self.pv.data[dmtrack[0],dmtrack[1]]))
 
 
 if __name__ == '__main__':
