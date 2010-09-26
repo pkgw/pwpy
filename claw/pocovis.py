@@ -15,6 +15,7 @@ import miriad
 import numpy as n
 import pylab as p
 import scipy.optimize as opt
+from threading import Thread
 #from matplotlib.font_manager import fontManager, FontProperties
 #font= FontProperties(size='x-small');
 
@@ -30,8 +31,8 @@ class poco:
         self.baseline_order = n.array([ 257, 258, 514, 261, 517, 1285, 262, 518, 1286, 1542, 259, 515, 773, 774, 771, 516, 1029, 1030, 772, 1028, 1287, 1543, 775, 1031, 1799, 1544, 776, 1032, 1800, 2056, 260, 263, 264, 519, 520, 1288])   # second iteration of bl nums
         self.autos = []
         self.noautos = []
-        self.dmarr = n.arange(40,70,2)       # dm trial range in pc/cm3
-        self.tarr = n.arange(-200.,100000)/1000.   # time trial range in seconds
+        self.dmarr = n.arange(50,60,2)       # dm trial range in pc/cm3
+#        self.tarr = n.arange(0,1000)/1000.   # time trial range in seconds
         self.usedmmask = False    # algorithm for summing over dm track.  'dmmask' is data-shaped array with True/False values, else is 2xn array where track is.
         for a1 in range(1,9):             # loop to adjust delays
             for a2 in range(a1,9):
@@ -55,7 +56,7 @@ class poco:
         nchan = self.nchan
         nbl = self.nbl
         i = 0
-        initsize=36000000
+        initsize=36000
         da = n.zeros((initsize,nchan),dtype='complex64')
         fl = n.zeros((initsize,nchan),dtype='bool')
         ti = n.zeros((initsize),dtype='float64')
@@ -80,12 +81,13 @@ class poco:
                 da[i] = data
                 fl[i] = flags
             else:
+                break     # test to stop at initsize
                 da = n.concatenate((da,[data]))
                 ti = n.concatenate((ti,[time]))
                 fl = n.concatenate((fl,[flags]))
         #            bl = n.concatenate((bl,[baseline]))
             i = i+1
-            if not (i % 100000):
+            if not (i % 1000):
                 print 'Read integration ', str(i)
 
         if i <= initsize:
@@ -97,6 +99,7 @@ class poco:
         self.data = da.reshape(i/nbl,nbl,nchan)
         self.flags = fl.reshape(i/nbl,nbl,nchan)
         self.time = ti[::nbl]
+        self.reltime = 24*3600*(self.time - self.time[0])     # relative time array in seconds
         print
         print 'Data read!'
         print 'Shape of Data, Flags, Time:'
@@ -131,10 +134,12 @@ class poco:
         p.colorbar(ax)
 
 
-    def dmmask(self, dm = 0., t0 = 0., show=0):
+    def dmmask(self, dm = 0., t0 = 0., show=0,):
         """Takes dispersion measure in pc/cm3 and time offset from first integration in seconds.
+        Returns a mask to be multiplied by the data array.
         """
 
+        reltime = self.reltime
         if self.data.shape[1] == len(self.chans):
             chans = self.chans
         else:
@@ -142,7 +147,6 @@ class poco:
 
         # initialize mask (false=0)
         mask = n.zeros((self.data.shape[0],self.data.shape[1]),dtype=bool)   # could get clever here.  use integer code to stack dm masks in unique way
-        time = 24*3600*(self.time - self.time[0])     # relative time array in seconds
         freq = self.sfreq + chans * self.sdf             # freq array in GHz
 
         # given freq, dm, dfreq, calculate pulse time and duration
@@ -150,13 +154,13 @@ class poco:
         pulsedt = 8.3e-6 * dm * (1000*self.sdf) * freq**(-3)   # dtime in seconds
 
         for ch in range(mask.shape[1]):
-            ontime = n.where(((pulset[ch] + pulsedt[ch]/2.) >= time) & ((pulset[ch] - pulsedt[ch]/2.) <= time))
+            ontime = n.where(((pulset[ch] + pulsedt[ch]/2.) >= reltime) & ((pulset[ch] - pulsedt[ch]/2.) <= reltime))
 #            print ontime
             mask[ontime, ch] = True
 
         if show:
             ax = p.imshow(mask, aspect='auto', interpolation='nearest')
-            p.axis([-0.5,len(chans)+0.5,max(time),min(time)])
+            p.axis([-0.5,len(chans)+0.5,max(reltime),min(reltime)])
             p.colorbar(ax)
 
         return mask
@@ -164,15 +168,16 @@ class poco:
 
     def dmtrack(self, dm = 0., t0 = 0., show=0):
         """Takes dispersion measure in pc/cm3 and time offset from first integration in seconds.
+        Returns an array of (time, channel) to select from the data array.
         """
 
+        reltime = self.reltime
         if self.data.shape[1] == len(self.chans):  # related to preparing of data?
             chans = self.chans
         else:
             chans = n.arange(nchan)
         nchan = len(chans)
 
-        time = 24*3600*(self.time - self.time[0])     # relative time array in seconds
         freq = self.sfreq + chans * self.sdf             # freq array in GHz
 
         # given freq, dm, dfreq, calculate pulse time and duration
@@ -182,7 +187,7 @@ class poco:
         timebin = []
         chanbin = []
         for ch in range(nchan):
-            ontime = n.where(((pulset[ch] + pulsedt[ch]/2.) >= time) & ((pulset[ch] - pulsedt[ch]/2.) <= time))
+            ontime = n.where(((pulset[ch] + pulsedt[ch]/2.) >= reltime) & ((pulset[ch] - pulsedt[ch]/2.) <= reltime))
 #            print ontime[0], ch
             timebin = n.concatenate((timebin, ontime[0]))
             chanbin = n.concatenate((chanbin, (ch * n.ones(len(ontime[0]), dtype=int))))
@@ -199,13 +204,13 @@ class poco:
 
     def dedisperse(self):
         """Integrates over data*dmmask or data at dmtrack for each pair of elements in dmarr, tarr.
+        Not threaded.  Uses dmmask or dmthread directly.
         """
 
         dmarr = self.dmarr
-        tarr = self.tarr
+        reltime = self.reltime
 
-        time = 24*3600*(self.time - self.time[0])     # relative time array in seconds
-        dmt0arr = n.zeros((len(dmarr),len(tarr)), dtype='float64')
+        dmt0arr = n.zeros((len(dmarr),len(reltime)), dtype='float64')
 #        accummask = n.zeros(self.data.shape, dtype='bool')
         if self.data.shape[1] == len(self.chans):
             chans = self.chans
@@ -213,17 +218,17 @@ class poco:
             chans = n.arange(self.nchan)
 
         for i in range(len(dmarr)):
-            for j in range(len(tarr)):
+            for j in range(len(reltime)):
                 if self.usedmmask:    # slower by factor of 2 than dmtracks
-                    dmmask = self.dmmask(dm=dmarr[i], t0=tarr[j])
+                    dmmask = self.dmmask(dm=dmarr[i], t0=reltime[j])
                     if dmmask.sum() >= 5:               # ignore tiny, noise-dominated tracks
                         dmt0arr[i,j] = n.mean(n.abs (self.data * dmmask)[n.where(dmmask == True)])
 #                   accummask = accummask + dmmask
                 else:
-                    dmtrack = self.dmtrack(dm=dmarr[i], t0=tarr[j])
+                    dmtrack = self.dmtrack(dm=dmarr[i], t0=reltime[j])
                     if len(dmtrack[0]) >= 5:               # ignore tiny, noise-dominated tracks
                         dmt0arr[i,j] = n.mean(n.abs (self.data[dmtrack[0],dmtrack[1]]))
-            print 'Dedispersed for ', dmarr[i]
+#            print 'dedispersed for ', dmarr[i]
 
         self.dmt0arr = dmt0arr
 
@@ -231,10 +236,35 @@ class poco:
 #        p.axis([-0.5,len(chans)+0.5,max(time),min(time)])
 
 
-    def plotdmt0(self, sig=5.):
-        """Calculates rms noise in dmt0 space, then plots circles for each significant point
+    def dedisperse2(self):
+        """Integrates over data*dmmask or data at dmtrack for each pair of elements in dmarr, tarr.
+        Uses threading.  
         """
-        tarr = self.tarr
+
+        dmarr = self.dmarr
+        reltime = self.reltime
+
+        self.dmt0arr = n.zeros((len(dmarr),len(reltime)), dtype='float64')
+#        accummask = n.zeros(self.data.shape, dtype='bool')
+        if self.data.shape[1] == len(self.chans):
+            chans = self.chans
+        else:
+            chans = n.arange(self.nchan)
+
+        threadlist = []
+        for i in range(len(dmarr)):
+            for j in range(len(reltime)):
+                proc = worker(self, i, j)
+                threadlist.append(proc)
+                proc.start()
+            print 'dedispersed for ', dmarr[j]
+        for proc in threadlist:
+            proc.join()
+
+
+    def plotdmt0(self, sig=5.):
+        """calculates rms noise in dmt0 space, then plots circles for each significant point
+        """
         dmarr = self.dmarr
         arr = self.dmt0arr
 
@@ -245,22 +275,43 @@ class poco:
         cliparr = n.where((arr < mean + 5*std) & (arr > mean - 5*std))
         mean = arr[cliparr].mean()
         std = arr[cliparr].std()
-        print 'final mean, std:  ', mean, std
+#        print 'final mean, std:  ', mean, std
 
-        time = 24*3600*(self.time - self.time[0])     # relative time array in seconds
+        reltime = 24*3600*(self.time - self.time[0])     # relative time array in seconds
 
-        print 'mean, sig, std:  ', mean, sig, std
+        print 'final mean, sig, std:  ', mean, sig, std
         if sig:
             peaks = n.where(arr > (mean + sig*std))   # this is probably biased
-            scaling = std*sig
 
             print 'peaks:  ', peaks
             if peaks:
                 for i in range(len(peaks[1])):
-                    p.plot([tarr[peaks[1][i]]], [dmarr[peaks[0][i]]], 'bo', markersize=arr[peaks[0][i],peaks[1][i]]/scaling)
-
+                    ax = p.imshow(arr, aspect='auto', interpolation='nearest', extent=(min(reltime),max(reltime),max(dmarr),min(dmarr)))
+                    p.plot([reltime[peaks[1][i]]], [dmarr[peaks[0][i]]], 'o', markersize=10*((arr[peaks[0][i],peaks[1][i]]-mean)/(sig*std)), markerfacecolor='white', markeredgecolor='blue', alpha=0.5)
         else:
-            ax = p.imshow(arr, aspect='auto', interpolation='nearest', extent=(min(tarr),max(tarr),max(dmarr),min(dmarr)))
+            ax = p.imshow(arr, aspect='auto', interpolation='nearest', extent=(min(reltime),max(reltime),max(dmarr),min(dmarr)))
+
+
+class worker(Thread):
+    
+    def __init__(self, pv, i, j):
+        Thread.__init__(self)
+        self.pv = pv
+        self.i = i
+        self.j = j
+
+    def run(self):
+        """Threadable unit for dedisperse2.
+        """
+
+        if self.pv.usedmmask:    # slower by factor of 2 than dmtracks
+            dmmask = self.pv.dmmask(dm=self.pv.dmarr[self.i], t0=self.pv.reltime[self.j])
+            if dmmask.sum() >= 5:               # ignore tiny, noise-dominated tracks
+                self.pv.dmt0arr[self.i,self.j] = n.mean(n.abs (self.pv.data * dmmask)[n.where(dmmask == True)])
+        else:
+            dmtrack = self.pv.dmtrack(dm=self.pv.dmarr[self.i], t0=self.pv.reltime[self.j])
+            if len(dmtrack[0]) >= 5:               # ignore tiny, noise-dominated tracks
+                self.pv.dmt0arr[self.i,self.j] = n.mean(n.abs (self.pv.data[dmtrack[0],dmtrack[1]]))
 
 
 if __name__ == '__main__':
@@ -268,6 +319,7 @@ if __name__ == '__main__':
     print 'Greetings, human.'
     print ''
 
-    pv = poco('poco_crab_candpulse.mir')
+    pv = poco('poco.mir')
     pv.prep()
-
+    pv.dedisperse()
+    pv.plotdmt0()
