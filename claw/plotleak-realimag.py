@@ -19,16 +19,16 @@ def run():
     for i in range(1,17):
         # specify ascii files output by 'split-cal-leak.csh'
         try:
-            a.append(asciidata.AsciiData ('/indirect/big_scr2/claw/data/ata/hex14-polcal/sept2010/hexa-3c286-hp0-1430-leakamp%d.txt' % i))
-            p.append(asciidata.AsciiData ('/indirect/big_scr2/claw/data/ata/hex14-polcal/sept2010/hexa-3c286-hp0-1430-leakphase%d.txt' % i))
+            a.append(asciidata.AsciiData ('/indirect/big_scr2/claw/data/ata/polcal/oct2010/mosfxc-3c138.uvaver.uvcal.uvredo-leakamp%d.txt' % i))
+            p.append(asciidata.AsciiData ('/indirect/big_scr2/claw/data/ata/polcal/oct2010/mosfxc-3c138.uvaver.uvcal.uvredo-leakphase%d.txt' % i))
         except:
             print 'skipping %d' % (i)
     print 'now building leak plot 2'
     if plottwo:
         for i in range(1,17):
             try:
-                a2.append(asciidata.AsciiData ('/indirect/big_scr2/claw/data/ata/hex14-polcal/sept2010/hexc-3c286-hp0-1480-leakamp%d.txt' % i))
-                p2.append(asciidata.AsciiData ('/indirect/big_scr2/claw/data/ata/hex14-polcal/sept2010/hexc-3c286-hp0-1480-leakphase%d.txt' % i))
+                a2.append(asciidata.AsciiData ('/indirect/big_scr2/claw/data/ata/hex14-polcal-sep7/oct2010/hexa-3c286-hp0-1430-leakamp%d.txt' % i))
+                p2.append(asciidata.AsciiData ('/indirect/big_scr2/claw/data/ata/hex14-polcal-sep7/oct2010/hexa-3c286-hp0-1430-leakphase%d.txt' % i))
 #            a2.append(asciidata.AsciiData ('/indirect/big_scr3/claw/data/ata/nvss-rm-best/day2-2010/mosfxc-3c286-2010-100-flagged2-leakamp%d.txt' % i))
 #            p2.append(asciidata.AsciiData ('/indirect/big_scr3/claw/data/ata/nvss-rm-best/day2-2010/mosfxc-3c286-2010-100-flagged2-leakphase%d.txt' % i))
             except:
@@ -209,6 +209,8 @@ def run():
         # real-imag (x-y) plot
         # two pols per source
         for i in range(nants):
+            if rx[0,i] == 0:
+                continue
             rxj = numpy.concatenate((rx[:,i],rx2[:,i]))
             ixj = numpy.concatenate((ix[:,i],ix2[:,i]))
             ryj = numpy.concatenate((ry[:,i],ry2[:,i]))
@@ -231,18 +233,23 @@ def run():
     if type == 'overlap':
         # real-imag (x-y) plot
         # two pols per source
-        for i in range(1,nants,2):
+        colors = ['b','g','r','c','m','y','k','b','g','r','c','m','y','k','b','g','r','c','m','y','k','b','g','r','c','m','y','k','b','g','r','c','m','y','k','b','g','r','c','m','y','k','b','g','r','c','m','y','k']
+        nantlist = range(nants)
+        for i in nantlist:
+            if rx[0,i] == 0:
+                continue
             pylab.figure(1)
-            pylab.plot(rx[:,i],ix[:,i],'.-')
-            pylab.plot(rx2[:,i],ix2[:,i],'--')
+            print i, nantlist.index(i), colors[nantlist.index(i)]
+            pylab.plot(rx[:,i],ix[:,i],colors[nantlist.index(i)]+'.-')
+            pylab.plot(rx2[:,i],ix2[:,i],colors[nantlist.index(i)]+'--')
             pylab.xlabel('Real')
             pylab.ylabel('Imaginary')
             pylab.title('Leakages')
             pylab.text(rx[0,i],ix[0,i],str(antnum[i]))
             pylab.text(rx2[0,i],ix2[0,i],str(antnum[i]))
             pylab.figure(2)
-            pylab.plot(ry[:,i],iy[:,i],'.-')
-            pylab.plot(ry2[:,i],iy2[:,i],'--')
+            pylab.plot(ry[:,i],iy[:,i],colors[nantlist.index(i)]+'.-')
+            pylab.plot(ry2[:,i],iy2[:,i],colors[nantlist.index(i)]+'--')
             pylab.xlabel('Real')
             pylab.ylabel('Imaginary')
             pylab.title('Leakages')
@@ -255,7 +262,7 @@ def run():
 #            pylab.text(rx[0,i]-rx2[0,i],ix[0,i]-ix2[0,i],str(antnum[i]))
 #            pylab.xlabel('Real')
 #            pylab.ylabel('Imaginary')
-        pylab.title('Leakage Differences')
+        pylab.title('Leakages')
 
     pylab.show()
 
