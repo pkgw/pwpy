@@ -356,8 +356,8 @@ c     Open the second dataset.
       jha = 0
       call BLoad
       call BLoad
-      if(nchan(1).eq.0 .or. nchan(2).eq.0)
-     *        call bug('w','No integrations found')
+c      if(nchan(1).eq.0 .or. nchan(2).eq.0)
+c     *        call bug('w','No integrations found')
       end
 c***********************************************************************
       subroutine Bload
