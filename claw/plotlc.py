@@ -7,8 +7,8 @@ import scipy as s
 import scipy.optimize as opt
 
 # params
-nbins = 50
-tint = 0.15   # integration time in seconds
+nbins = 100
+tint = 0.1   # integration time in seconds
 
 # read data
 if len(sys.argv) < 2:

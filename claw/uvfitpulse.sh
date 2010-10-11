@@ -9,7 +9,7 @@ startt=`date +%s`
 
 ## User parameters ##
 bgints=2  # size of background region to subtract mean emission
-ints=100   # number of integrations to use
+ints=30000   # number of integrations to use
 skipint=0
 binsize=1.0 # size of integration in seconds (why?)
 interval=`echo 'scale=5; '${binsize}'*2/60' | bc`  # set this to assure at least two averaged bins in bg
