@@ -3,7 +3,7 @@
 #
 # Script to write log file of Q, U, for polarised sources
 
-set nchan=160
+set nchan=16
 # What source are we processing?
 
 if $#argv == 0 then

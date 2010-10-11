@@ -14,10 +14,11 @@ endif
 set freq = 1430
 set diam = 20
 set imsize = 1024
-set nchan = 160
+set nchan = 16
 set boxlo = `echo $imsize'/2 - 60' | bc`
 set boxhi = `echo $imsize'/2 + 60' | bc`
-set imgparams = "robust=0 cell=10 select=-shadow($diam),ti(09SEP19:18:00:00,09SEP20:15:00:00),ti(09NOV27:16:00:00,09NOV27:23:59:00),ti(09DEC04:17:30:00,09DEC04:23:59:00)" # fwhm=440,150"  # cuts bad cal in day 1,2,3
+#set imgparams = "robust=0 cell=10 select=-shadow($diam),ti(09SEP19:18:00:00,09SEP20:15:00:00),ti(09NOV27:16:00:00,09NOV27:23:59:00),ti(09DEC04:17:30:00,09DEC04:23:59:00)" # fwhm=440,150"  # cuts bad cal in day 1,2,3
+set imgparams = "robust=0 cell=10 select=-shadow($diam)"
 set restorparams = ''   # fwhm=440,150 pa=74 # for 1230 (m87)
 #set restorparams = 'fwhm=440,150 pa=74'  # for 1230 (m87)
 set visall = `ls -df $source-? $source-?? $source-??? | awk '{printf("%s,",$1)}' ; echo`
