@@ -93,15 +93,13 @@ def readdata (vis, nants, blinfo, expectdualpol):
     print 'Reading', vis, '...'
 
     nbl = nants * (nants - 1) / 2
-    visgen = vis.readLowlevel (False, select='-auto,pol(xx,yy)', nocal=True)
+    visgen = vis.readLowlevel ('wb3', False, select='-auto,pol(xx,yy)', nocal=True)
     thepol = None
 
     rephase = dra != 0. or ddec != 0.
     lmn = None
 
-    for inp, pream, data, flags, n in visgen:
-        data = data[:n]
-        flags = flags[:n]
+    for inp, pream, data, flags in visgen:
         pol = inp.getVarInt ('pol')
 
         if expectdualpol:
