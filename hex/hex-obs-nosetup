@@ -331,6 +331,11 @@ echo success 1 >>$summfile1
 echo tend `date -u +%y%b%d:%H:%M:%S.0` >>$summfile2
 echo success 1 >>$summfile2
 
+# Notify the hex auto-reduction software that there's work
+# to be done.
+echo `pwd`/$summfile1 >/ataarchive/scratch/hexproc/notify/`date -u +%y%m%d-%H%M%S`-$$-`hostname`-1
+echo `pwd`/$summfile2 >/ataarchive/scratch/hexproc/notify/`date -u +%y%m%d-%H%M%S`-$$-`hostname`-2
+
 echo "$me ended successfully at `date`" |& tee -ia $log
 exit 0
 
@@ -341,6 +346,11 @@ echo "$me aborting" |& tee -ia $log
 # for recovering if most of the observation is still usable
 echo tend `date -u +%y%b%d:%H:%M:%S.0` >>$summfile1
 echo tend `date -u +%y%b%d:%H:%M:%S.0` >>$summfile2
+
+# Still notify the auto-reduction software so that the
+# attempted observation is remembered.
+echo `pwd`/$summfile1 >/ataarchive/scratch/hexproc/notify/`date -u +%y%m%d-%H%M%S`-$$-`hostname`-1
+echo `pwd`/$summfile2 >/ataarchive/scratch/hexproc/notify/`date -u +%y%m%d-%H%M%S`-$$-`hostname`-2
 
 # Kill rotators just in case
 frot.csh $inst1 $ephem $freq1 `pwd` kill
