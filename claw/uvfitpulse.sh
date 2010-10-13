@@ -9,18 +9,19 @@ startt=`date +%s`
 
 ## User parameters ##
 bgints=2  # size of background region to subtract mean emission
-ints=30000   # number of integrations to use
+ints=20000   # number of integrations to use
 skipint=0
 binsize=1.0 # size of integration in seconds (why?)
 interval=`echo 'scale=5; '${binsize}'*2/60' | bc`  # set this to assure at least two averaged bins in bg
-visstep=10  # number of visibilities per integration.  sadly, needs to be hardwired...
+visstep=56  # number of visibilities per integration.  sadly, needs to be hardwired...
+bgsub=0   # do bgsub technique
 # output properties:
 #suffix='0.15'-${startt}
 #visroot='fxmir-m82-0.15'
 #outroot='m82-bgsub-'${suffix}
-suffix='0.1'-${startt}
-visroot='fxc-j0332-0.1s-xx'
-outroot='j0332-bgsub-xx'${suffix}
+suffix='0.2-4'-${startt}
+visroot='fxmir-m82-02-4'
+outroot='m82-nosub-'${suffix}
 cleanup=1
 
 #set -x -e
@@ -58,16 +59,21 @@ for ((i=${bgints}+${skipint};i<${ints}-${bgints}+${skipint};i++)); do
     vis0=`echo 'scale=0; '${visstep}'*'${i}'+1' | bc`     # get neighboring ints in background select
     vis1=`echo 'scale=0; '${visstep}'*('${i}'+1)' | bc`     # get neighboring ints in background select
 
-    # create uv data for mean visibility
-    uvaver vis=${visroot} select='vis('${visbg0}','${visbg1}'),-vis('${vis0}','${vis1}')' line=chan,1,1,32 interval=${interval} out=${outroot}'-off'
-    uvaver vis=${visroot} select='vis('${vis0}','${vis1}')' line=chan,1,1,32 interval=${interval} out=${outroot}'-on'
+    if [ $bgsub == 1 ]
+	then
+        # create uv data for mean visibility
+	uvaver vis=${visroot} select='vis('${visbg0}','${visbg1}'),-vis('${vis0}','${vis1}')' line=chan,1,1,32 interval=${interval} out=${outroot}'-off'
+	uvaver vis=${visroot} select='vis('${vis0}','${vis1}')' line=chan,1,1,32 interval=${interval} out=${outroot}'-on'
 
-    # difference integration from mean emission
-    uvdiff vis=${outroot}'-on',${outroot}'-off' out=${outroot}'-diff'
+        # difference integration from mean emission
+	~claw/code/mmm/claw/uvdiff vis=${outroot}'-on',${outroot}'-off' out=${outroot}'-diff'
 
-    # uvfit
-    uvfit vis=${outroot}'-diff' object=point fix=xy spar=11,0,0 >& /tmp/uvfitpulse-${suffix}.txt
-#    uvfit vis=${visroot} select='vis('${vis0}','${vis1}')' object=point spar=11,0,0 >& /tmp/uvfitpulse-${suffix}.txt
+       # uvfit
+	uvfit vis=${outroot}'-diff' object=point fix=xy spar=11,0,0 >& /tmp/uvfitpulse-${suffix}.txt
+    else
+	uvfit vis=${visroot} select='vis('${vis0}','${vis1}')' object=point fix=xy spar=11,0,0 >& /tmp/uvfitpulse-${suffix}.txt
+    fi
+
     # confirm that fit retuned good values
     if [ `grep 'Failed to determine covariance matrix' /tmp/uvfitpulse-${suffix}.txt | wc -l` != 0 ] || [ `grep 'Failed to converge' /tmp/uvfitpulse-${suffix}.txt | wc -l` != 0 ]
 	then
