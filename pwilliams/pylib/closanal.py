@@ -509,7 +509,7 @@ class QuadComputer (ClosureComputer):
                 apacc (ap3, lrms)
                 apacc (ap4, lrms)
 
-                yield key, lrms
+                yield key, lrms, 0.
 
         self.qtyData = sorted (c (), key=lambda t: abs (t[1]))
         
