@@ -7,7 +7,9 @@ endif
 
 set file = $argv[1]
 
-latex ${file}.tex
-latex ${file}.tex
+latex ${file}
+bibtex ${file}
+latex ${file}
+latex ${file}
 dvips ${file}.dvi  -o ${file}.ps -t letter
 ps2pdf ${file}.ps
