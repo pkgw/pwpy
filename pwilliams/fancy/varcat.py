@@ -89,12 +89,13 @@ from mirtask import uvdat, keys
 
 #print 'varcat'
 
-keys.keyword ('vars', 'a', None, 64)
-keys.keyword ('context', 'a', None, 64)
-keys.keyword ('format', 'a', None, 64)
-keys.keyword ('cformat', 'a', None, 64)
-keys.doUvdat ('dsl3', True)
-opts = keys.process ()
+ks = keys.KeySpec ()
+ks.mkeyword ('vars', 'a', 64)
+ks.mkeyword ('context', 'a', 64)
+ks.mkeyword ('format', 'a', 64)
+ks.mkeyword ('cformat', 'a', 64)
+ks.uvdat ('dsl3', True)
+opts = ks.process ()
 
 if len (opts.vars) == 0:
     print 'Must specify variables to print out!'
@@ -146,7 +147,7 @@ print s
 
 curFile = None
 
-for dIn, p, d, f, n in uvdat.readAll ():
+for dIn, p, d, f in uvdat.read ():
     if dIn is not curFile:
         uvt = dIn.makeVarTracker ()
         uvt.track (*opts.vars)

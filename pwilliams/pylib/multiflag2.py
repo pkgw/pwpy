@@ -288,7 +288,7 @@ class MultiFlag2 (object):
 
 _SVNID = '$Id$'
 
-def task ():
+def task (args=None):
     from mirtask import keys, util
     from miriad import VisData, basicTrace
 
@@ -296,12 +296,13 @@ def task ():
     
     banner = util.printBannerSvn ('multiflag2', 'apply groups of flags by calling UVFLAG', _SVNID)
 
-    keys.keyword ('spec', 'f', None, 128)
-    keys.keyword ('vis', 'f', None, 128)
-    keys.keyword ('freq', 'd', -1)
-    keys.keyword ('half', 'i', 0)
-    keys.keyword ('pol', 'a', ' ')
-    opts = keys.process ()
+    ks = keys.KeySpec ()
+    ks.mkeyword ('spec', 'f', 128)
+    ks.mkeyword ('vis', 'f', 128)
+    ks.keyword ('freq', 'd', -1)
+    ks.keyword ('half', 'i', 0)
+    ks.keyword ('pol', 'a', ' ')
+    opts = ks.process (args)
 
     if opts.pol == ' ': opts.pol = None
     
@@ -323,5 +324,5 @@ def task ():
         mf.applyDataSet (VisData (vf), 'unused')
 
 if __name__ == '__main__':
-    task ()
+    task (sys.argv[1:])
     sys.exit (0)

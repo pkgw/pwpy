@@ -711,7 +711,7 @@ class DataProcessor (object):
               '(%g * "jyperk" in dataset)' % (-self.fjyperk)
         return v
     
-    def process (self, inp, preamble, data, flags, nread):
+    def process (self, inp, preamble, data, flags):
         time = preamble[3]
 
         if not self.first:
@@ -762,9 +762,6 @@ class DataProcessor (object):
             if nspect > 0:
                 sdf = inp.getVarDouble ('sdf', nspect)
         
-        data = data[0:nread]
-        flags = flags[0:nread]
-
         bp = util.mir2aps (inp, preamble)
         ants = util.decodeBaseline (preamble[4])
         fcpdiscard = (self.flux is not None) and (not util.apsAreInten (bp))
@@ -896,7 +893,7 @@ def rewriteData (banner, vis, out, solutions, varyJyPerK, **kwargs):
     if varyJyPerK:
         theSysTemp = solutions[0][2][0]
 
-    for inp, preamble, data, flags, nread in vis.readLowlevel (False, **kwargs):
+    for inp, preamble, data, flags in vis.readLowlevel ('3', False, **kwargs):
         if first:
             first = False
 
@@ -1052,14 +1049,9 @@ def rewriteData (banner, vis, out, solutions, varyJyPerK, **kwargs):
                 jyperk = sefd / theSysTemp
             dOut.writeVarFloat ('jyperk', jyperk)
 
-        # Convert UVW coordinates from wavelengths back to nanoseconds
-        # (readLowlevel automatically has Miriad do the conversion to
-        # wavelengths when reading data)
-        preamble[0:3] /= inp.getVarDouble ('sfreq')
-        
         inp.copyLineVars (dOut)
         dOut.writeVarInt ('pol', pol)
-        dOut.write (preamble, data, flags, nread)
+        dOut.write (preamble, data, flags)
 
     # All done. 
 
@@ -1079,27 +1071,27 @@ def die (s):
     return 1
 
 
-def taskCalc ():
+def taskCalc (args):
     banner = util.printBannerSvn ('calctsys',
                                   'compute TSys values from data noise properties', SVNID)
     
     # Keywords and argument checking
 
-    keys.keyword ('interval', 'd', 5.)
-    keys.keyword ('flux', 'd', -1)
-    keys.keyword ('maxtsys', 'd', 350.)
-    keys.keyword ('maxresid', 'd', 50.)
-    keys.keyword ('vis', 'f', ' ')
-    keys.keyword ('out', 'f', ' ')
-    keys.keyword ('textout', 'f', ' ')
-    keys.keyword ('quant', 'i', None, 2)
-    keys.keyword ('hann', 'i', 1)
-    keys.keyword ('jyperk', 'd', -1.0)
-    keys.keyword ('select', 'a', '')
-    keys.option ('showpre', 'showfinal', 'showall', 'dualpol',
+    ks = keys.KeySpec ()
+    ks.keyword ('interval', 'd', 5.)
+    ks.keyword ('flux', 'd', -1)
+    ks.keyword ('maxtsys', 'd', 350.)
+    ks.keyword ('maxresid', 'd', 50.)
+    ks.keyword ('vis', 'f', ' ')
+    ks.keyword ('out', 'f', ' ')
+    ks.keyword ('textout', 'f', ' ')
+    ks.mkeyword ('quant', 'i', 2)
+    ks.keyword ('hann', 'i', 1)
+    ks.keyword ('jyperk', 'd', -1.0)
+    ks.keyword ('select', 'a', '')
+    ks.option ('showpre', 'showfinal', 'showall', 'dualpol',
                  'nocal', 'nopass', 'nopol')
-
-    args = keys.process ()
+    args = ks.process (args)
 
     # Verify arguments that can be invalid
     
@@ -1222,7 +1214,7 @@ def taskCalc ():
                         args.maxtsys, args.maxresid, args.showpre, args.showall,
                         args.showfinal)
 
-    for tup in vis.readLowlevel (False, **inputArgs):
+    for tup in vis.readLowlevel ('3', False, **inputArgs):
         dp.process (*tup)
 
     dp.finish ()
@@ -1241,17 +1233,17 @@ def taskCalc ():
     return 0
 
 
-def taskApply (argv):
+def taskApply (args):
     banner = util.printBannerSvn ('applytsys',
                                   'insert TSys information into UV data', SVNID)
 
-    keys.keyword ('vis', 'f', ' ')
-    keys.keyword ('out', 'f', ' ')
-    keys.keyword ('textin', 'f', ' ')
-    keys.keyword ('select', 'a', '')
-    keys.option ('dualpol', 'nocal', 'nopass', 'nopol')
-
-    args = keys.process (argv)
+    ks = keys.KeySpec ()
+    ks.keyword ('vis', 'f', ' ')
+    ks.keyword ('out', 'f', ' ')
+    ks.keyword ('textin', 'f', ' ')
+    ks.keyword ('select', 'a', '')
+    ks.option ('dualpol', 'nocal', 'nopass', 'nopol')
+    args = ks.process (args)
 
     if args.vis == ' ':
         return die ('no UV input specified')
@@ -1284,4 +1276,4 @@ def taskApply (argv):
 
 
 if __name__ == '__main__':
-    sys.exit (taskCalc ())
+    sys.exit (taskCalc (sys.argv[1:]))

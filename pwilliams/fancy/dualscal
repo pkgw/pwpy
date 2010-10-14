@@ -50,24 +50,25 @@ banner = util.printBannerSvn ('dualscal', 'selfcal polarizations separately', SV
 
 # Define all the arguments 
 
-keys.keyword ('vis', 'f', None, 128)
-keys.keyword ('select', 'a', ' ')
-keys.keyword ('model', 'f', ' ')
-keys.keyword ('clip', 'd', N.nan)
-keys.keyword ('interval', 'd', N.nan)
-keys.keyword ('minants', 'i', -1)
-keys.keyword ('refant', 'i', -1)
-keys.keyword ('flux', 'd', N.nan)
-keys.keyword ('offset', 'd', None, 2)
-keys.keyword ('line', 'a', None, 5)
-keys.keyword ('out', 'f', ' ')
-keys.option ('amplitude', 'phase', 'smooth', 'polarized', 'mfs',
-             'relax', 'apriori', 'noscale', 'mosaic', 'verbose')
+ks = keys.KeySpec ()
+ks.mkeyword ('vis', 'f', 128)
+ks.keyword ('select', 'a', ' ')
+ks.keyword ('model', 'f', ' ')
+ks.keyword ('clip', 'd', N.nan)
+ks.keyword ('interval', 'd', N.nan)
+ks.keyword ('minants', 'i', -1)
+ks.keyword ('refant', 'i', -1)
+ks.keyword ('flux', 'd', N.nan)
+ks.mkeyword ('offset', 'd', 2)
+ks.mkeyword ('line', 'a', 5)
+ks.keyword ('out', 'f', ' ')
+ks.option ('amplitude', 'phase', 'smooth', 'polarized', 'mfs',
+           'relax', 'apriori', 'noscale', 'mosaic', 'verbose')
 # Specific to this task:
-keys.keyword ('ttol', 'd', DEFAULT_TTOL * 86400)
-keys.option ('usemself', 'serial')
+ks.keyword ('ttol', 'd', DEFAULT_TTOL * 86400)
+ks.option ('usemself', 'serial')
 
-kws = keys.process ()
+kws = ks.process ()
 
 
 # Process the arguments

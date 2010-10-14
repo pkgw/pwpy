@@ -34,26 +34,27 @@ numdisplay.open ()
 
 # Args
 
-keys.doUvdat ('dsl3', True)
-keys.option ('notimes')
-opts = keys.process ()
+ks = keys.KeySpec ()
+ks.uvdat ('dsl3', True)
+ks.option ('notimes')
+opts = ks.process ()
 
 
 # Read in the data
 
 prevn = None
 
-for dset, pream, data, flags, n in uvdat.readAll ():
+for dset, pream, data, flags in uvdat.read ():
     t = pream[3]
 
     if prevn is None:
-        prevn = n
-        ag = ArrayGrower (n, dtype=data.dtype)
+        prevn = flags.size
+        ag = ArrayGrower (flags.size, dtype=data.dtype)
         accum = None
         nacc = 0
         times = []
     else:
-        if n != prevn:
+        if flags.size != prevn:
             print >>sys.stderr, 'Error: changing number of channels in selected data'
             sys.exit (1)
 
@@ -62,8 +63,7 @@ for dset, pream, data, flags, n in uvdat.readAll ():
         elif t == times[-1]:
             print >>sys.stderr, 'Warning: time repeated in selected data'
 
-    data = data[:n]
-    flags = flags[:n].astype (N.bool)
+    flags = flags.astype (N.bool)
 
     # Could have options for what to do with this.
     data[N.where (~flags)] = 0.0

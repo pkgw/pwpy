@@ -78,10 +78,11 @@ deg2rad = N.pi / 180.
 SVNID = '$Id$'
 banner = util.printBannerSvn ('fringefix', 'correct for fringe rate amplitude loss', SVNID)
 
-keys.keyword ('out', 'f', ' ')
-keys.keyword ('maxscale', 'd', 3.)
-keys.doUvdat ('dsl3', True)
-opts = keys.process ()
+ks = keys.KeySpec ()
+ks.keyword ('out', 'f', ' ')
+ks.keyword ('maxscale', 'd', 3.)
+ks.uvdat ('dsl3', True)
+opts = ks.process ()
 
 if opts.out == ' ':
     print >>sys.stderr, 'Error: must give an output filename'
@@ -102,7 +103,7 @@ windowVars = ['ischan', 'nschan', 'nspect', 'restfreq',
 nSeen = 0
 nSupp = 0
 
-for dIn, preamble, data, flags, nread in uvdat.readAll ():
+for dIn, preamble, data, flags in uvdat.read ():
     anyChange = False
     nSeen += 1
     
@@ -187,8 +188,6 @@ for dIn, preamble, data, flags, nread in uvdat.readAll ():
 
     # Hey! We actually have some data processing to do!
 
-    data = data[0:nread]
-    flags = flags[0:nread]
     pol = uvdat.getPol ()
 
     #if i % 5000 == 0:
@@ -227,9 +226,7 @@ for dIn, preamble, data, flags, nread in uvdat.readAll ():
         
     dOut.writeVarInt ('pol', pol)
     dOut.writeVarFloat ('ffscale', corr)
-    dOut.write (preamble, data, flags, nread)
-        
-    # I don't understand what this does ...
+    dOut.write (preamble, data, flags)
     nPol -= 1
 
 if not polsVaried:

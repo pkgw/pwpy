@@ -640,7 +640,7 @@ class MultiFlag (object):
     def applyUvdat (self, banner):
         curInp = None
 
-        for inp, preamble, data, flags, nread in uvdat.readAll ():
+        for inp, preamble, data, flags, nread in uvdat.read ():
             if inp is not curInp:
                 if curInp is not None:
                     # See comment below.
@@ -663,7 +663,7 @@ class MultiFlag (object):
     def applyDataSet (self, dset, banner):
         first = True
         
-        for inp, preamble, data, flags, nread in dset.readLowlevel (False):
+        for inp, preamble, data, flags, nread in dset.readLowlevel ('w3', False):
             if first:
                 self.setupFile (inp, banner)
                 first = False
@@ -678,15 +678,16 @@ class MultiFlag (object):
 
 _SVNID = '$Id$'
 
-def task ():
+def task (args=None):
     print 'This script is UNFINISHED and EXPERIMENTAL!!!!'
     print 'Use multiflag2 instead!!!!'
     
     banner = util.printBannerSvn ('multiflag', 'UV data multiflagger', _SVNID)
     
-    keys.keyword ('spec', 'f', ' ', 128)
-    keys.doUvdat ('3', False)
-    opts = keys.process ()
+    ks = keys.KeySpec ()
+    ks.mkeyword ('spec', 'f', 128)
+    ks.uvdat ('3', False)
+    opts = ks.process (args)
 
     if len (opts.spec) < 1:
         print >>sys.stderr, 'Error: must give at least one "spec" filename'
@@ -702,5 +703,5 @@ def task ():
     mf.applyUvdat (banner)
 
 if __name__ == '__main__':
-    task ()
+    task (sys.argv[1:])
     sys.exit (0)

@@ -112,11 +112,12 @@ SVNID = '$Id$'
 
 banner = util.printBannerSvn ('ataglue', 'glue together two 512-channel ATA datasets', SVNID)
 
-keys.keyword ('out', 'f', ' ')
-keys.keyword ('vis', 'f', None, 2)
-keys.keyword ('tol', 'd', 1e-4)
-keys.option ('badc1', 'flagdc')
-opts = keys.process ()
+ks = keys.KeySpec ()
+ks.keyword ('out', 'f', ' ')
+ks.mkeyword ('vis', 'f', 2)
+ks.keyword ('tol', 'd', 1e-4)
+ks.option ('badc1', 'flagdc')
+opts = ks.process ()
 
 if opts.out == ' ':
     print >>sys.stderr, 'Error: must give output filename.'

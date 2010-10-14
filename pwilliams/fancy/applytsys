@@ -45,4 +45,4 @@
 
 import sys, calctsys
 
-sys.exit (calctsys.taskApply (sys.argv))
+sys.exit (calctsys.taskApply (sys.argv[1:]))

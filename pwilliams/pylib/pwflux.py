@@ -117,10 +117,7 @@ class Fluxer (object):
         byPol = {}
         tMin = tMax = None
 
-        for inp, preamble, data, flags, n in uvdat.readAll ():
-            data = data[:n]
-            flags = flags[:n]
-
+        for inp, preamble, data, flags in uvdat.read ():
             if not flags.any ():
                 continue
 
@@ -244,14 +241,15 @@ def flushPrint (tMin, tMax, poldata):
             (pname, mreal, mimag, amp, uamp, phdeg, uphdeg, count)
 
 
-def task (argv):
+def task (args=None):
     banner = util.printBannerSvn ('pwflux', 'calculate flux from UV data', SVNID)
 
-    keys.keyword ('interval', 'd', 1)
-    keys.keyword ('offset', 'd', None, 2)
-    keys.keyword ('textapp', 'f', ' ')
-    keys.doUvdat ('dsl3w', True)
-    opts = keys.process (argv)
+    ks = keys.KeySpec ()
+    ks.keyword ('interval', 'd', 1)
+    ks.mkeyword ('offset', 'd', 2)
+    ks.keyword ('textapp', 'f', ' ')
+    ks.uvdat ('dsl3w', True)
+    opts = ks.process (args)
 
     interval = opts.interval / (24. * 60.)
 
@@ -283,4 +281,4 @@ def task (argv):
 # Go
 
 if __name__ == '__main__':
-    sys.exit (task (sys.argv))
+    sys.exit (task ())

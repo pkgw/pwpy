@@ -61,11 +61,12 @@ import numpy as N
 SVNID = '$Id$'
 banner = printBannerSvn ('gpcat', 'print antenna gains tables', SVNID)
 
-keys.keyword ('vis', 'f', ' ')
-keys.keyword ('rank', 'i', 0)
-keys.keyword ('feed', 'i', 1)
-keys.option ('phase', 'delay')
-opts = keys.process ()
+ks = keys.KeySpec ()
+ks.keyword ('vis', 'f', ' ')
+ks.keyword ('rank', 'i', 0)
+ks.keyword ('feed', 'i', 1)
+ks.option ('phase', 'delay')
+opts = ks.process ()
 
 if opts.vis == ' ':
     print >>sys.stderr, 'Error: an input file must be given'

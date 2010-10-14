@@ -52,9 +52,10 @@ import numpy as N
 SVNID = '$Id$'
 banner = util.printBannerSvn ('fxcal', 'reimplementation of uvcal options=fxcal', SVNID)
 
-keys.keyword ('out', 'f', ' ')
-keys.doUvdat ('ds3', False)
-opts = keys.process ()
+ks = keys.KeySpec ()
+ks.keyword ('out', 'f', ' ')
+ks.uvdat ('ds3', False)
+opts = ks.process ()
 
 if opts.out == ' ':
     print >>sys.stderr, 'Error: must give an output filename'
@@ -110,7 +111,7 @@ lastTime = None
 autos = {}
 crosses = {}
 
-for dIn, preamble, data, flags, nread in uvdat.readAll ():
+for dIn, preamble, data, flags in uvdat.read ():
     anyChange = False
     
     if dIn is not curFile:
@@ -184,7 +185,6 @@ for dIn, preamble, data, flags, nread in uvdat.readAll ():
 
         anyChange = True
 
-    flags = flags[0:nread]
     pol = uvdat.getPol ()
 
     if not flags.any (): continue # skip all-flagged records
@@ -196,7 +196,6 @@ for dIn, preamble, data, flags, nread in uvdat.readAll ():
     
     time = preamble[3]
     bl = util.decodeBaseline (preamble[4])
-    data = data[0:nread]
 
     if not doneNPol:
         # If necessary, write out a new value for the

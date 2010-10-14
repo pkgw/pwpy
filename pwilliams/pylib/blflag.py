@@ -501,10 +501,10 @@ class IterFlagWorkFlow (object):
         
         print 'Reading', self.work, '...'
         ngot = 0
-        iter = self.work.readLowlevel (False, line='chan,1,1,%d' % self.nchan)
+        iter = self.work.readLowlevel ('w3', False, line='chan,1,1,%d' % self.nchan)
         
-        for inp, preamble, data, flags, nread in iter:
-            assert (nread == 1)
+        for inp, preamble, data, flags in iter:
+            assert data.size == 1
             if flags[0] == 0: continue
             ngot += 1
             bl = decodeBaseline (preamble[4])

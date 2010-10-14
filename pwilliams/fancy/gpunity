@@ -22,8 +22,9 @@ banner = printBannerSvn ('gpunity', 'keep delays but set gains to 1+0j', SVNID)
 
 # Get args and check for consistency.
 
-keys.keyword ('vis', 'f', ' ')
-opts = keys.process ()
+ks = keys.KeySpec ()
+ks.keyword ('vis', 'f', ' ')
+opts = ks.process ()
 
 if opts.vis == ' ':
     print >>sys.stderr, 'Error: an input file must be given'

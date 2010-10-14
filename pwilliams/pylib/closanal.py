@@ -545,9 +545,9 @@ class ClosureProcessor (object):
         
         # Go!
         
-        for (inp, preamble, data, flags, nread) in gen:
-            data = data[0:nread].copy ()
-            flags = flags[0:nread].copy ()
+        for inp, preamble, data, flags in gen:
+            data = data.copy ()
+            flags = flags.copy ()
 
             time = preamble[3]
             bp = util.mir2bp (inp, preamble)
@@ -593,10 +593,10 @@ class ClosureProcessor (object):
         for fa in fas: fa ()
 
     def readUVDat (self):
-        self._read (uvdat.readAll ())
+        self._read (uvdat.read ())
 
     def readVis (self, vis):
-        self._read (vis.readLowlevel (False))
+        self._read (vis.readLowlevel ('w3', False))
     
     def plotUVDs (self):
         import omega
@@ -627,18 +627,18 @@ class ClosureProcessor (object):
 
 # Task functionality
 
-def task (argv):
+def task (args):
     banner = util.printBannerSvn ('closanal', 'attempt to identify bad baselines based on '
                                   'closure quantities', SVNID)
 
-    keys.keyword ('interval', 'd', 10.)
-    keys.keyword ('nclos', 'i', 10)
-    keys.keyword ('nbl', 'i', 10)
-    keys.keyword ('nant', 'i', 10)
-    keys.option ('rmshist', 'best', 'uvdplot', 'blhist', 'amplitude', 'relative')
-    keys.doUvdat ('dsl3xw', True)
-
-    args = keys.process (argv)
+    ks = keys.KeySpec ()
+    ks.keyword ('interval', 'd', 10.)
+    ks.keyword ('nclos', 'i', 10)
+    ks.keyword ('nbl', 'i', 10)
+    ks.keyword ('nant', 'i', 10)
+    ks.option ('rmshist', 'best', 'uvdplot', 'blhist', 'amplitude', 'relative')
+    ks.uvdat ('dsl3xw', True)
+    args = ks.process (args)
 
     # Verify arguments
     
@@ -704,4 +704,4 @@ def task (argv):
 # Standalone task execution
 
 if __name__ == '__main__':
-    sys.exit (task (sys.argv))
+    sys.exit (task (sys.argv[1:]))

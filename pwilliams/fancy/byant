@@ -39,11 +39,12 @@ funcs = { 'uvdistance': (_uvd, False),
 
 # Process args
 
-keys.keyword ('only', 'i', -1)
-keys.keyword ('odest', 'a', ' ')
-keys.keymatch ('axis', 2, funcs.keys ())
-keys.doUvdat ('dsl3', True)
-opts = keys.process ()
+ks = keys.KeySpec ()
+ks.keyword ('only', 'i', -1)
+ks.keyword ('odest', 'a', ' ')
+ks.keymatch ('axis', 2, funcs.keys ())
+ks.uvdat ('dsl3', True)
+opts = ks.process ()
 
 if len (opts.axis) < 1:
     opts.axis.append ('uvdistance')
@@ -66,10 +67,10 @@ def _acc (ga, tup):
     
 byAp = AccDict (_cr, _acc)
 
-for dIn, p, d, f, n in uvdat.readAll ():
+for dIn, p, d, f in uvdat.read ():
     # Average down this visibility
 
-    w = N.where (f[0:n])
+    w = N.where (f)
     nok = len (w[0])
     if nok == 0: continue
 

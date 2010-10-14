@@ -26,12 +26,12 @@ for vname in sys.argv[1:]:
     vis = miriad.VisData (vname)
     print vname
 
-    g = vis.readLowlevel (False, select='-auto', line='chan,1,1,512')
+    g = vis.readLowlevel ('3', False, select='-auto', line='chan,1,1,512')
     src = None
     
-    for dIn, preamble, data, flags, nread in g:
+    for dIn, preamble, data, flags in g:
         if not flags.any (): continue # skip all-flagged records
-        assert (nread == 1)
+        assert data.size == 1
 
         if src is None:
             src = dIn.getVarFirstString ('source', 'unknown')

@@ -25,15 +25,15 @@ class AmpFlagsAccum (object):
         self.maxnchan = 0
 
     def _accum (self, tup):
-        inp, preamble, data, flags, nread = tup
+        inp, preamble, data, flags = tup
         inttime = inp.getVarFirstFloat ('inttime', 10.0)
 
-        self.maxnchan = max (self.maxnchan, nread)
+        self.maxnchan = max (self.maxnchan, flags.size)
 
-        data = N.abs (data[0:nread] * inttime)
-        times = N.zeros (nread) + inttime
+        data = N.abs (data * inttime)
+        times = N.zeros (flags.size) + inttime
 
-        w = N.where (flags[0:nread] == 0)
+        w = N.where (flags == 0)
         data[w] = 0.
         times[w] = 0.
 
@@ -51,7 +51,7 @@ class AmpFlagsAccum (object):
         #from mirtask.uvdat import getPol
         #thepol = None
         
-        for tup in dset.readLowlevel (False, nopass=True, nocal=True, nopol=True):
+        for tup in dset.readLowlevel ('w3', False, nopass=True, nocal=True, nopol=True):
             ant1, ant2 = decodeBaseline (tup[1][4])
             #pol = getPol ()
             

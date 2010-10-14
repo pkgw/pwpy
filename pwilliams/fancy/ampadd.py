@@ -46,9 +46,10 @@ import sys
 SVNID = '$Id$'
 banner = util.printBannerSvn ('ampadd', 'average UV amplitudes over everything but frequency', SVNID)
 
-keys.keyword ('log', 'f', ' ')
-keys.keyword ('vis', 'f', None, 64)
-keys.option ('show')
+ks = keys.KeySpec ()
+ks.keyword ('log', 'f', ' ')
+ks.mkeyword ('vis', 'f', 64)
+ks.option ('show')
 
 class AmpFlagsAccum (object):
     def __init__ (self):
@@ -58,14 +59,14 @@ class AmpFlagsAccum (object):
         self.data = self.flags = self.times = self.freq = self.sfreq = None
 
     def _accum (self, tup):
-        inp, preamble, data, flags, nread = tup
+        inp, preamble, data, flags = tup
         inttime = inp.getVarFirstFloat ('inttime', 10.0)
         
-        data = N.abs (data[0:nread] * inttime)
-        times = N.ndarray (nread)
+        data = N.abs (data * inttime)
+        times = N.ndarray (data.size)
         times.fill (inttime)
 
-        w = N.where (flags[0:nread] == 0)
+        w = N.where (flags == 0)
         data[w] = 0.
         times[w] = 0.
 
@@ -81,7 +82,7 @@ class AmpFlagsAccum (object):
         #thepol = None
         first = True
         
-        for tup in dset.readLowlevel (False, nopass=True, nocal=True, nopol=True):
+        for tup in dset.readLowlevel ('w3', False, nopass=True, nocal=True, nopol=True):
             if first:
                 # Read in freq and half
                 first = False
@@ -120,7 +121,7 @@ class AmpFlagsAccum (object):
         self.y = self.data[w] / self.times[w]
 
 afa = AmpFlagsAccum ()
-args = keys.process ()
+args = ks.process ()
 
 if len (args.vis) < 1:
     print >>sys.stderr, 'Error: No input datasets specified!'

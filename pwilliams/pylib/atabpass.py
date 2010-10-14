@@ -55,12 +55,13 @@ def getData ():
     return biga
 
 
-def task ():
+def task (args):
     banner = util.printBannerSvn ('atabpass', 'correct for ATA digital filter bandpass', SVNID)
 
-    keys.keyword ('out', 'f', ' ')
-    keys.doUvdat ('ds3', False)
-    opts = keys.process ()
+    ks = keys.KeySpec ()
+    ks.keyword ('out', 'f', ' ')
+    ks.uvdat ('ds3', False)
+    opts = ks.process (args)
 
     if opts.out == ' ':
         print >>sys.stderr, 'Error: must give an output filename'
@@ -82,7 +83,7 @@ def task ():
     windowVars = ['ischan', 'nschan', 'nspect', 'restfreq',
                   'sdf', 'sfreq', 'systemp', 'xtsys', 'ytsys']
 
-    for dIn, preamble, data, flags, nread in uvdat.readAll ():
+    for dIn, preamble, data, flags in uvdat.read ():
         anyChange = False
     
         if dIn is not curFile:
@@ -157,8 +158,6 @@ def task ():
 
             anyChange = True
 
-        data = data[0:nread]
-        flags = flags[0:nread]
         pol = uvdat.getPol ()
 
         if not doneNPol:
@@ -204,4 +203,4 @@ def task ():
     return 0
 
 if __name__ == '__main__':
-    sys.exit (task ())
+    sys.exit (task (sys.argv[1:]))

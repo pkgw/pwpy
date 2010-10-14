@@ -137,17 +137,17 @@ def merge (name1, ds1, name2, ds2, outset, banner, ttol):
     outset.closeHistory ()
 
 
-def task (argv):
+def task (args):
     banner = printBannerSvn ('gpmergepols', 'merge gains table for multi-pol data',
                              SVNID)
 
     # Args
-    keys.init (argv)
-    keys.keyword ('vis', 'f', ' ', 2)
-    keys.keyword ('out', 'f', ' ')
-    keys.keyword ('ttol', 'd', DEFAULT_TTOL * 86400)
-    keys.option ('replace')
-    opts = keys.process ()
+    ks = keys.KeySpec ()
+    ks.mkeyword ('vis', 'f', 2)
+    ks.keyword ('out', 'f', ' ')
+    ks.keyword ('ttol', 'd', DEFAULT_TTOL * 86400)
+    ks.option ('replace')
+    opts = ks.process (args)
 
     if len (opts.vis) != 2:
         print >>sys.stderr, 'Error: must specify two input vis or gains files'
@@ -184,4 +184,4 @@ def task (argv):
 
 
 if __name__ == '__main__':
-    sys.exit (task (sys.argv))
+    sys.exit (task (sys.argv[1:]))
