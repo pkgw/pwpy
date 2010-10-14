@@ -14,27 +14,35 @@ import omega
 from numutils import ArrayGrower, AccDict
 from mirtask import uvdat, keys, util
 
-# The things we can plot
+# The things we can plot. I believe that Python lambda functions
+# have smaller invocation overheads than full-fledged functions,
+# so use those whenever possible for speed.
 
-def _uvd (inp, preamble, datum):
-    return 0.001 * N.sqrt (preamble[0]**2 + preamble[1]**2)
+_uvd = lambda inp, preamble, datum: \
+    0.001 * N.sqrt (preamble[0]**2 + preamble[1]**2)
 
-def _ti (inp, preamble, datum):
-    return preamble[3]
+_ti = lambda inp, preamble, datum: preamble[3]
 
-def _ph (theant, otherant, inp, preamble, datum):
-    return N.arctan2 (datum.imag, datum.real) * 180 / N.pi
+_dtime = lambda inp, preamble, datum: ((preamble[3] - 0.5) % 1.0) * 24
 
-def _amp (inp, preamble, datum):
-    return N.abs (datum)
+_ph = lambda theant, otherant, inp, preamble, datum: \
+    N.arctan2 (datum.imag, datum.real) * 180 / N.pi
 
-def _partner (theant, otherant, inp, preamble, datum):
-    return otherant
+_amp = lambda inp, preamble, datum: N.abs (datum)
+
+_re = lambda inp, preamble, datum: datum.real
+
+_im = lambda theant, otherant, inp, preamble, datum: datum.imag
+
+_partner = lambda theant, otherant, inp, preamble, datum: otherant
 
 funcs = { 'uvdistance': (_uvd, False),
           'phase': (_ph, True), # antdep because BL ordering affects sign
           'amplitude': (_amp, False),
+          'real': (_re, False),
+          'imaginary': (_im, True), # same as phase
           'time': (_ti, False),
+          'dtime': (_dtime, False),
           'partner': (_partner, True) }
 
 # Process args
