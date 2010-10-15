@@ -79,8 +79,13 @@ endif
 
 if ($tstart != none) then
     foreach vis (vis00 $rest)
-	echo uvflag flagval=f select="-time($tstart,$tend)" vis=$vis
-	uvflag flagval=f select="-time($tstart,$tend)" vis=$vis
+	if (-f $vis/hexflag) then
+	    echo "Dataset $vis already flagged for time bounds"
+	else
+	    echo uvflag flagval=f select="-time($tstart,$tend)" vis=$vis
+	    uvflag flagval=f select="-time($tstart,$tend)" vis=$vis
+	    touch $vis/hexflag
+	endif
     end
 endif
 
