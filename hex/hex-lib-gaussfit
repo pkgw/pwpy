@@ -97,6 +97,11 @@ for analysisdir in sys.argv[1:]:
         if key not in gains: gains[key] = []
         gains[key] += amps
 
+    def floatornan (s):
+        if s == '-':
+            return N.NaN
+        return float (s)
+
     for l in file (errsfn, 'r'):
         a = l.strip ().split ()
 
@@ -115,7 +120,7 @@ for analysisdir in sys.argv[1:]:
         key = (ant, pol)
 
         # FIXME: can have '-' for no gain solution for a pointing
-        errs = map (float, a[3:])
+        errs = map (floatornan, a[3:])
 
         # TODO: do something with the phases
         if key not in guncerts: guncerts[key] = []
@@ -196,8 +201,20 @@ for ((ant, pol), gamps) in gains.iteritems ():
     fitdata[(ant, pol)] = f
 
     gamps = N.asarray (gamps)
+    gerrs = N.asarray (guncerts[(ant, pol)])
+
+    # Check for failed solutions
+    nogood = N.where (~N.isfinite (gerrs))
+    if not N.all (gamps[nogood] == 0.):
+        print 'Warning: some error solutions failed while gains succeeded'
+    good = N.where (N.isfinite (gerrs))
+    if N.any (gamps[good] == 0.):
+        print 'Warning: some gains are zero while errors are finite'
+    gamps = gamps[good]
+    gerrs = gerrs[good]
+
     f.amps = gamps**-2 # gain -> sensitivity
-    f.gerrs = (N.asarray (guncerts[(ant, pol)]) * 2 / gamps**3)
+    f.gerrs = (N.asarray (gerrs) * 2 / gamps**3)
     f.ant = ant
     f.pol = pol
 
@@ -220,6 +237,9 @@ for ((ant, pol), gamps) in gains.iteritems ():
         idxarr = N.asarray (idxarr)
         antxs = xs[idxarr]
         antys = ys[idxarr]
+
+    antxs = antxs[good]
+    antys = antys[good]
 
     f.npts = antxs.size
     
