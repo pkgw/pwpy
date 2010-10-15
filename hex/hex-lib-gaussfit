@@ -106,7 +106,7 @@ for analysisdir in sys.argv[1:]:
         a = l.strip ().split ()
 
         if len (a) != 3 + thisn:
-            print >>sys.stderr, 'Error: unexpected number of entries in', gainsfn, ':', \
+            print >>sys.stderr, 'Error: unexpected number of entries in', errsfn, ':', \
                   len (a), 'not', 3 + thisn
             sys.exit (1)
 

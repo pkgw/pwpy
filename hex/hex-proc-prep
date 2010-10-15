@@ -243,11 +243,12 @@ if (! -f data-relgainerrs.txt) then
 
 	if ($%polvis == 0) then
 	    echo "Warning: pointing $vis entirely flagged"
-	    continue
+	    touch gainerrs/$vis.rel
+	else
+	    hex-lib-calcgainerr $polvis $flux $oras[$i] $odecs[$i] gainerrs/$vis.rel
+	    if ($status) exit $status
 	endif
 
-	hex-lib-calcgainerr $polvis $flux $oras[$i] $odecs[$i] gainerrs/$vis.rel
-	if ($status) exit $status
 	set gefiles = ($gefiles gainerrs/$vis.rel)
 	@ i = $i + 1
     end
