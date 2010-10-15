@@ -95,7 +95,10 @@ endif
 
 if (! -f data-offsets.txt) then
     hex-lib-calcoffsets $tstart $tend vis00 $rest >data-offsets.txt
-    if ($status) exit $status
+    if ($status) then
+	rm -f data-offsets.txt
+	exit 1
+    endif
 endif
 
 set oras = (`cut -d' ' -f1 <data-offsets.txt |awk '{print $1 * -206265}'`)
@@ -122,7 +125,7 @@ end
 
 # Calibrate the on-source pointing
 
-if (-d vis00/gains.xxp) then
+if (-f vis00/hexcced) then
     echo "Primary pointing dataset vis00 has already been calibrated"
 else
     echo "Calibrating primary pointing dataset vis00"
@@ -131,6 +134,7 @@ else
     if ($status) exit $status
     echo "<<<<<<<<<<<<<<<<<<<<"
     cp vis00/gains vis00/gains.orig
+    touch vis00/hexcced
 endif
 
 # If all of one pol are flagged, the dataset will have nfeed=1, not
@@ -212,7 +216,10 @@ endif
 
 if (! -f data-relgains.txt) then
     hex-lib-extractgains -s -m vis00 $rest >data-relgains.txt
-    if ($status) exit $status
+    if ($status) then
+	rm -f data-relgains.txt
+	exit 1
+    endif
 endif
 
 if (! -f data-relgainerrs.txt) then
@@ -239,19 +246,28 @@ if (! -f data-relgainerrs.txt) then
     end
 
     hex-lib-mergegainerrtables $gefiles >data-relgainerrs.txt
-    if ($status) exit $status
+    if ($status) then
+	rm -f data-relgainerrs.txt
+	exit 1
+    endif
 endif
     
 # Extract absolute antenna gains at the pointing center and uncerts
 
 if (! -f data-absgains.txt) then
     hex-lib-extractgains -j vis00 >data-absgains.txt
-    if ($status) exit $status
+    if ($status) then
+	rm -f data-absgains.txt
+	exit 1
+    endif
 endif
 
 if (! -f data-absgainerrs.txt) then
     hex-lib-calcgainerr vis00 $flux 0 0 data-absgainerrs.txt
-    if ($status) exit $status
+    if ($status) then
+	rm -f data-absgainerrs.txt
+	exit 1
+    endif
 endif
 
 # TODO: extract closure information of primary pointing.
