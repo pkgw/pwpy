@@ -9,7 +9,7 @@ startt=`date +%s`
 
 ## User parameters ##
 bgints=2  # size of background region to subtract mean emission
-ints=20000   # number of integrations to use
+ints=18000   # number of integrations to use
 skipint=0
 binsize=1.0 # size of integration in seconds (why?)
 interval=`echo 'scale=5; '${binsize}'*2/60' | bc`  # set this to assure at least two averaged bins in bg
@@ -19,8 +19,8 @@ bgsub=0   # do bgsub technique
 #suffix='0.15'-${startt}
 #visroot='fxmir-m82-0.15'
 #outroot='m82-bgsub-'${suffix}
-suffix='0.2-4'-${startt}
-visroot='fxmir-m82-02-4'
+suffix='0.2-5'-${startt}
+visroot='fxmir-m82-02-5'
 outroot='m82-nosub-'${suffix}
 cleanup=1
 

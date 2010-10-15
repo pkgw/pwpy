@@ -12,13 +12,13 @@ set visroot=$1   # input file name
 set log=${1}.log  # output log file
 set chans=50  # channels per frequency chunk;  each is calibrated independently
 set combine=0  # optionally can combine gain (not leakage) cal with other files to extend in time
-#set leakcal='/big_scr2/claw/data/ata/polcal/oct2010/mosfxc-3c138.uvaver.uvcal.uvredo'  # optionally can apply leakages from other files;  sometimes useful for helping the fit converge
-set leakcal=''  # optionally can apply leakages from other files;  sometimes useful for helping the fit converge
+set leakcal='/big_scr2/claw/data/ata/polcal/oct2010/mosfxc-3c138.uvaver.uvcal.uvredo'  # optionally can apply leakages from other files;  sometimes useful for helping the fit converge  **may fail when filename is long?**
+#set leakcal=''  # optionally can apply leakages from other files;  sometimes useful for helping the fit converge
 set leaks=0   # optionally can output leakage text files
 
 # Filters for data;  useful to remove bad antennas
-set antsel=''
-#set antsel=select=ant'('1,4,8,11,12,16,25,33,36,37,41')('1,4,8,11,12,16,25,33,36,37,41')' # smaller leak in polcal2.uvaver.high
+#set antsel=''
+set antsel=select=ant'('1,4,8,11,12,16,25,33,36,37,41')('1,4,8,11,12,16,25,33,36,37,41')'
 #set antsel=select=ant'('1,4,5,6,7,8,10,11,12,13,14,33,37')('1,4,5,6,7,8,10,11,12,13,14,33,37')' # smaller leak in polcal2.uvaver.high
 #set antsel='select=-ant(5,6,10,11,42)'  # removes 1800 day2,3 large leaks
 #set antsel='select=-ant(5,8,16,26,42)'  # removes 1000 day2,3 large leaks
@@ -91,7 +91,8 @@ foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16)
     else
 	echo 'Copying leakage calbration from '${leakcal} | tee -ia $log
 	mfcal vis=${visroot}-${piece} refant=${refant} interval=60 tol=0.00001 | tee -ia $log
-	gpcopy vis=${leakcal}-${piece} out=${visroot}-${piece} options=nopass,nocal | tee -ia $log # this works for 1800 xfer
+#	cp ${leakcal}-${piece}/leakage ${visroot}-${piece}/
+	gpcopy vis=${leakcal}-${piece} out=${visroot}-${piece} options=nopass,nocal | tee -ia $log # this works for 1800 xfer  **OR NOT?!**  long filename problem?!
 	set xyphases = `grep GPCAL ${leakcal}-${piece}/history | grep Xyphase | tail -n 7 | cut -c 25- | gawk '{printf("%s,%s,%s,%s,%s,%s,%s,",$1,$2,$3,$4,$5,$6,$7)}'`
 	echo $xyphases | tee -ia $log
 #	gpcal vis=${visroot}-${piece} refant=${refant} options=nopol,xyref interval=90 tol=0.00001 xyphase=$xyphases # this works for 1800 xfer

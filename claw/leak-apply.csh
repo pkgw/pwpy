@@ -16,7 +16,8 @@ set combine=0
 #set antsel='select=-ant(5,6,10,11,42)'  # removes 1800 day2,3 large leaks
 #set antsel='select=-ant(5,42)'  # removes 2010 day2 large leaks
 #set antsel='select=-ant(6)'  # removes 1430 day1 large leak
-set antsel=''
+set antsel=select=ant'('1,4,8,11,12,16,25,33,36,37,41')('1,4,8,11,12,16,25,33,36,37,41')'  # good polcal list
+#set antsel=''
 #set refant=16
 
 if $#argv == 0 then
@@ -30,7 +31,7 @@ endif
 
 echo 'Applying calibration to file '${apply}
 rm -rf tmp-${apply}-tmp
-#uvaver vis=${apply} out=tmp-${apply}-tmp interval=0.001 options=nopol,nocal,nopass $antsel
+uvaver vis=${apply} out=tmp-${apply}-tmp interval=0.001 options=nopol,nocal,nopass $antsel
 
 # loop over frequency chunks
 #foreach piece (1 2 3 4 5 6 7 8)
@@ -43,7 +44,7 @@ foreach piece (1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16)
     set startchan = `echo '100 + '${chans}' * ('${piece}'-1)' | bc`
 
     # reorder data to keep pol data in order expected by other tools.  also split in frequency
-#    uvaver vis=tmp-${apply}-tmp out=${apply}-${piece} line=ch,${chans},${startchan},1,1 interval=0.001 options=nopol,nocal,nopass
+    uvaver vis=tmp-${apply}-tmp out=${apply}-${piece} line=ch,${chans},${startchan},1,1 interval=0.001 options=nopol,nocal,nopass
 
     # copy 3c286 cal to source.  apply extended cal if it exists.
     if $combine == 1 then
