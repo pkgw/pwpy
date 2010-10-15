@@ -9,6 +9,9 @@ import numpy as N
 import miriad
 from mirtask import readgains
 
+missingok = '-m' in sys.argv
+if missingok:
+    sys.argv.remove ('-m')
 
 if sys.argv[1] == '-s':
     # Split mode
@@ -34,7 +37,14 @@ def readSplit (i, filebase):
 
     for pol in 'xy':
         fn = filebase + '.' + pol
-        vis = miriad.VisData (fn).open ('rw')
+        vis = miriad.VisData (fn)
+        if not vis.exists:
+            if missingok:
+                continue
+            print >>sys.stderr, 'Error: input dataset', fn, 'does not exist'
+            sys.exit (1)
+
+        vis = vis.open ('rw')
         gr = readgains.GainsReader (vis)
         gr.prep ()
 
@@ -69,7 +79,14 @@ def readSplit (i, filebase):
 def readJoined (i, fn):
     global nants
 
-    vis = miriad.VisData (fn).open ('rw')
+    vis = miriad.VisData (fn)
+    if not vis.exists:
+        if missingok:
+            return
+        print >>sys.stderr, 'Error: input dataset', fn, 'does not exist'
+        sys.exit (1)
+
+    vis = vis.open ('rw')
     gr = readgains.GainsReader (vis)
     gr.prep ()
 
