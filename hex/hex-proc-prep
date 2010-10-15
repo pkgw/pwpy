@@ -5,7 +5,7 @@
 
 #set echo = 1
 set newrfiflags = "subint=1"
-set calcalflags = "options=sefd,autoref"
+set calcalflags = "options=sefd"
 set selfcalflags = "options=amp,nosc refant=11 interval=999"
 
 # Make sure the shell environment is set up
