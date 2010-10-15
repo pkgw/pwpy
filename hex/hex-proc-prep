@@ -128,6 +128,13 @@ else
     cp vis00/gains vis00/gains.orig
 endif
 
+# If all of one pol are flagged, the dataset will have nfeed=1, not
+# nfeed=2, which confuses some of the gains-manipulating tools
+# downstream. Patch this up, using metadata from RAPID to figure out
+# which feed is the one that was retained.
+hex-lib-2feedgains vis00
+if ($status) exit $status
+
 if (! -f data-calrpt.txt) then
     # TODO: we could crack the calrpt in the same way that we
     # crack the image report. I'm not quite sure why the calrpt
@@ -161,19 +168,27 @@ set i = 1
 
 foreach vis (vis00 $rest)
     foreach p (x y)
-	if (-d $vis.$p) then
-	    echo "Rough-calibrated dataset $vis.$p exists"
+	if (-d $vis.$p || -f $vis.$p.wasempty) then
+	    echo "Rough-calibrated dataset $vis.$p exists or was found to be empty"
 	 else
 	    uvcat options=unflagged select="pol($p$p),-auto" vis=$vis out=$vis.$p
 	    if ($status) exit $status
+
+	    if (`gethd in=$vis.$p/ncorr` == 0) then
+		echo "Dataset $vis.$p was empty; removing and remembering"
+		rm -rf $vis.$p
+		touch $vis.$p.wasempty
+	    endif
 	endif
 
-	if (-f $vis.$p/gains) then
-	    echo "Dataset $vis.$p already self-caled"
-	else
-	    set offset = ${oras[$i]},${odecs[$i]}
-	    selfcal vis=$vis.$p flux=$flux offset=$offset $selfcalflags |tee selfcal-logs/$vis.$p
-	    if ($status) exit $status
+	if (-d $vis.$p) then
+	    if (-f $vis.$p/gains) then
+		echo "Dataset $vis.$p already self-caled"
+	    else
+		set offset = ${oras[$i]},${odecs[$i]}
+		selfcal vis=$vis.$p flux=$flux offset=$offset $selfcalflags |tee selfcal-logs/$vis.$p
+		if ($status) exit $status
+	    endif
 	endif
     end
 
@@ -191,7 +206,7 @@ endif
 # Extract antenna gains normalized to 1 at pointing center and uncerts
 
 if (! -f data-relgains.txt) then
-    hex-lib-extractgains -s vis00 $rest >data-relgains.txt
+    hex-lib-extractgains -s -m vis00 $rest >data-relgains.txt
     if ($status) exit $status
 endif
 
@@ -204,7 +219,15 @@ if (! -f data-relgainerrs.txt) then
     mkdir -p gainerrs
 
     foreach vis (vis00 $rest)
-	hex-lib-calcgainerr $vis.x $vis.y $flux $oras[$i] $odecs[$i] gainerrs/$vis.rel
+	set polvis = ""
+	if (-d $vis.x) set polvis = $vis.x
+	if (-d $vis.y) set polvis = "$polvis $vis.y"
+	if ($%polvis == 0) then
+	    echo "Error: pointing $vis entirely flagged"
+	    exit 1
+	endif
+
+	hex-lib-calcgainerr $polvis $flux $oras[$i] $odecs[$i] gainerrs/$vis.rel
 	if ($status) exit $status
 	set gefiles = ($gefiles gainerrs/$vis.rel)
 	@ i = $i + 1

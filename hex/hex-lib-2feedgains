@@ -1,0 +1,140 @@
+#! /usr/bin/env python
+# -*- python -*-
+#
+# Ensure that the given dataset has a two-feed gains table. If the gains table
+# is for a single feed, we used some metadata from the RAPID reduction to
+# figure out which pol those gains are for and add in zero gains for the other pol.
+
+import numpy as N
+
+
+def die (format, *args):
+    raise SystemExit ('Error: ' + (format % args))
+
+
+def ensureTwoFeeds (vis):
+    from mirtask.readgains import GainsReader, readBandpass
+
+    handle = vis.open ('rw')
+    gr = GainsReader (handle)
+    gr.prep ()
+
+    if gr.nfeeds == 2:
+        gr.gitem.close ()
+        handle.close ()
+        return
+
+    if gr.nfeeds != 1:
+        gr.gitem.close ()
+        handle.close ()
+        die ('expected exactly 1 or 2 feeds in %s; got %d', vis, gr.nfeeds)
+
+    times, gains = gr.readAll ()
+
+    # If there's a bandpass, we'll need to touch it up too.
+
+    dobp = handle.hasItem ('bandpass')
+
+    if dobp:
+        nschans, freqs, bp = readBandpass (handle)
+        nbpants = bp.shape[0]
+        nchan = bp.shape[2]
+
+    # Now we need to figure out which feed the gains are for.
+
+    try:
+        retmap = open (vis.path ('retmap'))
+    except StandardError, e:
+        die ('need, but failed to open, %s: %s', vis.path ('retmap'), e)
+
+    seenany = set ()
+
+    for line in retmap:
+        if line[0] == '#':
+            continue
+        a = line.strip ().split ()
+        pol = a[0].split ('-')[-1]
+        nret = int (a[-1])
+
+        if nret > 0:
+            seenany.add (pol)
+
+    if len (seenany) > 1:
+        die ('must have only one retained pol in %s; saw %s', vis, ', '.join (seenany))
+    if len (seenany) == 0:
+        die ('no retained data in %s?!', vis)
+
+    thepol = list (seenany)[0][0].lower ()
+
+    if thepol == 'x':
+        polofs = 0
+    elif thepol == 'y':
+        polofs = 1
+    else:
+        die ('tried to guess gain polarization in %s; got %s', vis, thepol)
+
+    # Compute our new gains array ... There's probably a crafty way to
+    # vectorize the data copying, but these are small arrays.
+
+    nsol, ngains = gains.shape
+    ntau = gr.ntau
+    nants = gr.nants
+
+    newngains = (ntau + 2) * nants
+    newgains = N.zeros ((nsol, newngains), dtype=N.complex64)
+
+    for solnum in xrange (nsol):
+        for antnum in xrange (nants):
+            oldofs = (ntau + 1) * antnum
+            newofs = (ntau + 2) * antnum
+            newgains[solnum,newofs + polofs] = gains[solnum,oldofs]
+
+            if ntau > 0:
+                newgains[solnum,newofs + 2] = gains[solnum,oldofs + 1]
+
+    # Now, rewrite the gains
+
+    handle.writeHeaderInt ('ngains', newngains)
+    handle.writeHeaderInt ('nfeeds', 2)
+
+    gitem = handle.getItem ('gains', 'w')
+    offset = 8
+    
+    for solnum in xrange (nsol):
+        gitem.writeDoubles (times[solnum:], offset, 1)
+        offset += 8
+        gitem.writeComplex (newgains[solnum,:], offset, newngains)
+        offset += 8 * newngains
+
+    gitem.close ()
+
+    # Finally, bandpass stuff.
+
+    if dobp:
+        newbp = N.zeros ((nbpants, 2, nchan), dtype=N.complex64)
+        newbp[:,polofs,:] = bp[:,0,:]
+
+        bpitem = handle.getItem ('bandpass', 'w')
+        bpitem.writeComplex (newbp, 8)
+        bpitem.close ()
+
+    handle.close ()
+
+
+def program (argv):
+    from miriad import VisData
+
+    if len (argv) != 2:
+        raise SystemExit ('Usage: %s <vis dataset>' % argv[0])
+
+    vis = VisData (argv[1])
+
+    if not vis.exists:
+        die ('visibility dataset %s does not exist', vis)
+
+    ensureTwoFeeds (vis)
+
+
+if __name__ == '__main__':
+    import sys
+    program (sys.argv)
