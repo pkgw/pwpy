@@ -25,6 +25,8 @@ from miriad import *
 from mirtask import readgains, util
 
 
+ONE_DUAL, TWO_SINGLE, ONE_SINGLE = range (3)
+
 # Arguments
 
 if len (sys.argv) < 6:
@@ -38,11 +40,22 @@ if not vis1.exists:
     sys.exit (1)
 
 if len (sys.argv) == 6:
-    join = False
+    h = vis1.open ('rw')
+    nfeeds = h.getHeaderInt ('nfeeds', 0)
+    h.close ()
+
+    if nfeeds == 1:
+        mode = ONE_SINGLE
+    elif nfeeds == 2:
+        mode = ONE_DUAL
+    else:
+        print >>sys.stderr, 'Error: weird nfeeds', nfeeds, 'for input', vis1
+        sys.exit (1)
+    
     ofs = 2
     vis2 = None
 elif len (sys.argv) == 7:
-    join = True
+    mode = TWO_SINGLE
     ofs = 3
     vis2 = VisData (sys.argv[2])
 
@@ -164,7 +177,7 @@ def readdata (vis, nants, blinfo, expectdualpol):
 
     return thepol
 
-if not join:
+if mode == ONE_DUAL:
     nants, gains = readvisgains (vis1, True)
     newgains = N.zeros ((2, nants), dtype=N.complex)
     newgains[0] = gains[::2]
@@ -174,7 +187,22 @@ if not join:
     nbl = nants * (nants - 1) / 2
     blinfo = N.zeros ((2, nbl, 4))
     readdata (vis1, nants, blinfo, True)
-else:
+elif mode == ONE_SINGLE:
+    nants, tmpgains = readvisgains (vis1, False)
+    gains = N.zeros ((2, nants), dtype=N.complex)
+    nbl = nants * (nants - 1) / 2
+    blinfo = N.zeros ((2, nbl, 4))
+    pol = readdata (vis1, nants, blinfo[0], False)
+
+    if pol == util.POL_XX:
+        gains[0] = tmpgains
+    elif pol == util.POL_YY:
+        gains[1] = tmpgains
+        blinfo[1] = blinfo[0]
+        blinfo[0].fill (0)
+    else:
+        raise SystemExit ('Error: expected XX or YY pols in dataset')
+elif mode == TWO_SINGLE:
     nants1, gains1 = readvisgains (vis1, False)
     nants2, gains2 = readvisgains (vis2, False)
     nants = max (nants1, nants2)
@@ -451,6 +479,10 @@ def fit (blinfo, gains, flux, **kwargs):
 def processone (pidx, blinfo, gains, dtable, flux):
     blinfo = blinfo[pidx]
     gains = gains[pidx]
+
+    if not N.any (N.isfinite (blinfo[:,0])):
+        print 'No valid data for %c fit.' % ('XY'[pidx], )
+        return
 
     print 'Running %c fit ...' % ('XY'[pidx], )
     squeeze, params, uncerts, resids, rchisq, cov = fit (blinfo, gains, flux)
