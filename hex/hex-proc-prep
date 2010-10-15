@@ -195,8 +195,12 @@ foreach vis (vis00 $rest)
 		echo "Dataset $vis.$p already self-caled"
 	    else
 		set offset = ${oras[$i]},${odecs[$i]}
-		selfcal vis=$vis.$p flux=$flux offset=$offset $selfcalflags |tee selfcal-logs/$vis.$p
-		if ($status) exit $status
+		selfcal vis=$vis.$p flux=$flux offset=$offset $selfcalflags |& tee selfcal-logs/$vis.$p
+		if ($status) then
+		    echo "Selfcal for dataset $vis.$p failed; removing and logging"
+		    rm -rf $vis.$p
+		    touch $vis.$p.selfcalfailed
+		endif
 	    endif
 	endif
     end
@@ -232,11 +236,14 @@ if (! -f data-relgainerrs.txt) then
 
     foreach vis (vis00 $rest)
 	set polvis = ""
-	if (-d $vis.x) set polvis = $vis.x
-	if (-d $vis.y) set polvis = "$polvis $vis.y"
+
+	foreach p (x y) 
+	    if (-d $vis.$p) set polvis = "$polvis $vis.$p"
+	end
+
 	if ($%polvis == 0) then
-	    echo "Error: pointing $vis entirely flagged"
-	    exit 1
+	    echo "Warning: pointing $vis entirely flagged"
+	    continue
 	endif
 
 	hex-lib-calcgainerr $polvis $flux $oras[$i] $odecs[$i] gainerrs/$vis.rel
