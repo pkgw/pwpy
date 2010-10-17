@@ -12,3 +12,7 @@ else
 endif
 
 hex-lib-gaussfit $analysisdir >$analysisdir/data-gaussfits.txt
+if ($status) then
+    rm -f $analysisdir/data-gaussfits.txt
+    exit 1
+endif
