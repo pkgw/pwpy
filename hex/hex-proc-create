@@ -73,6 +73,12 @@ if (-f $1 && $#argv == 2) then
 	echo "Warning: this hex run didn't include all of the scans that "
 	echo "  it should have. There may not be enough data to analyze."
     endif
+
+    # If the summary file is in the archive, copy its location as a unique
+    # identifier.
+    if ($1 =~ /ataarchive/*) then
+	echo "$1" >$workdir/data-archsummpath.txt
+    endif
 else
     set tstart = none
     set tend = none
