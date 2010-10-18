@@ -206,10 +206,10 @@ for ((ant, pol), gamps) in gains.iteritems ():
     # Check for failed solutions
     nogood = N.where (~N.isfinite (gerrs))
     if not N.all (gamps[nogood] == 0.):
-        print 'Warning: some error solutions failed while gains succeeded'
+        print >>sys.stderr, 'Warning: some error solutions failed while gains succeeded'
     good = N.where (N.isfinite (gerrs))
     if N.any (gamps[good] == 0.):
-        print 'Warning: some gains are zero while errors are finite'
+        print >>sys.stderr, 'Warning: some gains are zero while errors are finite'
     gamps = gamps[good]
     gerrs = gerrs[good]
 
@@ -244,7 +244,7 @@ for ((ant, pol), gamps) in gains.iteritems ():
     f.npts = antxs.size
     
     if f.npts < 6:
-        print 'Warning: antpol %d%s has too few (%d) points to fit (need 6)' \
+        print >>sys.stderr, 'Warning: antpol %d%s has too few (%d) points to fit (need 6)' \
               % (ant, pol, f.npts)
         f.failed = True
         continue
