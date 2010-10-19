@@ -321,15 +321,15 @@ def fit (blinfo, gains, flux, **kwargs):
                 lastsqidx = sqj
                 lastsqant = j
 
-        if N.abs (gains[i].imag) < 1e-7:
-            # Skip ants without gain solutions
-            if N.abs (gains[i].real) > 1e-8:
-                if refant is None:
+        if N.abs (gains[i].imag) < 1e-7 and N.abs (gains[i].real) > 1e-8:
+            # Looks like a refant (not a flagged ant)
+            if refant is None:
+                refant = i
+            else:
+                print >>sys.stderr, 'Warning: at least two apparent refants, %d and %d' \
+                      % (refant + 1, i + 1)
+                if N.abs (gains[i].imag) < N.abs (gains[refant].imag):
                     refant = i
-                elif refant is not None:
-                    print 'Previous refant:', refant, gains[refant].real, gains[refant].imag
-                    print 'New refant :-( :', i, gains[i].real, gains[i].imag
-                    raise Exception ('Two refants?')
 
     if refant is None:
         raise Exception ('Couldn\'t find refant')
