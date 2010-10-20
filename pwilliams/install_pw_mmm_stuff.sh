@@ -39,6 +39,7 @@ fancy/amprfi
 fancy/applytsys
 fancy/atabpass
 fancy/ataglue.py
+fancy/atanudgetime
 fancy/box-fitpoint
 fancy/box-overlay
 fancy/box-region
