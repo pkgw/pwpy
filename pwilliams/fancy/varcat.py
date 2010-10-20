@@ -49,6 +49,8 @@
  'pol'        The variable is treated as a FITS-encoded polarization
               number and is formatted as the string representation of
               that polarization: XX, RL, etc.
+ 'precise'    The values is printed out as a floating-point number
+              with 18 decimal places of precision.
  '' (blank)   The most appropriate formatting style for the variable is
               used. For the UV variable "time", this is "time"; for
               "baseline", it is "baseline"; for "pol", it is "pol";
@@ -69,6 +71,9 @@
 < stokes
 
 < line
+
+@ width
+ The width of each output column, in characters. Default is 20.
 
 @ options
  Multiple options can be specified, separated by commas, and
@@ -94,6 +99,7 @@ ks.mkeyword ('vars', 'a', 64)
 ks.mkeyword ('context', 'a', 64)
 ks.mkeyword ('format', 'a', 64)
 ks.mkeyword ('cformat', 'a', 64)
+ks.keyword ('width', 'i', 20)
 ks.uvdat ('dsl3', True)
 opts = ks.process ()
 
@@ -127,6 +133,7 @@ formatters = {
     'time': mirtask.util.jdToFull,
     'baseline': fBaseline,
     'pol': mirtask.util.polarizationName,
+    'precise': lambda v: '%.18e' % (v, ),
     'default': str
     }
 
@@ -140,7 +147,7 @@ autoFormat = {
 
 s = ''
 for v in opts.context + opts.vars:
-    s += v.ljust (20)
+    s += v.ljust (opts.width)
 print s
 
 # Print the variables!
@@ -205,8 +212,8 @@ for dIn, p, d, f in uvdat.read ():
         else:
             f = formatter (get ()[1])
 
-        if len (f) < 20:
-            s += f.ljust (20)
+        if len (f) < opts.width:
+            s += f.ljust (opts.width)
         else:
             s += '%s... ' % (f[0:16])
 
