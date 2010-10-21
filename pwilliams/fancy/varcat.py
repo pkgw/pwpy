@@ -91,8 +91,7 @@
 import sys
 import mirtask
 from mirtask import uvdat, keys
-
-#print 'varcat'
+from mirtask.util import die
 
 ks = keys.KeySpec ()
 ks.mkeyword ('vars', 'a', 64)
@@ -104,22 +103,20 @@ ks.uvdat ('dsl3', True)
 opts = ks.process ()
 
 if len (opts.vars) == 0:
-    print 'Must specify variables to print out!'
-    sys.exit (1)
+    die ('no variables to print out were specified')
 
 if len (opts.context) == 0:
     opts.context = ['time']
 
 if len (opts.format) > len (opts.vars):
-    print 'More formatting commands than variables to print!'
-    sys.exit (1)
+    die ('more formatting commands were specified than there are variables to print')
 else:
     while len (opts.format) < len (opts.vars):
         opts.format.append ('')
 
 if len (opts.cformat) > len (opts.context):
-    print 'More context formatting commands than context variables to print!'
-    sys.exit (1)
+    die ('more context formatting commands were specified than there are'
+         ' context variables to print')
 else:
     while len (opts.cformat) < len (opts.context):
         opts.cformat.append ('')
@@ -165,8 +162,7 @@ for dIn, p, d, f in uvdat.read ():
             tup = dIn.probeVar (v)
 
             if tup is None:
-                print 'No such variable "%s" in %s!' % (v, dIn.name)
-                sys.exit (1)
+                die ('no such variable "%s" in dataset %s!', v, dIn.name)
 
             vtype = tup[0]
             vlen = tup[1]
@@ -187,9 +183,8 @@ for dIn, p, d, f in uvdat.read ():
             elif vtype == 'd': get = lambda: dIn.getVarDouble (v, vlen)
             elif vtype == 'c': get = lambda: dIn.getVarComplex (v, vlen)
             else:
-                print 'Unhandled or ungettable variable type "%s" for "%s" in %s!' \
-                      % (vtype, v, dIn.name)
-                sys.exit (1)
+                die ('unhandled or ungettable variable type "%s" for "%s" in '
+                     'dataset %s!', vtype, v, dIn.name)
 
             # Ok, we have all the info we need. For some reason I need to stuff
             # vlen into the tuple, otherwise old values seem to get thrown away or
