@@ -90,7 +90,7 @@
 
 import sys
 import mirtask
-from mirtask import uvdat, keys
+from mirtask import uvdat, keys, cliutil
 from mirtask.util import die
 
 ks = keys.KeySpec ()
