@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-"""= varcat -- Print values of UV variables.
+"""= varcat.py -- Print values of UV variables.
 & pkgw
 : Tools
 +
@@ -22,7 +22,7 @@
  Array-valued variables are not well-handled at the moment.
  
 < vis
- Multiple input datasets are supported by VARCAT.
+ Multiple input datasets are supported by VARCAT.PY.
 
 @ vars
  A comma-separated list of variable names. A line containing the values

@@ -56,7 +56,7 @@ fancy/pwflux
 fancy/pwmodel
 fancy/qimage
 fancy/uvasimg
-fancy/varcat.py
+fancy/varcat
 '
 
 modules='
