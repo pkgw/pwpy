@@ -210,6 +210,6 @@ for dIn, p, d, f in uvdat.read ():
         if len (f) < opts.width:
             s += f.ljust (opts.width)
         else:
-            s += '%s... ' % (f[0:16])
+            s += '%s... ' % (f[0:(opts.width - 4)])
 
     print s
