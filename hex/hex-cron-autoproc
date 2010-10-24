@@ -1,0 +1,111 @@
+#! /bin/tcsh -f
+#
+# Cronjob that looks for notifications of new hex observations,
+# records their existence, and fires off an automatic reduction.
+#
+# This script should produce no output unless something weird is 
+# detected in the notification/auto-processing system.
+
+# Make sure the shell environment is set up
+source `dirname $0`/hex-lib-checkenv
+
+set workdir = /ataarchive/scratch/hexproc
+# Testing demonstrates that "if ({ cd foo })" doesn't cd the script
+cd $workdir
+if ($status) then
+    echo "ERROR: could not cd to $workdir"
+    exit 1
+endif
+
+set statfile = status.$$.`hostname`
+
+mkdir -p notify problems inflight
+
+if (`ls inflight` != "") then
+    echo "WARNING: in-flight directory $workdir/inflight not empty"
+    ls -la inflight
+endif
+
+while (1)
+    set item = `ls -1 notify |head -n1`
+    if ($item == "") break
+
+    if (! { mv notify/$item inflight/ }) then
+	echo "WARNING: notify file $workdir/notify/$item disappeared before I could claim it"
+	continue
+    endif
+
+    set file = inflight/$item
+    set summ = `cat $file`
+    echo "checking $file $summ" >$statfile
+
+    if (! -f "$summ") then
+	echo "WARNING: item $item points to nonexistant summary file $summ"
+	mv $file problems/
+	continue
+    endif
+
+    if ("$summ" !~ /ataarchive/*) then
+	echo "WARNING: skipping summary $summ from item $item since it is not archive-rooted"
+	mv $file problems/
+	continue
+    endif
+
+    # Solaris fgrep doesn't do -q, tcsh ({}) doesn't do redirects.
+    # (The fgrep in /usr/xpg4/bin does, but I don't know how that stuff
+    # all works so I'm avoiding mucking with it.)
+    fgrep "$summ" summaries.tab >/dev/null
+    if (! $status) then
+	echo "WARNING: summary $summ from item $item has already been processed"
+	mv $file problems/
+	continue
+    endif
+
+    # Complicated stuff to give a nice name to the analysis directory.
+    set ymd = `date +%Y/%m/%d`
+    set pfx = ""
+    if ($summ !~ /ataarchive/$ymd/*) then
+	set pfx = `echo $summ |sed -e "s|^/ataarchive/\(....\)/\(..\)/\(..\)/.*|\1\2\3|"`_
+    endif
+    set sb = `basename $summ`
+    set p = `echo $sb | sed -e "s/-/ /g"`
+    if ($p[1] == hex && $p[4] == summ)set sb = ${p[2]}_${p[3]}_${p[5]}
+
+    set reddir = /ataarchive/$ymd/hexproc/$pfx$sb
+    # Create the YYYY/MM/DD directories as needed, with the right
+    # perms and ownership. Both pkwill and obs can SSH as obs without
+    # a password so we use that to become the obs user. The -m option
+    # to mkdir doesn't get applied to parent directories, and SSH
+    # doesn't seem to preserve internal spaces in command arguments,
+    # and the desired umask is set in the .cshrc which isn't sourced
+    # with a -c, and tcsh has moronic string quoting rules, so we end
+    # up with this ugliness:
+    ssh obs@strato 'tcsh -c "umask 2; mkdir -p /ataarchive/'$ymd'/hexproc"'
+
+    if (! { mkdir $reddir }) then
+	set ok = 0
+
+	foreach serial (`seq 1 10`)
+	    set reddir = /ataarchive/$ymd/hexproc/$pfx${sb}_$serial
+	    if ({ mkdir $reddir }) then
+		set ok = 1
+		break
+	    endif
+	end
+
+	if (! $ok) then
+	    echo "WARNING: couldn't create $reddir for reducing $summ"
+	    mv $file problems/
+	    continue
+	endif
+    endif
+
+    # Ignore whether the automated processing succeeded or not.
+    # That's not our problem.
+    echo "reducing $file $summ $reddir" >$statfile
+    hex-proc-auto $summ $reddir
+    echo "$summ $reddir" >>summaries.tab
+    rm $file
+end
+
+rm -f $statfile
