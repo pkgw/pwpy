@@ -32,7 +32,7 @@ class poco:
         self.baseline_order = n.array([ 257, 258, 514, 261, 517, 1285, 262, 518, 1286, 1542, 259, 515, 773, 774, 771, 516, 1029, 1030, 772, 1028, 1287, 1543, 775, 1031, 1799, 1544, 776, 1032, 1800, 2056, 260, 263, 264, 519, 520, 1288])   # second iteration of bl nums
         self.autos = []
         self.noautos = []
-        self.dmarr = n.arange(45,65,2)       # dm trial range in pc/cm3
+        self.dmarr = n.arange(35,75,1)       # dm trial range in pc/cm3
 #        self.tshift = 0.2     # not implemented yet
         self.nskip = nskip*self.nbl    # number of iterations to skip (for reading in different parts of buffer)
         nskip = self.nskip
@@ -292,7 +292,7 @@ class poco:
         p.ylabel('DM (pc/cm3)')
         p.title('Signal to Noise Ratio of Dedispersed Pulse')
         if save:
-            p.savefig('plot_dmt0_%s.jpg' % (str(self.nskip)))
+            p.savefig('plot_dmt0_%s.png' % (str(self.nskip)))
 
 
     def dedisperse2(self):
@@ -347,10 +347,10 @@ if __name__ == '__main__':
     # default stuff
     print 'Greetings, human.'
     print ''
-    nints = 1000
+    nints = 10000
     
     for nskip in range(nints*0.3,nints*10,nints*0.6):
-        pv = poco('poco.mir', nints=nints, nskip=nskip)
+        pv = poco('poco-crab0.mir', nints=nints, nskip=nskip)
         pv.prep()
         pv.dedisperse()
         pv.plotdmt0(save=1)

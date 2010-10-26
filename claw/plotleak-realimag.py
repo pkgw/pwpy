@@ -27,8 +27,8 @@ def run():
     if plottwo:
         for i in range(1,17):
             try:
-                a2.append(asciidata.AsciiData ('/indirect/big_scr2/claw/data/ata/hex14-polcal-sep7/oct2010/hexa-3c286-hp0-1430-leakamp%d.txt' % i))
-                p2.append(asciidata.AsciiData ('/indirect/big_scr2/claw/data/ata/hex14-polcal-sep7/oct2010/hexa-3c286-hp0-1430-leakphase%d.txt' % i))
+                a2.append(asciidata.AsciiData ('/indirect/big_scr2/claw/data/ata/polcal/oct2010/mosfxc-3c286.uvaver.uvredo-leakamp%d.txt' % i))
+                p2.append(asciidata.AsciiData ('/indirect/big_scr2/claw/data/ata/polcal/oct2010/mosfxc-3c286.uvaver.uvredo-leakphase%d.txt' % i))
 #            a2.append(asciidata.AsciiData ('/indirect/big_scr3/claw/data/ata/nvss-rm-best/day2-2010/mosfxc-3c286-2010-100-flagged2-leakamp%d.txt' % i))
 #            p2.append(asciidata.AsciiData ('/indirect/big_scr3/claw/data/ata/nvss-rm-best/day2-2010/mosfxc-3c286-2010-100-flagged2-leakphase%d.txt' % i))
             except:
@@ -49,6 +49,11 @@ def run():
 #    ax = numpy.array([a[0].columns[0],a[1].columns[0],a[2].columns[0],a[3].columns[0],a[4].columns[0],a[5].columns[0],a[6].columns[0]])
 #    py = numpy.array([p[0].columns[1],p[1].columns[1],p[2].columns[1],p[3].columns[1],p[4].columns[1],p[5].columns[1],p[6].columns[1]])
 #    ay = numpy.array([a[0].columns[1],a[1].columns[1],a[2].columns[1],a[3].columns[1],a[4].columns[1],a[5].columns[1],a[6].columns[1]])
+# assuming 14 frequency chunks
+#    px = numpy.array([p[0].columns[0],p[1].columns[0],p[2].columns[0],p[3].columns[0],p[4].columns[0],p[5].columns[0],p[6].columns[0],p[7].columns[0],p[8].columns[0],p[9].columns[0],p[10].columns[0],p[11].columns[0],p[12].columns[0],p[13].columns[0]])
+#    ax = numpy.array([a[0].columns[0],a[1].columns[0],a[2].columns[0],a[3].columns[0],a[4].columns[0],a[5].columns[0],a[6].columns[0],a[7].columns[0],a[8].columns[0],a[9].columns[0],a[10].columns[0],a[11].columns[0],a[12].columns[0],a[13].columns[0]])
+#    py = numpy.array([p[0].columns[1],p[1].columns[1],p[2].columns[1],p[3].columns[1],p[4].columns[1],p[5].columns[1],p[6].columns[1],p[7].columns[1],p[8].columns[1],p[9].columns[1],p[10].columns[1],p[11].columns[1],p[12].columns[1],p[13].columns[1]])
+#    ay = numpy.array([a[0].columns[1],a[1].columns[1],a[2].columns[1],a[3].columns[1],a[4].columns[1],a[5].columns[1],a[6].columns[1],a[7].columns[1],a[8].columns[1],a[9].columns[1],a[10].columns[1],a[11].columns[1],a[12].columns[1],a[13].columns[1]])
 # assuming 16 frequency chunks
     px = numpy.array([p[0].columns[0],p[1].columns[0],p[2].columns[0],p[3].columns[0],p[4].columns[0],p[5].columns[0],p[6].columns[0],p[7].columns[0],p[8].columns[0],p[9].columns[0],p[10].columns[0],p[11].columns[0],p[12].columns[0],p[13].columns[0],p[14].columns[0],p[15].columns[0]])
     ax = numpy.array([a[0].columns[0],a[1].columns[0],a[2].columns[0],a[3].columns[0],a[4].columns[0],a[5].columns[0],a[6].columns[0],a[7].columns[0],a[8].columns[0],a[9].columns[0],a[10].columns[0],a[11].columns[0],a[12].columns[0],a[13].columns[0],a[14].columns[0],a[15].columns[0]])
