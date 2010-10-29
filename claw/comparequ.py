@@ -2,12 +2,12 @@
 
 import sys, asciidata, numpy, pylab
 
-f1 = '/indirect/big_scr2/claw/data/ata/polcal2/oct2010/log.3c138.1430.self'
-f2 = '/indirect/big_scr2/claw/data/ata/polcal2/oct2010/log.3c138.1430.polcal'
-f3 = '/indirect/big_scr2/claw/data/ata/hex14-polcal/oct2010/log.3c286.1430.self'
-f4 = '/indirect/big_scr2/claw/data/ata/hex14-polcal/oct2010/log.3c286.1430.polcal'
-f5 = '/indirect/big_scr2/claw/data/ata/hex14-polcal-sep7/oct2010/log.3c286.1430.self'
-f6 = '/indirect/big_scr2/claw/data/ata/hex14-polcal-sep7/oct2010/log.3c286.1430.polcal'
+f1 = '/indirect/big_scr2/claw/data/ata/polcal2/oct2010/log.3c286.1430.self-new'
+f2 = '/indirect/big_scr2/claw/data/ata/polcal2/oct2010/log.3c286.1430.polcal-new'
+f3 = '/indirect/big_scr2/claw/data/ata/hex14-polcal/oct2010/log.3c286.1430.self-new'
+f4 = '/indirect/big_scr2/claw/data/ata/hex14-polcal/oct2010/log.3c286.1430.polcal-new'
+f5 = '/indirect/big_scr2/claw/data/ata/hex14-polcal-sep7/oct2010/log.3c286.1430.self-new'
+f6 = '/indirect/big_scr2/claw/data/ata/hex14-polcal-sep7/oct2010/log.3c286.1430.polcal-new'
 
 def plot(file1, file2, color='blue'):
 # load files
@@ -45,7 +45,7 @@ def plot(file1, file2, color='blue'):
     for i in range(len(nu)):
         pylab.arrow(0, 0, (q2[i] - q[i])/p, (u2[i] - u[i])/p, fill=0, edgecolor=color)
 
-    pylab.axis([-1*p,p,-1*p,p])
+    pylab.axis([-0.4*p,0.5*p,-0.4*p,1.1*p])
 
 if __name__ == '__main__':
 #    plot(f1, f2)
