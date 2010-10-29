@@ -1,0 +1,25 @@
+#! /usr/bin/env python
+# -*- python -*-
+
+import sys, os
+
+def die (format, *args):
+    raise SystemExit ('Error: ' + (format % args))
+
+try:
+    import numpy
+except ImportError:
+    die ('unable to import numpy module')
+
+try:
+    import sqlite3
+except ImportError:
+    die ('unable to import sqlite3 module')
+
+import hextoolkit
+
+if len (sys.argv) != 2:
+    print >>sys.stderr, 'Usage: %s <gaussfit data root directory>' % sys.argv[0]
+    raise SystemExit (1)
+
+hextoolkit.buildsql (sys.argv[1])
