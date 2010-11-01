@@ -16,9 +16,7 @@ programs='
 atastdflag
 C
 chbo
-icr.sh
 iquv
-micr.sh
 mirargmerge
 pg2eps
 polsplit
