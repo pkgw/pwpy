@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-"""= pocovis.py - a skeleton task
+"""= pocovis.py - visualization of poco data
 & claw
 : Unknown
 +
@@ -8,14 +8,14 @@
 --
 """
 
-import sys
+import sys, string
 #import mirtask
 #from mirtask import uvdat, keys, util
 import miriad
 import numpy as n
 import pylab as p
 import scipy.optimize as opt
-from threading import Thread
+#from threading import Thread
 #from matplotlib.font_manager import fontManager, FontProperties
 #font= FontProperties(size='x-small');
 
@@ -32,11 +32,12 @@ class poco:
         self.baseline_order = n.array([ 257, 258, 514, 261, 517, 1285, 262, 518, 1286, 1542, 259, 515, 773, 774, 771, 516, 1029, 1030, 772, 1028, 1287, 1543, 775, 1031, 1799, 1544, 776, 1032, 1800, 2056, 260, 263, 264, 519, 520, 1288])   # second iteration of bl nums
         self.autos = []
         self.noautos = []
-        self.dmarr = n.arange(35,75,1)       # dm trial range in pc/cm3
+        self.dmarr = n.arange(55,60,2)       # dm trial range in pc/cm3
 #        self.tshift = 0.2     # not implemented yet
         self.nskip = nskip*self.nbl    # number of iterations to skip (for reading in different parts of buffer)
         nskip = self.nskip
         self.usedmmask = False    # algorithm for summing over dm track.  'dmmask' is data-shaped array with True/False values, else is 2xn array where track is.
+        self.file = file
         for a1 in range(1,9):             # loop to adjust delays
             for a2 in range(a1,9):
                 self.blindex = n.where(self.baseline_order == a1*256 + a2)[0][0]
@@ -211,6 +212,44 @@ class poco:
         return track
 
 
+    def dmtrack2(self, dm = 0., t0 = 0., show=0):
+        """Takes dispersion measure in pc/cm3 and time offset from first integration in seconds.
+        Returns an product of data with array of (time, channel) to select from the data array.
+        Used by ipython-parallelized dedisperse3.
+        """
+
+        minintersect = len(self.chans)
+        reltime = self.reltime
+        if self.data.shape[1] == len(self.chans):  # related to preparing of data?
+            chans = self.chans
+        else:
+            chans = n.arange(self.nchan)
+        nchan = len(chans)
+
+        freq = self.sfreq + chans * self.sdf             # freq array in GHz
+
+        # given freq, dm, dfreq, calculate pulse time and duration
+        pulset = 4.2e-3 * dm * freq**(-2) + t0  # time in seconds
+        pulsedt = 8.3e-6 * dm * (1000*self.sdf) * freq**(-3)   # dtime in seconds
+
+        timebin = []
+        chanbin = []
+        for ch in range(nchan):
+            ontime = n.where(((pulset[ch] + pulsedt[ch]/2.) >= reltime) & ((pulset[ch] - pulsedt[ch]/2.) <= reltime))
+#            print ontime[0], ch
+            timebin = n.concatenate((timebin, ontime[0]))
+            chanbin = n.concatenate((chanbin, (ch * n.ones(len(ontime[0]), dtype=int))))
+
+        track = (list(timebin), list(chanbin))
+#        print 'timebin, chanbin:  ', timebin, chanbin
+
+        if len(dmtrack[0]) >= minintersect:               # ignore tiny, noise-dominated tracks
+            dmt0 = n.mean(n.abs (self.data[dmtrack[0],dmtrack[1]]))
+
+        return dmt0
+
+
+
     def dedisperse(self):
         """Integrates over data*dmmask or data at dmtrack for each pair of elements in dmarr, time.
         Not threaded.  Uses dmmask or dmthread directly.
@@ -283,6 +322,7 @@ class poco:
         p.colorbar()
 
         if peaks:
+            print 'max ', max(arr)
             for i in range(len(peaks[1])):
                 ax = p.imshow(arr, aspect='auto', origin='lower', interpolation='nearest', extent=(min(reltime),max(reltime),min(dmarr),max(dmarr)))
                 p.axis((min(reltime),max(reltime),min(dmarr),max(dmarr)))
@@ -292,7 +332,10 @@ class poco:
         p.ylabel('DM (pc/cm3)')
         p.title('Signal to Noise Ratio of Dedispersed Pulse')
         if save:
-            p.savefig('plot_dmt0_%s.png' % (str(self.nskip)))
+            savename = self.file.split('.')[:-1]
+            savename.append(str(self.nskip) + '.png')
+            savename = string.join(savename,'.')
+            p.savefig(savename)
 
 
     def dedisperse2(self):
@@ -319,6 +362,43 @@ class poco:
             print 'submitted for dm= ', dmarr[i]
         for proc in threadlist:
             proc.join()
+
+    def dedisperse3(self):
+        """Integrates over data*dmmask or data at dmtrack for each pair of elements in dmarr, time.
+        Uses ipython.
+        """
+        from IPython.kernel import client
+
+        # initialize engines
+        mec = client.MultiEngineClient()
+        ids = mec.get_ids()
+        print 'Got engines: ', ids
+        mec.push_function(dict(dmtrack2 = self.dmtrack2))    # set up function for later
+
+###
+        dmarr = self.dmarr
+        reltime = self.reltime
+        minintersect = len(self.chans)
+
+        dmt0arr = n.zeros((len(dmarr),len(reltime)), dtype='float64')
+#        accummask = n.zeros(self.data.shape, dtype='bool')
+        if self.data.shape[1] == len(self.chans):
+            chans = self.chans
+        else:
+            chans = n.arange(self.nchan)
+
+            pr_list = []
+        for i in range(len(dmarr)):
+            for j in range(len(reltime)):
+                k = (j + len(realtime) * i) % len(ids)   # queue each iter amongst targets
+                pr_list.append(mec.execute('dmtrack2(%f,%f)' % (dmarr[i], reltime[j]), targets=[k], block=False))
+                if len(pr_list) == len(ids):     # wait until node queue is full
+                    mec.barrier(pr_list)         # then wait for all processes to finish
+                    for process in range(len(pr_list)):
+                        dmt0arr[i,j] = pr_list.pop().r
+            print 'dedispersed for ', dmarr[i]
+
+        self.dmt0arr = dmt0arr
 
 
 #class worker(Thread):
@@ -350,8 +430,7 @@ if __name__ == '__main__':
     nints = 10000
     
     for nskip in range(nints*0.3,nints*10,nints*0.6):
-        pv = poco('poco-crab0.mir', nints=nints, nskip=nskip)
+        pv = poco('poco-crab10.mir', nints=nints, nskip=nskip)
         pv.prep()
-        pv.dedisperse()
+        pv.dedisperse3()
         pv.plotdmt0(save=1)
-
