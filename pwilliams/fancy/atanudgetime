@@ -78,8 +78,15 @@ out = VisData (args.out)
 ohandle = out.open ('c')
 ohandle.setPreambleType ('uvw', 'time', 'baseline')
 tprev = None
+savedNPol = 0
+polsVaried = False
+nPol = 0
+doneNPol = False
 
 for ihandle, preamble, data, flags in uvdat.read ():
+    # FIXME: we won't quite correctly handle the case where
+    # multiple input datasets are specified.
+
     if tprev is None:
         ihandle.copyHeader (ohandle, 'history')
         linetype = uvdat.getLinetype ()
@@ -95,9 +102,24 @@ for ihandle, preamble, data, flags in uvdat.read ():
         if abs (time - tprev) < delta:
             preamble[3] = time = tprev
 
+    if nPol == 0:
+        nPol = uvdat.getNPol ()
+        doneNPol = False
+
+    if not doneNPol:
+        if nPol != savedNPol:
+            ohandle.writeVarInt ('npol', nPol)
+            polsVaried = polsVaried or savedNPol != 0
+            savedNPol = nPol
+        doneNPol = True
+
     ihandle.copyLineVars (ohandle)
     ohandle.writeVarInt ('pol', uvdat.getPol ())
     ohandle.write (preamble, data, flags)
     tprev = time
+    nPol -= 1
+
+if not polsVaried:
+    ohandle.writeHeaderInt ('npol', savedNPol)
 
 ohandle.close ()
