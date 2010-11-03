@@ -18,18 +18,19 @@ GetOptions('galactic|g' => \$galactic,
 
 if ($help) {
 	print "map.pl options:\n";
-	print "  --ata | -a\tinput coordinates in ATA catalog.list format\n";
+	print "  --ata | -a\tuse ATA catalog.list format for master catalog\n";
 	print "  --galactic | -g\toutput in galactic coordinates\n";
 	print "  --help  | -h\t\tprint this help message\n";
-	print "  --color | -c [color]\tspecify color for regions (default blue)\n";
-	print "  --file  | -f [fname]\tspecify input file containing fields (default pigss2.done)\n";
-	print "  --master| -m [fname]\tspecify master catalog file (default pigss2.fields)\n";
+	print "  --color | -c [color]\tspecify color for regions (default none)\n";
+	print "  --file  | -f [fname]\tspecify input file list of target names (default pigss2.done)\n";
+	print "  --master| -m [fname]\tspecify master catalog file (default pfhex.fields)\n";
+	print "\t\t\tdefault catalog format is: name ra dec (radians)\n";
 	print "  --ofile | -o [fname]\tspecify output filename for regions (default ds9.reg)\n";
 	exit;
 }
 
-defined($masterfile) or $masterfile='pigss2.fields';
-$color='blue' if (!defined $color);
+defined($masterfile) or $masterfile='/home/dwhysong/pigss/pfhex.fields';
+#$color='blue' if (!defined $color);
 $width=2000;
 $PI = 3.141592653589793238462643383279502884197;
 
@@ -90,12 +91,13 @@ if (defined($ofname)) {
 	print "plotfields.pl: appending $nelem regions to $ofname\n";
 	open FILE, ">>$ofname";
 }
+if (defined($color)) { $color="color=$color"; }
 for ($i=0; $i<$nelem; $i++) {
 	$x = ($proj->at(0,$i)+sqrt(8))/sqrt(32);	# Convert to range [0..1]
 	$y = ($proj->at(1,$i)+sqrt(2))/sqrt(8);
 	$x *= $width - 1;
 	$y *= $width/2 - 1;
-	print FILE "cross point $x $y # color=$color text={$$name[$i]}\n" if defined $ofname;
-	print "cross point $x $y # color=$color text={$$name[$i]}\n" if (!defined $ofname);
+	print FILE "cross point $x $y # text={$$name[$i]} $color\n" if defined $ofname;
+	print "cross point $x $y # text={$$name[$i]} $color\n" if (!defined $ofname);
 }
 close FILE if defined $ofname;

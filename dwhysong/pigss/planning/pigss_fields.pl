@@ -5,7 +5,6 @@ use Math::Trig;
 use Astro::Coords;
 use Getopt::Long;
 
-# Generate mosaic pointings for a survey
 
 $restart=0.5;
 Getopt::Long::Configure ("bundling");

@@ -1,0 +1,23 @@
+%N autoflag
+%D Automatically flag data
+%P dhw
+%: editing
+%B
+	autoflag is a MIRIAD-compatible program that edits visibility data.
+	calibration of visibility data. Either phase only or amplitude and
+	phase calibration can be performed. The inputs are visibility data
+	files and model images. This program then calculates the visibilities
+	corresponding to the model, searches for redundant visibilities, and
+	solves for the gains.
+%A cal
+	Name of input calibrator files. No default. Multiple data files
+	can be entered in a comma-separated list. These should be strong
+	point sources. At least one calibrator file is required.
+%A vis
+	Name of input visibility data files. No default. Multiple data files
+	can be used in a comma-separated list. These data should be closely
+	associated in time with the calibrator scans.
+%A options
+	This gives several processing options. Possible values are:
+	  noband      Skip the internal bandpass calibration step.
+	  noflag      Do not write the flag table; useful to see what would be done.

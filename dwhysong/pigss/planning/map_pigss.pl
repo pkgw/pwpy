@@ -6,8 +6,6 @@ use Astro::Coord;
 use Astro::Time;
 use Getopt::Long;
 
-# This is the same as map.pl, except it rotates everything by 180 degrees in RA
-# so that the PiGSS-2 targets are centered.
 
 Getopt::Long::Configure ("bundling");
 GetOptions('galactic|g' => \$galactic,

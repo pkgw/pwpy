@@ -105,4 +105,4 @@ for ($k=0; $k<$ra->nelem;$k++) {
 }
 close FILE;
 wfits $map, $ofname.".fits";
-exec("ds9 -geometry 2000x1000 -cmap BB -log -fits $ofname.fits -zoom 0.8 -regions load $ofname.reg -regions showtext no");
+system("ds9 -geometry 2000x1000 -cmap BB -log -fits $ofname.fits -zoom 0.8 -regions load $ofname.reg -regions showtext no");

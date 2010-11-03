@@ -18,7 +18,7 @@ GetOptions('galactic|g' => \$galactic,
 if ($help) {
 	print "map.pl options:\n";
 	print "  --galactic | -g\toutput in galactic coordinates\n";
-	print "  --map | -m [fname]\t\tproduce map from [fname] data and write to nvss.fits\n";
+	print "  --map | -m [fname]\t\tproduce map and write to nvss.fits\n";
 	print "  --help | -h\t\tprint this help message\n";
 	print "  --color | -c [color]\t\tspecify color for regions (default blue)\n";
 	print "  --rfile | -r [fname]\t\tspecify input filename for regions (default pigss_ngalcap)\n";

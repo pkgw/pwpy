@@ -1,0 +1,13 @@
+void f_setarg(int, char *[]);
+void f_setsig();
+void f_init();
+void f_exit();
+void basant_(double *, int *, int *);
+int polspara_(int *);
+void keyini_(void);
+void keyline_(char *, int *, float *, float *, float *, int);
+void hisinput_(int *, char *, int);
+void selinput_(char *key, float *sels, int *maxsels, int size_of_key);
+void selapply_(int *, float *sels, int *flag);
+void modelini_(int *, int *, float *, char *, int);
+void model_(char *, int *, int *, float *, float *, int *, int *, void (*header)(int *, double *, float *, char *, int *, char *, float *, int *), int *, int *, int);
