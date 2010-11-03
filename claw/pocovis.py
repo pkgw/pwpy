@@ -212,44 +212,6 @@ class poco:
         return track
 
 
-    def dmtrack2(self, dm = 0., t0 = 0., show=0):
-        """Takes dispersion measure in pc/cm3 and time offset from first integration in seconds.
-        Returns an product of data with array of (time, channel) to select from the data array.
-        Used by ipython-parallelized dedisperse3.
-        """
-
-        minintersect = len(self.chans)
-        reltime = self.reltime
-        if self.data.shape[1] == len(self.chans):  # related to preparing of data?
-            chans = self.chans
-        else:
-            chans = n.arange(self.nchan)
-        nchan = len(chans)
-
-        freq = self.sfreq + chans * self.sdf             # freq array in GHz
-
-        # given freq, dm, dfreq, calculate pulse time and duration
-        pulset = 4.2e-3 * dm * freq**(-2) + t0  # time in seconds
-        pulsedt = 8.3e-6 * dm * (1000*self.sdf) * freq**(-3)   # dtime in seconds
-
-        timebin = []
-        chanbin = []
-        for ch in range(nchan):
-            ontime = n.where(((pulset[ch] + pulsedt[ch]/2.) >= reltime) & ((pulset[ch] - pulsedt[ch]/2.) <= reltime))
-#            print ontime[0], ch
-            timebin = n.concatenate((timebin, ontime[0]))
-            chanbin = n.concatenate((chanbin, (ch * n.ones(len(ontime[0]), dtype=int))))
-
-        track = (list(timebin), list(chanbin))
-#        print 'timebin, chanbin:  ', timebin, chanbin
-
-        if len(dmtrack[0]) >= minintersect:               # ignore tiny, noise-dominated tracks
-            dmt0 = n.mean(n.abs (self.data[dmtrack[0],dmtrack[1]]))
-
-        return dmt0
-
-
-
     def dedisperse(self):
         """Integrates over data*dmmask or data at dmtrack for each pair of elements in dmarr, time.
         Not threaded.  Uses dmmask or dmthread directly.
@@ -283,6 +245,8 @@ class poco:
 
 #        ax = p.imshow(accummask, aspect='auto')
 #        p.axis([-0.5,len(chans)+0.5,max(time),min(time)])
+
+
 
 
     def plotdmt0(self, sig=5., save=0):
@@ -363,64 +327,81 @@ class poco:
         for proc in threadlist:
             proc.join()
 
+
     def dedisperse3(self):
         """Integrates over data*dmmask or data at dmtrack for each pair of elements in dmarr, time.
         Uses ipython.
         """
         from IPython.kernel import client
 
+        dmarr = self.dmarr
+        reltime = self.reltime
+        dmt0arr = n.zeros((len(dmarr),len(reltime)), dtype='float64')
+
         # initialize engines
+        tc = client.TaskClient()
         mec = client.MultiEngineClient()
         ids = mec.get_ids()
         print 'Got engines: ', ids
-        mec.push_function(dict(dmtrack2 = self.dmtrack2))    # set up function for later
+#        mec.push_function(dict(dmtrack2 = dmtrack2))    # set up function for later
+#        mec.push(dict(data=self.data, reltime=reltime))
+#        mec.execute('import numpy as n')
+#        mec.push_function(dict(dmtrack2 = dmtrack2))    # set up function for later
 
-###
-        dmarr = self.dmarr
-        reltime = self.reltime
-        minintersect = len(self.chans)
-
-        dmt0arr = n.zeros((len(dmarr),len(reltime)), dtype='float64')
-#        accummask = n.zeros(self.data.shape, dtype='bool')
-        if self.data.shape[1] == len(self.chans):
-            chans = self.chans
-        else:
-            chans = n.arange(self.nchan)
-
-            pr_list = []
+        pr_list = []
+        iarr = []; jarr = []
         for i in range(len(dmarr)):
             for j in range(len(reltime)):
-                k = (j + len(realtime) * i) % len(ids)   # queue each iter amongst targets
-                pr_list.append(mec.execute('dmtrack2(%f,%f)' % (dmarr[i], reltime[j]), targets=[k], block=False))
+#                iarr.append(i)
+#                jarr.append(j)
+#                k = (j + len(reltime) * i) % len(ids)   # queue each iter amongst targets
+                st = client.StringTask('dmt0 = dmtrack2(data, reltime, %f, %f)' % (dmarr[i], reltime[j]), pull='dmt0', push=dict(data = self.data,reltime = reltime))
+                pr_list.append(tc.run(task=st))
                 if len(pr_list) == len(ids):     # wait until node queue is full
-                    mec.barrier(pr_list)         # then wait for all processes to finish
-                    for process in range(len(pr_list)):
-                        dmt0arr[i,j] = pr_list.pop().r
+                    for l in range(len(pr_list)):
+                        tc.barrier(pr_list)         # then wait for all processes to finish
+                        dmt0 = tc.get_task_result(pr_list[l])
+                        print dmt0
+#                        dmt0arr[iarr[l],jarr[l]] = dmt0[l]
+#            iarr = []; jarr = []
             print 'dedispersed for ', dmarr[i]
 
         self.dmt0arr = dmt0arr
 
 
-#class worker(Thread):
-#    
-#    def __init__(self, pv, i, j):
-#        Thread.__init__(self)
-#        self.pv = pv
-#        self.i = i
-#        self.j = j
-#
-#    def run(self):
-#        """Threadable unit for dedisperse2.
-#        """
-#
-#        if self.pv.usedmmask:    # slower by factor of 2 than dmtracks
-#            dmmask = self.pv.dmmask(dm=self.pv.dmarr[self.i], t0=self.pv.reltime[self.j])
-#            if dmmask.sum() >= 5:               # ignore tiny, noise-dominated tracks
-#                self.pv.dmt0arr[self.i,self.j] = n.mean(n.abs (self.pv.data * dmmask)[n.where(dmmask == True)])
-#        else:
-#            dmtrack = self.pv.dmtrack(dm=self.pv.dmarr[self.i], t0=self.pv.reltime[self.j])
-#            if len(dmtrack[0]) >= 5:               # ignore tiny, noise-dominated tracks
-#                self.pv.dmt0arr[self.i,self.j] = n.mean(n.abs (self.pv.data[dmtrack[0],dmtrack[1]]))
+def dmtrack2(data, reltime, dm = 0., t0 = 0.):
+    """Takes dispersion measure in pc/cm3 and time offset from first integration in seconds.
+    Returns an product of data with array of (time, channel) to select from the data array.
+    Used by ipython-parallelized dedisperse3.
+    """
+
+    chans = n.arange(6,58)
+    nchan = len(chans)
+    sfreq = 0.718  # freq for first channel in GHz
+    sdf = 0.104/nchan   # dfreq per channel in GHz
+    freq = sfreq + chans * sdf             # freq array in GHz
+    minintersect = len(chans)
+
+    # given freq, dm, dfreq, calculate pulse time and duration
+    pulset = 4.2e-3 * dm * freq**(-2) + t0  # time in seconds
+    pulsedt = 8.3e-6 * dm * (1000*sdf) * freq**(-3)   # dtime in seconds
+    
+    timebin = []
+    chanbin = []
+    for ch in range(nchan):
+        ontime = n.where(((pulset[ch] + pulsedt[ch]/2.) >= reltime) & ((pulset[ch] - pulsedt[ch]/2.) <= reltime))
+    #        print ontime[0], ch
+        timebin = n.concatenate((timebin, ontime[0]))
+        chanbin = n.concatenate((chanbin, (ch * n.ones(len(ontime[0]), dtype=int))))
+
+    track = (list(timebin), list(chanbin))
+        
+    if sum(track[0]) >= minintersect:               # ignore tiny, noise-dominated tracks
+        dmt0 = n.mean(n.abs (data[track[0],track[1]]))
+    else:
+        dmt0 = 0.
+        
+    return dmt0
 
 
 if __name__ == '__main__':
@@ -429,8 +410,9 @@ if __name__ == '__main__':
     print ''
     nints = 10000
     
-    for nskip in range(nints*0.3,nints*10,nints*0.6):
-        pv = poco('poco-crab10.mir', nints=nints, nskip=nskip)
+#    for nskip in range(nints*0.3,nints*10,nints*0.6):
+    for nskip in range(1):
+        pv = poco('poco_crab_candpulse.mir', nints=nints, nskip=nskip)
         pv.prep()
-        pv.dedisperse3()
+        pv.dedisperse()
         pv.plotdmt0(save=1)
