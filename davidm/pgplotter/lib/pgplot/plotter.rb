@@ -197,6 +197,7 @@ module Pgplot
         xxmin = xx.min
         xxmax = xx.max
       end
+      xxmin, xxmax = NArray[xxmin, xxmax].to_type(NArray::SFLOAT).to_a
       if xxmin == xxmax
         xxmin -= 1
         xxmax += 1
@@ -212,6 +213,7 @@ module Pgplot
         yymin = yy.min
         yymax = yy.max
       end
+      yymin, yymax = NArray[yymin, yymax].to_type(NArray::SFLOAT).to_a
       if yymin == yymax
         yymin -= 1
         yymax += 1
@@ -346,8 +348,7 @@ module Pgplot
       # Kludge for GSL::FFT::Complex::PackedArray
       #zz = zz.to_a2 if zz.respond_to? :to_a2
 
-      xxmin = xx.min
-      xxmax = xx.max
+      xxmin, xxmax = NArray[xx.min, xx.max].to_type(NArray::SFLOAT).to_a
       if xxmin == xxmax
         xxmin -= 1
         xxmax += 1
@@ -363,8 +364,7 @@ module Pgplot
                 else [0] * zz.length
                 end
 
-      zzmin = zzabs.min
-      zzmax = zzabs.max
+      zzmin, zzmax = NArray[zzabs.min, zzabs.max].to_type(NArray::SFLOAT).to_a
       if zzmin == zzmax
         zzmin -= 1
         zzmax += 1
@@ -420,6 +420,7 @@ module Pgplot
         zzmin, zzmax = opts[:ph_range] || [zzangle.min, zzangle.max]
         zzmin = -180 if zzmin < -180
         zzmax =  180 if zzmax >  180
+        zzmin, zzmax = NArray[zzmin, zzmax].to_type(NArray::SFLOAT).to_a
         if zzmin == zzmax
           zzmin -= 1
           zzmax += 1
