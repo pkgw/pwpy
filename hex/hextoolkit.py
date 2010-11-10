@@ -1,6 +1,11 @@
 # hextoolkit.py
 # Keaton Burns, University of California Berkeley, 09/28/2010
-"""Commonly used hex analysis code"""
+"""
+Commonly used hex analysis code.
+Contains functions infopath, antnum, antname, sqlitedb_to_ndarray,
+    sqlitecursor_to_ndarray, atatojday, feedID, gaussread, gausstosql,
+    resetsql, buildsql, hexfromtxt
+"""
 
 
 import os
@@ -178,21 +183,17 @@ def gaussread(path):
     
     # Read in gaussian fit file, bail if empty
     GDTYPES = 'i,S1,i,i,f,f,f,f,f,f,f,f,f,f,f'
-    GNAMES = ['ANT','POL','Npts','','XiSq','AMP','AMPuc','OffRA','OffRAuc','OffDec','OffDecuc','WidthRA','WidthRAuc','WidthDec','WidthDecuc']
-    try:
-        gread = np.genfromtxt(join (path, 'data-gaussfits.txt'), dtype = GDTYPES, names = GNAMES, usecols = (0,1,2,3,4,5,6,7,8,9,10,11,12,13,14))#, invalid_raise = False)
-    except IOError: 
-        return 'GAUSSFITS_READ_FAILURE', 0, 0, 0
+    GNAMES = ['ANT','POL','Npts','','XiSq','AMP','AMPuc','OffRA','OffRAuc','OffDec','OffDecuc','WidthRA','WidthRAuc','WidthDec','WidthDecuc']  
+    gread = hexfromtxt(join(path, 'data-gaussfits.txt'), dtype=GDTYPES, names=GNAMES, colnum=15)
+    if gread == None: return 'GAUSSFITS_READ_FAILURE', 0, 0, 0
     
     # Read in SEFD file, intend to pass zeros if empty
     EDTYPES = 'i, S1, f, f, f, f, f'
     ENAMES = ['Ant', 'Pol', 'Avg-Amp', 'Amp-RMS', 'Avg-Pha', 'Pha-RMS', 'SEFD']
-    try:
-        ### NOTE:  newer versions of numpy may require skiprows --> skip_headers, also use 'invalid_raise = False'
-        eread = np.genfromtxt(join (path, 'data-sefd.txt'), dtype = EDTYPES, names = ENAMES, skiprows = 2)#, invalid_raise = False)
-    except IOError:
+    eread = hexfromtxt(join(path, 'data-sefd.txt'), dtype=EDTYPES, names=ENAMES, skip_header=2)
+    if eread == None:
         eread = 'SEFD_READ_FAILURE'
-        print 'Failed to read data-sefd.txt, inserting 0.0 for all.'
+        print 'GAUSSREAD: Failed to read data-sefd.txt, inserting 0.0 for all.'
     
     # Read in run information
     sinfofile = open(join (path, 'data-sinfo.txt'), 'r')
@@ -268,7 +269,6 @@ def gaussread(path):
             
     return gread, eread, info, squint
     
-
     
 def gausstosql(path, RESET = 0):
     """
@@ -298,7 +298,7 @@ def gausstosql(path, RESET = 0):
     
     # Bail if fail
     if gread == 'GAUSSFITS_READ_FAILURE':
-        print 'Failed to read data-gaussfits.txt, closing...'
+        print 'GAUSSTOSQL: Failed to read data-gaussfits.txt, closing...'
         connection.close()
         return
     
@@ -310,9 +310,9 @@ def gausstosql(path, RESET = 0):
     if ASPlist != None:
         if ASPtest in ASPlist['archsummpath']:
             rid = ASPlist['rid'][np.where(ASPlist['archsummpath'] == ASPtest)]
-            print 'Run already entered into database'
+            print 'GAUSSTOSQL: Run already entered into database'
             confirm = ''
-            while confirm == '': confirm = raw_input('Confirm overwrite (y): ')
+            while confirm == '': confirm = raw_input('GAUSSTOSQL: Confirm overwrite (y): ')
             if confirm[0] in ['y', 'Y', '1']:
                 sql_cmd = 'DELETE FROM runs WHERE rid = ' + str(rid)
                 cursor.execute(sql_cmd)
@@ -321,7 +321,7 @@ def gausstosql(path, RESET = 0):
                 cursor.execute(sql_cmd)
 
             else:
-                print 'Insertion cancelled'
+                print 'GAUSSTOSQL: Insertion cancelled'
                 connection.close()
                 return
     
@@ -349,7 +349,7 @@ def resetsql():
  
     # Backup database
     os.rename(dbpath, dbpath + '.old')
-    print 'Moving old database to', dbpath + '.old'
+    print 'RESETSQL: Moving old database to', dbpath + '.old'
     
     # Connect to sqlite database
     connection = sqlite3.connect(dbpath)
@@ -380,7 +380,7 @@ def resetsql():
     connection.commit()
     connection.close()
     
-    print 'Saving new database squint.db'
+    print 'RESETSQL: Saving new database squint.db'
     return
 
     
@@ -407,8 +407,74 @@ def buildsql(rootdir):
 
     for i in gaussfitswalk:
         if 'data-gaussfits.txt' in i[2]:
-            print 'Reading files from ' + i[0]
+            print 'BUILDSQL: Reading files from ' + i[0]
             gausstosql(i[0])
 
 
+def hexfromtxt(fname, dtype=float, names=None, skip_header=0, colnum=0):    
+    """
+    hexfromtxt
+    ==========
+    
+    PURPOSE:
+        Mimic numpy.genfromtxt from 1.4+ versions of numpy
+        Read whitespace-separated text files into ndarray
+        
+    CALLING SEQUENCE:
+        filearray = hexfromtxt(fname, dtype=float, names=None, skip_header=0, colnum=0)
+        
+    INPUTS:
+        fname       :=  path to text file
+        dtype       :=  list of column datatypes as strings, or string of datatypes separated by commas (no spaces)
+                        (default all floats)
+        names       :=  list of column names, or string of names separated by commas (no spaces)
+                        (default 'f0','f1',...,'fn')
+        skip_header :=  number of lines to skip at top of file
+        colnum      :=  number of columns to look for
+                        (if not specified, will look at dtype then names then first row after header)
+    """
 
+    # Read lines from file, skipping header
+    file = open(fname, 'r')
+    fileread = file.readlines()[skip_header:]
+    file.close
+    
+    # Bail if empty
+    if fileread == []: return None
+    
+    # Turn entries into lists of strings
+    fileread = [i.strip().split() for i in fileread]
+    
+    # Change string dtype, names into list
+    if type(dtype) == type(str()): dtype = dtype.split(',')
+    if type(names) == type(str()): names = names.split(',')
+    
+    # If colnum not specified, take as number of dtype, then names, then first element
+    if colnum == 0: 
+        if type(dtype) == type(list()): colnum = len(dtype)
+        elif type(names) == type(list()): colnum = len(names)
+        else: colnum = len(fileread[0])
+    
+    # Get lists of proper-length elements
+    filelist = []
+    for i in fileread:
+        if len(i) == colnum:
+            filelist.append(i)
+        else: print 'HEXFROMTXT: Rejecting row, wrong number of elements'
+
+    # Create proper ndarray
+    if names == None:
+        if dtype == float: passdtype = (',f' * colnum)[1:]
+        else: passdtype = ','.join(dtype)
+    elif dtype == float:
+        passdtype = zip(names, (',f' * colnum)[1:].strip().split())
+    else: passdtype = zip(names, dtype)
+    
+    filearray = np.zeros(len(filelist), dtype=passdtype)
+    
+    # Add data to array
+    for i in xrange(len(filelist)):
+        for j in xrange(colnum):
+            filearray[i][j] = filelist[i][j]
+    
+    return filearray
