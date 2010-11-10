@@ -10,11 +10,11 @@ spec = Gem::Specification.new do |s|
   s.name = 'astroutil'
   # Version is YYYY.M.V, where YYYY.M is year and month (1 or 7) of most recent
   # leap second included, and V is version within that epoch.
-  s.version = '2009.1.4'
+  s.version = '2009.1.5'
   s.summary = 'Astronomy related extensions for Ruby'
   s.description = <<-EOD
     Provides astronomy related extensions to standard Ruby classes, including
-    angle converion methods to Math module and Numeric class, segxagesimal
+    angle converion methods to Math module and Numeric class, sexagesimal
     conversions to Numeric, Array, and String classes, DateTime::J2000 constant
     for J2000.0 epoch, convenience methods to create DateTime objects from ajd
     and amjd values, and conversions between various time frames to DateTime
