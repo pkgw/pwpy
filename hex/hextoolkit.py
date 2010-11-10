@@ -188,7 +188,7 @@ def gaussread(path):
     if gread == None: return 'GAUSSFITS_READ_FAILURE', 0, 0, 0
     
     # Read in SEFD file, intend to pass zeros if empty
-    EDTYPES = 'i, S1, f, f, f, f, f'
+    EDTYPES = 'i,S1,f,f,f,f,f'
     ENAMES = ['Ant', 'Pol', 'Avg-Amp', 'Amp-RMS', 'Avg-Pha', 'Pha-RMS', 'SEFD']
     eread = hexfromtxt(join(path, 'data-sefd.txt'), dtype=EDTYPES, names=ENAMES, skip_header=2)
     if eread == None:
@@ -232,7 +232,7 @@ def gaussread(path):
     for i in xrange(1,43):
         if np.size(np.where(gread['ANT'] == i)) == 2: sqpairs += 1
     
-    print 'sqpairs =', sqpairs
+    print 'GAUSSREAD: sqpairs =', sqpairs
     
     # Define types and names for the squint ndarray
     SDTYPES = ['i', 'S2', 'i', 'f', 'f', 'f']
@@ -390,18 +390,17 @@ def buildsql(rootdir):
     ========
     
     PURPOSE:
-        Rebuilds squint.db by sorting through all subdirectories of given root directory
-    
+        Adds to squint.db by sorting through all subdirectories of given root directory
+        NOTE: Does not reset database, instead adds to current database
+              To reset use resetsql()
+
     CALLING SEQUENCE:
         buildsql(rootdir)
     
     INPUTS:
-        rootdir     :=  root directory to build from
+        rootdir     :=  root directory to add from
     """
-    
-    # Reset database
-    resetsql()    
-
+   
     # Find all folders with data-gaussfits.txt
     gaussfitswalk = os.walk(rootdir)
 

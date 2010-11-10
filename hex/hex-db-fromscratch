@@ -22,4 +22,8 @@ if len (sys.argv) != 2:
     print >>sys.stderr, 'Usage: %s <gaussfit data root directory>' % sys.argv[0]
     raise SystemExit (1)
 
-hextoolkit.buildsql (sys.argv[1])
+# Reset and build database
+hextoolkit.resetsql()
+hextoolkit.buildsql(sys.argv[1])
+
+
