@@ -55,7 +55,7 @@ module Pgplot
   class Plotter
     include Pgplot
 
-    VERSION = '$Id$'
+    VERSION = '0.0.2'
 
     @@instances = {}
     @@last_selected = nil
