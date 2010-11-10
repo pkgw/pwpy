@@ -2,7 +2,9 @@
 # Keaton Burns, University of California Berkeley, 09/28/2010
 """Commonly used hex analysis code"""
 
-import os, os.path
+
+import os
+import os.path
 from os.path import join
 import numpy as np
 import sqlite3
@@ -12,22 +14,23 @@ import sqlite3
 dbpath = '/ataarchive/scratch/hexproc/squint.db'
 
 
-def infopath (*args):
-    return join (os.path.dirname (__file__), *args)
+def infopath(*args):
+    return join(os.path.dirname(__file__), *args)
+
 
 def antnum(astr):
     """Return ATA antenna number given antenna name"""
-    telnum = np.genfromtxt(infopath ('telnum.txt'), dtype='|S2', comments='#')
+    telnum = np.genfromtxt(infopath('telnum.txt'), dtype='|S2', comments='#')
     return telnum.tostring().index(astr)/2 + 1
 
 
 def antname(anum):
     """Return ATA antenna name given antenna number"""
-    telnum = np.genfromtxt(infopath ('telnum.txt'), dtype='|S2', comments='#')
+    telnum = np.genfromtxt(infopath('telnum.txt'), dtype='|S2', comments='#')
     return telnum[anum - 1]
 
 
-def sqlitedb_to_ndarray(fname, table = 'data', str_length = 20):
+def sqlitedb_to_ndarray(fname, table='data', str_length=20):
     """Load table from a table in a sqlite3 .db file to a numpy ndarray"""
     
     connection = sqlite3.connect(fname)
@@ -136,28 +139,20 @@ def atatojday(atadate):
     JD = JDN + (hour - 12) / 24. + min / 1440. + sec / 86400.
     return JD
     
+
 def feedID(antnum, julday):
     """Return feed number for antenna antum on day julday"""
+  
+    # Read in feedswapjd.txt file
+    feedlog = np.genfromtxt(infopath('feedswapjd.txt'), dtype=('f' + ',i2' * 43), delimiter=',')
     
-    # Read in CSV file to numpy ndarray
-    #feedfile = open(infopath ('feedswap.csv'))
-    #feedtext = feedfile.readlines()[0]
-    #feedfile.close
-    #feedtext = feedtext.split('\r')
-    
-    #feedarray = []
-    #for i in feedtext: feedarray.append(i.split(','))
-    #feedarray = np.array(feedarray)
-    
-    #for i in xrange(np.size(feedarray, axis=1)):
-    #    feedarray[1][i] = atatojday(feedarray[1][i] + ':00:00:00')
-    
-    feedlog = np.genfromtxt(infopath ('feedswapjd.txt'), dtype=('f' + ',i2' * 43), delimiter=',', autostrip=1)
-    
-    jloc = np.where(feedlog['f0'] == max(feedlog['f0'][np.where(feedlog['f0'] < julday)]))
-    
+    # Find all swaps before requested julday, take ant from latest one
+    afterswitch = np.where(feedlog['f0'] < julday * np.ones(np.shape(feedlog['f0'])))
+    jloc = np.where(feedlog['f0'] == np.max(feedlog['f0'][afterswitch]))
+     
     return feedlog[jloc][0][antnum + 1]
-    
+   
+
 def gaussread(path):
     """
     gaussread
@@ -185,7 +180,7 @@ def gaussread(path):
     GDTYPES = 'i,S1,i,i,f,f,f,f,f,f,f,f,f,f,f'
     GNAMES = ['ANT','POL','Npts','','XiSq','AMP','AMPuc','OffRA','OffRAuc','OffDec','OffDecuc','WidthRA','WidthRAuc','WidthDec','WidthDecuc']
     try:
-        gread = np.genfromtxt(join (path, 'data-gaussfits.txt'), dtype = GDTYPES, names = GNAMES, invalid_raise = False, usecols = (0,1,2,3,4,5,6,7,8,9,10,11,12,13,14))
+        gread = np.genfromtxt(join (path, 'data-gaussfits.txt'), dtype = GDTYPES, names = GNAMES, usecols = (0,1,2,3,4,5,6,7,8,9,10,11,12,13,14))#, invalid_raise = False)
     except IOError: 
         return 'GAUSSFITS_READ_FAILURE', 0, 0, 0
     
@@ -193,7 +188,8 @@ def gaussread(path):
     EDTYPES = 'i, S1, f, f, f, f, f'
     ENAMES = ['Ant', 'Pol', 'Avg-Amp', 'Amp-RMS', 'Avg-Pha', 'Pha-RMS', 'SEFD']
     try:
-        eread = np.genfromtxt(join (path, 'data-sefd.txt'), dtype = EDTYPES, names = ENAMES, skip_header = 2, invalid_raise = False)
+        ### NOTE:  newer versions of numpy may require skiprows --> skip_headers, also use 'invalid_raise = False'
+        eread = np.genfromtxt(join (path, 'data-sefd.txt'), dtype = EDTYPES, names = ENAMES, skiprows = 2)#, invalid_raise = False)
     except IOError:
         eread = 'SEFD_READ_FAILURE'
         print 'Failed to read data-sefd.txt, inserting 0.0 for all.'
@@ -293,52 +289,9 @@ def gausstosql(path, RESET = 0):
     """
     
     
-    ####################
-    ## Database setup ##
-    ####################
-    
-    # Backup database for RESET
-    if RESET == 'yesforsure':
-        os.rename(dbpath, dbpath + '.old')
-        print 'Moving old database to', dbpath + '.old'
-    
     # Connect to sqlite database
     connection = sqlite3.connect(dbpath)
     cursor = connection.cursor()
-    
-    # Reset and creation routine
-    if RESET == 'yesforsure': 
-
-        # Create table to hold observations
-        sql_cmd = """CREATE TABLE obs (oid INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, 
-                                       rid int,
-                                       antnum int,
-                                       antname text,
-                                       feed int,
-                                       squintx float,
-                                       squinty float,
-                                       sefd float);"""
-        cursor.execute(sql_cmd)
-        
-        # Create table to hold runs
-        sql_cmd = """CREATE TABLE runs (rid INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, 
-                                       date float,
-                                       source text,
-                                       freq float,
-                                       flux float,
-                                       archsummpath text);"""
-        cursor.execute(sql_cmd) 
-        
-        # Close and exit
-        connection.commit()
-        connection.close()
-        print 'Saving new database squint.db'
-        return
-        
-    
-    ####################
-    ## Data Insertion ##
-    ####################
     
     # Run gaussread
     [gread, eread, info, squint] = gaussread(path)
@@ -391,6 +344,45 @@ def gausstosql(path, RESET = 0):
     connection.close()
     
     
+def resetsql():
+    """Reset sql database, backup old database to squint.db.old"""
+ 
+    # Backup database
+    os.rename(dbpath, dbpath + '.old')
+    print 'Moving old database to', dbpath + '.old'
+    
+    # Connect to sqlite database
+    connection = sqlite3.connect(dbpath)
+    cursor = connection.cursor()
+    
+    # Reset and creation routine
+    # Create table to hold observations
+    sql_cmd = """CREATE TABLE obs (oid INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, 
+                                   rid int,
+                                   antnum int,
+                                   antname text,
+                                   feed int,
+                                   squintx float,
+                                   squinty float,
+                                   sefd float);"""
+    cursor.execute(sql_cmd)
+    
+    # Create table to hold runs
+    sql_cmd = """CREATE TABLE runs (rid INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, 
+                                   date float,
+                                   source text,
+                                   freq float,
+                                   flux float,
+                                   archsummpath text);"""
+    cursor.execute(sql_cmd) 
+    
+    # Close and exit
+    connection.commit()
+    connection.close()
+    
+    print 'Saving new database squint.db'
+    return
+
     
 def buildsql(rootdir):
     """
@@ -408,7 +400,7 @@ def buildsql(rootdir):
     """
     
     # Reset database
-    gausstosql('', RESET = 'yesforsure')
+    resetsql()    
 
     # Find all folders with data-gaussfits.txt
     gaussfitswalk = os.walk(rootdir)
@@ -416,4 +408,7 @@ def buildsql(rootdir):
     for i in gaussfitswalk:
         if 'data-gaussfits.txt' in i[2]:
             print 'Reading files from ' + i[0]
-            gausstosql(i[0] + '/')
+            gausstosql(i[0])
+
+
+
