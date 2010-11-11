@@ -356,9 +356,14 @@ def resetsql():
  
     # Backup database
     dbpath = getdbpath ()
-    os.rename(dbpath, dbpath + '.old')
-    print 'RESETSQL: Moving old database to', dbpath + '.old'
-    
+    try:
+        os.rename(dbpath, dbpath + '.old')
+        print 'RESETSQL: Moved old database to', dbpath + '.old'
+    except OSError, e:
+        # Ignore the error if the database doesn't yet exist.
+        if e.errno != 2:
+            raise
+
     # Connect to sqlite database
     connection = sqlite3.connect(dbpath)
     cursor = connection.cursor()
