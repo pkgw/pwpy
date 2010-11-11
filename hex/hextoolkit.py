@@ -275,7 +275,7 @@ def gaussread(path):
     return gread, eread, info, squint
     
     
-def gausstosql(path):
+def gausstosql(path, replacedups=True):
     """
     gausstosql
     =========
@@ -288,6 +288,10 @@ def gausstosql(path):
     
     INPUTS:
         path        :=  path to folder containing hex reduction txts
+        replacedups :=  whether information for hex runs that have already
+                        been entered into the database should replace the
+                        preexisting information. If False, the new information
+                        will be ignored.
     """
     
     # Run gaussread
@@ -308,27 +312,22 @@ def gausstosql(path):
     
     # Check to see if already in database
     ASPtest = info[4]
-    sql_cmd = 'SELECT archsummpath,rid FROM runs;'
-    cursor.execute(sql_cmd)
-    ASPlist = sqlitecursor_to_ndarray(cursor)
-    if ASPlist != None:
-        if ASPtest in ASPlist['archsummpath']:
-            rid = ASPlist['rid'][np.where(ASPlist['archsummpath'] == ASPtest)]
-            print 'GAUSSTOSQL: Run already entered into database'
-            confirm = ''
-            while confirm == '': confirm = raw_input('GAUSSTOSQL: Confirm overwrite (y): ')
-            if confirm[0] in ['y', 'Y', '1']:
-                sql_cmd = 'DELETE FROM runs WHERE rid = ' + str(rid)
-                cursor.execute(sql_cmd)
-                
-                sql_cmd = 'DELETE FROM obs WHERE rid = ' + str(rid)
-                cursor.execute(sql_cmd)
+    cursor.execute('SELECT rid FROM runs WHERE archsummpath = ?', 
+                   (ASPtest, ))
+    matches = cursor.fetchall ()
 
-            else:
-                print 'GAUSSTOSQL: Insertion cancelled'
-                connection.close()
-                return
-    
+    if len (matches) > 0:
+        rid = matches[0][0]
+
+        if not replacedups:
+            print 'GAUSSTOSQL: Run', ASPtest, 'already entered into database; dropping new data'
+            connection.close ()
+            return
+
+        print 'GAUSSTOSQL: Run', ASPtest, 'already entered into database; replacing old data'
+        cursor.execute('DELETE FROM runs WHERE rid = ?', (rid, ))
+        cursor.execute('DELETE FROM obs WHERE rid = ?', (rid, ))
+
     # Insert run
     # info = (tstart, source, freq, flux, archsummpath)
     run_data = str(info)
