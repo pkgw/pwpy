@@ -342,6 +342,8 @@ module Pgplot
         :phase_color => Color::YELLOW,
         :device => '/xs',
         :ph_range => [-180, 180],
+        :mag_scale => :linear,
+        :log_floor => 1e-10,
         :overlay => false,
       }.merge!(opts)
 
@@ -363,6 +365,13 @@ module Pgplot
                 elsif zz[0].respond_to? :angle; zz.map {|z| z.angle * 180 / Math::PI}
                 else [0] * zz.length
                 end
+
+      case opts[:mag_scale].to_s
+      when /log/i
+        zzabs = NMath.log10(zzabs+opts[:log_floor])
+      when /db/i
+        zzabs = 10*NMath.log10(zzabs+opts[:log_floor])
+      end
 
       zzmin, zzmax = NArray[zzabs.min, zzabs.max].to_type(NArray::SFLOAT).to_a
       if zzmin == zzmax
