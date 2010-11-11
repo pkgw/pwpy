@@ -275,22 +275,19 @@ def gaussread(path):
     return gread, eread, info, squint
     
     
-def gausstosql(path, RESET = 0):
+def gausstosql(path):
     """
     gausstosql
     =========
     
     PURPOSE:
-        Adds squint array data from gaussread to sqlite3 database squint.db
+        Adds squint array data from gaussread to the squint SQL database.
     
     CALLING SEQUENCE:
-        gausstosql(path, RESET = 0)
+        gausstosql(path)
     
     INPUTS:
-        date        :=  path to folder containing hex reduction txts
-        RESET       :=  recreates database (CAREFUL..., must be 'yesforsure')
-                        backs up old database to squintOLD.db
-    
+        path        :=  path to folder containing hex reduction txts
     """
     
     # Run gaussread
