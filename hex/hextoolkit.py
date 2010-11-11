@@ -310,7 +310,7 @@ def gausstosql(path, RESET = 0):
     cursor = connection.cursor()
     
     # Check to see if already in database
-    ASPtest = info[3]
+    ASPtest = info[4]
     sql_cmd = 'SELECT archsummpath,rid FROM runs;'
     cursor.execute(sql_cmd)
     ASPlist = sqlitecursor_to_ndarray(cursor)
