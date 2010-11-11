@@ -233,6 +233,8 @@ def gaussread(path):
         if np.size(np.where(gread['ANT'] == i)) == 2: sqpairs += 1
     
     print 'GAUSSREAD: sqpairs =', sqpairs
+    # Uncomment following line: will not add runs to database if no corresponding obs
+    #if sqpairs == 0: return 'NO_SQUINT_PAIRS', 0, 0, 0
     
     # Define types and names for the squint ndarray
     SDTYPES = ['i', 'S2', 'i', 'f', 'f', 'f']
@@ -288,19 +290,21 @@ def gausstosql(path, RESET = 0):
     
     """
     
-    
-    # Connect to sqlite database
-    connection = sqlite3.connect(dbpath)
-    cursor = connection.cursor()
-    
     # Run gaussread
     [gread, eread, info, squint] = gaussread(path)
     
     # Bail if fail
     if gread == 'GAUSSFITS_READ_FAILURE':
         print 'GAUSSTOSQL: Failed to read data-gaussfits.txt, closing...'
-        connection.close()
         return
+    # If 'NO_SQUINT_PAIRS' flagging is activated in gaussread, this will catch
+    if gread == 'NO_SQUINT_PAIRS':
+        print 'GAUSSTOSQL: No squint pairs found, closing...'
+        return
+    
+    # Connect to sqlite database
+    connection = sqlite3.connect(dbpath)
+    cursor = connection.cursor()
     
     # Check to see if already in database
     ASPtest = info[3]
