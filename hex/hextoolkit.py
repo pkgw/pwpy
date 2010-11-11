@@ -16,7 +16,10 @@ import sqlite3
 
 
 # Set location of database file
-dbpath = '/ataarchive/scratch/hexproc/squint.db'
+def getdbpath ():
+    if 'SQUINTDBPATH' in os.environ:
+        return os.environ['SQUINTDBPATH']
+    return '/ataarchive/scratch/hexproc/squint.db'
 
 
 def infopath(*args):
@@ -303,7 +306,7 @@ def gausstosql(path, RESET = 0):
         return
     
     # Connect to sqlite database
-    connection = sqlite3.connect(dbpath)
+    connection = sqlite3.connect(getdbpath ())
     cursor = connection.cursor()
     
     # Check to see if already in database
@@ -352,6 +355,7 @@ def resetsql():
     """Reset sql database, backup old database to squint.db.old"""
  
     # Backup database
+    dbpath = getdbpath ()
     os.rename(dbpath, dbpath + '.old')
     print 'RESETSQL: Moving old database to', dbpath + '.old'
     
