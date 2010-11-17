@@ -66,14 +66,11 @@ def hexplot(xdata, ydata, groupby = '', colorby = '', pyfilter = '',
             
     """
     
-    # Set location of database file
-    dbpath = '/Users/kburns/PYTHON/BOWER/hex/squint.db'
-    
     # Setup pdf output
     pp = PdfPages(saveas)
     
     # Connect to sqlite database
-    connection = sqlite3.connect(dbpath)
+    connection = sqlite3.connect(hextoolkit.getdbpath ())
     cursor = connection.cursor()
     
     # Query for necessary information
