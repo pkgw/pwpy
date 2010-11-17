@@ -11,7 +11,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.pylab import plt
 
 def hexplot(xdata, ydata, groupby = '', colorby = '', pyfilter = '',
-            sqlfilter = '', wherecmd = '', saveas='squintplots.pdf'):
+            sqlfilter = '', wherecmd = '', saveas='squintplots.pdf',
+            lines=False):
     """
     hexplot
     =======
@@ -32,6 +33,7 @@ def hexplot(xdata, ydata, groupby = '', colorby = '', pyfilter = '',
         <NOT IMPLEMENTED>sqlfilter   :=
         wherecmd    :=  'WHERE ...' command for specifying data in sql query
         saveas      :=  savename for pdf of plots
+        lines       :=  whether to connect the plotted points with lines
     
 
     TAG LIST:
@@ -128,9 +130,11 @@ def hexplot(xdata, ydata, groupby = '', colorby = '', pyfilter = '',
             ixdata = data[xdata]
             iydata = data[ydata]
         
-        # Scatter plot the group, label
-        plt.scatter(ixdata, iydata)
-        #plt.plot(ixdata, iydata)
+        # Plot the group, label
+        if lines:
+            plt.plot(ixdata, iydata)
+        else:
+            plt.scatter(ixdata, iydata)
         
         if groupby != '': plt.title(groupby + ' = ' + str(grouplist[i]))
         plt.xlabel(xdata)
@@ -151,15 +155,3 @@ def hexplot(xdata, ydata, groupby = '', colorby = '', pyfilter = '',
         pp.savefig()
         
     pp.close()
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
