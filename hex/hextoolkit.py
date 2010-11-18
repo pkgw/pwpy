@@ -202,8 +202,8 @@ def gaussread(path):
     eread = hexfromtxt(join(path, 'data-sefd.txt'), dtype=EDTYPES, names=ENAMES, skip_header=2)
     if eread == None:
         eread = 'SEFD_READ_FAILURE'
-        print 'GAUSSREAD: Failed to read data-sefd.txt, inserting 0.0 for all.'
-    
+        print '   No SEFD data found.'
+
     # Read in run information
     sinfofile = open(join (path, 'data-sinfo.txt'), 'r')
     sinforead = sinfofile.readlines()
@@ -241,9 +241,10 @@ def gaussread(path):
     for i in xrange(1,43):
         if np.size(np.where(gread['ANT'] == i)) == 2: sqpairs += 1
     
-    print 'GAUSSREAD: sqpairs =', sqpairs
-    # Uncomment following line: will not add runs to database if no corresponding obs
-    #if sqpairs == 0: return 'NO_SQUINT_PAIRS', 0, 0, 0
+    if sqpairs == 0:
+        print '   No squint pairs found.'
+        # We'll still add the run to the DB.
+        #return 'NO_SQUINT_PAIRS', 0, 0, 0
     
     # Define types and names for the squint ndarray
     SDTYPES = 'i S2 i f f f f f f'.split ()
@@ -358,7 +359,6 @@ def resetsql():
     dbpath = getdbpath ()
     try:
         os.rename(dbpath, dbpath + '.old')
-        print 'RESETSQL: Moved old database to', dbpath + '.old'
     except OSError, e:
         # Ignore the error if the database doesn't yet exist.
         if e.errno != 2:
@@ -395,9 +395,6 @@ def resetsql():
     # Close and exit
     connection.commit()
     connection.close()
-    
-    print 'RESETSQL: Saving new database squint.db'
-    return
 
     
 def buildsql(rootdir):
@@ -450,6 +447,8 @@ def hexfromtxt(fname, dtype=float, names=None, skip_header=0, colnum=0):
                         (if not specified, will look at dtype then names then first row after header)
     """
 
+    anybad = False
+
     # Read lines from file, skipping header
     file = open(fname, 'r')
     fileread = file.readlines()[skip_header:]
@@ -476,7 +475,11 @@ def hexfromtxt(fname, dtype=float, names=None, skip_header=0, colnum=0):
     for i in fileread:
         if len(i) == colnum:
             filelist.append(i)
-        else: print 'HEXFROMTXT: Rejecting row, wrong number of elements'
+        else:
+            anybad = True
+
+    if anybad:
+        print '   Some rows didn\'t have the right number of columns.'
 
     # Create proper ndarray
     if names == None:
