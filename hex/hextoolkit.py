@@ -16,9 +16,9 @@ import sqlite3
 
 # Set things up so we can dumpy numpy array values right
 # into sqlite databases.
-sqlite3.register_adapter (np.int32, lambda x: int (x))
-sqlite3.register_adapter (np.float32, lambda x: float (x))
-sqlite3.register_adapter (np.string_, lambda x: str (x))
+sqlite3.register_adapter (np.int32, int)
+sqlite3.register_adapter (np.float32, float)
+sqlite3.register_adapter (np.string_, str)
 
 # Set location of database file
 def getdbpath ():
