@@ -410,12 +410,13 @@ def buildsql(rootdir):
     """
    
     # Find all folders with data-gaussfits.txt
-    gaussfitswalk = os.walk(rootdir)
 
-    for i in gaussfitswalk:
-        if 'data-gaussfits.txt' in i[2]:
-            print 'BUILDSQL: Reading files from ' + i[0]
-            gausstosql(i[0])
+    def load (unused, dirname, filenames):
+        if 'data-gaussfits.txt' in filenames:
+            print dirname
+            gausstosql (dirname)
+
+    os.path.walk (rootdir, load, None)
 
 
 def hexfromtxt(fname, dtype=float, names=None, skip_header=0, colnum=0):    
