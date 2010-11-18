@@ -47,8 +47,8 @@ def hexplot(xdata, ydata, groupby = '', colorby = '', pyfilter = '',
             'antnum'
             'antname'
             'feed'
-            'squintx'
-            'squinty'
+            'squintaz'
+            'squintel'
             'sefd'
         Derived from SQL database:
             'squintmag'
@@ -79,8 +79,8 @@ def hexplot(xdata, ydata, groupby = '', colorby = '', pyfilter = '',
     for i in called_tags:
         if i != '': 
             if i in ('squintmag', 'squintangle'):
-                inputs.append('squintx')
-                inputs.append('squinty')
+                inputs.append('squintaz')
+                inputs.append('squintel')
             else: inputs.append(i)
     sql_cmd = 'SELECT ' + ','.join(inputs) + ' FROM runs NATURAL JOIN obs ' + wherecmd
     cursor.execute(sql_cmd)
@@ -102,9 +102,9 @@ def hexplot(xdata, ydata, groupby = '', colorby = '', pyfilter = '',
         
         # ... and calculate derived tage
         if 'squintmag' in called_tags:
-            data['squintmag'] = np.sqrt(data['squintx'] ** 2 + data['squinty'] ** 2)
+            data['squintmag'] = np.sqrt(data['squintaz'] ** 2 + data['squintel'] ** 2)
         if 'squintangle' in called_tags:
-            data['squintangle'] = np.arctan2(data['squinty'], data['squintx'])
+            data['squintangle'] = np.arctan2(data['squintel'], data['squintaz'])
     else: data = sqldata
     
     # Get number of and list of groups

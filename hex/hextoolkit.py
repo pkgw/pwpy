@@ -191,8 +191,8 @@ def gaussread(path):
     
     # Read in gaussian fit file, bail if empty
     GDTYPES = 'i,S1,i,i,f,f,f,f,f,f,f,f,f,f,f'
-    GNAMES = ('ANT,POL,Npts,,XiSq,AMP,AMPuc,OffRA,OffRAuc,OffDec,'
-              'OffDecuc,WidthRA,WidthRAuc,WidthDec,WidthDecuc')
+    GNAMES = ('ANT,POL,Npts,,XiSq,AMP,AMPuc,OffAz,OffAzuc,OffEl,'
+              'OffEluc,WidthRA,WidthRAuc,WidthDec,WidthDecuc')
     gread = hexfromtxt(join(path, 'data-gaussfits.txt'), dtype=GDTYPES, names=GNAMES, colnum=15)
     if gread == None: return 'GAUSSFITS_READ_FAILURE', 0, 0, 0
     
@@ -247,7 +247,7 @@ def gaussread(path):
     
     # Define types and names for the squint ndarray
     SDTYPES = ['i', 'S2', 'i', 'f', 'f', 'f', 'f']
-    SNAMES = ['antnum', 'antname', 'feed', 'squintx', 'squinty', 'sefd', 'sumchisq']
+    SNAMES = ['antnum', 'antname', 'feed', 'squintaz', 'squintel', 'sefd', 'sumchisq']
     squint = np.zeros(sqpairs, dtype = zip(SNAMES, SDTYPES))
     
     # Calculate squints
@@ -266,8 +266,8 @@ def gaussread(path):
             # Squint defined from x to y, in arcminutes
             xloc = np.where(gread[antloc]['POL'] == 'x')
             yloc = np.where(gread[antloc]['POL'] == 'y')
-            squint[j]['squintx'] = (gread[antloc][yloc]['OffRA'] - gread[antloc][xloc]['OffRA']) / 60.0
-            squint[j]['squinty'] = (gread[antloc][yloc]['OffDec'] - gread[antloc][xloc]['OffDec']) / 60.0
+            squint[j]['squintaz'] = (gread[antloc][yloc]['OffAz'] - gread[antloc][xloc]['OffAz']) / 60.0
+            squint[j]['squintel'] = (gread[antloc][yloc]['OffEl'] - gread[antloc][xloc]['OffEl']) / 60.0
 
             # Take SEFD as max from x and y for each antenna
             if eread == 'SEFD_READ_FAILURE':
@@ -370,8 +370,8 @@ def resetsql():
                                    antnum int,
                                    antname text,
                                    feed int,
-                                   squintx float,
-                                   squinty float,
+                                   squintaz float,
+                                   squintel float,
                                    sefd float,
                                    sumchisq float);"""
     cursor.execute(sql_cmd)
