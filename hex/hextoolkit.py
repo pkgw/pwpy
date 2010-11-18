@@ -191,13 +191,14 @@ def gaussread(path):
     
     # Read in gaussian fit file, bail if empty
     GDTYPES = 'i,S1,i,i,f,f,f,f,f,f,f,f,f,f,f'
-    GNAMES = ['ANT','POL','Npts','','XiSq','AMP','AMPuc','OffRA','OffRAuc','OffDec','OffDecuc','WidthRA','WidthRAuc','WidthDec','WidthDecuc']  
+    GNAMES = ('ANT,POL,Npts,,XiSq,AMP,AMPuc,OffRA,OffRAuc,OffDec,'
+              'OffDecuc,WidthRA,WidthRAuc,WidthDec,WidthDecuc')
     gread = hexfromtxt(join(path, 'data-gaussfits.txt'), dtype=GDTYPES, names=GNAMES, colnum=15)
     if gread == None: return 'GAUSSFITS_READ_FAILURE', 0, 0, 0
     
     # Read in SEFD file, intend to pass zeros if empty
     EDTYPES = 'i,S1,f,f,f,f,f'
-    ENAMES = ['Ant', 'Pol', 'Avg-Amp', 'Amp-RMS', 'Avg-Pha', 'Pha-RMS', 'SEFD']
+    ENAMES = 'Ant,Pol,Avg-Amp,Amp-RMS,Avg-Pha,Pha-RMS,SEFD'
     eread = hexfromtxt(join(path, 'data-sefd.txt'), dtype=EDTYPES, names=ENAMES, skip_header=2)
     if eread == None:
         eread = 'SEFD_READ_FAILURE'
