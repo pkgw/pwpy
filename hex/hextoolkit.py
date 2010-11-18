@@ -14,6 +14,11 @@ from os.path import join
 import numpy as np
 import sqlite3
 
+# Set things up so we can dumpy numpy array values right
+# into sqlite databases.
+sqlite3.register_adapter (np.int32, lambda x: int (x))
+sqlite3.register_adapter (np.float32, lambda x: float (x))
+sqlite3.register_adapter (np.string_, lambda x: str (x))
 
 # Set location of database file
 def getdbpath ():
@@ -329,19 +334,11 @@ def gausstosql(path, replacedups=True):
         cursor.execute('DELETE FROM runs WHERE rid = ?', (rid, ))
         cursor.execute('DELETE FROM obs WHERE rid = ?', (rid, ))
 
-    # Insert run
-    # info = (tstart, source, freq, flux, archsummpath)
-    run_data = str(info)
-    sql_cmd = 'INSERT INTO runs (date, source, freq, flux, archsummpath) VALUES ' + str(run_data)
-    cursor.execute(sql_cmd)
+    # Insert data. NULL values will be replaced with automatic object ids.
+    cursor.execute('INSERT INTO runs VALUES (NULL,?,?,?,?,?)', info)
     runID = cursor.lastrowid
-    
-    # Insert observations
-    for i in xrange(np.size(squint)):
-        # Attach run ID
-        obs_data = '(' + str(runID) + ', ' + str(squint[i])[1:]
-        sql_cmd = 'INSERT INTO obs (rid, antnum, antname, feed, squintx, squinty, sefd, sumchisq) VALUES ' + str(obs_data)
-        cursor.execute(sql_cmd)
+    cursor.executemany ('INSERT INTO obs VALUES (NULL,?,?,?,?,?,?,?,?)',
+                        ((runID, ) + tuple (row) for row in squint))
     
     # Finish up!
     connection.commit()
