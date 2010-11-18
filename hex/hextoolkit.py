@@ -240,8 +240,8 @@ def gaussread(path):
     #if sqpairs == 0: return 'NO_SQUINT_PAIRS', 0, 0, 0
     
     # Define types and names for the squint ndarray
-    SDTYPES = ['i', 'S2', 'i', 'f', 'f', 'f']
-    SNAMES = ['antnum', 'antname', 'feed', 'squintx', 'squinty', 'sefd']
+    SDTYPES = ['i', 'S2', 'i', 'f', 'f', 'f', 'f']
+    SNAMES = ['antnum', 'antname', 'feed', 'squintx', 'squinty', 'sefd', 'sumchisq']
     squint = np.zeros(sqpairs, dtype = zip(SNAMES, SDTYPES))
     
     # Calculate squints
@@ -269,7 +269,8 @@ def gaussread(path):
             else:
                 eloc = np.where(eread['Ant'] == i)
                 if np.size(eloc) != 0: squint[j]['sefd'] = max(eread[eloc]['SEFD'])
-            
+
+            squint[j]['sumchisq'] = gread[antloc][xloc]['XiSq'] + gread[antloc][yloc]['XiSq']
             j += 1
             
     return gread, eread, info, squint
@@ -339,7 +340,7 @@ def gausstosql(path, replacedups=True):
     for i in xrange(np.size(squint)):
         # Attach run ID
         obs_data = '(' + str(runID) + ', ' + str(squint[i])[1:]
-        sql_cmd = 'INSERT INTO obs (rid, antnum, antname, feed, squintx, squinty, sefd) VALUES ' + str(obs_data)
+        sql_cmd = 'INSERT INTO obs (rid, antnum, antname, feed, squintx, squinty, sefd, sumchisq) VALUES ' + str(obs_data)
         cursor.execute(sql_cmd)
     
     # Finish up!
@@ -373,7 +374,8 @@ def resetsql():
                                    feed int,
                                    squintx float,
                                    squinty float,
-                                   sefd float);"""
+                                   sefd float,
+                                   sumchisq float);"""
     cursor.execute(sql_cmd)
     
     # Create table to hold runs
