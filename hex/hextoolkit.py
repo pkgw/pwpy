@@ -452,7 +452,7 @@ def hexfromtxt(fname, dtype=float, names=None, skip_header=0, colnum=0):
     # Read lines from file, skipping header
     file = open(fname, 'r')
     fileread = file.readlines()[skip_header:]
-    file.close
+    file.close ()
     
     # Bail if empty
     if fileread == []: return None
