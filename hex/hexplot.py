@@ -63,7 +63,8 @@ def hexplot(xdata, ydata, groupby = '', colorby = '', pyfilter = '',
         -look into interactive plotting
         -outlier identification & option to suppress (in database buildup)
         -suppress addition printing
-            
+        -plot uncertainties when available (and compute them for
+         derived quantities such as squintmag and squintangle)
     """
     
     # Setup pdf output

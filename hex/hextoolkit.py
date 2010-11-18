@@ -246,8 +246,9 @@ def gaussread(path):
     #if sqpairs == 0: return 'NO_SQUINT_PAIRS', 0, 0, 0
     
     # Define types and names for the squint ndarray
-    SDTYPES = ['i', 'S2', 'i', 'f', 'f', 'f', 'f']
-    SNAMES = ['antnum', 'antname', 'feed', 'squintaz', 'squintel', 'sefd', 'sumchisq']
+    SDTYPES = 'i S2 i f f f f f f'.split ()
+    SNAMES = ['antnum', 'antname', 'feed', 'squintaz', 'squintaz_uc',
+              'squintel', 'squintel_uc', 'sefd', 'sumchisq']
     squint = np.zeros(sqpairs, dtype = zip(SNAMES, SDTYPES))
     
     # Calculate squints
@@ -267,7 +268,11 @@ def gaussread(path):
             xloc = np.where(gread[antloc]['POL'] == 'x')
             yloc = np.where(gread[antloc]['POL'] == 'y')
             squint[j]['squintaz'] = (gread[antloc][yloc]['OffAz'] - gread[antloc][xloc]['OffAz']) / 60.0
+            squint[j]['squintaz_uc'] = np.sqrt (gread[antloc][yloc]['OffAzuc']**2 +
+                                                gread[antloc][xloc]['OffAzuc']**2) / 60.0
             squint[j]['squintel'] = (gread[antloc][yloc]['OffEl'] - gread[antloc][xloc]['OffEl']) / 60.0
+            squint[j]['squintel_uc'] = np.sqrt (gread[antloc][yloc]['OffEluc']**2 +
+                                                gread[antloc][xloc]['OffEluc']**2) / 60.0
 
             # Take SEFD as max from x and y for each antenna
             if eread == 'SEFD_READ_FAILURE':
@@ -338,7 +343,7 @@ def gausstosql(path, replacedups=True):
     # Insert data. NULL values will be replaced with automatic object ids.
     cursor.execute('INSERT INTO runs VALUES (NULL,?,?,?,?,?)', info)
     runID = cursor.lastrowid
-    cursor.executemany ('INSERT INTO obs VALUES (NULL,?,?,?,?,?,?,?,?)',
+    cursor.executemany ('INSERT INTO obs VALUES (NULL,?,?,?,?,?,?,?,?,?,?)',
                         ((runID, ) + tuple (row) for row in squint))
     
     # Finish up!
@@ -371,7 +376,9 @@ def resetsql():
                                    antname text,
                                    feed int,
                                    squintaz float,
+                                   squintaz_uc float,
                                    squintel float,
+                                   squintel_uc float,
                                    sefd float,
                                    sumchisq float);"""
     cursor.execute(sql_cmd)
