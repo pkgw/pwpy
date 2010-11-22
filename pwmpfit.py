@@ -290,7 +290,7 @@ pmut[i]'th column of 'a' has the i'th biggest norm."""
 
 
 @test
-def _qr_test ():
+def _qr_examples ():
     # This is the sample given in the comments of Craig Markwardt's
     # IDL MPFIT implementation. Our results differ because we always
     # use pivoting whereas his example didn't. But the results become
@@ -356,18 +356,21 @@ def _qr_test ():
 
 # QR solution.
 
-def _qrsolv (r, ipvt, diag, qtb, sdiag):
-    """Solve an equation given a QR factored matrix.
+def _qrd_solve (r, pmut, ddiag, qtb, sdiag):
+    """Solve an equation given a QR factored matrix and a diagonal.
 
 Parameters:
 r     - n-by-n in-out array. The full upper triangle contains the full
         upper triangle of R. On output, the strict lower triangle
         contains the transpose of the strict upper triangle of
-        s.
-ipvt  - n-vector describing the permutation matrix P.
-diag  - n-vector containing the diagonal of D.
-qtb   - n-vector containing the first n elements of Q^T B
-sdiag - output n-vector. It is filled with the diagonal of s.
+        S.
+pmut  - n-vector describing the permutation matrix P.
+ddiag - n-vector containing the diagonal of the matrix D in the base 
+        problem (see below).
+qtb   - n-vector containing the first n elements of Q^T B.
+sdiag - output n-vector. It is filled with the diagonal of S. Should
+        be preallocated by the caller -- can result in somewhat greater
+        efficiency if the vector is reused from one call to the next.
 
 Returns:
 x     - n-vector solving the equation.
@@ -390,11 +393,12 @@ R z = Q^T B, P^T D P z = 0 (why the P^T?)
 
 If the system is rank-deficient, these equations are solved as well as
 possible in a least-squares sense. For the purposes of the LM
-algorithm we also compute the upper triangular n-by-n matrix s such
+algorithm we also compute the upper triangular n-by-n matrix S such
 that
 
-P^T (A^T A + D D) P = S^T S
+P^T (A^T A + D D) P = S^T S.
 """
+
     m, n = r.shape
 
     # "Copy r and (q.T)*b to preserve input and initialize s.  In
@@ -406,98 +410,111 @@ P^T (A^T A + D D) P = S^T S
         r[i:,i] = r[i,i:]
 
     x = r.diagonal ()
-    wa = qtb.copy ()
+    zwork = qtb.copy ()
 
     # "Eliminate the diagonal matrix d using a Givens rotation."
     
-    for j in xrange (n):
+    for i in xrange (n):
         # "Prepare the row of D to be eliminated, locating the
         # diagonal element using P from the QR factorization."
 
-        l = ipvt[j]
-        if diag[l] == 0:
-            sdiag[j] = r[j,j]
-            r[j,j] = x[j]
+        li = pmut[i]
+        if ddiag[li] == 0:
+            sdiag[i] = r[i,i]
+            r[i,i] = x[i]
             continue
 
-        sdiag[j:] = 0
-        sdiag[j] = diag[l]
+        sdiag[i:] = 0
+        sdiag[i] = ddiag[li]
 
         # "The transformations to eliminate the row of d modify only a
         # single element of (q transpose)*b beyond the first n, which
         # is initially zero."
 
-        qtbpj = 0.
+        qtbpi = 0.
 
-        for k in xrange (j, n):
+        for j in xrange (i, n):
             # "Determine a Givens rotation which eliminates the
             # appropriate element in the current row of D."
 
-            if sdiag[k] == 0:
+            if sdiag[j] == 0:
                 continue
 
-            if abs (r[k,k]) < abs (sdiag[k]):
-                cot = r[k,k] / sdiag[k]
+            if abs (r[j,j]) < abs (sdiag[j]):
+                cot = r[j,j] / sdiag[j]
                 sin = 0.5 / N.sqrt (0.25 + 0.25 * cot**2)
                 cos = sin * cot
             else:
-                tan = sdiag[k] / r[k,k]
+                tan = sdiag[j] / r[j,j]
                 cos = 0.5 / N.sqrt (0.25 + 0.25 * tan**2)
                 sin = cos * tan
 
             # "Compute the modified diagonal element of r and the
             # modified element of ((q transpose)*b,0)."
-            r[k,k] = cos * r[k,k] + sin * sdiag[k]
-            temp = cos * wa[k] + sin * qtbpj
-            qtbpj = -sin * wa[k] + cos * qtbpj
-            wa[k] = temp
+            r[j,j] = cos * r[j,j] + sin * sdiag[j]
+            temp = cos * zwork[j] + sin * qtbpi
+            qtbpi = -sin * zwork[j] + cos * qtbpi
+            zwork[j] = temp
 
             # "Accumulate the transformation in the row of s."
-            # (On the final iteration of this sub-loop.)
-            if k + 1 < n:
-                temp = cos * r[k+1:,k] + sin * sdiag[k+1:]
-                sdiag[k+1:] = -sin * r[k+1:,k] + cos * sdiag[k+1:]
-                r[k+1:,k] = temp
+            if j + 1 < n:
+                temp = cos * r[j+1:,j] + sin * sdiag[j+1:]
+                sdiag[j+1:] = -sin * r[j+1:,j] + cos * sdiag[j+1:]
+                r[j+1:,j] = temp
 
-        sdiag[j] = r[j,j]
-        r[j,j] = x[j]
+        # Save the diagonal of S and restore the diagonal of R
+        # from its saved location in x.
+        sdiag[i] = r[i,i]
+        r[i,i] = x[i]
 
     # "Solve the triangular system for z.  If the system is singular
     # then obtain a least squares solution."
 
     nsing = n
-    wh = N.where (sdiag == 0)
-    if len (wh[0]) > 0:
-        nsing = wh[0][0]
-        wa[nsing:] = 0
+
+    for i in xrange (n):
+        if sdiag[i] == 0.:
+            nsing = i
+            zwork[i:] = 0
+            break
             
     if nsing >= 1:
-        wa[nsing-1] /= sdiag[nsing-1] # Degenerate case
+        zwork[nsing-1] /= sdiag[nsing-1] # Degenerate case
         # "Reverse loop"
-        for j in xrange (nsing - 2, -1, -1):
-            s = N.dot (r[j+1:nsing,j], wa[j+1:nsing])
-            wa[j] = (wa[j] - s) / sdiag[j]
+        for i in xrange (nsing - 2, -1, -1):
+            s = N.dot (r[i+1:nsing,i], zwork[i+1:nsing])
+            zwork[i] = (zwork[i] - s) / sdiag[i]
 
-    # "Permute the components of z back to components of x
-    x[ipvt] = wa
+    # "Permute the components of z back to components of x."
+    x[pmut] = zwork
     return x
 
 
-def _manual_qrsolv (r, pmut, diag, qtb, dtype=N.float):
+def _manual_qrd_solve (r, pmut, ddiag, qtb, dtype=N.float, build_s=False):
     r = N.asarray (r, dtype)
     pmut = N.asarray (pmut, N.int)
-    diag = N.asarray (diag, dtype)
+    ddiag = N.asarray (ddiag, dtype)
     qtb = N.asarray (qtb, dtype)
 
-    rcopy = r.copy ()
+    swork = r.copy ()
     sdiag = N.empty (r.shape[0], r.dtype)
 
-    x = _qrsolv (rcopy, pmut, diag, qtb, sdiag)
+    x = _qrd_solve (swork, pmut, ddiag, qtb, sdiag)
 
-    return rcopy, x, sdiag
+    if not build_s:
+        return x, swork, sdiag
+
+    # Rebuild s.
+
+    swork = swork.T
+    for i in xrange (r.shape[0]):
+        swork[i:,i] = 0
+        swork[i,i] = sdiag[i]
+
+    return x, swork
 
 
-def _qrsolv_full (a, b, ddiag, dtype=N.float):
+def _qrd_solve_full (a, b, ddiag, dtype=N.float):
     """Solve the equation A x = B, D x = 0.
 
 Parameters:
@@ -535,18 +552,41 @@ has its columns sorted that way.
 
     q, r, pmut = _qr_factor_full (a)
     qtb = N.dot (q.T, b)
-    swork, x, sdiag = _manual_qrsolv (r[:n], pmut, ddiag, qtb)
+    x, s = _manual_qrd_solve (r[:n], pmut, ddiag, qtb, 
+                              dtype=dtype, build_s=True)
 
-    # Now rebuild s.
+    return x, s, pmut
 
-    swork = swork.T
-    for i in xrange (n):
-        swork[i:,i] = 0
-        swork[i,i] = sdiag[i]
 
-    # And that's it.
+@test
+def _qrd_solve_alone ():
+    # Testing out just the QR solution function without 
+    # also the QR factorization bits.
 
-    return x, swork, pmut
+    # The very simplest case.
+    r = N.eye (2)
+    pmut = N.asarray ([0, 1])
+    diag = N.asarray ([0., 0])
+    qtb = N.asarray ([3., 5])
+    x, s = _manual_qrd_solve (r, pmut, diag, qtb, build_s=True)
+    Taaae (x, [3., 5])
+    Taaae (s, N.eye (2))
+
+    # Now throw in a diagonal matrix ...
+    diag = N.asarray ([2., 3.])
+    x, s = _manual_qrd_solve (r, pmut, diag, qtb, build_s=True)
+    Taaae (x, [0.6, 0.5])
+    Taaae (s, N.sqrt (N.diag ([5, 10])))
+
+    # And a permutation. We permute A but maintain
+    # B, effectively saying x1 = 5, x2 = 3, so
+    # we need to permute diag as well to scale them
+    # by the amounts that yield nice X values.
+    pmut = N.asarray ([1, 0])
+    diag = N.asarray ([3., 2.])
+    x, s = _manual_qrd_solve (r, pmut, diag, qtb, build_s=True)
+    Taaae (x, [0.5, 0.6])
+    Taaae (s, N.sqrt (N.diag ([5, 10])))
 
 
 # Calculation of the Levenberg-Marquardt parameter
@@ -624,7 +664,7 @@ def _lmpar (r, ipvt, diag, qtb, delta, x, sdiag, par, enorm, finfo):
 
         temp = N.sqrt (par)
         wa1 = temp * diag
-        x = _qrsolv (r, ipvt, wa1, qtb, sdiag)
+        x = _qrd_solve (r, ipvt, wa1, qtb, sdiag)
         wa2 = diag * x
         dxnorm = enorm (wa2, finfo)
         temp = fp
