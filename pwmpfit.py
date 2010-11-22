@@ -1,9 +1,8 @@
 """pwmpfit - Pythonic, Numpy-based port of MPFIT.
 """
 
-# Test problem: http://www.maxthis.com/curviex.htm
-
 import numpy as N
+
 
 # Quickie testing infrastructure
 
@@ -17,7 +16,20 @@ def test (f):
 
 def _runtests ():
     for f in _testfuncs:
+        print f.__name__, '...'
         f ()
+
+from numpy.testing import assert_array_almost_equal as Taaae
+from numpy.testing import assert_almost_equal as Taae
+
+
+# Public constants
+
+DSIDE_AUTO = 0x0
+DSIDE_POS  = 0x1
+DSIDE_NEG  = 0x2
+DSIDE_TWO  = 0x3
+
 
 # Parameter Info attributes that can be specified
 #
@@ -42,13 +54,16 @@ PI_O_TIED = 1 # fixed to be a function of other parameters
 PI_NUM_O = 2
 
 
-# Norm-calculating functions. Apparently the "careful"
-# norm calculator can be slow, while the "fast" version
-# can be susceptible to under- or overflows.
+# Euclidean norm-calculating functions. Apparently the "careful" norm
+# calculator can be slow, while the "fast" version can be susceptible
+# to under- or overflows.
 
 _enorm_fast = lambda v, finfo: N.sqrt (N.dot (v, v))
 
 def _enorm_careful (v, finfo):
+    #if v.size == 0:
+    #    return 0.
+
     agiant = finfo.max / v.size
     adwarf = finfo.tiny * v.size
 
@@ -56,17 +71,592 @@ def _enorm_careful (v, finfo):
     # Need to do this because of the possibility of over- or under-
     # flow.
     
-    mx = v.max ()
-    mn = v.min ()
-    mx = max (abs (mx), abs (mn))
+    mx = max (abs (v.max ()), abs (v.min ()))
     
     if mx == 0:
-        return v[0] * 0.
+        return v[0] * 0. # preserve type (?)
     if mx > agiant or mx < adwarf:
         return mx * N.sqrt (N.dot (v / mx, v / mx))
     
     return N.sqrt (N.dot (v, v))
 
+
+# Q-R factorization.
+
+def _qr_factor_packed (a, enorm, finfo):
+    """Compute the packed pivoting Q-R factorization of a matrix.
+
+Parameters:
+a     - An m-by-n matrix, m >= n. This will be *overwritten* 
+        by this function as described below!
+enorm - A Euclidian-norm-computing function.
+finfo - A Numpy finfo object.
+
+Returns:
+pmut   - An n-element permutation vector
+rdiag  - An n-element vector of the diagonal of R
+acnorm - An n-element vector of the norms of the columns
+         of the input matrix 'a'.
+
+Computes the Q-R factorization of the matrix 'a', with pivoting, in a
+packed form, in-place. The packed information can be used to construct
+matrices q and r such that
+
+  N.dot (q, r) = a[:,pmut]
+
+where q is m-by-m and q q^T = ident and r is m-by-n and is upper
+triangular.  The function _qr_factor_full can compute these
+matrices. The packed form of output is all that is used by the main LM
+fitting algorithm.
+
+"Pivoting" refers to permuting the columns of 'a' to have their norms
+in nonincreasing order. The return value 'pmut' maps the unpermuted
+columns of 'a' to permuted columns. That is, the norms of the columns
+of a[:,pmut] are in nonincreasing order.
+
+The parameter 'a' is overwritten by this function. Its new value
+should still be interpreted as an m-by-n array. It comes in two
+parts. Its strict upper triangular part contains the strict upper
+triangular part of R. (The diagonal of R is returned in 'rdiag' and
+the strict lower trapezoidal part of R is zero.) The lower trapezoidal
+part of 'a' contains Q as factorized into a series of Householder
+transformation vectors. Q can be reconstructed as the matrix product
+of n Householder matrices, where the i'th Householder matrix is
+defined by
+
+H_i = I - 2 (v^T v) / (v v^T)
+
+where 'v' is the pmut[i]'th column of 'a' with its strict upper
+triangular part set to zero. See _qr_factor_full for more information.
+
+'rdiag' contains the diagonal part of the R matrix, taking into
+account the permutation of 'a'. The strict upper triangular part of R
+is stored in 'a' *with permutation*, so that the i'th column of R has
+rdiag[i] as its diagonal and a[:i,pmut[i]] as its upper part. See
+_qr_factor_full for more information.
+
+'acnorm' contains the norms of the columns of the original input
+matrix 'a' without permutation.
+
+The form of this transformation and the method of pivoting first
+appeared in Linpack."""
+
+    machep = finfo.eps
+    m, n = a.shape
+
+    if m < n:
+        raise ValueError ('a must be at least as tall as it is wide')
+
+    # Initialize our various arrays.
+
+    acnorm = N.empty (n, finfo.dtype)
+    for j in xrange (n):
+        acnorm[j] = enorm (a[:,j], finfo)
+
+    rdiag = acnorm.copy ()
+    wa = rdiag.copy ()
+
+    pmut = N.arange (n)
+
+    # Start the computation.
+
+    for i in xrange (n):
+        # Find the column of a with the i'th largest norm,
+        # and note it in the pivot vector.
+
+        kmax = rdiag[i:].argmax () + i
+
+        if kmax != i:
+            temp = pmut[i]
+            pmut[i] = pmut[kmax]
+            pmut[kmax] = temp
+            rdiag[kmax] = rdiag[i]
+            wa[kmax] = wa[i]
+
+        # "Compute the Householder transformation to reduce the i'th
+        # column of A to a multiple of the i'th unit vector."
+
+        li = pmut[i]
+        aii = a[i:,li] # note that modifying aii modifies a
+        ainorm = enorm (aii, finfo)
+
+        if ainorm == 0:
+            rdiag[i] = 0
+            continue
+
+        if a[i,li] < 0:
+            # Doing this apparently improves FP precision somehow.
+            ainorm = -ainorm
+
+        aii /= ainorm
+        aii[0] += 1
+
+        # "Apply the transformation to the remaining columns and
+        # update the norms."
+
+        for j in xrange (i + 1, n):
+            lj = pmut[j]
+            aij = a[i:,lj] # modifying aij modifies a as well.
+
+            if a[i,li] != 0:
+                aij -= aii * N.dot (aij, aii) / a[i,li]
+
+            if rdiag[j] != 0:
+                temp = a[i,lj] / rdiag[j]
+                rdiag[j] *= N.sqrt (max (1 - temp**2, 0))
+                temp = rdiag[j] / wa[j]
+
+                if 0.05 * temp**2 <= machep:
+                    # What does this do???
+                    wa[j] = rdiag[j] = enorm (a[i+1:,lj], finfo)
+
+        rdiag[i] = -ainorm
+
+    return pmut, rdiag, acnorm
+
+
+def _manual_qr_factor_packed (a, dtype=N.float):
+    # This testing function gives sensible defaults to _qr_factor_packed
+    # and makes a copy of its input to make comparisons easier.
+
+    a = N.array (a, dtype)
+    pmut, rdiag, acnorm = _qr_factor_packed (a, _enorm_careful, N.finfo (dtype))
+    return a, pmut, rdiag, acnorm
+
+
+def _qr_factor_full (a, dtype=N.float):
+    """Compute the QR factorization of a matrix, with pivoting.
+
+Parameters:
+a     - An m-by-n arraylike, m >= n.
+dtype - (optional) The data type to use for computations.
+        Default is N.float.
+
+Returns:
+q    - An m-by-m orthogonal matrix (q q^T = ident)
+r    - An m-by-n upper triangular matrix
+pmut - An n-element permutation vector
+
+The returned values will satisfy the equation
+
+N.dot (q, r) = a[:,pmut]
+
+The outputs are computed indirectly via the function
+_qr_factor_packed. If you need to compute q and r matrices in
+production code, there are faster ways to do it. This function is for
+testing _qr_factor_packed.
+
+The permutation vector pmut is a vector of the integers 0 through
+n-1. It sorts the columns of 'a' by their norms, so that the
+pmut[i]'th column of 'a' has the i'th biggest norm."""
+
+    m, n = a.shape
+
+    # Compute the packed Q and R matrix information.
+
+    packed, pmut, rdiag, acnorm = \
+        _manual_qr_factor_packed (a, dtype)
+
+    # Now we unpack. Start with the R matrix, which is easy:
+    # we just have to piece it together from the strict
+    # upper triangle of 'a' and the diagonal in 'rdiag'.
+    # We're working in the "permuted frame", as it were, so
+    # we need to permute indices when accessing 'a', which is
+    # in the "unpermuted" frame.
+
+    r = N.zeros ((m, n))
+
+    for i in xrange (n):
+        r[:i,i] = packed[:i,pmut[i]]
+        r[i,i] = rdiag[i]
+
+    # Now the Q matrix. It is the concatenation of n Householder
+    # transformations, each of which is defined by a column in the
+    # lower trapezoidal portion of 'a'. We extract the appropriate
+    # vector, construct the matrix for the Householder transform,
+    # and build up the Q matrix.
+
+    q = N.eye (m)
+    v = N.empty (m)
+
+    for i in xrange (n):
+        v[:] = packed[:,pmut[i]]
+        v[0:i] = 0
+        
+        hhm = N.eye (m) - 2 * N.outer (v, v) / N.dot (v, v)
+        q = N.dot (q, hhm)
+
+    return q, r, pmut
+
+
+@test
+def _qr_test ():
+    # This is the sample given in the comments of Craig Markwardt's
+    # IDL MPFIT implementation. Our results differ because we always
+    # use pivoting whereas his example didn't. But the results become
+    # the same if you remove the pivoting bits.
+
+    a = N.asarray ([[9., 4], [2, 8], [6, 7]])
+    packed, pmut, rdiag, acnorm = _manual_qr_factor_packed (a)
+    
+    Taaae (packed, [[-8.27623852, 1.35218036],
+                    [ 1.96596229, 0.70436073],
+                    [ 0.25868293, 0.61631563]])
+    assert pmut[0] == 1
+    assert pmut[1] == 0
+    Taaae (rdiag, [-11.35781669, 7.24595584])
+    Taaae (acnorm, [11.0, 11.35781669])
+
+    q, r, pmut = _qr_factor_full (a)
+    Taaae (N.dot (q, r), a[:,pmut])
+
+    # This is the sample given in Wikipedia. I know, shameful!  Once
+    # again, the Wikipedia example doesn't include pivoting, but the
+    # numbers work out.
+
+    a = N.asarray ([[12., -51, 4],
+                    [6, 167, -68],
+                    [-4, 24, -41]])
+    packed, pmut, rdiag, acnorm = _manual_qr_factor_packed (a)
+    Taaae (packed, [[ 1.66803309,  1.28935268, -71.16941178],
+                    [-2.18085468, -0.94748818,   1.36009392],
+                    [ 2.        , -0.13616597,   0.93291606]])
+    assert pmut[0] == 1
+    assert pmut[1] == 2
+    assert pmut[2] == 0
+    Taaae (rdiag, [176.25549637, 35.43888862, 13.72812946])
+    Taaae (acnorm, [14., 176.25549637, 79.50471684])
+
+    # A sample I constructed myself analytically. I made the Q
+    # from rotation matrices and chose R pretty dumbly to get a
+    # nice-ish matrix following the columnar norm constraint.
+
+    r3 = N.sqrt (3)
+    a = N.asarray ([[-3 * r3, 3 * r3],
+                    [7, 9],
+                    [-2, -6]])
+    q, r, pmut = _qr_factor_full (a)
+
+    r *= N.sign (q[0,0])
+    for i in xrange (3):
+        # Normalize signs.
+        q[:,i] *= (-1)**i * N.sign (q[0,i])
+
+    assert pmut[0] == 1
+    assert pmut[1] == 0
+
+    Taaae (q, 0.25 * N.asarray ([[r3, -2 * r3, 1],
+                                 [3, 2, r3], 
+                                 [-2, 0, 2 * r3]]))
+    Taaae (r, N.asarray ([[12, 4],
+                          [0, 8],
+                          [0, 0]]))
+    Taaae (N.dot (q, r), a[:,pmut])
+
+
+# QR solution.
+
+def _qrsolv (r, ipvt, diag, qtb, sdiag):
+    """Solve an equation given a QR factored matrix.
+
+Parameters:
+r     - n-by-n in-out array. The full upper triangle contains the full
+        upper triangle of R. On output, the strict lower triangle
+        contains the transpose of the strict upper triangle of
+        s.
+ipvt  - n-vector describing the permutation matrix P.
+diag  - n-vector containing the diagonal of D.
+qtb   - n-vector containing the first n elements of Q^T B
+sdiag - output n-vector. It is filled with the diagonal of s.
+
+Returns:
+x     - n-vector solving the equation.
+
+Compute the n-vector x such that
+
+A x = B, D x = 0
+
+where A is an m-by-n matrix, B is an m-vector, and D is an n-by-n
+diagonal matrix. We are given information about pivoted QR
+factorization of A with permutation, such that
+
+A P = Q R
+
+where P is a permutation matrix, Q has orthogonal columns, and R is
+upper triangular with nonincreasing diagonal elements. Q is m-by-m, R
+is m-by-n, and P is n-by-n. If x = P z, then we need to solve
+
+R z = Q^T B, P^T D P z = 0 (why the P^T?)
+
+If the system is rank-deficient, these equations are solved as well as
+possible in a least-squares sense. For the purposes of the LM
+algorithm we also compute the upper triangular n-by-n matrix s such
+that
+
+P^T (A^T A + D D) P = S^T S
+"""
+    m, n = r.shape
+
+    # "Copy r and (q.T)*b to preserve input and initialize s.  In
+    # particular, save the diagonal elements of r in x."  Recall that
+    # on input only the full upper triangle of R is meaningful, so we
+    # can mirror that into the lower triangle without issues.
+
+    for i in xrange (n):
+        r[i:,i] = r[i,i:]
+
+    x = r.diagonal ()
+    wa = qtb.copy ()
+
+    # "Eliminate the diagonal matrix d using a Givens rotation."
+    
+    for j in xrange (n):
+        # "Prepare the row of D to be eliminated, locating the
+        # diagonal element using P from the QR factorization."
+
+        l = ipvt[j]
+        if diag[l] == 0:
+            sdiag[j] = r[j,j]
+            r[j,j] = x[j]
+            continue
+
+        sdiag[j:] = 0
+        sdiag[j] = diag[l]
+
+        # "The transformations to eliminate the row of d modify only a
+        # single element of (q transpose)*b beyond the first n, which
+        # is initially zero."
+
+        qtbpj = 0.
+
+        for k in xrange (j, n):
+            # "Determine a Givens rotation which eliminates the
+            # appropriate element in the current row of D."
+
+            if sdiag[k] == 0:
+                continue
+
+            if abs (r[k,k]) < abs (sdiag[k]):
+                cot = r[k,k] / sdiag[k]
+                sin = 0.5 / N.sqrt (0.25 + 0.25 * cot**2)
+                cos = sin * cot
+            else:
+                tan = sdiag[k] / r[k,k]
+                cos = 0.5 / N.sqrt (0.25 + 0.25 * tan**2)
+                sin = cos * tan
+
+            # "Compute the modified diagonal element of r and the
+            # modified element of ((q transpose)*b,0)."
+            r[k,k] = cos * r[k,k] + sin * sdiag[k]
+            temp = cos * wa[k] + sin * qtbpj
+            qtbpj = -sin * wa[k] + cos * qtbpj
+            wa[k] = temp
+
+            # "Accumulate the transformation in the row of s."
+            # (On the final iteration of this sub-loop.)
+            if k + 1 < n:
+                temp = cos * r[k+1:,k] + sin * sdiag[k+1:]
+                sdiag[k+1:] = -sin * r[k+1:,k] + cos * sdiag[k+1:]
+                r[k+1:,k] = temp
+
+        sdiag[j] = r[j,j]
+        r[j,j] = x[j]
+
+    # "Solve the triangular system for z.  If the system is singular
+    # then obtain a least squares solution."
+
+    nsing = n
+    wh = N.where (sdiag == 0)
+    if len (wh[0]) > 0:
+        nsing = wh[0][0]
+        wa[nsing:] = 0
+            
+    if nsing >= 1:
+        wa[nsing-1] /= sdiag[nsing-1] # Degenerate case
+        # "Reverse loop"
+        for j in xrange (nsing - 2, -1, -1):
+            s = N.dot (r[j+1:nsing,j], wa[j+1:nsing])
+            wa[j] = (wa[j] - s) / sdiag[j]
+
+    # "Permute the components of z back to components of x
+    x[ipvt] = wa
+    return x
+
+
+def _manual_qrsolv (r, pmut, diag, qtb, dtype=N.float):
+    r = N.asarray (r, dtype)
+    pmut = N.asarray (pmut, N.int)
+    diag = N.asarray (diag, dtype)
+    qtb = N.asarray (qtb, dtype)
+
+    rcopy = r.copy ()
+    sdiag = N.empty (r.shape[0], r.dtype)
+
+    x = _qrsolv (rcopy, pmut, diag, qtb, sdiag)
+
+    return rcopy, x, sdiag
+
+
+def _qrsolv_full (a, b, ddiag, dtype=N.float):
+    """Solve the equation A x = B, D x = 0.
+
+Parameters:
+a     - an m-by-n array, m >= n
+b     - an m-vector
+ddiag - an n-vector giving the diagonal of D. (The rest of D is 0.)
+
+Returns:
+x    - n-vector solving the equation.
+s    - the n-by-n supplementary matrix s.
+pmut - n-element permutation vector defining the permutation matrix P.
+
+The equations are solved in a least-squares sense if the system is
+rank-deficient.  D is a diagonal matrix and hence only its diagonal is
+in fact supplied as an argument. The matrix s is full upper triangular
+and solves the equation
+
+P^T (A^T A + D D) P = S^T S
+
+where P is the permutation matrix defined by the vector pmut; it puts
+the columns of 'a' in order of nonincreasing rank, so that a[:,pmut]
+has its columns sorted that way.
+"""
+
+    a = N.asarray (a, dtype)
+    b = N.asarray (b, dtype)
+    ddiag = N.asarray (ddiag, dtype)
+
+    m, n = a.shape
+    assert m >= n
+    assert b.shape == (m, )
+    assert ddiag.shape == (n, )
+
+    # The computation is straightforward.
+
+    q, r, pmut = _qr_factor_full (a)
+    qtb = N.dot (q.T, b)
+    swork, x, sdiag = _manual_qrsolv (r[:n], pmut, ddiag, qtb)
+
+    # Now rebuild s.
+
+    swork = swork.T
+    for i in xrange (n):
+        swork[i:,i] = 0
+        swork[i,i] = sdiag[i]
+
+    # And that's it.
+
+    return x, swork, pmut
+
+
+# Calculation of the Levenberg-Marquardt parameter
+
+def _lmpar (r, ipvt, diag, qtb, delta, x, sdiag, par, enorm, finfo):
+    dwarf = finfo.tiny
+    m, n = r.shape
+
+    # "Compute and store x in the Gauss-Newton direction. If
+    # the Jacobian is rank-deficient, obtain a least-squares
+    # solution.
+
+    nsing = n
+    wa1 = qtb.copy ()
+    wh = N.where (r.diagonal () == 0)
+    if len (wh[0]) > 0:
+        nsing = wh[0][0]
+        wa1[wh[0][0]:] = 0
+    if nsing > 1:
+        # "Reverse loop"
+        for j in xrange (nsing - 1, -1, -1):
+            wa1[j] /= r[j,j]
+            if j - 1 >= 0:
+                wa1[:j] -= r[:j,j] * wa1[j]
+
+    # "Note: ipvt here is a permutation array."
+    x[ipvt] = wa1
+
+    # "Initialize the iteration counter.  Evaluate the function at the
+    # origin, and test for acceptance of the gauss-newton direction"
+    iterct = 0
+    wa2 = diag * x
+    dxnorm = enorm (wa2, finfo)
+    fp = dxnorm - delta
+    if fp <= 0.1 * delta:
+        return r, 0, x, sdiag
+
+    # "If the Jacobian is not rank deficient, the Newton step provides a
+    # lower bound, parl, for the zero of the function.  Otherwise set
+    # this bound to zero."
+      
+    parl = 0.
+        
+    if nsing >= n:
+        wa1 = diag[ipvt] * wa2[ipvt] / dxnorm
+        wa1[0] /= r[0,0] # Degenerate case 
+        for j in xrange (1, n):
+            s = N.dot (r[:j,j], wa1[:j])
+            wa1[j] = (wa1[j] - s) / r[j,j]
+
+        temp = enorm (wa1, finfo)
+        parl = fp / delta / temp**2
+
+    # "Calculate an upper bound, paru, for the zero of the function."
+
+    for j in xrange (n):
+        s = N.dot (r[:j+1,j], qtb[:j+1])
+        wa1[j] = s / diag[ipvt[j]]
+    gnorm = enorm (wa1, finfo)
+    paru = gnorm / delta
+    if paru == 0:
+        paru = dwarf / min (delta, 0.1)
+
+    par = N.clip (par, parl, paru)
+    if par == 0:
+        par = gnorm / dxnorm
+
+    # Begin iteration
+    while True:
+        iterct += 1
+
+        # Evaluate at current value of par.
+        if par == 0:
+            par = max (dwarf, paru * 0.001)
+
+        temp = N.sqrt (par)
+        wa1 = temp * diag
+        x = _qrsolv (r, ipvt, wa1, qtb, sdiag)
+        wa2 = diag * x
+        dxnorm = enorm (wa2, finfo)
+        temp = fp
+        fp = dxnorm - delta
+
+        if (abs (fp) < 0.1 * delta or (parl == 0 and fp <= temp and temp < 0) or
+            iter == 10):
+            break
+
+        # "Compute the Newton correction."
+        wa1 = diag[ipvt] * wa2[ipvt] / dxnorm
+
+        for j in xrange (n - 1):
+            wa1[j] /= sdiag[j]
+            wa1[j+1:n] -= r[j+1:n,j] * wa1[j]
+        wa1[n-1] /= siag[n-1] # degenerate case
+
+        temp = enorm (wa1, finfo)
+        parc = fp / delta / temp**2
+
+        if fp > 0: parl = max (parl, par)
+        elif fp < 0: paru = min (paru, par)
+
+        # Improve estimate of par
+
+        par = max (parl, par + parc)
+
+    # All done
+    return r, par, x, diag
+
+
+# The actual user interface to the problem-solving machinery:
 
 class Solution (object):
     prob = None
@@ -252,7 +842,7 @@ class Problem (object):
         if N.any (N.isinf (p[PI_F_STEP])):
             raise ValueError ('Some specified parameter steps infinite.')
         
-        if N.any (p[PI_F_STEP] > p[PI_F_MAXSTEP]):
+        if N.any ((p[PI_F_STEP] > p[PI_F_MAXSTEP]) & ~self._getBits (PI_M_RELSTEP)):
             raise ValueError ('Some specified steps bigger than specified maxsteps.')
 
         if N.any (p[PI_F_LLIMIT] > p[PI_F_ULIMIT]):
@@ -283,6 +873,7 @@ class Problem (object):
         # A tied parameter is effectively fixed.
         qfixed = self._getBits (PI_M_FIXED) | qtied
         self._ifree = N.where (-qfixed)[0]
+
 
     def copy (self):
         n = Problem (self._func, self._npar, self._nout, self.solclass)
@@ -339,9 +930,12 @@ class Problem (object):
         self._pinfof[PI_F_LLIMIT,idx] = lower
         self._pinfof[PI_F_ULIMIT,idx] = upper
 
-        # Try to be clever here.
+        # Try to be clever here -- setting lower = upper
+        # markes the parameter as fixed.
+
         w = N.where (lower == upper)
-        self.pValue (w, lower[w], True)
+        if len (w) > 0 and w[0].size > 0:
+            self.pValue (w, N.atleast_1d (lower)[w], True)
 
         return self
 
@@ -349,7 +943,7 @@ class Problem (object):
     def pStep (self, idx, step, maxstep=N.inf, isrel=False):
         if N.any (N.isinf (step)):
             raise ValueError ('step')
-        if N.any (step > maxstep):
+        if N.any ((step > maxstep) & ~isrel):
             raise ValueError ('step > maxstep')
 
         self._pinfof[PI_F_STEP,idx] = step
@@ -424,7 +1018,7 @@ class Problem (object):
 
         # Steps for numerical derivatives
         isrel = self._getBits (PI_M_RELSTEP)
-        dside = self._getBits (PI_M_SIDE)
+        dside = self._pinfob & PI_M_SIDE
         maxstep = self._pinfof[PI_F_MAXSTEP]
         qmax = N.isfinite (maxstep)
         qminmax = N.any (qmax)
@@ -486,7 +1080,7 @@ class Problem (object):
 
             # Calculate the Jacobian
 
-            fjac = self._fdjac2 (x, fvec, ulim, dside, x0, isrel, finfo)
+            fjac = self._fdjac2 (x, fvec, ulim, dside, x0, maxstep, isrel, finfo)
 
             if qanylim:
                 # Check for parameters pegged at limits
@@ -507,7 +1101,7 @@ class Problem (object):
 
             # Compute QR factorization of the Jacobian
 
-            fjac, ipvt, wa1, wa2 = self.qrfac (fjac, finfo)
+            ipvt, wa1, wa2 = _qr_factor_packed (fjac, self._enorm, finfo)
 
             if self.niter == 1:
                 # If "diag" unspecified, scale according to norms of columns
@@ -574,8 +1168,8 @@ class Problem (object):
             # Inner loop
             while True:
                 # Get Levenberg-Marquardt parameter
-                fjac, par, wa1, wa2 = self.lmpar (fjac, ipvt, diag, qtf, delta,
-                                                  wa1, wa2, par, finfo)
+                fjac, par, wa1, wa2 = _lmpar (fjac, ipvt, diag, qtf, delta,
+                                              wa1, wa2, par, _enorm, finfo)
                 # "Store the direction p and x+p. Calculate the norm of p"
                 wa1 = -wa1
 
@@ -675,7 +1269,7 @@ class Problem (object):
                     if actred >= 0:
                         temp = 0.5
                     else:
-                        temp = 0.5 * dirder / (dider + 0.5 * actred)
+                        temp = 0.5 * dirder / (dirder + 0.5 * actred)
 
                     if 0.1 * fnorm1 >= self.fnorm or temp < 0.1:
                         temp = 0.1
@@ -784,7 +1378,7 @@ class Problem (object):
 
         return soln
 
-    def _fdjac2 (self, x, fvec, ulimit, dside, xall, isrel, finfo):
+    def _fdjac2 (self, x, fvec, ulimit, dside, xall, maxstep, isrel, finfo):
         ifree = self._ifree
         debug = self.debugJac
         machep = finfo.eps
@@ -803,14 +1397,9 @@ class Problem (object):
             fjac = N.zeros (nall, finfo.dtype)
             fjac[ifree] = 1.0
             self._call (xall, fp, fjac)
-
-            # "This definition is consistent with CURVEFIT."
-            assert fjac.shape == (m, nall)
-            fjac = -fjac
-
             if len (ifree) < nall:
                 fjac = fjac[:,ifree]
-                return fjac
+            return fjac
 
         fjac = N.zeros ((m, n), finfo.dtype)
         h = eps * N.abs (x)
@@ -820,13 +1409,16 @@ class Problem (object):
         wh = N.where (stepi > 0)
         h[wh] = stepi[wh] * N.where (isrel[ifree[wh]], x[wh], 1.)
 
+        # Clamp stepsizes to maxstep.
+        N.minimum (h, maxstep, h)
+
         # Make sure no zero step values
         h[N.where (h == 0)] = eps
 
         # Reverse sign of step if against a parameter limit or if
         # backwards-sided derivative
 
-        mask = dside == -1
+        mask = dside == DSIDE_NEG
         if ulimit is not None:
             mask |= x > ulimit - h
             wh = N.where (mask)
@@ -843,7 +1435,7 @@ class Problem (object):
             fp = N.empty (self._nout, dtype=finfo.dtype)
             self._call (xp, fp, None)
 
-            if abs (dside[j]) <= 1:
+            if dside[j] != DSIDE_TWO:
                 # One-sided derivative
                 fjac[:,j] = (fp - fvec) / h[j]
             else:
@@ -867,7 +1459,8 @@ class Problem (object):
         x = xall[ifree]
         fvec = N.empty (self._nout, dtype)
         ulimit = self._pinfof[PI_F_ULIMIT,ifree]
-        dside = self._getBits (PI_M_SIDE)
+        dside = self._pinfob & PI_M_SIDE
+        maxstep = self._pinfof[PI_F_MAXSTEP]
         isrel = self._getBits (PI_M_RELSTEP)
         finfo = N.finfo (dtype)
 
@@ -876,261 +1469,8 @@ class Problem (object):
         # the specified position.
 
         self._call (x, fvec, None)
-        return self._fdjac2 (x, fvec, ulimit, dside, xall, isrel, finfo)
+        return self._fdjac2 (x, fvec, ulimit, dside, xall, maxstep, isrel, finfo)
         
-    def qrfac (self, a, finfo):
-        # Hardwired to pivot=True since it always is in this code
-        machep = finfo.eps
-        m, n = a.shape
-
-        acnorm = N.zeros (n, finfo.dtype)
-        for j in xrange (n):
-            acnorm[j] = self._enorm (a[:,j], finfo)
-        rdiag = acnorm.copy ()
-        wa = rdiag.copy ()
-        ipvt = N.arange (n)
-
-        # "Reduce a to r with Householder transformations."
-        minmn = min (m, n)
-        for j in xrange (minmn):
-            # "Bring the column of the largest norm into the pivot position."
-            rmax = rdiag[j:len(rdiag)].max ()
-            kmax = N.where (rdiag[j:len(rdiag)] == rmax)
-            ct = len (kmax[0])
-            kmax[0][:] += j
-            if ct > 0:
-                kmax = kmax[0]
-                    
-                # "Exchange rows via the pivot only.  Avoid actually exchanging
-                # the rows, in case there is lots of memory transfer.  The
-                # exchange occurs later, within the body of MPFIT, after the
-                # extraneous columns of the matrix have been shed."
-                
-                if kmax != j:
-                    temp = ipvt[j]
-                    ipvt[j] = ipvt[kmax]
-                    ipvt[kmax] = temp
-                    rdiag[kmax] = rdiag[j]
-                    wa[kmax] = wa[j]
-
-            # "Compute the Householder transformation to reduce the jth
-            # column of A to a multiple of the jth unit vector."
-            lj = ipvt[j]
-            ajj = a[j:,lj]
-            ajnorm = self._enorm (ajj, finfo)
-
-            if ajnorm == 0:
-                break
-            if a[j,j] < 0:
-                ajnorm = -ajnorm
-
-            ajj /= ajnorm
-            ajj[0] += 1
-            a[j:,lj] = ajj
-
-            # "Apply the transformation to the remaining columns and
-            # update the norms."
-
-            if j + 1 < n:
-                for k in xrange (j + 1, n):
-                    lk = ipvt[k]
-                    ajk = a[j:,lk]
-                    if a[j,lj] != 0:
-                        a[j:,lk] = ajk - ajj * N.dot (ajk, ajj) / a[j,lj]
-                        if rdiag[k] != 0:
-                            temp = a[j,lk] / rdiag[k]
-                            rdiag[k] *= N.sqrt (max (1 - temp**2, 0))
-                            temp = rdiag[k] / wa[k]
-
-                            if 0.05 * temp**2 <= machep:
-                                rdiag[k] = self._enorm (a[j+1:,lk], finfo)
-                                wa[k] = rdiag[k]
-
-            rdiag[j] = -ajnorm
-
-        return a, ipvt, rdiag, acnorm
-
-
-    def qrsolv (self, r, ipvt, diag, qtb, sdiag):
-        m, n = r.shape
-
-        # "Copy r and (q.T)*b to preserve input and initialize s.
-        # In particular, save the diagonal elements of r in x.
-
-        for j in xrange (n):
-            r[j:n,j] = r[j,j:n]
-        x = r.diagonal ()
-        wa = qtb.copy ()
-
-        # "Eliminate the diagonal matrix d using a Givens rotation."
-
-        for j in xrange (n):
-            l = ipvt[j]
-            if diag[l] == 0:
-                break
-            sdiag[j:len(sdiag)] = 0
-            sdiag[j] = diag[l]
-
-            # "The transformations to eliminate the row of d modify only a
-            # single element of (q transpose)*b beyond the first n, which
-            # is initially zero."
-
-            qtbpj = 0.
-
-            for k in xrange (j, n):
-                if sdiag[k] == 0:
-                    break
-
-                if abs (r[k,k]) < abs (sdiag[k]):
-                    cotan = r[k,k] / sdiag[k]
-                    sine = 0.5 / N.sqrt (0.25 + 0.25 * cotan**2)
-                    cosine = sine * cotan
-                else:
-                    tang = sdiag[k] / r[k,k]
-                    cosine = 0.5 / N.sqrt (0.25 + 0.25 * tang**2)
-                    sine = cosine * tang
-
-                # "Compute the modified diagonal element of r and the
-                # modified element of ((q transpose)*b,0)."
-                r[k,k] = cosine * r[k,k] + sine * sdiag[k]
-                temp = cosine * wa[k] + sine * qtbpj
-                qtbpj = -sine * wa[k] + cosine * qtbpj
-                wa[k] = temp
-
-                # Accumulate the transformation in the row of s
-                if n > k + 1:
-                    temp = cosine * r[k+1:n,k] + sine * sdiag[k+1:n]
-                    sdiag[k+1:n] = -sine * r[k+1:n,k] + cosine * sdiag[k+1:n]
-                    r[k+1:n,k] = temp
-
-            sdiag[j] = r[j,j]
-            r[j,j] = x[j]
-
-        # "Solve the triangular system for z.  If the system is singular
-        # then obtain a least squares solution."
-
-        nsing = n
-        wh = N.where (sdiag == 0)
-        if len (wh[0]) > 0:
-            nsing = wh[0][0]
-            wa[nsing:] = 0
-            
-        if nsing >= 1:
-            wa[nsing-1] /= sdiag[nsing-1] # Degenerate c ase
-            # "Reverse loop"
-            for j in xrange (nsing - 2, -1, -1):
-                s = N.dot (r[j+1:nsing,j], wa[j+1:nsing])
-                wa[j] = (wa[j] - s) / sdiag[j]
-
-        # "Permute the components of z back to components of x
-        x[ipvt] = wa
-        return r, x, sdiag
-
-
-    def lmpar (self, r, ipvt, diag, qtb, delta, x, sdiag, par, finfo):
-        dwarf = finfo.tiny
-        m, n = r.shape
-
-        # "Compute and store x in the Gauss-Newton direction. If
-        # the Jacobian is rank-deficient, obtain a least-squares
-        # solution.
-
-        nsing = n
-        wa1 = qtb.copy ()
-        wh = N.where (r.diagonal () == 0)
-        if len (wh[0]) > 0:
-            nsing = wh[0][0]
-            wa1[wh[0][0]:] = 0
-        if nsing > 1:
-            # "Reverse loop"
-            for j in xrange (nsing - 1, -1, -1):
-                wa1[j] /= r[j,j]
-                if j - 1 >= 0:
-                    wa1[:j] -= r[:j,j] * wa1[j]
-
-        # "Note: ipvt here is a permutation array."
-        x[ipvt] = wa1
-
-        # "Initialize the iteration counter.  Evaluate the function at the
-        # origin, and test for acceptance of the gauss-newton direction"
-        iterct = 0
-        wa2 = diag * x
-        dxnorm = self._enorm (wa2, finfo)
-        fp = dxnorm - delta
-        if fp <= 0.1 * delta:
-            return r, 0, x, sdiag
-
-        # "If the Jacobian is not rank deficient, the Newton step provides a
-        # lower bound, parl, for the zero of the function.  Otherwise set
-        # this bound to zero."
-      
-        parl = 0.
-        
-        if nsing >= n:
-            wa1 = diag[ipvt] * wa2[ipvt] / dxnorm
-            wa1[0] /= r[0,0] # Degenerate case 
-            for j in xrange (1, n):
-                s = N.dot (r[:j,j], wa1[:j])
-                wa1[j] = (wa1[j] - s) / r[j,j]
-
-            temp = self._enorm (wa1, finfo)
-            parl = fp / delta / temp**2
-
-        # "Calculate an upper bound, paru, for the zero of the function."
-
-        for j in xrange (n):
-            s = N.dot (r[:j+1,j], qtb[:j+1])
-            wa1[j] = s / diag[ipvt[j]]
-        gnorm = self._enorm (wa1, finfo)
-        paru = gnorm / delta
-        if paru == 0:
-            paru = dwarf / min (delta, 0.1)
-
-        par = N.clip (par, parl, paru)
-        if par == 0:
-            par = gnorm / dxnorm
-
-        # Begin iteration
-        while True:
-            iterct += 1
-
-            # Evaluate at current value of par.
-            if par == 0:
-                par = max (dwarf, paru * 0.001)
-
-            temp = N.sqrt (par)
-            wa1 = temp * diag
-            r, x, sdiag = self.qrsolv (r, ipvt, wa1, qtb, sdiag)
-            wa2 = diag * x
-            dxnorm = self._enorm (wa2, finfo)
-            temp = fp
-            fp = dxnorm - delta
-
-            if (abs (fp) < 0.1 * delta or (parl == 0 and fp <= temp and temp < 0) or
-                iter == 10):
-                break
-
-            # "Compute the Newton correction."
-            wa1 = diag[ipvt] * wa2[ipvt] / dxnorm
-
-            for j in xrange (n - 1):
-                wa1[j] /= sdiag[j]
-                wa1[j+1:n] -= r[j+1:n,j] * wa1[j]
-            wa1[n-1] /= siag[n-1] # degenerate case
-
-            temp = self._enorm (wa1, finfo)
-            parc = fp / delta / temp**2
-
-            if fp > 0: parl = max (parl, par)
-            elif fp < 0: paru = min (paru, par)
-
-            # Improve estimate of par
-
-            par = max (parl, par + parc)
-
-        # All done
-        return r, par, x, diag
-
 
     def _doTies (self, p):
         funcs = self._pinfoo[PI_O_TIED]
@@ -1213,6 +1553,7 @@ def ResidualProblem (func, npar, x, yobs, err, solclass=Solution):
 
 # Test!
 
+
 @test
 def _solve_linear ():
     x = N.asarray ([1, 2, 3])
@@ -1229,21 +1570,94 @@ def _solve_linear ():
 
 @test
 def _simple_automatic_jac ():
-    from numpy.testing import assert_array_almost_equal as aaae
-
     def f (pars, vec, jac):
         N.exp (pars, vec)
 
     p = Problem (f, 1, 1)
     j = p._manual_fdjac2 (0) 
-    aaae (j, [[1.]])
+    Taaae (j, [[1.]])
     j = p._manual_fdjac2 (1) 
-    aaae (j, [[N.e]])
+    Taaae (j, [[N.e]])
 
     p = Problem (f, 3, 3)
     x = N.asarray ([0, 1, 2])
     j = p._manual_fdjac2 (x) 
-    aaae (j, N.diag (N.exp (x)))
+    Taaae (j, N.diag (N.exp (x)))
+
+@test
+def _jac_sidedness ():
+    # Make a function with a derivative discontinuity so we can test
+    # the sidedness settings.
+
+    def f (pars, vec, jac):
+        p = pars[0]
+
+        if p >= 0:
+            vec[:] = p
+        else:
+            vec[:] = -p
+
+    p = Problem (f, 1, 1)
+
+    # Default: positive unless against upper limit.
+    Taaae (p._manual_fdjac2 (0), [[1.]])
+
+    # DSIDE_AUTO should be the default.
+    p.pSide (0, DSIDE_AUTO)
+    Taaae (p._manual_fdjac2 (0), [[1.]])
+
+    # DSIDE_POS should be equivalent here.
+    p.pSide (0, DSIDE_POS)
+    Taaae (p._manual_fdjac2 (0), [[1.]])
+
+    # DSIDE_NEG should get the other side of the discont.
+    p.pSide (0, DSIDE_NEG)
+    Taaae (p._manual_fdjac2 (0), [[-1.]])
+
+    # DSIDE_AUTO should react to an upper limit and take
+    # a negative-step derivative.
+    p.pSide (0, DSIDE_AUTO)
+    p.pLimit (0, upper=0)
+    Taaae (p._manual_fdjac2 (0), [[-1.]])
+
+@test
+def _jac_stepsizes ():
+    def f (expstep, pars, vec, jac):
+        p = pars[0]
+
+        if p != 1.:
+            Taae (p, expstep)
+
+        vec[:] = 1
+
+    # Fixed stepsize of 1.
+    p = Problem (lambda p, v, j: f (2., p, v, j), 1, 1)
+    p.pStep (0, 1.)
+    p._manual_fdjac2 (1)
+
+    # Relative stepsize of 0.1
+    p = Problem (lambda p, v, j: f (1.1, p, v, j), 1, 1)
+    p.pStep (0, 0.1, isrel=True)
+    p._manual_fdjac2 (1)
+
+    # Fixed stepsize must be less than max stepsize.
+    try:
+        p = Problem (f, 2, 2)
+        p.pStep ((0, 1), (1, 1), (1, 0.5))
+        assert False, 'Invalid arguments accepted'
+    except ValueError:
+        pass
+
+    # Maximum stepsize, made extremely small to be enforced
+    # in default circumstances.
+    p = Problem (lambda p, v, j: f (1 + 1e-11, p, v, j), 1, 1)
+    p.pStep (0, 0.0, 1e-11)
+    p._manual_fdjac2 (1)
+
+    # Maximum stepsize and a relative stepsize
+    p = Problem (lambda p, v, j: f (1.1, p, v, j), 1, 1)
+    p.pStep (0, 0.5, 0.1, True)
+    p._manual_fdjac2 (1)
 
 # Finally ...
 
