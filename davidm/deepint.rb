@@ -25,8 +25,9 @@ keyini
   nx = keyi(:nxy, 2)
   ny = keyi(:nxy, 2)
   
-  # Get mag scale keyword
-  mag_scale_kw = keya(:mag, 'linear')
+  # Get axes scales
+  xax = keya(:axis, 'freq')
+  yax = keya(:axis, 'linear')
 
   # Time interval over which to average visdata
   # (given in minutes, but stored as days)
@@ -36,7 +37,8 @@ keyfin
 # Create Hash to store data
 data = {}
 
-# Variable to hold frequencies for each channel
+# Variable to hold xaxis info from dataset
+lineinfo = nil
 freqs = nil
 
 # Loop through data files
@@ -48,10 +50,14 @@ while tno = uvDatOpn
   nchan = uvrdvri(tno, :nchan) if nchan == 0
   # Create a new Vis object
   v = Vis.new(nchan)
-  freqs ||= uvinfo(tno, :frequency)
 
   # Loop through data
   while uvDatRd(v)
+
+    # Lazy init line and frequency info for x axis
+    lineinfo ||= uvinfo(tno, :line)
+    freqs ||= uvinfo(tno, :frequency)
+
     # Get keys
     time = v.time
     a1a2 = v.basant
@@ -94,16 +100,26 @@ baselines.each do |bl|
   end
 end
 
+# Generate xaxis values once
+if xax[0,1] == 'f'
+  xx=freqs
+else
+  xx=NArray.float(nchan).indgen!
+  # Compute "virtual" channel numbers based on line parameters
+  #xxplot = xx * lineinfo[4] + lineinfo[2] + lineinfo[3]/2.0 - 0.5
+  xx = xx.mul!(lineinfo[4]).add!(lineinfo[2] + lineinfo[3]/2.0 - 0.5)
+end
+
 baselines.each do |bl|
   a1, a2 = bl
   next if a1 == a2
 
   tau12, vis12 = integrations[bl]
+  mag_scale = yax
 
   # Normalize by geometric mean of the autos if present
   have_autos = integrations.has_key?([a1,a1]) && integrations.has_key?([a2,a2])
   if have_autos
-    mag_scale = mag_scale_kw
     mag_label = "Correlation Coefficient"
     tau11, vis11 = integrations[[a1,a1]]
     tau22, vis22 = integrations[[a2,a2]]
@@ -118,26 +134,26 @@ baselines.each do |bl|
     end
   else
     # Doesn't make much sense to do dB if not a ratio
-    mag_scale = 'log' if mag_scale_kw =~ /db/i
+    mag_scale = 'log' if yax =~ /db/i
     mag_label = "Magnitude"
   end
 
   title = "Ants #{a1}-#{a2};  Inputs #{a1-1}-#{a2-1}"
   title2 = "tau = #{(tau12/3600).to_hmsstr(3)}"
   mag_label += case mag_scale
-                when /db/i
+                when /^db/i # dB
                   ' (dB)'
-                when /log/i
+                when /^lo/i # log
                   ' (log10)'
-                else
+                else        # linear
                   ' (linear)'
                 end
 
-  magphase(vis12,
-           :mag_scale => mag_scale,
-           :xlabel => 'Channel',
-           :mag_label => mag_label,
+  magphase(xx, vis12,
            :title => title,
-           :title2 => title2
+           :title2 => title2,
+           :xlabel => xax[0,1] == 'f' ? 'Frequency (GHz)' : 'Channel',
+           :mag_label => mag_label,
+           :mag_scale => mag_scale
           )
 end
