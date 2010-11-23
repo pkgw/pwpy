@@ -65,13 +65,16 @@ while tno = uvDatOpn
     tau = uvrdvrf(tno, :inttime)
     warn "tau == 0 for #{a1a2[0]}-#{a1a2[1]} at #{time}" if tau == 0
     next if tau == 0
-    val = [tau, v.data.dup]
 
     # Store into data Hash
     data[time] ||= {}
-    data[a1a2] ||= {}
-    data[time][a1a2] = val
-    data[a1a2][time] = val
+    if data.has_key?(a1a2)
+      d = data[a1a2]
+      d[0] += tau
+      d[1].add!(v.data)
+    else
+      data[a1a2] = [tau, v.data.dup]
+    end
   end
 
   uvDatCls
@@ -84,20 +87,17 @@ baselines = keys.grep(Array).sort
 puts "got #{timestamps.length} distinct times"
 puts "got #{baselines.length} baselines"
 
-Plotter.new(:device=>device, :nx=>nx, :ny=>ny, :ask=>true)
-pgsch(1.5)
-
-# Hash for integrations
-# {[a1,a2] => [sum_tau, sum_visdata]}
-integrations = {}
-
-baselines.each do |bl|
-  integrations[bl] ||= [0.0, NArray.scomplex(nchan)]
-  data[bl].values.each do |tau, visdata|
-    integrations[bl][0] += tau
-    integrations[bl][1] += visdata
-  end
-end
+## Hash for integrations
+## {[a1,a2] => [sum_tau, sum_visdata]}
+#integrations = {}
+#
+#baselines.each do |bl|
+#  integrations[bl] ||= [0.0, NArray.scomplex(nchan)]
+#  data[bl].values.each do |tau, visdata|
+#    integrations[bl][0] += tau
+#    integrations[bl][1] += visdata
+#  end
+#end
 
 # Generate xaxis values once
 if xax[0,1] == 'f'
@@ -109,18 +109,21 @@ else
   xx = xx.mul!(lineinfo[4]).add!(lineinfo[2] + lineinfo[3]/2.0 - 0.5)
 end
 
+Plotter.new(:device=>device, :nx=>nx, :ny=>ny, :ask=>true)
+pgsch(1.5) if nx > 1 || ny > 1
+
 baselines.each do |bl|
   a1, a2 = bl
   next if a1 == a2
 
-  tau12, vis12 = integrations[bl]
+  tau12, vis12 = data[bl]
   mag_scale = yax
 
   # Normalize by geometric mean of the autos if present
-  have_autos = integrations.has_key?([a1,a1]) && integrations.has_key?([a2,a2])
+  have_autos = data.has_key?([a1,a1]) && data.has_key?([a2,a2])
   if have_autos
-    tau11, vis11 = integrations[[a1,a1]]
-    tau22, vis22 = integrations[[a2,a2]]
+    tau11, vis11 = data[[a1,a1]]
+    tau22, vis22 = data[[a2,a2]]
     if tau12 == tau11 && tau12 == tau22
       mag_label = "Correlation Coefficient"
       geomean = (vis11.real*vis22.real)**0.5
