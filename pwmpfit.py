@@ -1458,7 +1458,7 @@ class Problem (object):
         # Reverse sign of step if against a parameter limit or if
         # backwards-sided derivative
 
-        mask = dside == DSIDE_NEG
+        mask = (dside == DSIDE_NEG)[ifree]
         if ulimit is not None:
             mask |= x > ulimit - h
             wh = N.where (mask)
