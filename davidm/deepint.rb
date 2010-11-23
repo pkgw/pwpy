@@ -29,9 +29,8 @@ keyini
   xax = keya(:axis, 'freq')
   yax = keya(:axis, 'linear')
 
-  # Time interval over which to average visdata
-  # (given in minutes, but stored as days)
-  interval = keyr(:interval, 1.0) / (24*60)
+  # Get tau fudge factor
+  tau_fudge = keyr(:taufudge, 1)
 keyfin
 
 # Create Hash to store data
@@ -140,7 +139,7 @@ baselines.each do |bl|
   end
 
   title = "Ants #{a1}-#{a2};  Inputs #{a1-1}-#{a2-1}"
-  title2 = "tau = #{(tau12/3600).to_hmsstr(3)}"
+  title2 = "tau = #{(tau_fudge*tau12/3600).to_hmsstr(3)}"
   mag_label += case mag_scale
                 when /^db/i # dB
                   ' (dB)'
