@@ -24,6 +24,10 @@ module Mirdl
       self.flags_p = DL::PtrData.new(flags.ptr, flags.bsize)
     end
 
+    def self.[](nchan)
+      self.new(nchan)
+    end
+
     def u; preamble[0]; end
     def v; preamble[1]; end
     def w; preamble[2]; end
