@@ -120,10 +120,10 @@ baselines.each do |bl|
   # Normalize by geometric mean of the autos if present
   have_autos = integrations.has_key?([a1,a1]) && integrations.has_key?([a2,a2])
   if have_autos
-    mag_label = "Correlation Coefficient"
     tau11, vis11 = integrations[[a1,a1]]
     tau22, vis22 = integrations[[a2,a2]]
     if tau12 == tau11 && tau12 == tau22
+      mag_label = "Correlation Coefficient"
       geomean = (vis11.real*vis22.real)**0.5
       geomean0_idx = geomean.eq(0).where
       geomean[geomean0_idx] = 1.0
@@ -131,6 +131,7 @@ baselines.each do |bl|
       vis12.div!(geomean)
     else
       warn "baseline #{a1}-#{a2} has different inttime than #{a1}-#{a1} or #{a2}-#{a2}"
+      have_autos = false
     end
   else
     # Doesn't make much sense to do dB if not a ratio
