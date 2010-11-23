@@ -172,6 +172,8 @@ class DateTime
   # If +n+ is given and d is an Integer, the Astronomical Julian Date is taken
   # as <tt>Rational(d,n)</tt>.
   def self.ajd(d,n=nil)
+    # Convert d to Rational if it is a Float
+    d = Rational(1, Rational(1, d)) if Float === d
     d = Rational(d, n) if n && Integer === d
     J2000 + (d - J2000.ajd)
   end
@@ -180,8 +182,18 @@ class DateTime
   # If +n+ is given and d is an Integer, the Astronomical Modified Julian Date
   # is taken as <tt>Rational(d,n)</tt>.
   def self.amjd(d,n=nil)
+    # Convert d to Rational if it is a Float
+    d = Rational(1, Rational(1, d)) if Float === d
     d = Rational(d, n) if n && Integer === d
     J2000 + (d - J2000.amjd)
+  end
+
+  # A +DateTime+ object corresponding to the same time as +self+, but
+  # with an offset of the local timezone.  Returns +self+ if its offset already
+  # equals the local timezone offset.
+  def to_local
+    @@local_offset ||= Rational((Time.utc(1970)-Time.local(1970)).to_i, 86400)
+    (offset == @@local_offset) ? self : new_offset(@@local_offset)
   end
 
   # A +DateTime+ object corresponding to the same time as +self+, but
@@ -262,6 +274,8 @@ class DateTime
   # Returns TT_UT1 as of date represented by +self+.
   def tt_ut1(ut1_utc_days=nil)
     if ut1_utc_days
+      # Convert ut1_utc_days to Rational if it is a Float
+      ut1_utc_days = Rational(1, Rational(1, ut1_utc_days)) if Float === ut1_utc_days
       TT_TAI + tai_utc - ut1_utc_days
     elsif defined? ut1_utc
       TT_TAI + tai_utc - ut1_utc
@@ -302,6 +316,8 @@ class DateTime
   # Returns UT1 version of +self+, treating +self+ as UTC
   def utc_to_ut1(ut1_utc_days=nil)
     if ut1_utc_days
+      # Convert ut1_utc_days to Rational if it is a Float
+      ut1_utc_days = Rational(1, Rational(1, ut1_utc_days)) if Float === ut1_utc_days
       self + ut1_utc_days
     elsif defined? ut1_utc
       self + ut1_utc
@@ -332,6 +348,8 @@ class DateTime
   # Returns UT1 version of +self+, treating +self+ as TAI
   def tai_to_ut1(ut1_utc_days=nil)
     if ut1_utc_days
+      # Convert ut1_utc_days to Rational if it is a Float
+      ut1_utc_days = Rational(1, Rational(1, ut1_utc_days)) if Float === ut1_utc_days
       self - (self.tai_utc - ut1_utc_days)
     elsif defined? ut1_utc
       self - (self.tai_utc - ut1_utc)
@@ -362,6 +380,8 @@ class DateTime
   # Returns UT1 version of +self+, treating +self+ as TT
   def tt_to_ut1(ut1_utc_days=nil)
     if ut1_utc_days
+      # Convert ut1_utc_days to Rational if it is a Float
+      ut1_utc_days = Rational(1, Rational(1, ut1_utc_days)) if Float === ut1_utc_days
       self - (TT_TAI + self.tai_utc - ut1_utc_days)
     elsif defined? ut1_utc
       self - (TT_TAI + self.tai_utc - ut1_utc)
@@ -392,6 +412,8 @@ class DateTime
   # Returns UT1 version of +self+, treating +self+ as GPS
   def gps_to_ut1(ut1_utc_days=nil)
     if ut1_utc_days
+      # Convert ut1_utc_days to Rational if it is a Float
+      ut1_utc_days = Rational(1, Rational(1, ut1_utc_days)) if Float === ut1_utc_days
       self + (TAI_GPS - self.tai_utc + ut1_utc_days)
     elsif defined? ut1_utc
       self + (TAI_GPS - self.tai_utc + ut1_utc)
@@ -404,6 +426,8 @@ class DateTime
   # Returns UTC version of +self+, treating +self+ as UT1
   def ut1_to_utc(ut1_utc_days=nil)
     if ut1_utc_days
+      # Convert ut1_utc_days to Rational if it is a Float
+      ut1_utc_days = Rational(1, Rational(1, ut1_utc_days)) if Float === ut1_utc_days
       self + ut1_utc_days
     elsif defined? ut1_utc
       self + ut1_utc
@@ -416,6 +440,8 @@ class DateTime
   # Returns TAI version of +self+, treating +self+ as UT1
   def ut1_to_tai(ut1_utc_days=nil)
     if ut1_utc_days
+      # Convert ut1_utc_days to Rational if it is a Float
+      ut1_utc_days = Rational(1, Rational(1, ut1_utc_days)) if Float === ut1_utc_days
       self - (self.tai_utc - ut1_utc_days)
     elsif defined? ut1_utc
       self - (self.tai_utc - ut1_utc)
@@ -428,6 +454,8 @@ class DateTime
   # Returns TT version of +self+, treating +self+ as UT1
   def ut1_to_tt(ut1_utc_days=nil)
     if ut1_utc_days
+      # Convert ut1_utc_days to Rational if it is a Float
+      ut1_utc_days = Rational(1, Rational(1, ut1_utc_days)) if Float === ut1_utc_days
       self - (TT_TAI + self.tai_utc - ut1_utc_days)
     elsif defined? ut1_utc
       self - (TT_TAI + self.tai_utc - ut1_utc)
@@ -440,6 +468,8 @@ class DateTime
   # Returns GPS version of +self+, treating +self+ as UT1
   def ut1_to_gps(ut1_utc_days=nil)
     if ut1_utc_days
+      # Convert ut1_utc_days to Rational if it is a Float
+      ut1_utc_days = Rational(1, Rational(1, ut1_utc_days)) if Float === ut1_utc_days
       self + (TAI_GPS - self.tai_utc + ut1_utc_days)
     elsif defined? ut1_utc
       self + (TAI_GPS - self.tai_utc + ut1_utc)
