@@ -24,7 +24,7 @@ keyini
   # Get nxy
   nx = keyi(:nxy, 2)
   ny = keyi(:nxy, 2)
-  
+
   # Get axes scales
   xax = keya(:axis, 'freq')
   yax = keya(:axis, 'linear')
@@ -141,8 +141,29 @@ baselines.each do |bl|
     mag_label = "Magnitude"
   end
 
+  # Calculate mean and max amplitudes
+  vis12abs = vis12.abs
+  mean = vis12abs.mean
+  max = vis12abs.max
+  # maxx is NArray of x values where y == max
+  maxx = xx[vis12abs.eq(max).where]
+  case mag_scale
+  when /^db/i # dB
+    mean = 10*Math.log10(mean+1e-12)
+    max = 10*Math.log10(max+1e-12)
+  when /^lo/i # log
+    mean = Math.log10(mean+1e-12)
+    max = Math.log10(max+1e-12)
+  end
+  # maxy is Array with same length as maxx, all elements are max
+  maxy = [max] * maxx.length
+
   title = "Ants #{a1}-#{a2};  Inputs #{a1-1}-#{a2-1}"
-  title2 = "tau = #{(tau_fudge*tau12/3600).to_hmsstr(3)}"
+  # TODO Fix format for linear and/or channel-based plots
+  title2 = sprintf('tau = %s, mean=%.1f, max=%.1f @ %.3f MHz',
+                   (tau_fudge*tau12/3600).to_hmsstr(3), mean, max, 1000*maxx[0]
+                  )
+
   mag_label += case mag_scale
                 when /^db/i # dB
                   ' (dB)'
@@ -159,4 +180,16 @@ baselines.each do |bl|
            :mag_label => mag_label,
            :mag_scale => mag_scale
           )
+
+  axis(:mag)
+  plot([xx[0], xx[-1]], [mean, mean],
+       :overlay=>true,
+       :line_color=>Color::RED
+      )
+  plot(maxx, maxy,
+       :overlay=>true,
+       :line=>nil,
+       :marker=>Marker::DIAMOND,
+       :line_color=>Color::RED
+      )
 end
