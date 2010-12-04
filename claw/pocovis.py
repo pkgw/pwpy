@@ -11,7 +11,7 @@
 import sys, string
 #import mirtask
 #from mirtask import uvdat, keys, util
-import miriad
+import miriad, pickle
 import numpy as n
 import pylab as p
 import scipy.optimize as opt
@@ -32,7 +32,7 @@ class poco:
         self.baseline_order = n.array([ 257, 258, 514, 261, 517, 1285, 262, 518, 1286, 1542, 259, 515, 773, 774, 771, 516, 1029, 1030, 772, 1028, 1287, 1543, 775, 1031, 1799, 1544, 776, 1032, 1800, 2056, 260, 263, 264, 519, 520, 1288])   # second iteration of bl nums
         self.autos = []
         self.noautos = []
-        self.dmarr = n.arange(55,60,2)       # dm trial range in pc/cm3
+        self.dmarr = n.arange(53,63,2)       # dm trial range in pc/cm3
 #        self.tshift = 0.2     # not implemented yet
         self.nskip = nskip*self.nbl    # number of iterations to skip (for reading in different parts of buffer)
         nskip = self.nskip
@@ -95,8 +95,8 @@ class poco:
 #                ti = n.concatenate((ti,[time]))
 #                fl = n.concatenate((fl,[flags]))
 #                bl = n.concatenate((bl,[baseline]))
-            if not (i % 10000):
-                print 'Read integration ', str(i)
+            if not (i % (nbl*1000)):
+                print 'Read integration ', str(i/nbl)
             i = i+1
 
         if i < initsize:
@@ -105,20 +105,21 @@ class poco:
             fl = fl[0:i-nskip]
             ti = ti[0:i-nskip]
 
-        self.data = da.reshape((i-nskip)/nbl,nbl,nchan)
+        self.rawdata = da.reshape((i-nskip)/nbl,nbl,nchan)
         self.flags = fl.reshape((i-nskip)/nbl,nbl,nchan)
         self.time = ti[::nbl]
         self.reltime = 24*3600*(self.time - self.time[0])      # relative time array in seconds
         print
         print 'Data read!'
-        print 'Shape of Data, Flags, Time:'
-        print self.data.shape, self.flags.shape, self.time.shape
+        print 'Shape of raw data, flags, time:'
+        print self.rawdata.shape, self.flags.shape, self.time.shape
         print 
 
 
     def prep(self):
-        self.data = (self.data * self.flags)[:,self.noautos].mean(axis=1)
+        self.data = (self.rawdata * self.flags)[:,self.noautos].mean(axis=1)
         self.data = self.data[:,self.chans] 
+        self.rawdata = (self.rawdata * self.flags)[:,:,self.chans]
         print 'Data flagged, trimmed in channels, and averaged across baselines.'
         print 'New shape:'
         print self.data.shape
@@ -281,12 +282,15 @@ class poco:
         peaks = n.where(arr > sig)   # this is probably biased
         print 'peaks:  ', peaks
 
+        # Plot
         p.clf()
         ax = p.imshow(arr, aspect='auto', origin='lower', interpolation='nearest', extent=(min(reltime),max(reltime),min(dmarr),max(dmarr)))
         p.colorbar()
 
-        if peaks:
-            print 'max ', max(arr)
+        if len(peaks[0]) > 0:
+            print 'Peak at DM=%f, t0=%f' % (dmarr[peaks[0][0]], reltime[peaks[1][0]])
+            print 'max ', arr.max()
+
             for i in range(len(peaks[1])):
                 ax = p.imshow(arr, aspect='auto', origin='lower', interpolation='nearest', extent=(min(reltime),max(reltime),min(dmarr),max(dmarr)))
                 p.axis((min(reltime),max(reltime),min(dmarr),max(dmarr)))
@@ -300,6 +304,8 @@ class poco:
             savename.append(str(self.nskip) + '.png')
             savename = string.join(savename,'.')
             p.savefig(savename)
+
+        return peaks
 
 
     def dedisperse2(self):
@@ -368,6 +374,17 @@ class poco:
 
         self.dmt0arr = dmt0arr
 
+def redo(file):
+    """Takes pickle file specifying results of automated searches, then reproduces dmt0 plots.
+    To Do:  need to also use pickle to select data in raw format for imaging.
+    """
+    file = open(file, 'rb')
+    dump = pickle.load(file)
+    pv = poco(dump[1], nints=dump[3], nskip=dump[2])
+    pv.prep()
+    pv.dedisperse()
+    peaks = pv.plotdmt0(save=0)
+
 
 def dmtrack2(data, reltime, dm = 0., t0 = 0.):
     """Takes dispersion measure in pc/cm3 and time offset from first integration in seconds.
@@ -408,11 +425,21 @@ if __name__ == '__main__':
     # default stuff
     print 'Greetings, human.'
     print ''
+
+    if len(sys.argv) == 2:
+        print 'Assuming input file is pickle of candidate...'
+        redo(sys.argv[1])
+
     nints = 10000
-    
-#    for nskip in range(nints*0.3,nints*10,nints*0.6):
-    for nskip in range(1):
-        pv = poco('poco_crab_candpulse.mir', nints=nints, nskip=nskip)
+    for nskip in range(0,nints*10,nints*0.6):
+#    for nskip in range(1):
+        file = 'poco_crab_201103_10.mir'
+
+        pv = poco(file, nints=nints, nskip=nskip)
         pv.prep()
         pv.dedisperse()
-        pv.plotdmt0(save=1)
+        peaks = pv.plotdmt0(save=1)
+
+        fileout = open(file.split('.')[:-1] + '.' + str(nskip) + '.pkl', 'wb')
+        pickle.dump((fileout, file, nskip, nints, peaks[0], pv.dmarr[peaks[0]], peaks[1]), fileout)
+        fileout.close()
