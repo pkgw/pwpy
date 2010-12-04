@@ -384,6 +384,7 @@ def redo(file):
     pv.prep()
     pv.dedisperse()
     peaks = pv.plotdmt0(save=0)
+    file.close()
 
 
 def dmtrack2(data, reltime, dm = 0., t0 = 0.):
