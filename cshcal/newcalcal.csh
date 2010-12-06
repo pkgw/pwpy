@@ -1,5 +1,5 @@
 #! /usr/bin/tcsh -f
-# $Id: newcalcal.csh 1000 2010-12-06 05:02:44Z pkwill $
+# $Id$
 # Calibrates a calibrator...
 
 onintr fail

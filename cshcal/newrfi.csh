@@ -1,5 +1,5 @@
 #! /usr/bin/tcsh -f
-# $Id: newrfi.csh 696 2009-10-15 16:54:44Z karto $
+# $Id$
 onintr fail
 
 if ($#argv == 0) then

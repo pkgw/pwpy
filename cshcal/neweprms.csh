@@ -1,6 +1,6 @@
 #! /usr/bin/tcsh -f
 #
-# $Id: neweprms.csh 642 2009-09-17 18:41:54Z karto $
+# $Id$
 #    exit script cleanly  on interrupt
 
 onintr fail

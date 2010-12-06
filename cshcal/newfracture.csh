@@ -1,5 +1,5 @@
 #! /usr/bin/tcsh -f
-# $Id: newfracture.csh 771 2010-01-29 02:19:41Z karto $
+# $Id$
 set date1 = `date +%s.%N`
 
 onintr fail
