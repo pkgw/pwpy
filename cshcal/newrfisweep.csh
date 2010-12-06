@@ -1,5 +1,5 @@
 #! /usr/bin/tcsh -f
-# $Id: newrfisweep.csh 701 2009-10-16 01:01:40Z karto $
+# $Id$
 
 onintr fail
 
