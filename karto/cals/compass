@@ -5,22 +5,28 @@
 # This is going to be the cal observation program. Put simply, it will be awesome. Oh yes, it WILL be awesome.
 
 set datapath = /home/obs/mmm/karto/cals
+set corr = $1
+
+mkdir -p /ataarchive/scratch/obs/compass/$corr/view
+mkdir -p /ataarchive/scratch/obs/compass/$corr/data
 
 restart:
 
 set cal
 set freq
+set nchan
+set sdf
 set addflux
 set sysflux
 
-while (! -e ~/karto/compass.log)
+while (! -e ~/karto/compass.$corr)
     sleep 10
 end
 
-sleep 10
+sleep .01
 
-set list = (`cat ~/karto/compass.log`)
-rm -rf ~/karto/compass.log
+set list = (`cat ~/karto/compass.$corr`)
+rm -rf ~/karto/compass.$corr
 
 if ($#list < 5) then
     echo "WARNING: Blank compass entry"
@@ -32,22 +38,27 @@ shift list
 set vis = $list[1]
 set times = ($list[2] $list[3])
 set inst = (`echo $list[4] | tr ':' ' '`)
+set marker = (`echo $times[1] | tr '[a-z]' '[A-Z]' | sed 's/\([0-9][0-9]\)\([A-Z][A-Z][A-Z]\)\([0-9][0-9]\):/\3 \2 \1 /'`)
+set marker = (`date -d "$marker +0000" +%Y" "%m" "%d" "%H%M%S`)
 
-set histview = /ataarchive/`date +%Y`/`date +%m`/`date +%d`/status/compass-`date +%H%M`
+#set histview = /ataarchive/`date +%Y`/`date +%m`/`date +%d`/status/compass-`date +%H%M`
+set histview = /ataarchive/$marker[1]/$marker[2]/$marker[3]/status/compass-$marker[4]
 mkdir -p /ataarchive/scratch/obs/compass/view
-mkdir -p $histview
+mkdir -p $histview/$corr
 
 # Take data to a temp directory for processing
 
-uvaver vis=$vis select="time($times[1],$times[2])" options=relax,nocal,nopass,nopol out=/ataarchive/scratch/obs/compass/caldata
+uvaver vis=$vis select="time($times[1],$times[2])" options=relax,nocal,nopass,nopol out=/ataarchive/scratch/obs/compass/$corr/caldata >& $histview/$corr/dataread
 
 if ($status) then
-    rm -rf $histview
-    rm -rf /ataarchive/scratch/obs/compass/caldata
+    rm -rf /ataarchive/scratch/obs/compass/$corr/caldata
+    echo "Data read failed!" >> $histview/$corr/dataread
     goto restart
 endif
 
-cd /ataarchive/scratch/obs/compass/
+cd /ataarchive/scratch/obs/compass/$corr/
+
+cp -r caldata $histview/$corr/.
 
 set sourceline = (`uvlist vis=caldata options=var | grep "source" | tr ':' ' '`)
 
@@ -76,25 +87,49 @@ while ("$freq" == "")
     endif
 end
 
+set nchanline = (`uvlist vis=caldata options=var,full | grep "nchan" |  tr ':' ' '`)
+
+while ("$nchan" == "")
+    if ($nchanline[1] == "nchan") then
+	set nchan = `echo $nchanline[2] | awk '{print $1}'` 
+    else if ($#nchanline == 1) then
+	set nchan == "1024" # Default to 100 MHz
+    else
+	shift nchanline
+    endif
+end
+
+set sdfline = (`uvlist vis=caldata options=var,full | grep "sdf" |  tr ':' ' '`)
+
+while ("$sdf" == "")
+    if ($sdfline[1] == "sdf") then
+	set sdf = `echo $sdfline[2] | awk '{print $1}'` 
+    else if ($#sdfline == 1) then
+	set sdf = "1.02400E-04" # Default to 100 MHz
+    else
+	shift sdfline
+    endif
+end
+
 set mfreq = `echo $freq | awk '{print int($1*1000)}'`
 
 set calvals = (`calinfo target=$cal freq=$freq options=auto`)
 if ("$calvals[1]" == "FATAL") then
-    rm -rf caldata $histview
+    rm -rf caldata
     echo "WARNING: Calibrator data not found!"
     goto restart
 endif
 
 set flux = "$calvals[1],$calvals[2],$calvals[3]"
 set addflux = "$calvals[8]"
-set sysflux = `echo $freq | awk '{print 4+($1/5)^2}'`
+set sysflux = `echo $freq $sdf $nchan | awk '{print (4+($1/5)^2)*sqrt(0.10486/($2*$3))}'`
 set plim = `calc "asin($sysflux/$calvals[1])*180/pi"`
 
 fxhealth > fxstatus
 
 # Remove RFI from data
 
-newrfisweep.csh vis=caldata corrcycle=0 options=autoedge
+newrfisweep.csh vis=caldata options=autoedge scans=999 subint=999
 
 # Perform calibration on dataset
 
@@ -152,12 +187,21 @@ while ($idx <= `cat temprar | wc -l`)
     endif
 @ idx ++
 end
+
+set badants2 = (`grep "have no gains solutions." cal-$cal-$mfreq-maps/calrpt | awk '{print $2}' | tr ',' ' '`)
+
+foreach badant2 ($badants2)
+    set svals = (`echo $badant2 | sed 's/\([A-Z]\)/ \1/'`)
+    set svals = (`awk '{print " "$4,$5" "}' ~/bin/ata.ant | grep " $svals[1] " | awk '{print $1}'`$svals[2])
+    set badants = $badants","$svals
+end
+
 echo "color 1" >> wip.jypkstat
 echo "move $llim " `less temp.jypk2 | sort -rnk2 | head -n 1 | awk '{print $2+.5}'` >> wip.jypkstat
 echo "label Bad Antennas: `echo $badants | sed 's/,//'`" >> wip.jypkstat
 echo "mtext t 2 1 .75 "`date` >> wip.jypkstat
 echo end >> wip.jypkstat
-wip wip.jypkstat -d jypkstat.png/png >& /dev/null
+wip wip.jypkstat -d jypkstat-$corr.png/png >& /dev/null
 set arc = `echo 4500 | awk '{print int($1*1.430/freq)}' freq=$freq`
 echo "arc = $arc"
 set imstats = (`imstat in=cal-$cal-$mfreq-maps/$cal.rs | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
@@ -168,21 +212,23 @@ set levs = (`echo $imstats[3] $imstats2[4] | awk '{lim = 4*$1; while (lim < $2) 
 set levs = `echo $levs | tr ' ' ','`
 set alevel = `echo $imstats[3] $imstats2[5] | awk '{print (($2/$1)^2)^.5}'`
 
-cgdisp in=cal-$cal-$mfreq-maps/$cal.cm,cal-$cal-$mfreq-maps/$cal.cm region=relcenter,arcsec,box"(-$arc,-$arc,$arc,$arc)" device=cal.png/png labtyp=arcmin options=beambl,wedge,3value,mirr,full csize=0.6,1 olay=cal-$cal-$mfreq-maps/$cal.olay type=contour,pix levs1=$levs range=0,0,$plotscale,3 >& /dev/null
+cgdisp in=cal-$cal-$mfreq-maps/$cal.cm,cal-$cal-$mfreq-maps/$cal.cm region=relcenter,arcsec,box"(-$arc,-$arc,$arc,$arc)" device=cal-$corr.png/png labtyp=arcmin options=beambl,wedge,3value,mirr,full csize=0.6,1 olay=cal-$cal-$mfreq-maps/$cal.olay type=contour,pix levs1=$levs range=0,0,$plotscale,3 >& /dev/null
 
-echo `date +%s` 100 100 $range $imstats[3] $alevel >> obsstats
+set retstat = (`sed 1,3d caldata/retmap | awk '{if (NR == 1) {max = $2}; if (NR != 1) {if ($2*1 !=0) cnt+=1; idx+=1; dcnt+=$2; didx+=max}} END {print 100*cnt/idx,100*dcnt/didx}'`)
+
+echo `date +%s` $retstat[1] $retstat[2] $range $imstats[3] $alevel >> obsstats
 
 awk '{if ($1-curdate < 100000) print ($1-curdate)/3600,$2,$3,$4,1/($5+.000000000001),$6}' curdate=`date +%s` obsstats > temp.prsv
 cp $datapath/wip.prsv .
 echo "mtext t 1.5 0 .25 "`date` >> wip.prsv
 echo "end" >> wip.prsv
-wip wip.prsv -d prsv.png/png >& /dev/null
+wip wip.prsv -d prsv-$corr.png/png >& /dev/null
 cat $datapath/wip.hs > wip.hardstat
 cat $datapath/wip.builds >> wip.hardstat
 cat $datapath/wip.ants > temp.ants
 ataasciistatus -l | tr ',' ' ' | awk '{if ($1 != "") print $1,$2,($6^2+$7^2)^.5}' > temp.antstatus
 set antlist = (`fxconf.rb sals | awk '{if ($1 == inst) print $0}' inst=$inst[2] | tr '[a-z]' '[A-Z]'`)
-shift antlist
+if ($#antlist > 1) shift antlist
 
 set idx = 1
 while ($idx <= `wc -l temp.ants | awk '{print $1}'`)
@@ -219,7 +265,7 @@ end
 echo "mtext t 2 1 .75 "`date` >> wip.hardstat
 echo "end" >> wip.hardstat
 
-wip wip.hardstat -d hardstat.png/png >& /dev/null
+wip wip.hardstat -d hardstat-$corr.png/png >& /dev/null
 
 foreach i (*.png)
     convert $i -depth 8 -geometry 350 ${i:r}-thumb.png
@@ -233,17 +279,24 @@ while (-e view/hold && $timeout < 60)
 end
 
 rm -fr view/*
+rm -fr data/*
 cp wip.hardstat view/wip.hardstat
 cp wip.jypkstat view/wip.jypkstat
 cp temp.jypk2 view/temp.jypk2
 cp wip.prsv view/wip.prsv
 cp temp.prsv view/temp.prsv
 cp -r cal-$cal-$mfreq-maps/$cal.cm view/cal.cm
+cp -r cal-$cal-$mfreq-maps/$cal.cm data/cal.cm
 cp cal-$cal-$mfreq-maps/$cal.olay view/cal.olay
+
+cp -r caldata/gains.* data/.
+cp caldata/sefd data/sefd
+cp caldata/retmap data/retmap
 echo "cgdisp in=cal.cm,cal.cm region=relcenter,arcsec,box"'"'"(-$arc,-$arc,$arc,$arc)"'"'" device=1/xs labtyp=arcmin options=beambl,wedge,3value,mirr,full csize=0.6,1 olay=cal.olay type=contour,pix levs1=$levs range=0,0,$plotscale,3" > view/mapcmd
-cp -r view/* $histview/.
-cp *.png $histview/.
-scp *.png logbook:/srv/www/htdocs/files/plots/.
+cp -r view/* $histview/$corr/.
+cp -r data $histview/$corr/.
+cp *.png $histview/$corr/.
+scp *.png logbook:/srv/www/vhosts/log/files/plots/.
 rm -rf caldata
 rm -rf calreduc
 rm *.png
