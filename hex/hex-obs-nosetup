@@ -310,7 +310,10 @@ foreach pnt (`seq 1 $npnt`)
 
     # Notify COMPASS if we just did the central pointing
     if ($pnt == 1) then
-	echo "compass `pwd`/$vpf2 $tstart $tend $inst2" > ~/karto/compass.log
+	set justinst = `echo $inst1 |cut -d: -f1`
+	echo "compass `pwd`/$vpf1 $tstart $tend $inst1" > ~/karto/compass.$justinst
+	set justinst = `echo $inst2 |cut -d: -f1`
+	echo "compass `pwd`/$vpf2 $tstart $tend $inst2" > ~/karto/compass.$justinst
     endif
 
     # Note these observations in the summary files
