@@ -74,7 +74,7 @@ x = zRotation(raOff,decOff,raCenter)
 x = yRotation(x[0],x[1],-decCenter)
 x[0] *= -1
 x = xRotation(x[0],x[1],chi)
-puts "#{x[0]} #{x[1]}"
+#puts "#{x[0]} #{x[1]}"
 x = yRotation(x[0],x[1],el)
 x = zRotation(x[0],x[1],-az)
 puts "#{(x[0]+360)%360} #{x[1]}"

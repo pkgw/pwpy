@@ -32,9 +32,11 @@ set secondarycal
 set extendedcal
 set noinit = 0
 set genswitch = "`cat ~/bin/genswitch`"
-set pamboost = 28.5
-set bitsel = 11
+set pamboost = (17 7)
+#set pamboost = (15 0)
+set bitsel = 9
 set onecycle = 0
+set cycletime = 2700
 
 if ($#argv == 0) then
     exit 0
@@ -106,8 +108,12 @@ endif
 if ("$argv[1]" != "finish") goto varassign
 
 if ($stoptime < `date +%s`) then
-    echo "FATAL ERROR: Stoptime has passed!"
-    exit 1
+    if ($onecycle) then
+	set stoptime = `date +%s | awk '{print $1 + 1000000}'`
+    else
+	echo "FATAL ERROR: Stoptime has passed!"
+	exit 1
+    endif
 endif
 
 if ("$targetfile" == "") then
@@ -147,12 +153,19 @@ echo "done!"
 
 if ($noinit) goto primarycalobs
 
+# Kill fringe rotation if it's cycling
+frotnear.csh ${inst1}:${subarray} sun.ephem $inst1freq $PWD kill
+frotnear.csh ${inst2}:${subarray} sun.ephem $inst2freq $PWD kill
+
 # Set the bandwidth and integration time for each correlator
 echo -n "Setting up correlator for observation..."
 bw.csh ${inst1}:${subarray} $inst1bw >& bw.$inst1
 bw.csh ${inst2}:${subarray} $inst2bw >& bw.$inst2
 setintfx.csh $inttime ${inst1}:${subarray} >& int.$inst1
 setintfx.csh $inttime ${inst2}:${subarray} >& int.$inst2
+fxlaunch ${inst1}:${subarray} >& launch.$inst1
+fxlaunch ${inst2}:${subarray} >& launch.$inst2
+
 echo "done!"
 # Set up the antennas for observing
 echo -n "Initializing antennas for observation"
@@ -166,10 +179,6 @@ atasetazel `echo $ants | tr ' ' ','` 0 41 -w >& np.$subarray
 echo -n "."
 waitfocus `echo $ants | tr ' ' ','` $focusfreq >& waitfocus.$subarray
 echo "done!"
-
-# Kill fringe rotation if it's cycling
-frotnear.csh ${inst1}:${subarray} sun.ephem $inst1freq $PWD kill
-frotnear.csh ${inst2}:${subarray} sun.ephem $inst2freq $PWD kill
 
 echo -n "Getting nominal attenuation settings for iBobs..."
 #Get the attenuation settings for each correlation at each freq
@@ -199,10 +208,11 @@ foreach target($extendedcal $satlist)
     ataephem $target --utcms --interval 10 >> ephem.log
 end
 
-ataephem --notof --utcms --interval 10 sun >> ephem.log
+ataephem --notof --utcms --nocull --interval 10 sun >> ephem.log
 
 # Start observing the primary calibrators
 primarycalobs:
+set ants = (`fxconf.rb sals | grep $subarray | sed s/$subarray//`)
 pamsboost.csh pams.$subarray 0 > /dev/null
 bitsel.csh 8
 set calcount = 0
@@ -223,15 +233,15 @@ foreach caltarget ($primarycal)
 	    atawrapephem $caltarget.ephem
 	    atatrackephem `echo $ants | tr ' ' ','` $caltarget.ephem -w &
 	    while ($freqidx <= $#inst1freqs || $freqidx <= $#inst2freqs)
+		frotnear.csh ${inst1}:${subarray} sun.ephem $inst1freq $PWD kill
+		frotnear.csh ${inst2}:${subarray} sun.ephem $inst2freq $PWD kill
 		if ($freqidx <= $#inst1freqs) then
-		    frotnear.csh ${inst1}:${subarray} sun.ephem $inst1freq $PWD kill
-		    attenrestore.csh autoattenall.$inst1.log.$inst1freqs[$freqidx] ; frotnear.csh ${inst1}:${subarray} $caltarget.ephem $inst1freqs[$freqidx] $PWD start; sleep $inttime &
+		    attenrestore.csh autoattenall.$inst1.log.$inst1freqs[$freqidx] ; frotnear.csh ${inst1}:${subarray} $caltarget.ephem $inst1freqs[$freqidx] $PWD start; sleep 5 &
 		    atasetskyfreq $inst1lo $inst1freqs[$freqidx] &
 		    set inst1freq = $inst1freqs[$freqidx]
 		endif
 		if ($freqidx <= $#inst2freqs) then
-		    frotnear.csh ${inst2}:${subarray} sun.ephem $inst2freq $PWD kill
-		    attenrestore.csh autoattenall.$inst2.log.$inst2freqs[$freqidx] ; frotnear.csh ${inst2}:${subarray} $caltarget.ephem $inst2freqs[$freqidx] $PWD start; sleep $inttime &
+		    attenrestore.csh autoattenall.$inst2.log.$inst2freqs[$freqidx] ; frotnear.csh ${inst2}:${subarray} $caltarget.ephem $inst2freqs[$freqidx] $PWD start; sleep 5 &
 		    atasetskyfreq $inst2lo $inst2freqs[$freqidx] &
 		    set inst2freq = $inst2freqs[$freqidx]
 		endif
@@ -244,9 +254,9 @@ foreach caltarget ($primarycal)
 		endif
 		
 		wait
-		if ($freqidx <= $#inst1freqs) atafx ssa-$inst1-$caltarget-$inst1freqs[$freqidx] `echo $inst1antpols | tr ' ' ','` ${inst1}:${subarray} $caltarget.ephem -duration $pcaltime -bw $inst1bw $genswitch  >& $inst1.atafx.log &
+		if ($freqidx <= $#inst1freqs) atafx ssa-$inst1-$caltarget-$inst1freqs[$freqidx] `echo $inst1antpols | tr ' ' ','` ${inst1}:${subarray} $caltarget.ephem -duration $pcaltime -bw $inst1bw $genswitch >& $inst1.atafx.log &
 		if ($freqidx <= $#inst2freqs) atafx ssa-$inst2-$caltarget-$inst2freqs[$freqidx] `echo $inst2antpols | tr ' ' ','` ${inst2}:${subarray} $caltarget.ephem -duration $pcaltime -bw $inst2bw $genswitch >& $inst2.atafx.log &
-		sleep `echo $inttime | awk '{print ($1*3)+10}'`
+		sleep `echo $inttime | awk '{print ($1*3.5)+8}'`
 		set starttime1 = (`grep 'Getting Dump 0' $inst1.atafx.log | awk '{print $1,$2}'`)
 		set starttime2 = (`grep 'Getting Dump 0' $inst2.atafx.log | awk '{print $1,$2}'`)
 		if ($#starttime1 == 2) then
@@ -260,7 +270,7 @@ foreach caltarget ($primarycal)
 		    set starttime2 = 0
 		endif
 		set currenttime = `date +%s`
-		sleep `echo $currenttime $starttime1 $starttime2 $pcaltime $inttime | awk '{if (($2 == 0 && $3 == 0) || ($2+$4 < $1+(2*$5) && $3+$4 < $1+(2*$5))) {print 0; next}; if ($2 > $3) {print $2+$4-$1+2-(2*$5); next}; if ($2 >= $3) {print $3+$4-$1+2-(2*$5); next}}'`
+		sleep `echo $currenttime $starttime1 $starttime2 $pcaltime $inttime | awk '{if (($2 == 0 && $3 == 0) || ($2+$4+2 < $1+(2*$5) && $3+$4+2 < $1+(2*$5))) {print 0; next}; if ($2 > $3) {print $2+$4-$1+2-(2*$5); next}; if ($2 <= $3) {print $3+$4-$1+2-(2*$5); next}}'`
 		@ freqidx++
 		if ($stoptime < `date +%s`) goto finish
 	    end
@@ -289,15 +299,15 @@ foreach caltarget ($secondarycal)
 	    atawrapephem $caltarget.ephem
 	    atatrackephem `echo $ants | tr ' ' ','` $caltarget.ephem -w &
 	    while ($freqidx <= $#inst1freqs || $freqidx <= $#inst2freqs)
+		frotnear.csh ${inst1}:${subarray} sun.ephem $inst1freq $PWD kill
+		frotnear.csh ${inst2}:${subarray} sun.ephem $inst2freq $PWD kill
 		if ($freqidx <= $#inst1freqs) then
-		    frotnear.csh ${inst1}:${subarray} sun.ephem $inst1freq $PWD kill
-		    attenrestore.csh autoattenall.$inst1.log.$inst1freqs[$freqidx] ; frotnear.csh ${inst1}:${subarray} $caltarget.ephem $inst1freqs[$freqidx] $PWD start; sleep $inttime &
+		    attenrestore.csh autoattenall.$inst1.log.$inst1freqs[$freqidx] ; frotnear.csh ${inst1}:${subarray} $caltarget.ephem $inst1freqs[$freqidx] $PWD start; sleep 5 &
 		    atasetskyfreq $inst1lo $inst1freqs[$freqidx] &
 		    set inst1freq = $inst1freqs[$freqidx]
 		endif
 		if ($freqidx <= $#inst2freqs) then
-		    frotnear.csh ${inst2}:${subarray} sun.ephem $inst2freq $PWD kill
-		    attenrestore.csh autoattenall.$inst2.log.$inst2freqs[$freqidx] ; frotnear.csh ${inst2}:${subarray} $caltarget.ephem $inst2freqs[$freqidx] $PWD start; sleep $inttime &
+		    attenrestore.csh autoattenall.$inst2.log.$inst2freqs[$freqidx] ; frotnear.csh ${inst2}:${subarray} $caltarget.ephem $inst2freqs[$freqidx] $PWD start; sleep 5 &
 		    atasetskyfreq $inst2lo $inst2freqs[$freqidx] &
 		    set inst2freq = $inst2freqs[$freqidx]
 		endif
@@ -312,7 +322,7 @@ foreach caltarget ($secondarycal)
 		wait
 		if ($freqidx <= $#inst1freqs) atafx ssa-$inst1-$caltarget-$inst1freqs[$freqidx] `echo $inst1antpols | tr ' ' ','` ${inst1}:${subarray} $caltarget.ephem -duration $scaltime -bw $inst1bw $genswitch >& $inst1.atafx.log &
 		if ($freqidx <= $#inst2freqs) atafx ssa-$inst2-$caltarget-$inst2freqs[$freqidx] `echo $inst2antpols | tr ' ' ','` ${inst2}:${subarray} $caltarget.ephem -duration $scaltime -bw $inst2bw $genswitch >& $inst2.atafx.log &
-		sleep `echo $inttime | awk '{print ($1*3)+10}'`
+		sleep `echo $inttime | awk '{print ($1*3.5)+8}'`
 		set starttime1 = (`grep 'Getting Dump 0' $inst1.atafx.log | awk '{print $1,$2}'`)
 		set starttime2 = (`grep 'Getting Dump 0' $inst2.atafx.log | awk '{print $1,$2}'`)
 		if ($#starttime1 == 2) then
@@ -326,7 +336,7 @@ foreach caltarget ($secondarycal)
 		    set starttime2 = 0
 		endif
 		set currenttime = `date +%s`
-		sleep `echo $currenttime $starttime1 $starttime2 $scaltime $inttime | awk '{if (($2 == 0 && $3 == 0) || ($2+$4 < $1+(2*$5) && $3+$4 < $1+(2*$5))) {print 0; next}; if ($2 > $3) {print $2+$4-$1+2-(2*$5); next}; if ($2 >= $3) {print $3+$4-$1+2-(2*$5); next}}'`
+		sleep `echo $currenttime $starttime1 $starttime2 $scaltime $inttime | awk '{if (($2 == 0 && $3 == 0) || ($2+$4+2 < $1+(2*$5) && $3+$4+2 < $1+(2*$5))) {print 0; next}; if ($2 > $3) {print $2+$4-$1+2-(2*$5); next}; if ($2 <= $3) {print $3+$4-$1+2-(2*$5); next}}'`
 		@ freqidx++
 		if ($stoptime < `date +%s`) goto finish
 	    end
@@ -355,15 +365,15 @@ foreach caltarget ($extendedcal)
 	    atawrapephem $caltarget.ephem
 	    atatrackephem `echo $ants | tr ' ' ','` $caltarget.ephem -w &
 	    while ($freqidx <= $#inst1freqs || $freqidx <= $#inst2freqs)
+		frotnear.csh ${inst1}:${subarray} sun.ephem $inst1freq $PWD kill
+		frotnear.csh ${inst2}:${subarray} sun.ephem $inst2freq $PWD kill		
 		if ($freqidx <= $#inst1freqs) then
-		    frotnear.csh ${inst1}:${subarray} sun.ephem $inst1freq $PWD kill
-		    attenrestore.csh autoattenall.$inst1.log.$inst1freqs[$freqidx] ; frotnear.csh ${inst1}:${subarray} $caltarget.ephem $inst1freqs[$freqidx] $PWD start; sleep $inttime &
+		    attenrestore.csh autoattenall.$inst1.log.$inst1freqs[$freqidx] ; frotnear.csh ${inst1}:${subarray} $caltarget.ephem $inst1freqs[$freqidx] $PWD start; sleep 5 &
 		    atasetskyfreq $inst1lo $inst1freqs[$freqidx] &
 		    set inst1freq = $inst1freqs[$freqidx]
 		endif
 		if ($freqidx <= $#inst2freqs) then
-		    frotnear.csh ${inst2}:${subarray} sun.ephem $inst2freq $PWD kill
-		    attenrestore.csh autoattenall.$inst2.log.$inst2freqs[$freqidx] ; frotnear.csh ${inst2}:${subarray} $caltarget.ephem $inst2freqs[$freqidx] $PWD start; sleep $inttime &
+		    attenrestore.csh autoattenall.$inst2.log.$inst2freqs[$freqidx] ; frotnear.csh ${inst2}:${subarray} $caltarget.ephem $inst2freqs[$freqidx] $PWD start; sleep 5 &
 		    atasetskyfreq $inst2lo $inst2freqs[$freqidx] &
 		    set inst2freq = $inst2freqs[$freqidx]
 		endif
@@ -378,7 +388,7 @@ foreach caltarget ($extendedcal)
 		wait
 		if ($freqidx <= $#inst1freqs) atafx ssa-$inst1-$caltarget-$inst1freqs[$freqidx] `echo $inst1antpols | tr ' ' ','` ${inst1}:${subarray} $caltarget.ephem -duration $ecaltime -bw $inst1bw $genswitch >& $inst1.atafx.log &
 		if ($freqidx <= $#inst2freqs) atafx ssa-$inst2-$caltarget-$inst2freqs[$freqidx] `echo $inst2antpols | tr ' ' ','` ${inst2}:${subarray} $caltarget.ephem -duration $ecaltime -bw $inst2bw $genswitch >& $inst2.atafx.log &
-		sleep `echo $inttime | awk '{print ($1*3)+10}'`
+		sleep `echo $inttime | awk '{print ($1*3.5)+8}'`
 		set starttime1 = (`grep 'Getting Dump 0' $inst1.atafx.log | awk '{print $1,$2}'`)
 		set starttime2 = (`grep 'Getting Dump 0' $inst2.atafx.log | awk '{print $1,$2}'`)
 		if ($#starttime1 == 2) then
@@ -392,7 +402,7 @@ foreach caltarget ($extendedcal)
 		    set starttime2 = 0
 		endif
 		set currenttime = `date +%s`
-		sleep `echo $currenttime $starttime1 $starttime2 $ecaltime $inttime | awk '{if (($2 == 0 && $3 == 0) || ($2+$4 < $1+(2*$5) && $3+$4 < $1+(2*$5))) {print 0; next}; if ($2 > $3) {print $2+$4-$1+2-(2*$5); next}; if ($2 >= $3) {print $3+$4-$1+2-(2*$5); next}}'`
+		sleep `echo $currenttime $starttime1 $starttime2 $ecaltime $inttime | awk '{if (($2 == 0 && $3 == 0) || ($2+$4+2 < $1+(2*$5) && $3+$4+2 < $1+(2*$5))) {print 0; next}; if ($2 > $3) {print $2+$4-$1+2-(2*$5); next}; if ($2 <= $3) {print $3+$4-$1+2-(2*$5); next}}'`
 		@ freqidx++
 		if ($stoptime < `date +%s`) goto finish
 	    end
@@ -409,10 +419,11 @@ else if ($onecycle == 1) then
     set onecycle = 2
 endif
 
-satobs:
-
+set sourcetime = `date +%s`
 pamsboost.csh pams.$subarray $pamboost > pams.$subarray.prime
 bitsel.csh $bitsel
+
+satobs:
 set satidx = 1
 while ($satidx <= `wc -l $targetfile | awk '{print $1}'`)
     set vals = (`sed -n ${satidx}p $targetfile`)
@@ -420,9 +431,9 @@ while ($satidx <= `wc -l $targetfile | awk '{print $1}'`)
     @ satidx++
     atawrapephem $sat.ephem
     atatrackephem `echo $ants | tr ' ' ','` $sat.ephem -w &
-    if ("$vals[2]" != "$inst1freq" && "$vals[2]" != "$inst1freq") then
-	frotnear.csh ${inst1}:${subarray} sun.ephem $inst1freq $PWD kill
-	frotnear.csh ${inst2}:${subarray} sun.ephem $inst2freq $PWD kill
+    frotnear.csh ${inst1}:${subarray} sun.ephem $inst1freq $PWD kill
+    frotnear.csh ${inst2}:${subarray} sun.ephem $inst2freq $PWD kill
+    if ("$vals[2]" != "$inst1freq" && "$vals[3]" != "$inst2freq") then
 	set inst1freq = $vals[2]
 	atasetskyfreq $inst1lo $inst1freq
 	attenrestore.csh autoattenall.$inst1.log.$inst1freq &
@@ -431,19 +442,16 @@ while ($satidx <= `wc -l $targetfile | awk '{print $1}'`)
 	attenrestore.csh autoattenall.$inst2.log.$inst2freq &
 	wait
     else if ("$vals[2]" != "$inst1freq") then
-	frotnear.csh ${inst1}:${subarray} sun.ephem $inst1freq $PWD kill
 	set inst1freq = $vals[2]
 	atasetskyfreq $inst1lo $inst1freq
 	attenrestore.csh autoattenall.$inst1.log.$inst1freq
     else if ("$vals[3]" != "$inst2freq") then
-	frotnear.csh ${inst2}:${subarray} sun.ephem $inst2freq $PWD kill
 	set inst2freq = $vals[3]
 	atasetskyfreq $inst2lo $inst2freq
 	attenrestore.csh autoattenall.$inst2.log.$inst2freq
     endif
-    frotnear.csh ${inst1}:${subarray} $sat.ephem $inst1freq $PWD start; sleep $inttime &
-    frotnear.csh ${inst2}:${subarray} $sat.ephem $inst2freq $PWD start; sleep $inttime &
-
+    frotnear.csh ${inst1}:${subarray} $sat.ephem $inst1freq $PWD start; sleep 5 &
+    frotnear.csh ${inst2}:${subarray} $sat.ephem $inst2freq $PWD start; sleep 5 &
     if (! -e ssa-$inst1-$sat-$inst1freq) then
 	echo "sat,ssa-$inst1-$sat-$inst1freq,$inst1,$sat,$inst1freq" >> ssa.manifest
     endif
@@ -456,10 +464,9 @@ while ($satidx <= `wc -l $targetfile | awk '{print $1}'`)
     atafx ssa-$inst1-$sat-$inst1freq `echo $inst1antpols | tr ' ' ','` ${inst1}:${subarray} $sat.ephem -duration $sattime -bw $inst1bw $genswitch >& $inst1.atafx.log &
     atafx ssa-$inst2-$sat-$inst2freq `echo $inst2antpols | tr ' ' ','` ${inst2}:${subarray} $sat.ephem -duration $sattime -bw $inst2bw $genswitch >& $inst2.atafx.log &
 
-    sleep `echo $inttime | awk '{print ($1*3)+10}'`
+    sleep `echo $inttime | awk '{print ($1*3.5)+8}'`
     set starttime1 = (`grep 'Getting Dump 0' $inst1.atafx.log | awk '{print $1,$2}'`)
     set starttime2 = (`grep 'Getting Dump 0' $inst2.atafx.log | awk '{print $1,$2}'`)
-
     if ($#starttime1 == 2) then
 	set starttime1 = (`date -d "$starttime1" +%s`)
     else
@@ -478,18 +485,23 @@ while ($satidx <= `wc -l $targetfile | awk '{print $1}'`)
 	set sunpos = (`ephemspline.rb sun.ephem $ephemtime`)
 	set satephemname = `sed -n ${satidx}p $targetfile | awk '{print $1".ephem"}'`
 	set satpos = (`ephemspline.rb $satephemname $ephemtime`) 
-	if (`echo $sunpos $satpos | awk '{print $1*PI/180,$2*PI/180,$3*PI/180,$4*PI/180}' PI=3.14159265 | awk '{print atan2(((cos($3)*sin($4-$2))^2+(cos($1)*sin($3)-sin($1)*cos($3)*cos($4-$2))^2)^.5,sin($1)*sin($3)+cos($1)*cos($3)*cos($4-$2))}'| awk '{print int($1*180/3.14159265)}'` <= 20) then
-	    @ satidx++
-	else
+#	if (`echo $sunpos $satpos | awk '{print $1*PI/180,$2*PI/180,$3*PI/180,$4*PI/180}' PI=3.14159265 | awk '{print atan2(((cos($3)*sin($4-$2))^2+(cos($1)*sin($3)-sin($1)*cos($3)*cos($4-$2))^2)^.5,sin($1)*sin($3)+cos($1)*cos($3)*cos($4-$2))}'| awk '{print int($1*180/3.14159265)}'` <= 1) then
+#	    @ satidx++
+#	else
 	    set satcheck = 1
-	endif
+#	endif
 	if ($satidx > `wc -l $targetfile | awk '{print $1}'`) set satcheck = 1
     end
+
     set currenttime = `date +%s`
-    sleep `echo $currenttime $starttime1 $starttime2 $sattime $inttime | awk '{if (($2 == 0 && $3 == 0) || ($2+$4 < $1+(2*$5) && $3+$4 < $1+(2*$5))) {print 0; next}; if ($2 > $3) {print $2+$4-$1+2-(2*$5); next}; if ($2 >= $3) {print $3+$4-$1+2-(2*$5); next}}'`
+    sleep `echo $currenttime $starttime1 $starttime2 $sattime $inttime | awk '{if (($2 == 0 && $3 == 0) || ($2+$4+2 < $1+(2*$5) && $3+$4+2 < $1+(2*$5))) {print 0; next}; if ($2 > $3) {print $2+$4-$1+2-(2*$5); next}; if ($2 <= $3) {print $3+$4-$1+2-(2*$5); next}}'`
     if ($stoptime < `date +%s`) goto finish
 end
-
+if ($onecycle) then
+    echo "Finishing the cycle..."
+    goto primarycalobs
+endif
+if (`echo $sourcetime $cycletime | awk '{print int($1+$2)}'` > `date +%s`) goto satobs
 goto primarycalobs
 
 finish:
@@ -497,6 +509,8 @@ frotnear.csh ${inst1}:${subarray} sun.ephem $inst1freq $PWD kill
 frotnear.csh ${inst2}:${subarray} sun.ephem $inst2freq $PWD kill
 park.csh `slist.csh`
 fxconf.rb satake none `slist.csh`
+bitsel.csh 8
+wait
 exit 0
 
 fail:
@@ -504,4 +518,6 @@ frotnear.csh ${inst1}:${subarray} sun.ephem $inst1freq $PWD kill
 frotnear.csh ${inst2}:${subarray} sun.ephem $inst2freq $PWD kill
 park.csh `slist.csh`
 fxconf.rb satake none `slist.csh`
+bitsel.csh 8
+wait
 exit 0

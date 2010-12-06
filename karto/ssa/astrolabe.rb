@@ -194,7 +194,7 @@ def imageFrame (visFile,frameTimes,wd)
   # Autoamp - do an amp-only self-cal, which should reduce the residual fitting errors of the source
   # SEFD - use the system temps to weight the data, should downweight antennas with possible calibration errors
   # savedata - for use when grabbing the chi values
-  imageLog = `newautomap.csh vis=#{visFile} select="time("#{frameTimes[0]},#{frameTimes[1]}")" options=nopha,noflag,autoamp,sefd,savedata outdir=#{wd}/maps`
+  imageLog = `newautomap.csh vis=#{visFile} select="time("#{frameTimes[0]},#{frameTimes[1]}")" options=nopha,noflag,autoamp,sefd,savedata outdir=#{wd}/maps imsize=768`
   return imageLog # returns the image log for possible debugging
 end
 
@@ -205,7 +205,7 @@ def fitImage (imageFile)
   fitErr = ["0","0"]
   # Find the source peak first, which gives you a smaller region over which to fit your point source (leading to smaller residual errors)
   sourcePeak = `maxfit in="#{imageFile}" | grep "Fitted pixel" | head -n 1 | tr '(),' '   ' | awk '{print $4,$5}'`
-  sourceBox = [sourcePeak.split[0].to_f-50,sourcePeak.split[1].to_f-50,sourcePeak.split[0].to_f+50,sourcePeak.split[1].to_f+50]
+  sourceBox = [sourcePeak.split[0].to_f-1,sourcePeak.split[1].to_f-1,sourcePeak.split[0].to_f+1,sourcePeak.split[1].to_f+1]
   fitResults = `imfit in=#{imageFile} object=point region=box"(#{sourceBox[0]},#{sourceBox[1]},#{sourceBox[2]},#{sourceBox[3]})"` # Fit your point source
   fitResults.split("\n").each do |line|
     if line["Right Ascension"]
@@ -356,6 +356,7 @@ frameTimes.each do |currentFrame| # For each time frame, use newautomap to image
     if (posFit[0] == "0" || posFit[1] == "0" || posFit[2] == "0" || posFit[3] == "0")    
       puts "FAILED! (Bad fit)"
     else
+      `cgdisp in=#{wd}/maps/#{sourceName}.cm device=/xs labtyp=arcmin options=full,3val`
       fieldRADec = getRADec(wd + "/maps/" + sourceName + ".cm") # get the RADec of the image
       fieldChi = getChi(`du #{wd}/maps/#{sourceName}.*.* | head -n 1 | awk '{printf "%s",$2}'`) # Get Chi from the visibilities
       fieldEVector = getEVector(`du #{wd}/maps/#{sourceName}.*.* | head -n 1 | awk '{printf "%s",$2}'`)
