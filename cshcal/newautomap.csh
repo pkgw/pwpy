@@ -1,6 +1,6 @@
 #! /usr/bin/tcsh -f
 #
-# $Id: newautomap.csh 773 2010-02-01 06:08:16Z karto $
+# $Id$
 #
 # A simple mapping routine that has a bunch of cool features to it...
 
