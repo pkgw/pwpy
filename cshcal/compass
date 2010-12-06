@@ -135,11 +135,11 @@ fxhealth > fxstatus
 
 # Remove RFI from data
 
-newrfisweep.csh vis=caldata options=autoedge scans=999 subint=999
+newrfisweep.csh vis=caldata options=autoedge scans=999 subint=999 |tee -ia newrfisweep.log
 
 # Perform calibration on dataset
 
-newcalcal.csh vis=caldata sysflux=$sysflux addflux=$addflux flux=$flux plim=$plim options=polsplit,sefd
+newcalcal.csh vis=caldata sysflux=$sysflux addflux=$addflux flux=$flux plim=$plim options=polsplit,sefd |tee -ia newcalcal.log
 
 # Move results to a "display" directory
 
