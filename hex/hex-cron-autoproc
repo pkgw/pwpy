@@ -80,7 +80,9 @@ while (1)
     # and the desired umask is set in the .cshrc which isn't sourced
     # with a -c, and tcsh has moronic string quoting rules, so we end
     # up with this ugliness:
-    ssh obs@strato 'tcsh -c "umask 2; mkdir -p /ataarchive/'$ymd'/hexproc"'
+    # XXX Temp for archive user iron out what to do here
+    #ssh obs@strato 'tcsh -c "umask 2; mkdir -p /ataarchive/'$ymd'/hexproc"'
+    (umask 2; mkdir -p /ataarchive/$ymd/hexproc)
 
     if (! { mkdir $reddir }) then
 	set ok = 0
