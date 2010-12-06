@@ -882,7 +882,7 @@ else
 endif
 
 cd $wd; rm -f sfind.log; touch sfind.log
-sfind in=tempmap.cm options=oldsfind,auto,nofit rmsbox=256 xrms=4 labtyp=arcsec >& /dev/null
+sfind in=tempmap.cm options=oldsfind,auto,nofit rmsbox=50 xrms=4 labtyp=arcsec >& /dev/null
 cd ..
 
 # Find some stats about the map...

@@ -213,6 +213,8 @@ else if ("$argv[1]" =~ 'options='*) then
 	    set wrath = 1
 	else if ($option == "autocal") then
 	    set mapopt = "$mapopt,autocal"
+	else if ($option == "nocal") then
+	    set mapopt = "$mapopt,nocal"
 	else if ($option == "sefd") then
 	    set sefd = 1
 	    set mapopt = "$mapopt,sefd"

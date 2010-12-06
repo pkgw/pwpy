@@ -419,6 +419,7 @@ while ($idx <= $listlim)
     endif
     @ idx++
 end
+
 if (`head -n 1 $wd/vistimes` == "") then
     echo "FATAL ERROR: No data found (data may be entirely flagged)"
     goto fail
@@ -456,7 +457,7 @@ endif
 set lim = `wc -l $wd/vistimes | awk '{print $1}'`
 set idx = 1
 
-sort -unk2 $wd/vistimes > $wd/timecheck2
+sort -u $wd/vistimes | sort -nk2 > $wd/timecheck2
 echo "Reconstructing observational parameters..."
 set slist
 set clist
@@ -619,7 +620,7 @@ while ($idx <= $lim)
 	touch $wd/badants
 	if (`echo $vals[5] | wc -w`) then
 	    newrfi32.csh vis=$wd/vis select="time($timelim[1],$timelim[2])" rawdata=$wd/specdata > /dev/null
-	    newfracture.csh vis=$wd npoly=$cpoly nsig=$csig options=$corr,desel,recover,$rfitype,`if ($display == 2) echo "verbose"` $csel > $wd/badants
+	    newfracture.csh vis=$wd npoly=$cpoly nsig=$csig options=$corr,desel,recover,$rfitype,`if ($display == 2) echo "verbose $device"` $csel > $wd/badants
 	    echo "time($timelim[1],$timelim[2])" >> $wd/badantshist
 	    cat $wd/badants >> $wd/badantshist
 	else
