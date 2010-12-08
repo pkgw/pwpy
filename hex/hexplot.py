@@ -37,6 +37,7 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
         wherecmd    :=  'WHERE ...' command for specifying data in sql query
         saveas      :=  savename for pdf of plots
         lines       :=  whether to connect the plotted points with lines
+                        (add ' ORDER BY ' to wherecmd to control line order)
     
 
     TAG LIST:
@@ -59,15 +60,14 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
             
             
     TODO LIST:
-        -limit group numbers
         -fix some axis limits
         -custom axis limits
-        -line plotting & ordering
         -look into interactive plotting
         -outlier identification & option to suppress (in database buildup)
         -suppress addition printing
         -plot uncertainties when available (and compute them for
          derived quantities such as squintmag and squintangle)
+         
     """
     
     # Setup pdf output
@@ -139,7 +139,7 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
         
         # Plot the group, label
         if lines:
-            plt.plot(ixdata, iydata)
+            plt.plot(ixdata, iydata, 'o-')
         else:
             plt.scatter(ixdata, iydata)
         
