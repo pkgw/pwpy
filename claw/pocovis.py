@@ -440,7 +440,7 @@ if __name__ == '__main__':
 
 # loop over miriad data and time chunks
         for file in filelist:
-            for nskip in range(0,nints*11,nints*0.7):
+            for nskip in range(0,nints*10,nints*0.7):
                 print 'Starting file %s with nskip %d' % (file, nskip)
                 fileout = open(string.join(file.split('.')[:-1]) + '.txt', 'a')
                 pklout = open(string.join(file.split('.')[:-1]) + '.' + str(nskip) + '.pkl', 'wb')
