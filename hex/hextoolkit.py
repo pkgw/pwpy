@@ -14,14 +14,16 @@ from os.path import join
 import numpy as np
 import sqlite3
 
-# Set things up so we can dumpy numpy array values right
+
+# Set things up so we can dump numpy array values right
 # into sqlite databases.
 sqlite3.register_adapter (np.int32, int)
 sqlite3.register_adapter (np.float32, float)
 sqlite3.register_adapter (np.string_, str)
 
-# Set location of database file
+
 def getdbpath ():
+    """Retrieve path to database file"""
     if 'SQUINTDBPATH' in os.environ:
         return os.environ['SQUINTDBPATH']
     return '/ataarchive/scratch/hexproc/squint.db'
@@ -113,10 +115,10 @@ def atatojday(atadate):
         
     CALLING SEQUENCE:
         atatojday(datestr)
-        
+      
+        Sample atadate: '10Sep08:11:25:55.0'
+      
     """ 
-    
-    # Sample atadate: '10Sep08:11:25:55.0'
     
     # Split off semicolons and pull out components
     atadate = atadate.split(':')
