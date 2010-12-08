@@ -32,7 +32,7 @@ class poco:
         self.baseline_order = n.array([ 257, 258, 514, 261, 517, 1285, 262, 518, 1286, 1542, 259, 515, 773, 774, 771, 516, 1029, 1030, 772, 1028, 1287, 1543, 775, 1031, 1799, 1544, 776, 1032, 1800, 2056, 260, 263, 264, 519, 520, 1288])   # second iteration of bl nums
         self.autos = []
         self.noautos = []
-        self.dmarr = n.arange(53,63,2)       # dm trial range in pc/cm3
+        self.dmarr = n.arange(52,63,1)       # dm trial range in pc/cm3
 #        self.tshift = 0.2     # not implemented yet
         self.nskip = nskip*self.nbl    # number of iterations to skip (for reading in different parts of buffer)
         nskip = self.nskip
@@ -280,6 +280,7 @@ class poco:
 
         # Detect peaks
         peaks = n.where(arr > sig)   # this is probably biased
+        peakmax = n.where(arr == arr.max())
         print 'peaks:  ', peaks
 
         # Plot
@@ -288,8 +289,7 @@ class poco:
         p.colorbar()
 
         if len(peaks[0]) > 0:
-            print 'Peak at DM=%f, t0=%f' % (dmarr[peaks[0][0]], reltime[peaks[1][0]])
-            print 'max ', arr.max()
+            print 'Peak of %f sigma at DM=%f, t0=%f' % (arr.max(), dmarr[peakmax[0][0]], reltime[peakmax[1][0]])
 
             for i in range(len(peaks[1])):
                 ax = p.imshow(arr, aspect='auto', origin='lower', interpolation='nearest', extent=(min(reltime),max(reltime),min(dmarr),max(dmarr)))
@@ -301,7 +301,7 @@ class poco:
         p.title('Signal to Noise Ratio of Dedispersed Pulse')
         if save:
             savename = self.file.split('.')[:-1]
-            savename.append(str(self.nskip) + '.png')
+            savename.append(str(self.nskip/self.nbl) + '.png')
             savename = string.join(savename,'.')
             p.savefig(savename)
 
@@ -374,18 +374,6 @@ class poco:
 
         self.dmt0arr = dmt0arr
 
-def redo(file):
-    """Takes pickle file specifying results of automated searches, then reproduces dmt0 plots.
-    To Do:  need to also use pickle to select data in raw format for imaging.
-    """
-    file = open(file, 'rb')
-    dump = pickle.load(file)
-    pv = poco(dump[1], nints=dump[3], nskip=dump[2])
-    pv.prep()
-    pv.dedisperse()
-    peaks = pv.plotdmt0(save=0)
-    file.close()
-
 
 def dmtrack2(data, reltime, dm = 0., t0 = 0.):
     """Takes dispersion measure in pc/cm3 and time offset from first integration in seconds.
@@ -429,18 +417,41 @@ if __name__ == '__main__':
 
     if len(sys.argv) == 2:
         print 'Assuming input file is pickle of candidate...'
-        redo(sys.argv[1])
+#    To Do:  need to also use pickle to select data in raw format for imaging.
 
-    nints = 10000
-    for nskip in range(0,nints*10,nints*0.6):
-#    for nskip in range(1):
-        file = 'poco_crab_201103_10.mir'
-
-        pv = poco(file, nints=nints, nskip=nskip)
+        file = open(sys.argv[1], 'rb')
+        dump = pickle.load(file)
+        print 'Loaded pickle file for %s' % (dump[0])
+        print 'Has peaks at DM = ', dump[4]
+        pv = poco(dump[0], nints=dump[2], nskip=dump[1])    # format defined by pickle dump below
         pv.prep()
         pv.dedisperse()
         peaks = pv.plotdmt0(save=1)
+        file.close()
+    else:
+# set up loops
+        nints = 10000
+        fileroot = 'poco_crab_201103.mir'
+        filelist = []
+        for i in range(0,11):
+            filelist.append(string.join(fileroot.split('.')[:-1]) + '_' + str(i) + '.mir')
 
-        fileout = open(file.split('.')[:-1] + '.' + str(nskip) + '.pkl', 'wb')
-        pickle.dump((fileout, file, nskip, nints, peaks[0], pv.dmarr[peaks[0]], peaks[1]), fileout)
-        fileout.close()
+        print 'Looping over filelist: ', filelist
+
+# loop over miriad data and time chunks
+        for file in filelist:
+            for nskip in range(0,nints*11,nints*0.7):
+                print 'Starting file %s with nskip %d' % (file, nskip)
+                fileout = open(string.join(file.split('.')[:-1]) + '.txt', 'a')
+                pklout = open(string.join(file.split('.')[:-1]) + '.' + str(nskip) + '.pkl', 'wb')
+
+                pv = poco(file, nints=nints, nskip=nskip)
+                pv.prep()
+                pv.dedisperse()
+                peaks = pv.plotdmt0(save=0)
+                print >> fileout, file, nskip, nints, peaks
+
+                pickle.dump((file, nskip, nints, peaks[0], pv.dmarr[peaks[0]], peaks[1]), pklout)
+                pklout.close()
+
+        fileout.close
