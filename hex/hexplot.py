@@ -2,16 +2,18 @@
 # Keaton Burns, University of California Berkeley, 09/28/2010
 """Tools for visualizing data from hex SQLite database"""
 
-import hextoolkit
+
 import numpy as np
 import sqlite3
 import matplotlib
 matplotlib.use('pdf')
 from matplotlib.backends.backend_pdf import PdfPages
-from matplotlib.pylab import plt
+import matplotlib.pyplot as plt
+import hextoolkit
 
-def hexplot(xdata, ydata, groupby = '', colorby = '', pyfilter = '',
-            sqlfilter = '', wherecmd = '', saveas='squintplots.pdf',
+
+def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
+            sqlfilter=None, wherecmd='', saveas='squintplots.pdf',
             lines=False):
     """
     hexplot
@@ -21,8 +23,9 @@ def hexplot(xdata, ydata, groupby = '', colorby = '', pyfilter = '',
         Plots data from squint.db, grouped and colored as requested
     
     CALLING SEQUENCE:
-        hexplot(xdata, ydata, groupby = '', colorby = '', pyfilter = '', 
-                sqlfilter = '', wherecmd='', saveas='squintplots.pdf')
+        hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
+            sqlfilter=None, wherecmd='', saveas='squintplots.pdf',
+            lines=False)
     
     INPUTS:
         xdata       :=  tag for x-data in plots
@@ -52,7 +55,7 @@ def hexplot(xdata, ydata, groupby = '', colorby = '', pyfilter = '',
             'sefd'
         Derived from SQL database:
             'squintmag'
-            <NOT IMPLEMENTED>'squintangle'
+            'squintangle'
             
             
     TODO LIST:
@@ -78,7 +81,7 @@ def hexplot(xdata, ydata, groupby = '', colorby = '', pyfilter = '',
     inputs = []
     called_tags = [xdata, ydata, groupby, colorby]
     for i in called_tags:
-        if i != '': 
+        if i != None: 
             if i in ('squintmag', 'squintangle'):
                 inputs.append('squintaz')
                 inputs.append('squintel')
@@ -88,6 +91,7 @@ def hexplot(xdata, ydata, groupby = '', colorby = '', pyfilter = '',
     
     # Turn into ndarray
     sqldata = hextoolkit.sqlitecursor_to_ndarray(cursor)
+    connection.close()
     
     # Create new array with derived tags, if needed
     if 'squintmag' in called_tags or 'squintangle' in called_tags:
@@ -110,9 +114,14 @@ def hexplot(xdata, ydata, groupby = '', colorby = '', pyfilter = '',
     
     # Get number of and list of groups
     groupnum = 1
-    if groupby != '':
+    if groupby != None:
         grouplist = np.unique(data[groupby])
         groupnum = np.size(grouplist)
+        if groupnum >= 100:
+            print 'HEXPLOT: Requested grouping would yield over 100 plots'
+            print 'HEXPLOT: Quitting...'
+            pp.close()
+            return
                 
     # Plot a separate figure for each group
     for i in xrange(groupnum):
@@ -120,7 +129,7 @@ def hexplot(xdata, ydata, groupby = '', colorby = '', pyfilter = '',
         plt.clf()
         
         # Pull out individual group
-        if groupby != '':
+        if groupby != None:
             igroup = np.where(data[groupby] == grouplist[i])
             ixdata = data[xdata][igroup]
             iydata = data[ydata][igroup]
@@ -134,11 +143,12 @@ def hexplot(xdata, ydata, groupby = '', colorby = '', pyfilter = '',
         else:
             plt.scatter(ixdata, iydata)
         
-        if groupby != '': plt.title(groupby + ' = ' + str(grouplist[i]))
+        if groupby != None: 
+            plt.title(groupby + ' = ' + str(grouplist[i]))
         plt.xlabel(xdata)
         plt.ylabel(ydata)
-        plt.axhline(0, linestyle = ':')
-        plt.axvline(0, linestyle = ':')
+        plt.axhline(0, linestyle=':')
+        plt.axvline(0, linestyle=':')
         
         # Good 5% limits
         padlimits = [np.min(ixdata), np.max(ixdata), np.min(iydata),np.max(iydata)]
@@ -153,3 +163,6 @@ def hexplot(xdata, ydata, groupby = '', colorby = '', pyfilter = '',
         pp.savefig()
         
     pp.close()
+
+
+
