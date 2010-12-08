@@ -433,7 +433,7 @@ if __name__ == '__main__':
         nints = 10000
         fileroot = 'poco_crab_201103.mir'
         filelist = []
-        for i in range(0,11):
+        for i in range(1,11):     # loop skips first for this run.
             filelist.append(string.join(fileroot.split('.')[:-1]) + '_' + str(i) + '.mir')
 
         print 'Looping over filelist: ', filelist
