@@ -211,7 +211,7 @@ def gaussread(path):
     sinforead = sinfofile.readlines()
     sinfofile.close()
     
-    for i in xrange(np.size(sinforead)): sinforead[i] = sinforead[i].strip().split()
+    sinforead = [i.strip().split() for i in sinforead]
     source = sinforead[0][1]
     freq = sinforead[1][1]
     flux = sinforead[2][1]
@@ -226,8 +226,8 @@ def gaussread(path):
     boundsfile = open(join (path, 'data-databounds.txt'), 'r')
     boundsread = boundsfile.readlines()
     boundsfile.close()
-    
-    for i in xrange(np.size(boundsread)): boundsread[i] = boundsread[i].strip().split()
+
+    boundsread = [i.strip().split() for i in boundsread]
     tstart = atatojday(boundsread[0][1])
     #tend = atatojday(boundsread[1][1])
 
@@ -283,8 +283,10 @@ def gaussread(path):
             else:
                 eloc = np.where(eread['Ant'] == i)
                 if np.size(eloc) != 0: squint[j]['sefd'] = max(eread[eloc]['SEFD'])
+                else: squint[j]['sefd'] = 0.0
 
             squint[j]['sumchisq'] = gread[antloc][xloc]['XiSq'] + gread[antloc][yloc]['XiSq']
+            
             j += 1
             
     return gread, eread, info, squint
@@ -299,7 +301,7 @@ def gausstosql(path, replacedups=True):
         Adds squint array data from gaussread to the squint SQL database.
     
     CALLING SEQUENCE:
-        gausstosql(path)
+        gausstosql(path, replacedups=True)
     
     INPUTS:
         path        :=  path to folder containing hex reduction txts
@@ -370,7 +372,6 @@ def resetsql():
     connection = sqlite3.connect(dbpath)
     cursor = connection.cursor()
     
-    # Reset and creation routine
     # Create table to hold observations
     sql_cmd = """CREATE TABLE obs (oid INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, 
                                    rid int,
@@ -449,6 +450,7 @@ def hexfromtxt(fname, dtype=float, names=None, skip_header=0, colnum=0):
                         (if not specified, will look at dtype then names then first row after header)
     """
 
+    # Track if any rows have wrong number of columns
     anybad = False
 
     # Read lines from file, skipping header
@@ -488,7 +490,7 @@ def hexfromtxt(fname, dtype=float, names=None, skip_header=0, colnum=0):
         if dtype == float: passdtype = (',f' * colnum)[1:]
         else: passdtype = ','.join(dtype)
     elif dtype == float:
-        passdtype = zip(names, (',f' * colnum)[1:].strip().split())
+        passdtype = zip(names, (',f' * colnum)[1:].strip().split(','))
     else: passdtype = zip(names, dtype)
     
     filearray = np.zeros(len(filelist), dtype=passdtype)
