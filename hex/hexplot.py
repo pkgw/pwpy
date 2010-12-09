@@ -66,7 +66,6 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
             
             
     TODO LIST:
-        -fix some axis limits
         -custom axis limits
         -look into interactive plotting
         -outlier identification & option to suppress (in database buildup)
@@ -163,8 +162,9 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
                 
     # Plot a separate figure for each group
     for i in xrange(groupnum):
-        plt.figure(i+1, figsize = (9, 9))
+        plt.figure(i+1, figsize=(9, 9))
         plt.clf()
+        plt.subplots_adjust(left=0.125, right=0.9, bottom=0.125, top=0.9)
         
         # Pull out individual group, take everything if no grouping is specified
         if groupby != None: 
@@ -198,18 +198,52 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
             plt.title(groupby + ' = ' + str(grouplist[i]))
         plt.xlabel(xdata)
         plt.ylabel(ydata)
-        plt.axhline(0, linestyle=':')
-        plt.axvline(0, linestyle=':')
+        plt.axhline(0, linestyle=':', color='k')
+        plt.axvline(0, linestyle=':', color='k')
         
-        # Good 5% limits
-        padlimits = [np.min(ixdata), np.max(ixdata), np.min(iydata),np.max(iydata)]
+        # Data limits
+        plotlimits = [np.min(ixdata), np.max(ixdata), np.min(iydata),np.max(iydata)]
+        
+        # Modify for particular tags:
+        # Lower limit zero
+        if ydata in ['squintaz_uc', 'squintel_uc', 'squintmag', 'squintmag_uc', 
+                     'squintangle_uc', 'sefd', 'sumchisq']:
+            plotlimits[2] = 0.0
+        
+        # Symmetric about zero
+        if ydata in ['squintaz', 'squintel']:
+            plotlimits[2] = -np.max(np.abs(plotlimits[2:4]))
+            plotlimits[3] = np.max(np.abs(plotlimits[2:4]))
+        if xdata in ['squintaz', 'squintel']:
+            plotlimits[0] = -np.max(np.abs(plotlimits[0:2]))
+            plotlimits[1] = np.max(np.abs(plotlimits[0:2]))
+        
+        # Specific values
+        if ydata in ['squintangle']:
+            plotlimits[2] = -np.pi
+            plotlimits[3] = np.pi
+        if xdata in ['squintangle']:
+            plotlimits[0] = -np.pi
+            plotlimits[1] = np.pi
+
+        # Pad plot limits on all sides
         pad = 0.05
-        padlimits[0] -= pad * (padlimits[1] - padlimits[0])
-        padlimits[1] += pad * (padlimits[1] - padlimits[0])
-        padlimits[2] -= pad * (padlimits[3] - padlimits[2])
-        padlimits[3] += pad * (padlimits[3] - padlimits[2])
+        plotlimits[0] -= pad * (plotlimits[1] - plotlimits[0])
+        plotlimits[1] += pad * (plotlimits[1] - plotlimits[0])
+        plotlimits[2] -= pad * (plotlimits[3] - plotlimits[2])
+        plotlimits[3] += pad * (plotlimits[3] - plotlimits[2])
         
-        plt.axis(padlimits)
+        # Square up if comparing like quantities
+        arcmin = ['squintaz', 'squintel', 'squintmag']
+        arcmin_uc = ['squintaz_uc', 'squintel_uc', 'squintmag_uc']
+        if xdata in arcmin and ydata in arcmin:
+            plt.axis([-np.max(plotlimits), np.max(plotlimits), 
+                      -np.max(plotlimits), np.max(plotlimits)])
+        elif xdata in arcmin_uc and ydata in arcmin_uc:
+            plt.axis([np.min(plotlimits), np.max(plotlimits), 
+                      np.min(plotlimits), np.max(plotlimits)])
+        else: plt.axis(plotlimits)
+            
         plt.draw()
         pp.savefig()
         
