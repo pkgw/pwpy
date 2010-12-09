@@ -25,7 +25,7 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
     CALLING SEQUENCE:
         hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
             sqlfilter=None, wherecmd='', saveas='squintplots.pdf',
-            lines=False)
+            lines=False, errorbars=True)
     
     INPUTS:
         xdata       :=  tag for x-data in plots
@@ -70,8 +70,6 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
         -custom axis limits
         -look into interactive plotting
         -outlier identification & option to suppress (in database buildup)
-        -plot uncertainties when available (and compute them for
-         derived quantities such as squintmag and squintangle)
         -compute squintangle uncertainty & catch for x/yuc assignment in plotting
          
     """
