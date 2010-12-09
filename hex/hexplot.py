@@ -14,7 +14,7 @@ import hextoolkit
 
 def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
             sqlfilter=None, wherecmd='', saveas='squintplots.pdf',
-            lines=False):
+            lines=False, errorbars=True):
     """
     hexplot
     =======
@@ -38,6 +38,7 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
         saveas      :=  savename for pdf of plots
         lines       :=  whether to connect the plotted points with lines
                         (add ' ORDER BY ' to wherecmd to control line order)
+        errorbars   :=  add errorbars when available
     
 
     TAG LIST:
@@ -46,17 +47,22 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
             'source'
             'freq'
             'flux'
-            'archsummpath'
-            'rid'
+            'archsummpath'      (not physical)
+            'rid'               (not physical)
             'antnum'
             'antname'
             'feed'
             'squintaz'
+            'squintaz_uc'
             'squintel'
+            'squintel_uc'
             'sefd'
+            'sumchisq'
         Derived from SQL database:
             'squintmag'
+            'squintmag_uc'
             'squintangle'
+            'squintangle_uc' (NOT IMPLEMENTED)
             
             
     TODO LIST:
@@ -66,11 +72,16 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
         -outlier identification & option to suppress (in database buildup)
         -plot uncertainties when available (and compute them for
          derived quantities such as squintmag and squintangle)
+        -compute squintangle uncertainty & catch for x/yuc assignment in plotting
          
     """
     
     # Setup pdf output
     pp = PdfPages(saveas)
+    
+    ###########
+    ## Query ##
+    ###########
     
     # Connect to sqlite database
     connection = sqlite3.connect(hextoolkit.getdbpath ())
@@ -81,10 +92,17 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
     called_tags = [xdata, ydata, groupby, colorby]
     for i in called_tags:
         if i != None: 
-            if i in ('squintmag', 'squintangle'):
+            if i in ('squintmag', 'squintmag_uc', 'squintangle', 'squintangle_uc'):
                 inputs.append('squintaz')
                 inputs.append('squintel')
             else: inputs.append(i)
+            
+    if 'squintaz' in inputs: inputs.append('squintaz_uc')
+    if 'squintel' in inputs: inputs.append('squintel_uc')
+                
+    # Get rid of duplicates
+    inputs = list(set(inputs))
+            
     sql_cmd = 'SELECT ' + ','.join(inputs) + ' FROM runs NATURAL JOIN obs ' + wherecmd
     cursor.execute(sql_cmd)
     
@@ -93,30 +111,53 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
     connection.close()
     
     # Create new array with derived tags, if needed
-    if 'squintmag' in called_tags or 'squintangle' in called_tags:
+    if 'squintmag' in called_tags or 'squintmag_uc' in called_tags: getmag = True
+    else: getmag = False
+    
+    if 'squintangle' in called_tags or 'squintangle_uc' in called_tags: getangle = True
+    else: getangle = False
+    
+    if getmag or getangle:
+        
+        # Pull datatypes of queried tags
         plot_dtypes = eval(str(sqldata.dtype))
         
-        if 'squintmag' in called_tags: plot_dtypes.append(('squintmag', '<f8'))
-        if 'squintangle' in called_tags: plot_dtypes.append(('squintangle', '<f8'))
+        # Add derived datatypes
+        if getmag: 
+            plot_dtypes.append(('squintmag', '<f8'))
+            plot_dtypes.append(('squintmag_uc', '<f8'))
+        if getangle: 
+            plot_dtypes.append(('squintangle', '<f8'))
+            plot_dtypes.append(('squintangle_uc', '<f8'))
+            
+        # Create empty array, fill in all old data...
         data = np.zeros(np.size(sqldata), dtype=plot_dtypes)
-        
-        # Add all old data...
         for i in sqldata.dtype.names:
             data[i] = sqldata[i]
         
-        # ... and calculate derived tage
-        if 'squintmag' in called_tags:
+        # ... and calculate derived tags
+        if getmag:
             data['squintmag'] = np.sqrt(data['squintaz'] ** 2 + data['squintel'] ** 2)
-        if 'squintangle' in called_tags:
+            data['squintmag_uc'] = np.sqrt((data['squintaz_uc'] * data['squintaz']) ** 2 + 
+                                           (data['squintel_uc'] * data['squintel']) ** 2) / data['squintmag']
+        if getangle:
             data['squintangle'] = np.arctan2(data['squintel'], data['squintaz'])
+            ### Calculate squintangle uncertainty:
+            #data['squintangle_uc'] = 
+            
     else: data = sqldata
+    
+    
+    ##############
+    ## Plotting ##
+    ##############
     
     # Get number of and list of groups
     groupnum = 1
     if groupby != None:
         grouplist = np.unique(data[groupby])
         groupnum = np.size(grouplist)
-        if groupnum >= 100:
+        if groupnum > 100:
             print 'HEXPLOT: Requested grouping would yield over 100 plots'
             print 'HEXPLOT: Quitting...'
             pp.close()
@@ -127,20 +168,33 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
         plt.figure(i+1, figsize = (9, 9))
         plt.clf()
         
-        # Pull out individual group
-        if groupby != None:
+        # Pull out individual group, take everything if no grouping is specified
+        if groupby != None: 
             igroup = np.where(data[groupby] == grouplist[i])
-            ixdata = data[xdata][igroup]
-            iydata = data[ydata][igroup]
         else:
-            ixdata = data[xdata]
-            iydata = data[ydata]
+            igroup = np.where(data[xdata] == data[xdata])
+            
+        ixdata = data[xdata][igroup]
+        iydata = data[ydata][igroup]
+
+        # Determine errorbars as requested       
+        if errorbars:
+            if xdata in ['squintel', 'squintaz', 'squintmag']:
+                xuc = data[xdata + '_uc'][igroup]
+            else: xuc = None
+            
+            if ydata in ['squintel', 'squintaz', 'squintmag']:
+                yuc = data[ydata + '_uc'][igroup]
+            else: yuc = None
+        else:
+            xuc = None
+            yuc = None
         
         # Plot the group, label
-        if lines:
-            plt.plot(ixdata, iydata, 'o-')
-        else:
-            plt.scatter(ixdata, iydata)
+        if lines: plotformat = 'bo-'
+        else: plotformat = 'bo'
+
+        plt.errorbar(ixdata, iydata, xerr=xuc, yerr=yuc, fmt=plotformat)
         
         if groupby != None: 
             plt.title(groupby + ' = ' + str(grouplist[i]))
