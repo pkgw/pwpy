@@ -433,14 +433,14 @@ if __name__ == '__main__':
         nints = 10000
         fileroot = 'poco_crab_201103.mir'
         filelist = []
-        for i in range(1,11):     # loop skips first for this run.
+        for i in range(2,11):     # loop skips first for this run.
             filelist.append(string.join(fileroot.split('.')[:-1]) + '_' + str(i) + '.mir')
 
         print 'Looping over filelist: ', filelist
 
 # loop over miriad data and time chunks
         for file in filelist:
-            for nskip in range(0,nints*10,nints*0.7):
+            for nskip in range(0,nints*9,nints*0.7):
                 print 'Starting file %s with nskip %d' % (file, nskip)
                 fileout = open(string.join(file.split('.')[:-1]) + '.txt', 'a')
                 pklout = open(string.join(file.split('.')[:-1]) + '.' + str(nskip) + '.pkl', 'wb')
