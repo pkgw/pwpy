@@ -14,7 +14,7 @@ import hextoolkit
 
 def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
             sqlfilter=None, wherecmd='', saveas='squintplots.pdf',
-            lines=False, errorbars=True):
+            lines=False, errorbars=True, xlim=None, ylim=None):
     """
     hexplot
     =======
@@ -25,7 +25,7 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
     CALLING SEQUENCE:
         hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
             sqlfilter=None, wherecmd='', saveas='squintplots.pdf',
-            lines=False, errorbars=True)
+            lines=False, errorbars=True, xlim=None, ylim=None)
     
     INPUTS:
         xdata       :=  tag for x-data in plots
@@ -39,6 +39,8 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
         lines       :=  whether to connect the plotted points with lines
                         (add ' ORDER BY ' to wherecmd to control line order)
         errorbars   :=  add errorbars when available
+        xlim        :=  user-specified x-axis limits (xmin, xmax)
+        ylim        :=  user-specified y-axis limits (ymin, ymax)
     
 
     TAG LIST:
@@ -226,6 +228,22 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
             plotlimits[0] = -np.pi
             plotlimits[1] = np.pi
 
+        # Square up if comparing like quantities
+        arcmin = ['squintaz', 'squintel', 'squintmag']
+        arcmin_uc = ['squintaz_uc', 'squintel_uc', 'squintmag_uc']
+        if xdata in arcmin and ydata in arcmin:
+            plotlimits = [-np.max(plotlimits), np.max(plotlimits), 
+                          -np.max(plotlimits), np.max(plotlimits)]
+        elif xdata in arcmin_uc and ydata in arcmin_uc:
+            plotlimits = [np.min(plotlimits), np.max(plotlimits), 
+                          np.min(plotlimits), np.max(plotlimits)]
+ 
+        # Allow user determination
+        if xlim != None:
+            plotlimits[0:2] = list(hardx)
+        if ylim != None:
+            plotlimits[2:] = list(hardy)
+        
         # Pad plot limits on all sides
         pad = 0.05
         plotlimits[0] -= pad * (plotlimits[1] - plotlimits[0])
@@ -233,16 +251,7 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
         plotlimits[2] -= pad * (plotlimits[3] - plotlimits[2])
         plotlimits[3] += pad * (plotlimits[3] - plotlimits[2])
         
-        # Square up if comparing like quantities
-        arcmin = ['squintaz', 'squintel', 'squintmag']
-        arcmin_uc = ['squintaz_uc', 'squintel_uc', 'squintmag_uc']
-        if xdata in arcmin and ydata in arcmin:
-            plt.axis([-np.max(plotlimits), np.max(plotlimits), 
-                      -np.max(plotlimits), np.max(plotlimits)])
-        elif xdata in arcmin_uc and ydata in arcmin_uc:
-            plt.axis([np.min(plotlimits), np.max(plotlimits), 
-                      np.min(plotlimits), np.max(plotlimits)])
-        else: plt.axis(plotlimits)
+        plt.axis(plotlimits)
             
         plt.draw()
         pp.savefig()
