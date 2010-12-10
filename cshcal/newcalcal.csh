@@ -1024,7 +1024,7 @@ foreach ipol ($pollist) # Work with only one pol at a time
 	    echo -n "Beginning SEFD calculation"
 	    uvflag vis=$file options=none flagval=u select=auto >& /dev/null
 	    if ("$xants" != "") uvcal vis=$file options=nocal,nopass,nopol,fxcal select='pol(xx)' out=$wd/sefdcalx >& /dev/null
-	    if ("$yants" != "")uvcal vis=$file options=nocal,nopass,nopol,fxcal select='pol(xx)' out=$wd/sefdcaly >& /dev/null
+	    if ("$yants" != "") uvcal vis=$file options=nocal,nopass,nopol,fxcal select='pol(yy)' out=$wd/sefdcaly >& /dev/null
 	    uvflag vis="$wd/sefdcal*" flagval=f select='amp(0,0.0000000000000001)' options=none >& /dev/null #This is here since uvcal is stupid, and this corresponds to a noise level of 80 dB (SNR of 1:10^8)
 	    echo -n ", calculating gains tables..."
 	    touch $wd/checkmfcalx; touch $wd/checkmfcaly
