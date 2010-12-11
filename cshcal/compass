@@ -27,9 +27,11 @@ sleep .01
 
 set list = (`cat ~/karto/compass.$corr`)
 rm -rf ~/karto/compass.$corr
+echo COMPASS `date`: "beginning processing of the following entry:"
+echo $list
 
 if ($#list < 5) then
-    echo "WARNING: Blank compass entry"
+    echo COMPASS `date`: "entry seems to be in wrong format; giving up on this scan."
     goto restart
 endif
 
@@ -48,11 +50,12 @@ mkdir -p $histview/$corr
 
 # Take data to a temp directory for processing
 
-uvaver vis=$vis select="time($times[1],$times[2])" options=relax,nocal,nopass,nopol out=/ataarchive/scratch/obs/compass/$corr/caldata >& $histview/$corr/dataread
+uvaver vis=$vis select="time($times[1],$times[2])" options=relax,nocal,nopass,nopol out=/ataarchive/scratch/obs/compass/$corr/caldata |& tee -ia $histview/$corr/dataread
 
 if ($status) then
     rm -rf /ataarchive/scratch/obs/compass/$corr/caldata
     echo "Data read failed!" >> $histview/$corr/dataread
+    echo COMPASS `date`: "couldn't copy data for analysis; giving up on this scan."
     goto restart
 endif
 
@@ -116,7 +119,7 @@ set mfreq = `echo $freq | awk '{print int($1*1000)}'`
 set calvals = (`calinfo target=$cal freq=$freq options=auto`)
 if ("$calvals[1]" == "FATAL") then
     rm -rf caldata
-    echo "WARNING: Calibrator data not found!"
+    echo COMPASS `date`: "data not found about the calibrator ($cal $freq)! Giving up on this scan."
     goto restart
 endif
 
@@ -144,7 +147,7 @@ newcalcal.csh vis=caldata sysflux=$sysflux addflux=$addflux flux=$flux plim=$pli
 # Move results to a "display" directory
 
 if !(-e cal-$cal-$mfreq-maps/$cal.cm && -e cal-$cal-$mfreq-maps/sefd) then
-    echo "WARNING: COMPASS failed to complete!"
+    echo COMPASS `date`: "calibration failed! Giving up on this scan."
     rm -rf cal-$cal-$mfreq-maps caldata
     goto restart
 endif
@@ -307,6 +310,7 @@ rm -rf caldata
 rm -rf calreduc
 rm *.png
 mv cal-$cal-$mfreq-maps calreduc
+echo COMPASS `date`: "reduction succeeded! Going back to sleep."
 goto restart
 
 exit 0
