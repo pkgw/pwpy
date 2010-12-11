@@ -433,9 +433,10 @@ if __name__ == '__main__':
         nints = 10000
         fileroot = 'poco_crab_201103.mir'
         filelist = []
-        for i in range(2,11):     # loop skips first for this run.
+        for i in range(0,11):
             filelist.append(string.join(fileroot.split('.')[:-1]) + '_' + str(i) + '.mir')
 
+        filelist.reverse()  # get the last one first for testing purposes
         print 'Looping over filelist: ', filelist
 
 # loop over miriad data and time chunks
