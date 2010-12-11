@@ -340,14 +340,18 @@ class FitBase (object):
         return self
 
     def plot (self, dlines=True, smoothModel=True, xmin=None, xmax=None,
-              ymin=None, ymax=None, **kwargs):
+              ymin=None, ymax=None, mxmin=None, mxmax=None, **kwargs):
         import omega
 
         if not smoothModel:
             modx = self.x
             mody = self.mdata
         else:
-            modx = _N.linspace (self.x.min (), self.x.max (), 400)
+            if mxmin is None:
+                mxmin = self.x.min ()
+            if mxmax is None:
+                mxmax = self.x.max ()
+            modx = _N.linspace (mxmin, mxmax, 400)
             mody = self.mfunc (modx)
 
         vb = omega.layout.VBox (2)
@@ -497,6 +501,14 @@ class LeastSquaresFit (FitBase):
         if self._fitExport is not None:
             self._fitExport ()
 
+
+    def assumeParams (self, *args, **kwargs):
+        super (LeastSquaresFit, self).assumeParams (*args, **kwargs)
+        if self._fitExport is not None:
+            self._fitExport ()
+        return self
+
+
 class ConstrainedMinFit (FitBase):
     """A Fit object that implements its fit via a generic constrained
     function minimization algorithm. Extra fields are:
@@ -601,6 +613,7 @@ class ConstrainedMinFit (FitBase):
 
         for i in xrange (0, len (self._paramNames)):
             if self._info[i]['fixed']:
+                ndof += 1
                 continue
             self._info[i]['value'] = guess[i]
                 
@@ -617,13 +630,25 @@ class ConstrainedMinFit (FitBase):
         if not reckless and _N.any (~_N.isfinite (o.params)):
             raise Exception ('MPFIT converged on infinite parameters')
 
-        # Coerce into arrayness.
+        # Coerce into arrayness. Calculate rchisq ourselves since
+        # fixed parameters may change ndof over what the naive code
+        # expects.
         self.params = _N.atleast_1d (o.params)
         self.uncerts = _N.atleast_1d (o.perror)
         self.cov = o.covar
+        self.chisq = o.fnorm
+        self.rchisq = o.fnorm / ndof
         
         if self._fitExport is not None:
             self._fitExport ()
+
+
+    def assumeParams (self, *args, **kwargs):
+        super (LeastSquaresFit, self).assumeParams (*args, **kwargs)
+        if self._fitExport is not None:
+            self._fitExport ()
+        return self
+
 
 class MPFitTest (ConstrainedMinFit):
     _paramNames = ['a', 'b']
@@ -721,6 +746,14 @@ class RealConstrainedMinFit (FitBase):
 
         if self._fitExport is not None:
             self._fitExport ()
+
+
+    def assumeParams (self, *args, **kwargs):
+        super (LeastSquaresFit, self).assumeParams (*args, **kwargs)
+        if self._fitExport is not None:
+            self._fitExport ()
+        return self
+
 
 class GaussianFit (LeastSquaresFit):
     _paramNames = ['height', 'xmid', 'width']
