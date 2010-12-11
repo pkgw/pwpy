@@ -170,10 +170,15 @@ class FitBase (object):
             guess - The function to guess initial parameters, given the data.
         makeModel - The function to return a model evaluator function.
          _fitImpl - The function to actually perform the fit.
-    
+
+    Subclassers may optionally implement:
+
+       _fitExport - Set individual fields equivalent to the best-fit
+                    parameters for ease of use.
     """
     
     _paramNames = None
+    _fitExport = None
 
     def __init__ (self):
         if self._paramNames is None:
@@ -279,11 +284,13 @@ class FitBase (object):
                        reckless, **kwargs)
 
         if reckless:
+            if self._fitExport is not None:
+                self._fitExport ()
             return self
         
         if self.params is None:
             raise RuntimeError ('Failed to find best-fit parameters')
-        
+
         if self.uncerts is None:
             raise RuntimeError ('Failed to find uncertainties to fit parameters')
 
@@ -308,6 +315,9 @@ class FitBase (object):
             self.rchisq = (self.resids * self.resids.conj () / self.sigmas**2).sum () / \
                           (self.x.size - len (self.params))
 
+        if self._fitExport is not None:
+            self._fitExport ()
+
         return self
 
     def assumeParams (self, *params):
@@ -323,6 +333,9 @@ class FitBase (object):
             # resids may be complex
             self.rchisq = (self.resids * self.resids.conj () / self.sigmas**2).sum () / \
                           (self.x.size - len (self.params))
+
+        if self._fitExport is not None:
+            self._fitExport ()
 
         return self
     
@@ -343,9 +356,15 @@ class FitBase (object):
               ymin=None, ymax=None, mxmin=None, mxmax=None, **kwargs):
         import omega
 
+        _cmplx = {'real': lambda x: x.real,
+                  'imag': lambda x: x.imag,
+                  'amp': lambda x: _N.abs (x),
+                  'pha': lambda x: _N.arctan2 (x.imag, x.real)}
+
         if not smoothModel:
             modx = self.x
             mody = self.mdata
+            resy = mody
         else:
             if mxmin is None:
                 mxmin = self.x.min ()
@@ -353,16 +372,27 @@ class FitBase (object):
                 mxmax = self.x.max ()
             modx = _N.linspace (mxmin, mxmax, 400)
             mody = self.mfunc (modx)
+            resy = self.mdata
+
+        plotx = _cmplx[xcomponent] (self.x)
+        plotmodx = _cmplx[xcomponent] (modx)
+        y = _cmplx[ycomponent] (self.y)
+        mody = _cmplx[ycomponent] (mody)
+        resy = _cmplx[ycomponent] (resy)
+
+        resids = y - resy
+        if ycomponent == 'pha':
+            resids = ((resids + _N.pi) % (2 * _N.pi)) - _N.pi
 
         vb = omega.layout.VBox (2)
 
         if self.sigmas is not None:
-            vb.pData = omega.quickXYErr (self.x, self.y, self.sigmas, 'Data', lines=dlines, **kwargs)
+            vb.pData = omega.quickXYErr (plotx, y, self.sigmas, 'Data', lines=dlines, **kwargs)
         else:
-            vb.pData = omega.quickXY (self.x, self.y, 'Data', lines=dlines, **kwargs)
+            vb.pData = omega.quickXY (plotx, y, 'Data', lines=dlines, **kwargs)
 
         vb[0] = vb.pData
-        vb[0].addXY (modx, mody, 'Model')
+        vb[0].addXY (plotmodx, mody, 'Model')
         vb[0].setYLabel ('Y')
         vb[0].rebound (False, True)
         vb[0].setBounds (xmin, xmax, ymin, ymax)
@@ -370,9 +400,9 @@ class FitBase (object):
         vb[1] = vb.pResid = omega.RectPlot ()
         vb[1].defaultField.xaxis = vb[1].defaultField.xaxis
         if self.sigmas is not None:
-            vb[1].addXYErr (self.x, self.resids, self.sigmas, 'Resid.', lines=False)
+            vb[1].addXYErr (plotx, resids, self.sigmas, 'Resid.', lines=False)
         else:
-            vb[1].addXY (self.x, self.resids, 'Resid.', lines=False)
+            vb[1].addXY (plotx, resids, 'Resid.', lines=False)
         vb[1].setLabels ('X', 'Residuals')
         vb[1].rebound (False, True)
         vb[1].setBounds (xmin, xmax) # ignore Y values since residuals are on different scale
@@ -409,14 +439,20 @@ class LinearFit (FitBase):
         t = (x - Sx / S) * sm1
         Stt = (t**2).sum ()
         
-        self.b = _N.dot (t * y, sm1) / Stt
-        self.a = (Sy - Sx * self.b) / S
+        b = _N.dot (t * y, sm1) / Stt
+        a = (Sy - Sx * b) / S
         
-        self.sigma_a = _N.sqrt ((1 + Sx**2 / S / Stt) / S)
-        self.sigma_b = _N.sqrt (Stt ** -1)
+        sigma_a = _N.sqrt ((1 + Sx**2 / S / Stt) / S)
+        sigma_b = _N.sqrt (Stt ** -1)
 
-        self.params = _N.asarray ((self.a, self.b))
-        self.uncerts = _N.asarray ((self.sigma_a, self.sigma_b))
+        self.params = _N.asarray ((a, b))
+        self.uncerts = _N.asarray ((sigma_a, sigma_b))
+
+
+    def _fitExport (self):
+        self.a, self.b = self.params
+        self.sigma_a, self.sigma_b = self.uncerts
+
 
 class SlopeFit (FitBase):
     _paramNames = ['m']
@@ -435,11 +471,16 @@ class SlopeFit (FitBase):
         Sxx = _N.dot (x**2, sm2)
         Sxy = _N.dot (x * y, sm2)
 
-        self.m = Sxy / Sxx
-        self.sigma_m = 1. / _N.sqrt (Sxx)
+        m = Sxy / Sxx
+        sigma_m = 1. / _N.sqrt (Sxx)
         
-        self.params = _N.asarray ((self.m, ))
-        self.uncerts = _N.asarray ((self.sigma_m, ))
+        self.params = _N.asarray ((m, ))
+        self.uncerts = _N.asarray ((sigma_m, ))
+
+
+    def _fitExport (self):
+        self.m = self.params[0]
+        self.sigma_m = self.uncerts[0]
 
 
 class LeastSquaresFit (FitBase):
@@ -453,11 +494,7 @@ class LeastSquaresFit (FitBase):
       _paramNames - A list of textual names corresponding to the model parameters.
             guess - The function to guess initial parameters, given the data.
         makeModel - The function to return a model evaluator function.
-       _fitExport - (Optional.) Set individual fields equivalent to the best-fit
-                    parameters for ease of use.
     """
-    
-    _fitExport = None
     
     def _fitImpl (self, x, y, sig, guess, reckless, **kwargs):
         """Obtain a fit in some way, and set at least the following
@@ -468,7 +505,7 @@ class LeastSquaresFit (FitBase):
         """
 
         from scipy.optimize import leastsq
-        
+
         w = sig ** -1
 
         if issubclass (y.dtype.type, _N.complexfloating):
@@ -498,16 +535,6 @@ class LeastSquaresFit (FitBase):
         self.uncerts = _N.sqrt (cov.diagonal ())
         self.cov = cov
 
-        if self._fitExport is not None:
-            self._fitExport ()
-
-
-    def assumeParams (self, *args, **kwargs):
-        super (LeastSquaresFit, self).assumeParams (*args, **kwargs)
-        if self._fitExport is not None:
-            self._fitExport ()
-        return self
-
 
 class ConstrainedMinFit (FitBase):
     """A Fit object that implements its fit via a generic constrained
@@ -520,11 +547,8 @@ class ConstrainedMinFit (FitBase):
       _paramNames - A list of textual names corresponding to the model parameters.
             guess - The function to guess initial parameters, given the data.
         makeModel - The function to return a model evaluator function.
-       _fitExport - (Optional.) Set individual fields equivalent to the best-fit
-                    parameters for ease of use.
     """
     
-    _fitExport = None
     makeModelDeriv = None
     
     """Returns a function d(x) such that
@@ -638,16 +662,6 @@ class ConstrainedMinFit (FitBase):
         self.cov = o.covar
         self.chisq = o.fnorm
         self.rchisq = o.fnorm / ndof
-        
-        if self._fitExport is not None:
-            self._fitExport ()
-
-
-    def assumeParams (self, *args, **kwargs):
-        super (LeastSquaresFit, self).assumeParams (*args, **kwargs)
-        if self._fitExport is not None:
-            self._fitExport ()
-        return self
 
 
 class MPFitTest (ConstrainedMinFit):
@@ -674,11 +688,8 @@ class RealConstrainedMinFit (FitBase):
       _paramNames - A list of textual names corresponding to the model parameters.
             guess - The function to guess initial parameters, given the data.
         makeModel - The function to return a model evaluator function.
-       _fitExport - (Optional.) Set individual fields equivalent to the best-fit
-                    parameters for ease of use.
     """
     
-    _fitExport = None
     makeModelDeriv = None
     
     """Returns a function d(x) such that
@@ -743,16 +754,6 @@ class RealConstrainedMinFit (FitBase):
 
         self.params = _N.atleast_1d (pfit)
         self.uncerts = _N.zeros_like (self.params)
-
-        if self._fitExport is not None:
-            self._fitExport ()
-
-
-    def assumeParams (self, *args, **kwargs):
-        super (LeastSquaresFit, self).assumeParams (*args, **kwargs)
-        if self._fitExport is not None:
-            self._fitExport ()
-        return self
 
 
 class GaussianFit (LeastSquaresFit):
