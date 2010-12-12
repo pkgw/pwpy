@@ -72,6 +72,9 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
         -look into interactive plotting
         -outlier identification & option to suppress (in database buildup)
         -compute squintangle uncertainty & catch for x/yuc assignment in plotting
+        -color
+        -filtering by uc
+        -mag vs feed by ant
          
     """
     
@@ -240,9 +243,9 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
  
         # Allow user determination
         if xlim != None:
-            plotlimits[0:2] = list(hardx)
+            plotlimits[0:2] = list(xlim)
         if ylim != None:
-            plotlimits[2:] = list(hardy)
+            plotlimits[2:] = list(ylim)
         
         # Pad plot limits on all sides
         pad = 0.05
