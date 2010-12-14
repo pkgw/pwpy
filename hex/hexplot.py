@@ -12,8 +12,8 @@ import matplotlib.pyplot as plt
 import hextoolkit
 
 
-def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
-            sqlfilter=None, wherecmd='', saveas='squintplots.pdf',
+def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None, sqlfilter=None, 
+            wherecmd='', saveas='squintplots.pdf', title=None,
             lines=False, errorbars=True, xlim=None, ylim=None):
     """
     hexplot
@@ -36,6 +36,7 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
         <NOT IMPLEMENTED>sqlfilter   :=
         wherecmd    :=  'WHERE ...' command for specifying data in sql query
         saveas      :=  savename for pdf of plots
+        title       :=  title to add to all plots
         lines       :=  whether to connect the plotted points with lines
                         (add ' ORDER BY ' to wherecmd to control line order)
         errorbars   :=  add errorbars when available
@@ -193,14 +194,17 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
             xuc = None
             yuc = None
         
-        # Plot the group, label
+        # Plot the group
         if lines: plotformat = 'bo-'
         else: plotformat = 'bo'
 
         plt.errorbar(ixdata, iydata, xerr=xuc, yerr=yuc, fmt=plotformat)
         
-        if groupby != None: 
-            plt.title(groupby + ' = ' + str(grouplist[i]))
+        # Add labels and lines at axes
+        title_list = []
+        if title != None: title_list.append(title)
+        if groupby != None: title_list.append(groupby + ' = ' + str(grouplist[i]))
+        plt.title(', '.join(title_list))
         plt.xlabel(xdata)
         plt.ylabel(ydata)
         plt.axhline(0, linestyle=':', color='k')
