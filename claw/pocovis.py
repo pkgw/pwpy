@@ -305,7 +305,7 @@ class poco:
             savename = string.join(savename,'.')
             p.savefig(savename)
 
-        return peaks
+        return peaks,arr[peaks]
 
 
     def dedisperse2(self):
@@ -423,11 +423,15 @@ if __name__ == '__main__':
         dump = pickle.load(file)
         print 'Loaded pickle file for %s' % (dump[0])
         print 'Has peaks at DM = ', dump[4]
-        pv = poco(dump[0], nints=dump[2], nskip=dump[1])    # format defined by pickle dump below
-        pv.prep()
-        pv.dedisperse()
-        peaks = pv.plotdmt0(save=1)
-        file.close()
+        if len(dump[4]) >= 1:
+            print 'Grabbing 700 ints at %d' % (dump[1]+dump[5][0]-100)
+            pv = poco(dump[0], nints=600, nskip=dump[1]+dump[5][0]-100)    # format defined by pickle dump below
+            pv.prep()
+            pv.dedisperse()
+            peaks, peakssig = pv.plotdmt0(save=1)
+            file.close()
+        else:
+            print 'No significant detection.  Moving on...'
     else:
 # set up loops
         nints = 10000
@@ -449,10 +453,10 @@ if __name__ == '__main__':
                 pv = poco(file, nints=nints, nskip=nskip)
                 pv.prep()
                 pv.dedisperse()
-                peaks = pv.plotdmt0(save=0)
+                peaks, peakssig = pv.plotdmt0(save=0)
                 print >> fileout, file, nskip, nints, peaks
 
-                pickle.dump((file, nskip, nints, peaks[0], pv.dmarr[peaks[0]], peaks[1]), pklout)
+                pickle.dump((file, nskip, nints, peaks[0], pv.dmarr[peaks[0]], peaks[1], peakssig), pklout)
                 pklout.close()
 
         fileout.close
