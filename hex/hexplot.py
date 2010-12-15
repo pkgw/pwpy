@@ -62,6 +62,7 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None, sqlfilter=N
             'sefd'
             'sumchisq'
         Derived from SQL database:
+            'antfeed'
             'squintmag'
             'squintmag_uc'
             'squintangle'
@@ -97,7 +98,11 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None, sqlfilter=N
             if i in ('squintmag', 'squintmag_uc', 'squintangle', 'squintangle_uc'):
                 inputs.append('squintaz')
                 inputs.append('squintel')
-            else: inputs.append(i)
+            elif i in ('antfeed'):
+                inputs.append('antnum')
+                inputs.append('feed')
+            else:
+                inputs.append(i)
             
     if 'squintaz' in inputs: inputs.append('squintaz_uc')
     if 'squintel' in inputs: inputs.append('squintel_uc')
@@ -113,45 +118,45 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None, sqlfilter=N
     connection.close()
     
     # Create new array with derived tags, if needed
-    if 'squintmag' in called_tags or 'squintmag_uc' in called_tags: getmag = True
-    else: getmag = False
-    
-    if 'squintangle' in called_tags or 'squintangle_uc' in called_tags: getangle = True
-    else: getangle = False
-    
-    if getmag or getangle:
-        
-        # Pull datatypes of queried tags
-        plot_dtypes = eval(str(sqldata.dtype))
-        
-        # Add derived datatypes
-        if getmag: 
-            plot_dtypes.append(('squintmag', '<f8'))
-            plot_dtypes.append(('squintmag_uc', '<f8'))
-        if getangle: 
-            plot_dtypes.append(('squintangle', '<f8'))
-            plot_dtypes.append(('squintangle_uc', '<f8'))
-            
-        # Create empty array, fill in all old data...
-        data = np.zeros(np.size(sqldata), dtype=plot_dtypes)
+    getmag = 'squintmag' in called_tags or 'squintmag_uc' in called_tags
+    getangle = 'squintangle' in called_tags or 'squintangle_uc' in called_tags
+    getantfeed = 'antfeed' in called_tags
+
+    extra_dtypes = []
+
+    if getmag:
+        extra_dtypes.append(('squintmag', '<f8'))
+        extra_dtypes.append(('squintmag_uc', '<f8'))
+    if getangle:
+        extra_dtypes.append(('squintangle', '<f8'))
+        extra_dtypes.append(('squintangle_uc', '<f8'))
+    if getantfeed:
+        extra_dtypes.append(('antfeed', 'i'))
+
+    if len (extra_dtypes) == 0:
+        data = sqldata
+    else:
+        dtypes = eval(str(sqldata.dtype)) + extra_dtypes
+        data = np.zeros(np.size(sqldata), dtype=dtypes)
         for i in sqldata.dtype.names:
             data[i] = sqldata[i]
         
-        # ... and calculate derived tags
-        if getmag:
-            data['squintmag'] = np.sqrt(data['squintaz'] ** 2 + data['squintel'] ** 2)
-            data['squintmag_uc'] = np.sqrt((data['squintaz_uc'] * data['squintaz']) ** 2 + 
-                                           (data['squintel_uc'] * data['squintel']) ** 2) / data['squintmag']
-        if getangle:
-            data['squintangle'] = np.arctan2(data['squintel'], data['squintaz'])
-            el_over_az_uc = (np.sqrt((data['squintel_uc'] / data['squintel']) ** 2 +
-                                     (data['squintaz_uc'] / data['squintaz']) ** 2)
-                             * data['squintel'] / data['squintaz'])
-            data['squintangle_uc'] = (el_over_az_uc /
-                                      (1 + (data['squintel'] / data['squintaz']) ** 2))
-    else: data = sqldata
-    
-    
+    if getmag:
+        data['squintmag'] = np.sqrt(data['squintaz'] ** 2 + data['squintel'] ** 2)
+        data['squintmag_uc'] = np.sqrt((data['squintaz_uc'] * data['squintaz']) ** 2 + 
+                                       (data['squintel_uc'] * data['squintel']) ** 2) / data['squintmag']
+
+    if getangle:
+        data['squintangle'] = np.arctan2(data['squintel'], data['squintaz'])
+        el_over_az_uc = (np.sqrt((data['squintel_uc'] / data['squintel']) ** 2 +
+                                 (data['squintaz_uc'] / data['squintaz']) ** 2)
+                         * data['squintel'] / data['squintaz'])
+        data['squintangle_uc'] = (el_over_az_uc /
+                                  (1 + (data['squintel'] / data['squintaz']) ** 2))
+
+    if getantfeed:
+        data['antfeed'] = data['antnum'] * 1000 + data['feed']
+
     ##############
     ## Plotting ##
     ##############
