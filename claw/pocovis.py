@@ -120,28 +120,35 @@ class poco:
         self.data = (self.rawdata * self.flags)[:,self.noautos].mean(axis=1)
         self.data = self.data[:,self.chans] 
         self.rawdata = (self.rawdata * self.flags)[:,:,self.chans]
+
         print 'Data flagged, trimmed in channels, and averaged across baselines.'
         print 'New shape:'
         print self.data.shape
 
 
-    def spec(self):
-        noautos = self.noautos
-        autos = self.autos
+    def spec(self, save=0):
         chans = self.chans
-        time = self.time
+        reltime = self.reltime
         data = self.data
 
-#reorganize into dimensions of integration, baseline, channel
-        print 'Plotting spectrgram.'
-        abs = n.abs(data[:,chans])
+# does not account for noise bias.  assumes lots of flux in the field
+        print 'Renormalizing the data.  No noise bias correction.'
+        abs = n.abs(data)
+        mean = abs.mean()
+        std = abs.std()
+        abs = (abs - mean)/std
 
+        print 'Plotting spectrgram.'
         p.figure(1)
-        day0 = int(time[0])
-        ax = p.imshow(abs, aspect='auto', interpolation='nearest')
-#    ax = p.imshow(abs, aspect='auto', extent=(0,max(chans),max(time-day0),min(time-day0)))
-#    p.axis([-0.5,len(chans)+0.5,100,0])
+        ax = p.imshow(n.rot90(abs), aspect='auto', origin='upper', interpolation='nearest', extent=(min(reltime),max(reltime),min(chans),max(chans)))
         p.colorbar(ax)
+        p.xlabel('Relative time (s)')
+        p.ylabel('Channel ')
+        if save:
+            savename = self.file.split('.')[:-1]
+            savename.append(str(self.nskip/self.nbl) + '.spec.png')
+            savename = string.join(savename,'.')
+            p.savefig(savename)
 
 
     def dmmask(self, dm = 0., t0 = 0., show=0,):
@@ -414,8 +421,10 @@ if __name__ == '__main__':
     # default stuff
     print 'Greetings, human.'
     print ''
+    dedisperse = 0
 
     if len(sys.argv) == 2:
+# if pickle, then plot data or dm search results
         print 'Assuming input file is pickle of candidate...'
 #    To Do:  need to also use pickle to select data in raw format for imaging.
 
@@ -424,16 +433,34 @@ if __name__ == '__main__':
         print 'Loaded pickle file for %s' % (dump[0])
         print 'Has peaks at DM = ', dump[4]
         if len(dump[4]) >= 1:
-            print 'Grabbing 700 ints at %d' % (dump[1]+dump[5][0]-100)
-            pv = poco(dump[0], nints=600, nskip=dump[1]+dump[5][0]-100)    # format defined by pickle dump below
+            print 'Grabbing 10000 ints at %d' % (dump[1])
+            pv = poco(dump[0], nints=10000, nskip=dump[1])    # format defined by pickle dump below
             pv.prep()
-            pv.dedisperse()
-            peaks, peakssig = pv.plotdmt0(save=1)
-            file.close()
+
+            midtrial = len(dump[4])/2   # guess at peak snr
+            track = pv.dmtrack(dm=dump[4][midtrial], t0=pv.reltime[dump[5][midtrial]-1], show=0)  # needs to be shifted by -1 bin in reltime?
+            int0 = track[0][len(track[0])-1]
+#            print track, int0
+
+            if dedisperse == 0:  # just show spectrum
+#                raw = pv.rawdata
+                raw = pv.rawdata[n.array(track[0], dtype='int'), :, track[1]]   # all baselines for the known pulse
+                raw = n.abs(raw[:, pv.noautos]).mean(axis=1)   # create array of all time,freq bins containing pulse
+#                print raw
+#                print raw.mean(), raw.std()
+                pv.data = pv.data[int0:int0+100,:]
+                pv.reltime = pv.reltime[int0:int0+100]
+#                print track[0][len(track[0])-1] - int0, int0, pv.reltime[track[0][len(track[0])-1] - int0]
+                p.plot(pv.reltime[n.array(track[0]-int0, dtype='int')], pv.chans[track[1]], ',')
+                pv.spec(save=1)
+            elif dedisperse == 1:
+                pv.dedisperse()
+                peaks, peakssig = pv.plotdmt0(save=1)
+                file.close()
         else:
             print 'No significant detection.  Moving on...'
     else:
-# set up loops
+# else search for pulses
         nints = 10000
         fileroot = 'poco_crab_201103.mir'
         filelist = []
