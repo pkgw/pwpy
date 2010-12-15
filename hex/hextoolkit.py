@@ -277,13 +277,15 @@ def gaussread(path):
             squint[j]['squintel_uc'] = np.sqrt (gread[antloc][yloc]['OffEluc']**2 +
                                                 gread[antloc][xloc]['OffEluc']**2) / 60.0
 
-            # Take SEFD as max from x and y for each antenna
+            # Take SEFD as geometric mean of x and y for each antenna, if present
             if eread == 'SEFD_READ_FAILURE':
                 squint[j]['sefd'] = 0.0
             else:
                 eloc = np.where(eread['Ant'] == i)
-                if np.size(eloc) != 0: squint[j]['sefd'] = max(eread[eloc]['SEFD'])
-                else: squint[j]['sefd'] = 0.0
+                if np.size(eloc) != 0:
+                    squint[j]['sefd'] = np.exp(np.log(eread[eloc]['SEFD']).mean())
+                else: 
+                    squint[j]['sefd'] = 0.0
 
             squint[j]['sumchisq'] = gread[antloc][xloc]['XiSq'] + gread[antloc][yloc]['XiSq']
             
