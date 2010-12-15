@@ -65,14 +65,13 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None, sqlfilter=N
             'squintmag'
             'squintmag_uc'
             'squintangle'
-            'squintangle_uc' (NOT IMPLEMENTED)
+            'squintangle_uc'
             
             
     TODO LIST:
         -custom axis limits
         -look into interactive plotting
         -outlier identification & option to suppress (in database buildup)
-        -compute squintangle uncertainty & catch for x/yuc assignment in plotting
         -color
         -filtering by uc
         -mag vs feed by ant
@@ -145,9 +144,11 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None, sqlfilter=N
                                            (data['squintel_uc'] * data['squintel']) ** 2) / data['squintmag']
         if getangle:
             data['squintangle'] = np.arctan2(data['squintel'], data['squintaz'])
-            ### Calculate squintangle uncertainty:
-            #data['squintangle_uc'] = 
-            
+            el_over_az_uc = (np.sqrt((data['squintel_uc'] / data['squintel']) ** 2 +
+                                     (data['squintaz_uc'] / data['squintaz']) ** 2)
+                             * data['squintel'] / data['squintaz'])
+            data['squintangle_uc'] = (el_over_az_uc /
+                                      (1 + (data['squintel'] / data['squintaz']) ** 2))
     else: data = sqldata
     
     
@@ -183,11 +184,11 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None, sqlfilter=N
 
         # Determine errorbars as requested       
         if errorbars:
-            if xdata in ['squintel', 'squintaz', 'squintmag']:
+            if xdata in ['squintel', 'squintaz', 'squintmag', 'squintangle']:
                 xuc = data[xdata + '_uc'][igroup]
             else: xuc = None
             
-            if ydata in ['squintel', 'squintaz', 'squintmag']:
+            if ydata in ['squintel', 'squintaz', 'squintmag', 'squintangle']:
                 yuc = data[ydata + '_uc'][igroup]
             else: yuc = None
         else:
