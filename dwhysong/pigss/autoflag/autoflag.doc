@@ -19,5 +19,10 @@
 	associated in time with the calibrator scans.
 %A options
 	This gives several processing options. Possible values are:
-	  noband      Skip the internal bandpass calibration step.
-	  noflag      Do not write the flag table; useful to see what would be done.
+	  noflag      Do not write the flag table; useful to see what would be done
+	  noband      Skip the internal bandpass calibration step
+	  nophase     Skip test of phase variance on calibrator data
+	  norfi       Skip the preliminary RFI detection step (not recommended)
+	  nodist      Skip iterative data distribution test
+	  nonoise     Skip baseline noise test
+	  ata         Check for spectral corruption (for ATA data only)

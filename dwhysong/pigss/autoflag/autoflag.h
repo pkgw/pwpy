@@ -20,7 +20,7 @@ typedef struct bin_struct {
 	struct bin_struct *next;
 	struct dataset_struct *visdata;
 	struct vis_struct *data;
-	unsigned long int n_vis;
+	unsigned long n_vis;
 	double first_time, last_time;
 	complex float *med_spec, *rms_spec, *gains, *median, *deviation;
 	unsigned char *flags;

@@ -11,7 +11,7 @@ CFILES= options.c autoflag.c
 all: autoflag
 
 autoflag: autoflag.o options.o
-	g77 autoflag.o options.o -o autoflag $(LIBDIR) -lmir_linpack -lmir -lmir_uvio -lpgplot -lX11 -lm
+	g77 autoflag.o options.o -o autoflag $(LIBDIR) -lmir_linpack -lmir -lpgplot -lX11 -lm
 
 dep:
 	rm -f .depend
@@ -22,7 +22,7 @@ clean:
 	touch .depend
 
 distclean: clean
-	rm -f *.a autoflag autoflag.tar.bz2
+	rm -f *.a autoflag
 
 tar:
 	rm -f autoflag.tar.bz2
@@ -31,7 +31,7 @@ tar:
 install: autoflag
 	strip autoflag
 	install autoflag $(MIRBIN)
-	install autoflag.doc $(MIR)/doc
+	install autoflag.doc $(MIRDOC)/prog
 
 # DO NOT DELETE
 include .depend
