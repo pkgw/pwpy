@@ -353,7 +353,8 @@ class FitBase (object):
         return self
 
     def plot (self, dlines=True, smoothModel=True, xmin=None, xmax=None,
-              ymin=None, ymax=None, mxmin=None, mxmax=None, **kwargs):
+              ymin=None, ymax=None, mxmin=None, mxmax=None, 
+              xcomponent='real', ycomponent='real', **kwargs):
         import omega
 
         _cmplx = {'real': lambda x: x.real,
