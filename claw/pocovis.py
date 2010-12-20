@@ -438,16 +438,14 @@ if __name__ == '__main__':
             pv.prep()
 
             midtrial = len(dump[4])/2   # guess at peak snr
-            track = pv.dmtrack(dm=dump[4][midtrial], t0=pv.reltime[dump[5][midtrial]-1], show=0)  # needs to be shifted by -1 bin in reltime?
+            track = pv.dmtrack(dm=dump[4][midtrial], t0=pv.reltime[dump[5][midtrial]], show=0)  # needs to be shifted by -1 bin in reltime?
             int0 = track[0][len(track[0])-1]
 #            print track, int0
 
             if dedisperse == 0:  # just show spectrum
-#                raw = pv.rawdata
                 raw = pv.rawdata[n.array(track[0], dtype='int'), :, track[1]]   # all baselines for the known pulse
                 raw = n.abs(raw[:, pv.noautos]).mean(axis=1)   # create array of all time,freq bins containing pulse
-#                print raw
-#                print raw.mean(), raw.std()
+                print 'Mean, std in mean: %f, %f' % (raw.mean(), raw.std()/n.sqrt(len(raw)))
                 pv.data = pv.data[int0:int0+100,:]
                 pv.reltime = pv.reltime[int0:int0+100]
 #                print track[0][len(track[0])-1] - int0, int0, pv.reltime[track[0][len(track[0])-1] - int0]
