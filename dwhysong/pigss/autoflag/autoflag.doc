@@ -23,6 +23,6 @@
 	  noband      Skip the internal bandpass calibration step
 	  nophase     Skip test of phase variance on calibrator data
 	  norfi       Skip the preliminary RFI detection step (not recommended)
-	  nodist      Skip iterative data distribution test
-	  nonoise     Skip baseline noise test
+	  nodist      Skip the data distribution test
+	  nonoise     Skip the baseline noise test
 	  ata         Check for spectral corruption (for ATA data only)

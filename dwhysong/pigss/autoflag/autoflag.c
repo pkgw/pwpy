@@ -935,7 +935,7 @@ void calflag(bin_struct *bin) {
 
 
 	if (!noband) {
-write_spectrum(bin,"med.spec");
+//write_spectrum(bin,"med.spec");
 		// Do a bandpass calibration to flatten the spectrum.
 		// The gains array has dimensions [2 pols][n_ants][n_chan]
 		bin->gains = bpcal(bin, med_spec, median, rms_spec);
@@ -968,7 +968,7 @@ write_spectrum(bin,"med.spec");
         for (i=0; i<2*n_bl*n_chan; i++) meddev_cmplx(data[i],n[i],&(med_spec[i]),&(rms_spec[i]));
 	meddevspec(n_bl, n_chan, med_spec, median, deviation);
 
-write_spectrum(bin,"cal-med.spec");
+//write_spectrum(bin,"cal-med.spec");
 
 	if (ata) {
 		// Look for spectral corruption. This can be time dependent.
