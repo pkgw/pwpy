@@ -141,14 +141,17 @@ def sample_2pt(fft, ch1, ch2, show=0):
 def plot_fft(fft):
     """Plots the real and imaginary parts of the fft (i.e., Stokes Q and U)"""
 
+    # define good channels to avoid zeros
+    good = n.where(fft != 0)[0]
+
     p.figure(1)
     p.subplot(211)
-    p.plot(fft.real[:stdlen/2],fft.imag[:stdlen/2],',')
+    p.plot(fft[good].real[:stdlen/2],fft[good].imag[:stdlen/2],'.-')
     p.xlabel("Stokes Q (arb?)")
     p.ylabel("Stokes U (arb?)")
     p.subplot(212)
-    p.plot(n.arange(stdlen), fft.real, 'b.')
-    p.plot(n.arange(stdlen), fft.imag, 'r*')
+    p.plot(good, fft[good].real, 'b.')
+    p.plot(good, fft[good].imag, 'r*')
     p.xlabel('lambda^2 (arb?)')
     p.ylabel('Stokes Q,U (arb?)')
     p.show()
@@ -159,7 +162,8 @@ def fit_angle(fft, show=0, verbose=0):
     Note:  defined slope of angle vs. index to be -1*stdlen of input FD.
     """
 
-    # to do:  fit sampled fft (q-u)
+    # define good channels to avoid zeros
+    good = n.where(fft != 0)[0]
 
     line = lambda a,b,x: (a + x*b/(stdlen/2.)) % 2*n.pi - n.pi
     fitfunc = lambda p, x:  line(p[0], p[1], x)
@@ -167,20 +171,20 @@ def fit_angle(fft, show=0, verbose=0):
 
     # attempt one, using two channels
     p0 = [0.,0.]
-    p1, success = opt.leastsq(errfunc, p0[:], args = (n.arange(len(fft[0:2])), -1*n.angle(fft[0:2])))
+    p1, success = opt.leastsq(errfunc, p0[:], args = (good[0:2], -1*n.angle(fft[good][0:2])))
     if success and show and verbose:
         print 'First attempt...'
-        print 'Chi^2, Results: ', n.sum(errfunc(p1,n.arange(len(fft)), -1*n.angle(fft))**2), p1
+        print 'Chi^2, Results: ', n.sum(errfunc(p1, good, -1*n.angle(fft))**2), p1
 
     # attempt two, using first fit
     p0 = p1
-    p1, success = opt.leastsq(errfunc, p0[:], args = (n.arange(len(fft)), -1*n.angle(fft)))
+    p1, success = opt.leastsq(errfunc, p0[:], args = (good, -1*n.angle(fft[good])))
     if success:
-        print 'Chi^2, Results: ', n.sum(errfunc(p1,n.arange(len(fft)), -1*n.angle(fft))**2), p1
+        print 'Chi^2, Results: ', n.sum(errfunc(p1, good, -1*n.angle(fft[good]))**2), p1
 
     if show:
-        p.plot(fitfunc(p1, n.arange(len(fft))), '--')
-        p.plot(-1*n.angle(fft))
+        p.plot(good, fitfunc(p1, good), '--')
+        p.plot(good, -1*n.angle(fft[good]))
 
     return p1
 
@@ -218,7 +222,7 @@ def calc_ifft(fft, fd=[0], beam=[0]):
 
     return fd2
 
-def simulate_rrmrms(trials=10):
+def simulate_rrmrms(trials=1000, width=10, num=1, distribution=50):
     """Creates many trials of fd and samples Q-U (fft) to simulate theta-lambda^2 fit results.
     Optionally can sample at different redshifts.
     Question:  Does rms of RRM values increase at higher redshift?"""
@@ -227,7 +231,7 @@ def simulate_rrmrms(trials=10):
     std = []
     mean = []
     for i in range(trials):
-        fd = fd_point_random(num=2, width=10.)
+        fd = fd_gaussian_random(width=width, num=num, distribution=distribution)
         fft = calc_fft(fd)
 
 #    fft2 = sample_band_average_two(fft, 200, 10, 10)
