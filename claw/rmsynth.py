@@ -45,6 +45,27 @@ def fd_gaussian(width, height=1., center=0, show=0):
 
     return fd
 
+def fd_gaussian2(width, height=1., center=0, show=0):
+    """Returns a Gaussian Faraday disperison function.
+    Units are rad/m2.
+    """
+
+    # to do:  include phase in complex fd
+
+    pol = n.zeros(stdlen, dtype='complex')
+
+    fd = n.arange(-1*stdlen/2, stdlen/2, dtype='double')
+    for i in range(stdlen):
+        pol[i] = height*n.exp(-1.*((i-(center+stdlen/2))/float(width))**2) + 0.j
+
+    if show:
+        p.plot(fd, pol)
+        p.show()
+
+    print 'Simulated Gaussian FD of width %f, height %f, and center %f' % (float(width), float(height), float(center))
+
+    return fd, pol
+
 def fd_point2(height=1., center=0, show=0, verbose=1):
     """Returns a point-like Faraday disperison function.
     Units are rad/m2.
@@ -56,7 +77,7 @@ def fd_point2(height=1., center=0, show=0, verbose=1):
     pol = n.zeros(stdlen, dtype='complex')
     pol[stdlen/2 + center] = height + 0.j
 
-    fd = n.arange(-1*stdlen/2, stdlen/2)
+    fd = n.arange(-1*stdlen/2, stdlen/2, dtype='double')
 
     if show:
         p.plot(fd, pol)
@@ -65,7 +86,7 @@ def fd_point2(height=1., center=0, show=0, verbose=1):
     if show or verbose:
         print 'Simulated point FD of height %f and center %f' % (float(height), float(center))
 
-    return (fd,pol)
+    return fd,pol
 
 def fd_point(height=1., center=0, show=0, verbose=1):
     """Returns a point-like Faraday disperison function.
@@ -102,6 +123,21 @@ def fd_point_random(num=2, height=1., width=100):
 
     return fd
 
+def fd_point_random2(num=2, height=1., width=100):
+    """Returns a Faraday dispersion function with n point-like components randomly spread in 
+    Gaussian distribution of width.
+    """
+    import random
+
+    center = int(n.round(random.gauss(0., width), 0))
+    fd, pol = fd_point2(height=height, center=center)
+
+    for i in range(1, num):
+        center = int(n.round(random.gauss(0., width), 0))
+        pol = pol + fd_point2(height=height, center=center)[1]
+
+    return fd, pol
+
 def fd_gaussian_random(width, num=2, height=1., distribution=100):
     """Returns a Faraday dispersion function with n gaussian components randomly spread in 
     a Gaussian distribution with width equal to distribution.  Each width is equal to width.
@@ -115,7 +151,22 @@ def fd_gaussian_random(width, num=2, height=1., distribution=100):
         center = int(n.round(random.gauss(0., width), 0))
         fd = fd + fd_gaussian(width=width, height=height, center=center)
 
-    return fd
+    return fd, pol
+
+def fd_gaussian_random2(width, num=2, height=1., distribution=100):
+    """Returns a Faraday dispersion function with n gaussian components randomly spread in 
+    a Gaussian distribution with width equal to distribution.  Each width is equal to width.
+    """
+    import random
+
+    center = int(n.round(random.gauss(0., distribution), 0))
+    fd,pol = fd_gaussian2(width=width, height=height, center=center)
+
+    for i in range(1, num):
+        center = int(n.round(random.gauss(0., width), 0))
+        pol = pol + fd_gaussian(width=width, height=height, center=center)[1]
+
+    return fd, pol
 
 def calc_fft(fd, show=0):
     """Returns the fft of an fd, which is Stokes Q, U.  Optionally plots.
@@ -148,21 +199,24 @@ def calc_fft2(fd, pol, show=0):
     fft = n.fft.fft(pol)
 
     # create fft reference at origin to have 0th fourier mode at index=stdlen/2
-    fftref = n.fft.fft(fd_point2(height=1,center=0,verbose=0)[1])   # what is unit brightness?
+    fftref = n.fft.fft(fd_point2(height=1,center=0.,verbose=0)[1])   # what is unit brightness?
     fft = fft * fftref
+
+    lambda2 = (n.pi/(stdlen/2))*n.arange(stdlen)
+    stokes = fft
+
     if show:
-        p.plot((2*n.pi/stdlen)*fd, n.abs(fft))
-        p.show()
+        plot_fft2(lambda2, stokes)
 
-    return (2*n.pi/stdlen*fd, fft)
+    return (lambda2, stokes)
 
-def redshift_fft(fft, z):
-    """Takes fft (Q-U vs. lambda^2) and redshifts to z.
+def redshift_lambda2(lambda2, z):
+    """Takes true lambda^2 and redshifts to lambda_obs for given z.
     """
 
-    lambda_obs = lambda_rest * (1 + z)
+    lambda2_obs = lambda2 * (1 + z)**2
 
-    return lambda_obs
+    return lambda2_obs
 
 def sample_band(fft, center, width, show=0):
     """Samples a set of channels in lambda^2 space.  
@@ -200,6 +254,28 @@ def sample_band_average_two(fft, center, width, separation, show=0):
 
     return fft2
 
+def sample_band_average_two2(lambda2, stokes, center, width, separation, show=0):
+    """Samples a 2 sets of channels of fft with averaging.  Optionally plots.
+    Sampling set in lambda^2 space.
+    """
+
+    stokes2 = n.zeros(2, dtype='complex')
+    lambda22 = n.zeros(2, dtype='double')
+    indices1 = n.where( (lambda2 > (center-separation/2) - width/2) & (lambda2 < (center-separation/2) + width/2))
+    indices2 = n.where( (lambda2 > (center+separation/2) - width/2) & (lambda2 < (center+separation/2) + width/2))
+    stokes2[0] = n.mean(stokes[indices1])
+    lambda22[0] = center-separation/2
+    stokes2[1] = n.mean(stokes[indices2])
+    lambda22[1] = center+separation/2
+
+    if show:
+        p.figure(1)
+        p.plot(lambda2, n.abs(stokes))
+        p.plot(lambda22, n.abs(stokes2))
+        p.show()
+
+    return lambda22, stokes2
+
 def sample_2pt(fft, ch1, ch2, show=0):
     """Samples two channels of fft at original resolution.  Optionally plots"""
     pass
@@ -218,13 +294,39 @@ def plot_fft(fft):
     p.subplot(312)
     p.plot(good*(2*n.pi/stdlen), fft[good].real, 'b.')
     p.plot(good*(2*n.pi/stdlen), fft[good].imag, 'r*')
-    p.xlabel('lambda^2 (m^2)')
+    p.xlabel('Obs Lambda^2 (m^2)')
     p.ylabel('Stokes Q,U (Jy)')
     logx = p.subplot(313)
     logx.set_xscale('log')
     p.plot(0.3/n.sqrt(good*(2*n.pi/stdlen)), fft[good].real, 'b.')
     p.plot(0.3/n.sqrt(good*(2*n.pi/stdlen)), fft[good].imag, 'r*')
-    p.xlabel('Freq (GHz)')
+    p.xlabel('Obs Freq (GHz)')
+    p.ylabel('Stokes Q,U (Jy)')
+    p.show()
+
+def plot_fft2(lambda2, stokes):
+    """Plots the real and imaginary parts of the fft (i.e., Stokes Q and U).
+    Works for lambda^2 and stokes given as input.
+    """
+
+    # define good channels to avoid zeros
+    good = n.where(stokes != 0)[0]
+
+    p.figure(1)
+    p.subplot(311)
+    p.plot(stokes[good].real[:stdlen/2],stokes[good].imag[:stdlen/2],'.-')
+    p.xlabel("Stokes Q (Jy)")
+    p.ylabel("Stokes U (Jy)")
+    p.subplot(312)
+    p.plot(lambda2[good], stokes[good].real, 'b.')
+    p.plot(lambda2[good], stokes[good].imag, 'r*')
+    p.xlabel('Obs Lambda^2 (m^2)')
+    p.ylabel('Stokes Q,U (Jy)')
+    logx = p.subplot(313)
+    logx.set_xscale('log')
+    p.plot(0.3/n.sqrt(lambda2[good]), stokes[good].real, 'b.')
+    p.plot(0.3/n.sqrt(lambda2[good]), stokes[good].imag, 'r*')
+    p.xlabel('Obs Freq (GHz)')
     p.ylabel('Stokes Q,U (Jy)')
     p.show()
 
@@ -257,6 +359,39 @@ def fit_angle(fft, show=0, verbose=0):
     if show:
         p.plot(good, fitfunc(p1, good), '--')
         p.plot(good, -1*n.angle(fft[good]))
+
+    return p1
+
+def fit_angle2(lambda2, stokes, show=0, verbose=0):
+    """Fit line to angle of fft real-imag (i.e., Q-U).
+    Guesses based on initial fit to two channels.
+    Requires lambda2 and stokes input separately.
+    Note:  defined slope of angle vs. index to be -1*stdlen of input FD.
+    """
+
+    # define good channels to avoid zeros
+    good = n.where(stokes != 0)[0]
+
+    line = lambda a,b,x: n.mod((a - n.pi + x*b), 2*n.pi) - n.pi
+    fitfunc = lambda p, x:  line(p[0], p[1], x)
+    errfunc = lambda p, x, y: y - fitfunc(p, x)
+
+    # attempt one, using two channels
+    p0 = [0.,0.]
+    p1, success = opt.leastsq(errfunc, p0[:], args = (lambda2[good][0:2], -1*n.angle(stokes[good][0:2])))
+    if success and show and verbose:
+        print 'First attempt...'
+        print 'Chi^2, Results: ', n.sum(errfunc(p1, lambda2[good], -1*n.angle(stokes))**2), p1
+
+    # attempt two, using first fit
+    p0 = p1
+    p1, success = opt.leastsq(errfunc, p0[:], args = (lambda2[good], -1*n.angle(stokes[good])))
+    if success:
+        print 'Chi^2, Results: ', n.sum(errfunc(p1, lambda2[good], -1*n.angle(stokes[good]))**2), p1
+
+    if show:
+        p.plot(lambda2[good], fitfunc(p1, lambda2[good]), '--')
+        p.plot(lambda2[good], -1*n.angle(stokes[good]))
 
     return p1
 
@@ -319,7 +454,6 @@ def simulate_rrmrms(trials = 1000, s_center = 11, s_width = 10, s_sep = 10):
         rrm.append(result[1])
 
     return rrm
-
 
 def simulate_redshift():
     """Simulate a single source model, then measure at fixed redshifted lambda^2 coverage.
