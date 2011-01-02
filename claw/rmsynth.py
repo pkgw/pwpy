@@ -121,11 +121,11 @@ def calc_spectrum(fd, show=0):
     stokes = fft[0:stdlen/2]
 
     if show:
-        plot_fft2(lambda2, stokes)
+        plot_spectrum((lambda2, stokes))
 
     return (lambda2, stokes)
 
-def redshift_lambda(lambda2, z):
+def redshift_lambda2(lambda2, z):
     """Takes true lambda^2 and redshifts to lambda_obs for given z.
     """
 
@@ -149,6 +149,7 @@ def sample_band_average_two(spectrum, center, width, separation, show=0):
     lambda22[0] = center-separation/2
     stokes2[1] = n.mean(stokes[indices2])
     lambda22[1] = center+separation/2
+    print 'Averaged %d and %d indices for band 1 and band 2.' % (len(indices1[0]), len(indices2[0]))
 
     if show:
         p.figure(1)
@@ -223,10 +224,40 @@ def fit_angle(spectrum, show=0, verbose=0):
 
     return p1
 
+def simulate_redshift(trials=1000):
+    """Simulate a single distribution of source models.  
+    Measure sources fixed lambda^2 coverage over range of redshift.
+    Inputs should be given as redshift range and bands at z=0.
+    Question:  Does rms of RRM values increase at higher redshift?
+    """
 
+    # source model
+    width=50
+    num=3
+    distribution=300
 
+    # bands 
+    band1 = 1.4  # in GHz
+    band2 = 1.5  # in GHz
+    s_center = ((0.3/band1)**2 + (0.3/band2)**2)/2.
+    s_sep = abs((0.3/band1)**2 - (0.3/band2)**2)
+    s_width = s_sep
+    print 'Band center=%.3f, sep=%.3f, width=%.3f' % (s_center, s_sep, s_width)
 
+    zrrm = []
+    for z in n.arange(0,5)/2.:
+        rrm = []
+        for i in range(trials):
+            fd = fd_gaussian_random(width=width, num=num, distribution=distribution)
+            spectrum = calc_spectrum(fd)
+            lambda2z = redshift_lambda2(spectrum[0], z)
+            spectrum2 = sample_band_average_two((lambda2z, spectrum[1]), s_center, s_width, s_sep)
+            
+            result = fit_angle(spectrum2)
+            rrm.append(result[1])
+        zrrm.append(rrm)
 
+    return zrrm
 
 ###########################################
 ##############Old Versions#################
