@@ -204,6 +204,10 @@ def fit_angle(spectrum, show=0, verbose=0):
     Note:  defined slope of angle vs. index to be -1*stdlen of input FD.
     """
 
+    # to do:  needs better way to find global minimum or reject bad fits
+
+    guess = 1
+
     lambda2 = spectrum[0]
     stokes = spectrum[1]
 
@@ -218,13 +222,15 @@ def fit_angle(spectrum, show=0, verbose=0):
 
     # attempt one, using two channels
     p0 = [0.,0.]
-    p1, success = opt.leastsq(errfunc, p0[:], args = (lambda2[good][0:2], -1*n.angle(stokes[good][0:2])))
-    if success and show and verbose:
-        print 'First attempt...'
-        print 'Chi^2, Results: ', n.sum(errfunc(p1, lambda2[good], -1*n.angle(stokes))**2), p1
 
-    # attempt two, using first fit
-    p0 = p1
+    if guess:
+        p1, success = opt.leastsq(errfunc, p0[:], args = (lambda2[good][0:2], -1*n.angle(stokes[good][0:2])))
+        if success and show and verbose:
+            print 'First attempt...'
+            print 'Chi^2, Results: ', n.sum(errfunc(p1, lambda2[good], -1*n.angle(stokes))**2), p1
+            p0 = p1
+
+    # final fit
     p1, success = opt.leastsq(errfunc, p0[:], args = (lambda2[good], -1*n.angle(stokes[good])))
     if success:
         print 'Chi^2, Results: ', n.sum(errfunc(p1, lambda2[good], -1*n.angle(stokes[good]))**2), p1
@@ -236,7 +242,7 @@ def fit_angle(spectrum, show=0, verbose=0):
 
     return p1
 
-def simulate_rrmpol(trials=1, z=0., width=50., num=1, distribution=200.):
+def simulate_rrmpol(trials=1, z=0., width=50., num=1, distribution=200., show=0, verbose=0):
     """Simulate to measure the distribution of rrm and pol for
     a source model distribution at a given redshift.
     """
@@ -244,8 +250,8 @@ def simulate_rrmpol(trials=1, z=0., width=50., num=1, distribution=200.):
     # Define bands 
     band1 = n.array([1.4, 1.45])  # in GHz
     band2 = n.array([1.45, 1.5])  # in GHz
-    band3 = n.array([2.0, 2.05])  # in GHz
-    band4 = n.array([2.05, 2.1])  # in GHz
+    band3 = n.array([1.8, 1.85])  # in GHz
+    band4 = n.array([3.0, 3.05])  # in GHz
     s_band1 = (0.3/band1)**2
     s_band2 = (0.3/band2)**2
     s_band3 = (0.3/band3)**2
@@ -255,12 +261,12 @@ def simulate_rrmpol(trials=1, z=0., width=50., num=1, distribution=200.):
 
     for i in range(trials):
         fd = fd_gaussian_random(width=width, num=num, distribution=distribution)
-        spectrum = calc_spectrum(fd, show=1)
+        spectrum = calc_spectrum(fd, show=show)
         lambda2z = redshift_lambda2(spectrum[0], z)
         spectrum2 = sample_band_average_two((lambda2z, spectrum[1]), n.min(s_band1), n.max(s_band1), n.min(s_band2), n.max(s_band2))
         spectrum3 = sample_band_average_two((lambda2z, spectrum[1]), n.min(s_band3), n.max(s_band3), n.min(s_band4), n.max(s_band4))
         spectrum4 = (n.concatenate((spectrum2[0], spectrum3[0])), n.concatenate((spectrum2[1], spectrum3[1])))
-        result = fit_angle(spectrum4, show=1)
+        result = fit_angle(spectrum4, show=show, verbose=verbose)
         rrm.append(result[1])
         pol.append(spectrum4[1])
 
@@ -275,11 +281,11 @@ def simulate_redshift():
 
     rrm1 = []; pol1 = []; rrm2 = []; pol2 = []; rrm3 = []; pol3 = []
     for z in n.arange(0,4)/3.:
-        rrm, pol = simulate_rrmpol(trials=200, z=z, width=10., num=3, distribution=3000.)
+        rrm, pol = simulate_rrmpol(trials=200, z=z, width=10., num=1, distribution=100.)
         rrm1.append(rrm); pol1.append(pol)
-        rrm, pol = simulate_rrmpol(trials=200, z=z, width=50., num=3, distribution=3000.)
+        rrm, pol = simulate_rrmpol(trials=200, z=z, width=30., num=1, distribution=100.)
         rrm2.append(rrm); pol2.append(pol)
-        rrm, pol = simulate_rrmpol(trials=200, z=z, width=250., num=3, distribution=3000.)
+        rrm, pol = simulate_rrmpol(trials=200, z=z, width=100., num=1, distribution=100.)
         rrm3.append(rrm); pol3.append(pol)
 
     return rrm1, pol1, rrm2, pol2, rrm3, pol3
