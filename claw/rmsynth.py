@@ -10,10 +10,13 @@ import pylab as p
 import scipy.optimize as opt
 
 # params
-stdlen = 1000   # fd=0 at index=stdlen/2
+stdlen = 10000   # fd=0 at index=stdlen/2
 fdscale = 10.
 
 def find_nearest(array,value):
+    """Function to help set fd values at grid points.
+    """
+
     idx=(n.abs(array-value)).argmin()
     return array[idx]
 
@@ -23,7 +26,6 @@ def fd_gaussian(width=1., height=1., center=0., show=0):
     """
 
     # to do:  include phase in complex fd
-    # to do:  normalize differently?
 
     pol = n.zeros(stdlen, dtype='complex')
 
@@ -31,7 +33,7 @@ def fd_gaussian(width=1., height=1., center=0., show=0):
     index = n.where(fd == find_nearest(fd, center))[0]
 
     for i in range(stdlen):
-        pol[i] = height*n.exp(-1.*(float(fd[i]-fd[index])/float(width))**2) + 0.j
+        pol[i] = (height/n.sqrt(2*n.pi*width**2))*n.exp(-1.*(float(fd[i]-fd[index])/(n.sqrt(2)*width))**2) + 0.j
 
     if show:
         p.plot(fd, pol)
@@ -109,7 +111,7 @@ def calc_spectrum(fd, show=0):
     output is spectrum tuple with (lambda2, stokes).
     """
 
-    # to do:  plot only first half?  test whether complex fd produces asymmetric fft.
+    # to do:  test whether complex fd produces asymmetric fft.
 
     fft = n.fft.fft(fd[1])
 
@@ -129,11 +131,13 @@ def redshift_lambda2(lambda2, z):
     """Takes true lambda^2 and redshifts to lambda_obs for given z.
     """
 
+    print 'Redshifted to z = ', z
+
     lambda2_obs = lambda2 * (1 + z)**2
 
     return lambda2_obs
 
-def sample_band_average_two(spectrum, center, width, separation, show=0):
+def sample_band_average_two(spectrum, band1l, band1h, band2l, band2h, show=0):
     """Samples a 2 sets of channels of fft with averaging.  Optionally plots.
     Sampling set in lambda^2 units.
     """
@@ -141,14 +145,19 @@ def sample_band_average_two(spectrum, center, width, separation, show=0):
     lambda2 = spectrum[0]
     stokes = spectrum[1]
 
+    print 'Band 1: %.3f -- %.3f, Band 2: %.3f -- %.3f, n-pi: %.1f' % (band1l, band1h, band2l, band2h, n.pi/n.abs(n.mean([band1l, band1h]) - n.mean([band2l, band2h])))
+
+
     stokes2 = n.zeros(2, dtype='complex')
     lambda22 = n.zeros(2, dtype='double')
-    indices1 = n.where( (lambda2 > (center-separation/2) - width/2) & (lambda2 < (center-separation/2) + width/2))
-    indices2 = n.where( (lambda2 > (center+separation/2) - width/2) & (lambda2 < (center+separation/2) + width/2))
+    indices1 = n.where( (lambda2 > band1l) & (lambda2 < band1h))
+    indices2 = n.where( (lambda2 > band2l) & (lambda2 < band2h))
+#    indices1 = n.where( (lambda2 > (center-separation/2) - width/2) & (lambda2 < (center-separation/2) + width/2))
+#    indices2 = n.where( (lambda2 > (center+separation/2) - width/2) & (lambda2 < (center+separation/2) + width/2))
     stokes2[0] = n.mean(stokes[indices1])
-    lambda22[0] = center-separation/2
+    lambda22[0] = n.mean([band1l, band1h])
     stokes2[1] = n.mean(stokes[indices2])
-    lambda22[1] = center+separation/2
+    lambda22[1] = n.mean([band2l, band2h])
     print 'Averaged %d and %d indices for band 1 and band 2.' % (len(indices1[0]), len(indices2[0]))
 
     if show:
@@ -198,6 +207,8 @@ def fit_angle(spectrum, show=0, verbose=0):
     lambda2 = spectrum[0]
     stokes = spectrum[1]
 
+    print 'Low band:  %.3f, High band: %.3f, n-pi: %.1f' % (min(spectrum[0]), max(spectrum[0]), n.pi/n.abs(max(spectrum[0])-min(spectrum[0])))
+
     # define good channels to avoid zeros
     good = n.where(stokes != 0)[0]
 
@@ -217,6 +228,7 @@ def fit_angle(spectrum, show=0, verbose=0):
     p1, success = opt.leastsq(errfunc, p0[:], args = (lambda2[good], -1*n.angle(stokes[good])))
     if success:
         print 'Chi^2, Results: ', n.sum(errfunc(p1, lambda2[good], -1*n.angle(stokes[good]))**2), p1
+        print 
 
     if show:
         p.plot(lambda2[good], fitfunc(p1, lambda2[good]), '--')
@@ -224,238 +236,101 @@ def fit_angle(spectrum, show=0, verbose=0):
 
     return p1
 
-def simulate_redshift(trials=1000):
-    """Simulate a single distribution of source models.  
-    Measure sources fixed lambda^2 coverage over range of redshift.
-    Inputs should be given as redshift range and bands at z=0.
-    Question:  Does rms of RRM values increase at higher redshift?
+def simulate_rrmpol(trials=1, z=0., width=50., num=1, distribution=200.):
+    """Simulate to measure the distribution of rrm and pol for
+    a source model distribution at a given redshift.
     """
 
-    # source model
-    width=50
-    num=3
-    distribution=300
+    # Define bands 
+    band1 = n.array([1.4, 1.45])  # in GHz
+    band2 = n.array([1.45, 1.5])  # in GHz
+    band3 = n.array([2.0, 2.05])  # in GHz
+    band4 = n.array([2.05, 2.1])  # in GHz
+    s_band1 = (0.3/band1)**2
+    s_band2 = (0.3/band2)**2
+    s_band3 = (0.3/band3)**2
+    s_band4 = (0.3/band4)**2
 
-    # bands 
-    band1 = 1.4  # in GHz
-    band2 = 1.5  # in GHz
-    s_center = ((0.3/band1)**2 + (0.3/band2)**2)/2.
-    s_sep = abs((0.3/band1)**2 - (0.3/band2)**2)
-    s_width = s_sep
-    print 'Band center=%.3f, sep=%.3f, width=%.3f' % (s_center, s_sep, s_width)
+    rrm = []; pol = []
 
-    zrrm = []
-    for z in n.arange(0,5)/2.:
-        rrm = []
-        for i in range(trials):
-            fd = fd_gaussian_random(width=width, num=num, distribution=distribution)
-            spectrum = calc_spectrum(fd)
-            lambda2z = redshift_lambda2(spectrum[0], z)
-            spectrum2 = sample_band_average_two((lambda2z, spectrum[1]), s_center, s_width, s_sep)
-            
-            result = fit_angle(spectrum2)
-            rrm.append(result[1])
-        zrrm.append(rrm)
+    for i in range(trials):
+        fd = fd_gaussian_random(width=width, num=num, distribution=distribution)
+        spectrum = calc_spectrum(fd, show=1)
+        lambda2z = redshift_lambda2(spectrum[0], z)
+        spectrum2 = sample_band_average_two((lambda2z, spectrum[1]), n.min(s_band1), n.max(s_band1), n.min(s_band2), n.max(s_band2))
+        spectrum3 = sample_band_average_two((lambda2z, spectrum[1]), n.min(s_band3), n.max(s_band3), n.min(s_band4), n.max(s_band4))
+        spectrum4 = (n.concatenate((spectrum2[0], spectrum3[0])), n.concatenate((spectrum2[1], spectrum3[1])))
+        result = fit_angle(spectrum4, show=1)
+        rrm.append(result[1])
+        pol.append(spectrum4[1])
 
-    return zrrm
+    return (n.array(rrm), n.array(pol))
 
-###########################################
-##############Old Versions#################
-###########################################
-
-def fd_tophat_old(width, height=1., center=0, show=0):
-    """Returns a tophat Faraday disperison function.
-    Units are rad/m2.
+def simulate_redshift():
+    """
+    Runs simulate_rrmpol for a range of z.
+    Simulates three source model distributions.  Results plotted with plot_sim.
+    Question:  Does rms of RRM values increase at higher redshift?  What source property does this?
     """
 
-    fd = n.zeros(stdlen, dtype='complex')
-    fd[stdlen/2 - width + center: stdlen/2 + width + center] = height + 0.j
+    rrm1 = []; pol1 = []; rrm2 = []; pol2 = []; rrm3 = []; pol3 = []
+    for z in n.arange(0,4)/3.:
+        rrm, pol = simulate_rrmpol(trials=200, z=z, width=10., num=3, distribution=3000.)
+        rrm1.append(rrm); pol1.append(pol)
+        rrm, pol = simulate_rrmpol(trials=200, z=z, width=50., num=3, distribution=3000.)
+        rrm2.append(rrm); pol2.append(pol)
+        rrm, pol = simulate_rrmpol(trials=200, z=z, width=250., num=3, distribution=3000.)
+        rrm3.append(rrm); pol3.append(pol)
 
-    if show:
-        p.plot(fd)
-        p.show()
+    return rrm1, pol1, rrm2, pol2, rrm3, pol3
 
-    return fd
 
-def fd_gaussian_old(width, height=1., center=0, show=0):
-    """Returns a Gaussian Faraday disperison function.
-    Units are rad/m2.
+def plot_sim(res):
+    """Plots result from simulate_redshift.
+    Assumes three source models in res tuple.  Each source model gives a rrm and pol.
     """
 
-    # to do:  include phase in complex fd
+    rrm1 = res[0]; pol1 = res[1]
+    rrm2 = res[2]; pol2 = res[3]
+    rrm3 = res[4]; pol3 = res[5]
 
-    fd = n.zeros(stdlen, dtype='complex')
-    for i in range(stdlen):
-        fd[i] = height*n.exp(-1.*((i-(center+stdlen/2))/float(width))**2) + 0.j
+    trim = 999999.  # trim abs(rrm) larger than this value
 
-    if show:
-        p.plot(fd)
-        p.show()
-
-    print 'Simulated Gaussian FD of width %f, height %f, and center %f' % (float(width), float(height), float(center))
-
-    return fd
-
-def fd_point_old(height=1., center=0, show=0, verbose=1):
-    """Returns a point-like Faraday disperison function.
-    Units are rad/m2.
-    """
-
-    # to do:  include phase in complex fd
-    # to do:  flux not normalized?
-
-    fd = n.zeros(stdlen, dtype='complex')
-    fd[stdlen/2 + center] = height + 0.j
-
-    if show:
-        p.plot(fd)
-        p.show()
-
-    if show or verbose:
-        print 'Simulated point FD of height %f and center %f' % (float(height), float(center))
-
-    return fd
-
-def fd_point_random_old(num=2, height=1., width=100):
-    """Returns a Faraday dispersion function with n point-like components randomly spread in 
-    Gaussian distribution of width.
-    """
-    import random
-
-    center = int(n.round(random.gauss(0., width), 0))
-    fd = fd_point(height=height, center=center)
-
-    for i in range(1, num):
-        center = int(n.round(random.gauss(0., width), 0))
-        fd = fd + fd_point(height=height, center=center)
-
-    return fd
-
-def fd_gaussian_random_old(width, num=2, height=1., distribution=100):
-    """Returns a Faraday dispersion function with n gaussian components randomly spread in 
-    a Gaussian distribution with width equal to distribution.  Each width is equal to width.
-    """
-    import random
-
-    center = int(n.round(random.gauss(0., distribution), 0))
-    fd = fd_gaussian(width=width, height=height, center=center)
-
-    for i in range(1, num):
-        center = int(n.round(random.gauss(0., width), 0))
-        fd = fd + fd_gaussian(width=width, height=height, center=center)
-
-    return fd, pol
-
-def calc_fft_old(fd, show=0):
-    """Returns the fft of an fd, which is Stokes Q, U.  Optionally plots.
-    fd index number is in units of rad/m2.
-    fft index number is therefore in units of m2/rad, scaled by 2*pi/stdlen.
-    """
-
-    # to do:  plot only first half?  test whether complex fd produces asymmetric fft.
-
-    fft = n.fft.fft(fd)
-
-    # create fft reference at origin to have 0th fourier mode at index=stdlen/2
-    fftref = n.fft.fft(fd_point(height=1,center=0,verbose=0))
-    fft = fft * fftref
-    if show:
-       p.plot((2*n.pi/stdlen)*n.arange(stdlen), n.abs(fft))
-       p.show()
-
-    return fft
-
-def sample_band_old(fft, center, width, show=0):
-    """Samples a set of channels in lambda^2 space.  
-    Returns band at original resolution.  Optionally plots.
-    """
-
-    # to do:  sample linearly in lambda space
-
-    fft2 = n.zeros(len(fft), dtype='complex')
-    indices = n.arange(center-width/2, center+width/2)
-    fft2[indices] = fft[indices]
-
-    if show:
-        p.figure(1)
-        p.plot((2*n.pi/stdlen)*n.arange(stdlen), n.abs(fft))
-        p.plot((2*n.pi/stdlen)*n.arange(stdlen), n.abs(fft2))
-        p.show()
-
-    return fft2
-
-def sample_band_average_two_old(fft, center, width, separation, show=0):
-    """Samples a 2 sets of channels of fft with averaging.  Optionally plots"""
-
-    fft2 = n.zeros(len(fft), dtype='complex')
-    indices1 = n.arange(center-separation/2-width/2, center-separation/2+width/2)
-    indices2 = n.arange(center+separation/2-width/2, center+separation/2+width/2)
-    fft2[center-separation/2] = n.mean(fft[indices1])
-    fft2[center+separation/2] = n.mean(fft[indices2])
-
-    if show:
-        p.figure(1)
-        p.plot((2*n.pi/stdlen)*n.arange(stdlen), n.abs(fft))
-        p.plot((2*n.pi/stdlen)*n.arange(stdlen), n.abs(fft2))
-        p.show()
-
-    return fft2
-
-def plot_fft_old(fft):
-    """Plots the real and imaginary parts of the fft (i.e., Stokes Q and U)"""
-
-    # define good channels to avoid zeros
-    good = n.where(fft != 0)[0]
+    rrm1rms = [n.std(rrm1[i][n.where ( n.abs(rrm1[i]) < trim)]) for i in range(len(rrm1))]
+    rrm2rms = [n.std(rrm2[i][n.where ( n.abs(rrm2[i]) < trim)]) for i in range(len(rrm2))]
+    rrm3rms = [n.std(rrm3[i][n.where ( n.abs(rrm3[i]) < trim)]) for i in range(len(rrm3))]
+    pol1ave = n.mean(n.abs(pol1), axis=1)
+    pol2ave = n.mean(n.abs(pol2), axis=1)
+    pol3ave = n.mean(n.abs(pol3), axis=1)
 
     p.figure(1)
-    p.subplot(311)
-    p.plot(fft[good].real[:stdlen/2],fft[good].imag[:stdlen/2],'.-')
-    p.xlabel("Stokes Q (Jy)")
-    p.ylabel("Stokes U (Jy)")
-    p.subplot(312)
-    p.plot(good*(2*n.pi/stdlen), fft[good].real, 'b.')
-    p.plot(good*(2*n.pi/stdlen), fft[good].imag, 'r*')
-    p.xlabel('Obs Lambda^2 (m^2)')
-    p.ylabel('Stokes Q,U (Jy)')
-    logx = p.subplot(313)
-    logx.set_xscale('log')
-    p.plot(0.3/n.sqrt(good*(2*n.pi/stdlen)), fft[good].real, 'b.')
-    p.plot(0.3/n.sqrt(good*(2*n.pi/stdlen)), fft[good].imag, 'r*')
-    p.xlabel('Obs Freq (GHz)')
-    p.ylabel('Stokes Q,U (Jy)')
-    p.show()
+    rrm1con = [[n.std(rrm1[j][n.where ( n.abs(rrm1[j]) < trim)][:i]) for i in range(len(rrm1[0]))] for j in range(len(rrm1))]
+    rrm2con = [[n.std(rrm2[j][n.where ( n.abs(rrm2[j]) < trim)][:i]) for i in range(len(rrm2[0]))] for j in range(len(rrm2))]
+    rrm3con = [[n.std(rrm3[j][n.where ( n.abs(rrm3[j]) < trim)][:i]) for i in range(len(rrm3[0]))] for j in range(len(rrm3))]
+    for i in range(len(rrm1con)):
+        p.plot(rrm1con[i])
+        p.plot(rrm2con[i])
+        p.plot(rrm3con[i])
+    p.xlabel('iteration number')
+    p.ylabel('RRM RMS')
+    p.title('Convergence test')
 
-def fit_angle_old(fft, show=0, verbose=0):
-    """Fit line to angle of fft real-imag (i.e., Q-U).
-    Guesses based on initial fit to two channels.
-    Note:  defined slope of angle vs. index to be -1*stdlen of input FD.
-    """
+    print 'Pol 1, 2, 3 averages:'
+    print pol1ave
+    print pol2ave
+    print pol3ave
+    p.figure(2)
+    p.plot(rrm1rms, label='rrm1')
+    p.plot(rrm2rms, label='rrm2')
+    p.plot(rrm3rms, label='rrm3')
+    p.legend()
+    p.xlabel('redshift bin')
+    p.ylabel('RRM RMS')
+    p.title('RRM RMS redshift dependence')
 
-    # define good channels to avoid zeros
-    good = n.where(fft != 0)[0]
-
-    line = lambda a,b,x: (a + x*b/(stdlen/2.)) % 2*n.pi - n.pi   # WRONG!  should use n.mod()
-    fitfunc = lambda p, x:  line(p[0], p[1], x)
-    errfunc = lambda p, x, y: y - fitfunc(p, x)
-
-    # attempt one, using two channels
-    p0 = [0.,0.]
-    p1, success = opt.leastsq(errfunc, p0[:], args = (good[0:2], -1*n.angle(fft[good][0:2])))
-    if success and show and verbose:
-        print 'First attempt...'
-        print 'Chi^2, Results: ', n.sum(errfunc(p1, good, -1*n.angle(fft))**2), p1
-
-    # attempt two, using first fit
-    p0 = p1
-    p1, success = opt.leastsq(errfunc, p0[:], args = (good, -1*n.angle(fft[good])))
-    if success:
-        print 'Chi^2, Results: ', n.sum(errfunc(p1, good, -1*n.angle(fft[good]))**2), p1
-
-    if show:
-        p.plot(good, fitfunc(p1, good), '--')
-        p.plot(good, -1*n.angle(fft[good]))
-
-    return p1
+###########################################
+########Still to convert to new system#####
+###########################################
 
 def calc_rmbeam_old(center, width, show=0):
     """Returns beam in RM (fd) space for a given sampling function"""
@@ -490,45 +365,3 @@ def calc_ifft_old(fft, fd=[0], beam=[0]):
         p.show()
 
     return fd2
-
-def simulate_rrmrms_old(trials = 1000, s_center = 11, s_width = 10, s_sep = 10):
-    """Creates many trials of fd and samples Q-U (fft) to simulate theta-lambda^2 fit results.
-    Optionally can sample at different redshifts.
-    Question:  Does rms of RRM values increase at higher redshift?"""
-
-    rrm = []
-
-    # source model Gaussians in rad/m2
-    width=10
-    num=2
-    distribution=100
-
-    print 'Bands centered at ', 2*n.pi/stdlen * (s_center - s_sep), 2*n.pi/stdlen * (s_center + s_sep), ' m^2.'
-    print 'Bands centered at ', 0.3/n.sqrt(2*n.pi/stdlen * (s_center - s_sep)), 0.3/n.sqrt(2*n.pi/stdlen * (s_center + s_sep)), ' GHz.'
-    for i in range(trials):
-        fd = fd_gaussian_random(width=width, num=num, distribution=distribution)
-#        fd = fd_point_random(width=width, num=num)
-        fft = calc_fft(fd)
-#        fft2 = sample_band(fft, 10, 10)
-        fft2 = sample_band_average_two(fft, s_center, s_width, s_sep)
-
-        result = fit_angle(fft2)
-        rrm.append(result[1])
-
-    return rrm
-
-def simulate_redshift_old():
-    """Simulate a single source model, then measure at fixed redshifted lambda^2 coverage.
-    """
-
-    # to do:  inputs should be given as redshift range and bands at z=0
-
-    rrm8 = simulate_rrmrms(s_center = 8, s_width = 2, s_sep = 2)
-    rrm7 = simulate_rrmrms(s_center = 7, s_width = 2, s_sep = 2)
-    rrm6 = simulate_rrmrms(s_center = 6, s_width = 2, s_sep = 2)
-    rrm5 = simulate_rrmrms(s_center = 5, s_width = 2, s_sep = 2)
-    rrm4 = simulate_rrmrms(s_center = 4, s_width = 2, s_sep = 2)
-    rrm3 = simulate_rrmrms(s_center = 3, s_width = 2, s_sep = 2)
-
-    return (rrm8,rrm7,rrm6,rrm5,rrm4,rrm3)
-
