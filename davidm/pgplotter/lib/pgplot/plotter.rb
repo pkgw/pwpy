@@ -209,6 +209,20 @@ module Pgplot
         xxmax = xxavg + (1+opts[:xpad])*xxdev
       end
 
+      case opts[:yscale].to_s
+      when /log/i, /db/i
+        # Sanity check log floor
+        lf = opts[:log_floor].abs
+        lf = 1e-10 unless lf > 0.0
+        # Convert yy to NArray.float
+        yy = NArray[*yy].to_type(NArray::FLOAT)
+        # Set points below log floor to log floor
+        yy[yy.lt(lf)] = lf
+        yy = NMath.log10(yy)
+        yy.mul!(10) if opts[:yscale].to_s =~ /db/i
+        yy.mul!(2) if opts[:yscale].to_s =~ /db2/i
+      end
+
       yymin, yymax = opts[:yrange]
       yymin ||= yy.min
       yymax ||= yy.max
@@ -365,10 +379,17 @@ module Pgplot
                 end
 
       case opts[:mag_scale].to_s
-      when /log/i
-        zzabs = NMath.log10(zzabs+opts[:log_floor])
-      when /db/i
-        zzabs = 10*NMath.log10(zzabs+opts[:log_floor])
+      when /log/i, /db/i
+        # Sanity check log floor
+        lf = (opts[:log_floor]||1e-10).abs
+        lf = 1e-10 unless lf > 0.0
+        # Convert zzabs to NArray.float
+        zzabs = NArray[*zzabs].to_type(NArray::FLOAT)
+        # Set points below log floor to log floor
+        zzabs[zzabs.lt(lf)] = lf
+        zzabs = NMath.log10(zzabs)
+        zzabs.mul!(10) if opts[:mag_scale].to_s =~ /db/i
+        zzabs.mul!(2) if opts[:mag_scale].to_s =~ /db2/i
       end
 
       # Round to sfloat precision
