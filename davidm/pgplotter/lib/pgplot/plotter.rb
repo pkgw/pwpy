@@ -193,10 +193,9 @@ module Pgplot
       opts[:just] = 1 if opts[:just] == true
 
       xxmin, xxmax = opts[:xrange]
-      unless xxmin && xxmax
-        xxmin = xx.min
-        xxmax = xx.max
-      end
+      xxmin ||= xx.min
+      xxmax ||= xx.max
+      # Round to sfloat precision
       xxmin, xxmax = NArray[xxmin, xxmax].to_type(NArray::SFLOAT).to_a
       if xxmin == xxmax
         xxmin -= 1
@@ -209,10 +208,9 @@ module Pgplot
       end
 
       yymin, yymax = opts[:yrange]
-      unless yymin && yymax
-        yymin = yy.min
-        yymax = yy.max
-      end
+      yymin ||= yy.min
+      yymax ||= yy.max
+      # Round to sfloat precision
       yymin, yymax = NArray[yymin, yymax].to_type(NArray::SFLOAT).to_a
       if yymin == yymax
         yymin -= 1
@@ -347,9 +345,7 @@ module Pgplot
         :overlay => false,
       }.merge!(opts)
 
-      # Kludge for GSL::FFT::Complex::PackedArray
-      #zz = zz.to_a2 if zz.respond_to? :to_a2
-
+      # Round to sfloat precision
       xxmin, xxmax = NArray[xx.min, xx.max].to_type(NArray::SFLOAT).to_a
       if xxmin == xxmax
         xxmin -= 1
@@ -373,6 +369,7 @@ module Pgplot
         zzabs = 10*NMath.log10(zzabs+opts[:log_floor])
       end
 
+      # Round to sfloat precision
       zzmin, zzmax = NArray[zzabs.min, zzabs.max].to_type(NArray::SFLOAT).to_a
       if zzmin == zzmax
         zzmin -= 1
@@ -426,9 +423,12 @@ module Pgplot
       bin(xx, zzabs)
 
       if !opts[:overlay]
-        zzmin, zzmax = opts[:ph_range] || [zzangle.min, zzangle.max]
+        zzmin, zzmax = opts[:ph_range]
+        zzmin ||= zzangle.min
+        zzmax ||= zzangle.max
         zzmin = -180 if zzmin < -180
         zzmax =  180 if zzmax >  180
+        # Round to sfloat precision
         zzmin, zzmax = NArray[zzmin, zzmax].to_type(NArray::SFLOAT).to_a
         if zzmin == zzmax
           zzmin -= 1
