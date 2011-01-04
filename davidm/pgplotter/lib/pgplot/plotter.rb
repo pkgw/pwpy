@@ -55,7 +55,7 @@ module Pgplot
   class Plotter
     include Pgplot
 
-    VERSION = '0.0.2'
+    VERSION = '0.0.3'
 
     @@instances = {}
     @@last_selected = nil
@@ -185,6 +185,8 @@ module Pgplot
         :overlay => false,
         :xrange => nil,
         :yrange => nil,
+        :yscale => :linear,
+        :log_floor => 1e-10,
         :xpad => 0,
         :ypad => 0.1
       }.merge!(opts)

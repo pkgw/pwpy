@@ -5,10 +5,12 @@
 require 'rubygems'
 require 'rake/gempackagetask'
 
+require 'lib/pgplot/plotter'
+
 spec = Gem::Specification.new do |s|
   # Basics
   s.name = 'pgplotter'
-  s.version = '0.0.3'
+  s.version = Pgplot::Plotter::VERSION
   s.summary = 'Provides a plotter wrapper around PGPLOT routines'
   s.description = <<-EOD
     Provides a higher level API into the PGPLOT routines.
