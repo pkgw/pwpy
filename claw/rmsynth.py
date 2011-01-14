@@ -35,12 +35,6 @@ def fd_gaussian(width=1., height=1., center=0., show=0):
     for i in range(stdlen):
         pol[i] = (height/n.sqrt(2*n.pi*width**2))*n.exp(-1.*(float(fd[i]-fd[index])/(n.sqrt(2)*width))**2) + 0.j
 
-    if show:
-        p.plot(fd, pol)
-        p.xlabel('Faraday depth (rad/m2)')
-        p.ylabel('Polarized flux (Jy)')
-        p.show()
-
     print 'Simulated Gaussian FD of width %f, height %f, and center %f' % (float(width), float(height), float(fd[index]))
 
     return (fd, pol)
@@ -97,10 +91,12 @@ def fd_gaussian_random(num=1, distribution=100., dis_center=0., height=1., width
     return (depth, pol)
 
 def plot_fd(fd):
-    """Plots the fd.
+    """Plots the fd (where bright).
     """
 
     p.plot(fd[0], n.abs(fd[1]))
+    stuff = fd[0][n.where(fd[1] >= 1e-5)[0]]  # show just bright stuff
+    p.xlim(min(stuff), max(stuff))
     p.xlabel('Faraday depth (rad/m2)')
     p.ylabel('Polarized flux (Jy)')
 
@@ -233,19 +229,22 @@ def fit_angle(spectrum, show=0, verbose=0):
     # final fit
     p1, success = opt.leastsq(errfunc, p0[:], args = (lambda2[good], -1*n.angle(stokes[good])))
     if success:
-        print 'Chi^2, Results: ', n.sum(errfunc(p1, lambda2[good], -1*n.angle(stokes[good]))**2), p1
-        print 
+        chisq = n.sum(errfunc(p1, lambda2[good], -1*n.angle(stokes[good]))**2)
+        print 'Chi^2, Results: ', chisq, p1
 
     if show:
         p.plot(lambda2[good], fitfunc(p1, lambda2[good]), '--')
         p.plot(lambda2[good], -1*n.angle(stokes[good]))
 
-    return p1
+    print
+    return chisq, p1
 
 def simulate_rrmpol(trials=1, z=0., width=50., num=1, distribution=200., show=0, verbose=0):
     """Simulate to measure the distribution of rrm and pol for
     a source model distribution at a given redshift.
     """
+
+    chisqlimit = 0.5  # ok "eyeball" fit for 4-point spectrum?
 
     # Define bands 
     band1 = n.array([1.4, 1.45])  # in GHz
@@ -261,14 +260,18 @@ def simulate_rrmpol(trials=1, z=0., width=50., num=1, distribution=200., show=0,
 
     for i in range(trials):
         fd = fd_gaussian_random(width=width, num=num, distribution=distribution)
+        if show:
+            plot_fd(fd)
+            p.show()
         spectrum = calc_spectrum(fd, show=show)
         lambda2z = redshift_lambda2(spectrum[0], z)
         spectrum2 = sample_band_average_two((lambda2z, spectrum[1]), n.min(s_band1), n.max(s_band1), n.min(s_band2), n.max(s_band2))
         spectrum3 = sample_band_average_two((lambda2z, spectrum[1]), n.min(s_band3), n.max(s_band3), n.min(s_band4), n.max(s_band4))
         spectrum4 = (n.concatenate((spectrum2[0], spectrum3[0])), n.concatenate((spectrum2[1], spectrum3[1])))
-        result = fit_angle(spectrum4, show=show, verbose=verbose)
-        rrm.append(result[1])
-        pol.append(spectrum4[1])
+        chisq, result = fit_angle(spectrum4, show=show, verbose=verbose)
+        if chisq < chisqlimit:
+            rrm.append(result[1])
+            pol.append(spectrum4[1])
 
     return (n.array(rrm), n.array(pol))
 
@@ -280,13 +283,29 @@ def simulate_redshift():
     """
 
     rrm1 = []; pol1 = []; rrm2 = []; pol2 = []; rrm3 = []; pol3 = []
-    for z in n.arange(0,4)/3.:
+    for z in n.arange(0,13)/3.:
         rrm, pol = simulate_rrmpol(trials=200, z=z, width=10., num=1, distribution=100.)
         rrm1.append(rrm); pol1.append(pol)
         rrm, pol = simulate_rrmpol(trials=200, z=z, width=30., num=1, distribution=100.)
         rrm2.append(rrm); pol2.append(pol)
         rrm, pol = simulate_rrmpol(trials=200, z=z, width=100., num=1, distribution=100.)
         rrm3.append(rrm); pol3.append(pol)
+
+    return rrm1, pol1, rrm2, pol2, rrm3, pol3
+
+def simulate_redshift2():
+    """
+    Runs simulate_rrmpol for a range of z.
+    Simulates three source model distributions.  Results plotted with plot_sim.
+    Question:  Does rms of RRM values increase at higher redshift?  What source property does this?
+    """
+
+    rrm1 = []; pol1 = []; rrm2 = []; pol2 = []; rrm3 = []; pol3 = []
+    for z in n.arange(0,4)/1.:
+        rrm, pol = simulate_rrmpol(trials=10, z=z, width=7., num=10, distribution=70.)
+        rrm1.append(rrm); pol1.append(pol)
+        rrm2 = rrm1; rrm3 = rrm1
+        pol2 = pol1; pol3 = pol1
 
     return rrm1, pol1, rrm2, pol2, rrm3, pol3
 
@@ -333,6 +352,20 @@ def plot_sim(res):
     p.xlabel('redshift bin')
     p.ylabel('RRM RMS')
     p.title('RRM RMS redshift dependence')
+
+    p.figure(3)
+    for i in range(len(rrm1)):
+        p.subplot(311)
+        p.hist(rrm1[i],bins=20, label=str(i))
+        p.subplot(312)
+        p.hist(rrm2[i],bins=20, label=str(i))
+        p.subplot(313)
+        p.hist(rrm3[i],bins=20, label=str(i))
+
+    p.legend()
+    p.xlabel('RRM (rad/m2)')
+    p.ylabel('Number of sources')
+    p.title('Distribution of RRM')
 
 ###########################################
 ########Still to convert to new system#####
