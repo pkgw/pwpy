@@ -761,6 +761,11 @@ def setIntegTime (hookup, itime=None):
     _integTime = itime
     account ('setting integration time', time.time () - tStart)
 
+def resetDataEmitter (hookup):
+    tStart = time.time ()
+    runObs ('fxlaunch', hookup.instr)
+    account ('resetting fx2net processes', time.time () - tStart)
+
 def launchCatcher (hookup, src, freq, durationSeconds, outbase, ebase):
     tStart = time.time ()
     nsephem = ebase + '.ephem'
