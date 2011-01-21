@@ -239,6 +239,35 @@ def getIntegTime (hookup):
         raise SlurpError (args, 0, lines, None, e)
 
 
+# Bandwidth
+
+_bandwidthValues = [100, 52, 26, 13, 7, 3]
+
+def getBandwidth (hookup, board='i1'):
+    """Returns the *approximate* bandwidth, an integer."""
+
+    fullboard = '%s.fx%c' % (board, hookup.instr.split (':')[0][-1])
+    args = obsRubyArgs ('ibob', fullboard, 'regread', 'bwsel')
+    lines = _slurp (args)
+    try:
+        val = int (lines[0].split ()[0], 16) # string is in hex
+    except StandardError, e:
+        raise SlurpError (args, 0, lines, None, e)
+
+    mode0 = val & 0xF
+
+    if mode0 < 0 or mode0 > 5:
+        raise Exception ('Unexpected bandwidth code %d (from %s)' % \
+                         (mode0, lines[0]))
+
+    check = mode0 | (mode0 << 4) | (mode0 << 8) | (mode0 << 12)
+    if val & 0xFFFF != check:
+        raise Exception ('Unhandled non-uniform bandwidth config (from %s)' % \
+                         lines[0])
+
+    return _bandwidthValues[mode0]
+
+
 # Focus stuff
 
 def getFocusSettings (ants):
