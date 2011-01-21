@@ -7,8 +7,6 @@ SVNID = '$Id$'
 
 runLogger = None
 
-# FIXME: implement probing and controlling of bandwidth settings.
-
 # Some utilities for constructing commandlines. These are actually
 # not used much in this module, but come into play a lot in atactl.py
 
@@ -266,6 +264,24 @@ def getBandwidth (hookup, board='i1'):
                          lines[0])
 
     return _bandwidthValues[mode0]
+
+def computeExactBandwidth (approx):
+    # Copy of decision tree in bw.csh
+
+    if approx >= 79:
+        n = 0
+    elif approx >= 39:
+        n = 1
+    elif approx >= 20:
+        n = 2
+    elif approx >= 10:
+        n = 3
+    elif approx >= 5:
+        n = 4
+    else:
+        n = 5
+
+    return 104.8576 / 2**n
 
 
 # Focus stuff
