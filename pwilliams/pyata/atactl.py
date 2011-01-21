@@ -766,6 +766,17 @@ def resetDataEmitter (hookup):
     runObs ('fxlaunch', hookup.instr)
     account ('resetting fx2net processes', time.time () - tStart)
 
+def setBandwidth (hookup, bwintmhz):
+    # The script requires that ~obs/bin be in the path. Just force it temporarily.
+    tStart = time.time ()
+    import os
+    from ataprobe import _obsbindir
+    pathbak = os.environ['PATH']
+    os.environ['PATH'] += ':' + _obsbindir
+    runObs ('bw.csh', hookup.instr, str (bwintmhz))
+    os.environ['PATH'] = pathbak
+    account ('setting bandwidth', time.time () - tStart)
+
 def launchCatcher (hookup, src, freq, durationSeconds, outbase, ebase):
     tStart = time.time ()
     nsephem = ebase + '.ephem'
