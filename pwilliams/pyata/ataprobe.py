@@ -56,6 +56,21 @@ class SlurpError (EnvironmentError):
         super (SlurpError, self).__init__ (0, 'temp')
         self.args = (args, code, stdout, stderr, subexc)
 
+    def __str__ (self):
+        args, code, stdout, stderr, subexc = self.args
+        if subexc is None:
+            substr = '[none]'
+        else:
+            substr = '%s: %s' % (subexc.__class__.__name__, subexc)
+        return """Couldn't parse output of command: %s
+Exit code: %d
+Standard out: %s
+Standard error: %s
+Subexception: %s""" % (' '.join (args), code,
+                       stdout or '[none]',
+                       stderr or '[none]',
+                       substr)
+
 
 def _slurp (args, checkCode=True):
     """Return the output of a cmd, which is executed in a shell.
@@ -81,7 +96,7 @@ def _slurp (args, checkCode=True):
     if checkCode:
         if proc.returncode != 0:
             raise SlurpError (args, proc.returncode, stdout, stderr,
-                              EnvironmentError ())
+                              EnvironmentError ('Nonzero exit code'))
         return stdout.splitlines ()
     else:
         return proc.returncode, stdout.splitlines (), stderr.splitlines ()
