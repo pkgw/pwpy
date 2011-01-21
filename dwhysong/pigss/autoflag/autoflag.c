@@ -25,6 +25,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <assert.h>
+#include <fcntl.h>
 #include "mirclib.h"
 #include "mirflib.h"
 #include "hio.h"
@@ -476,7 +477,7 @@ void corrupt2(bin_struct *bin, unsigned int n_blocks, unsigned int *count) {
  * variance in each block is compared against the others.
  */
 void corrupt(bin_struct *bin, unsigned int n_blocks, unsigned int *count) {
-	unsigned int start, end, pol, bl, n_bl, n_ants, n_chan, ant1, ant2, idx, i, j, width;
+	unsigned int start, pol, bl, n_bl, n_ants, n_chan, ant1, ant2, idx, i, j, width;
 	complex float dev[n_blocks], tmp;
 	int n;
 
@@ -687,7 +688,7 @@ complex float *bpcal(bin_struct *bin, complex float *med, complex float *median,
 	return gain;
 }
 
-#include <fcntl.h>
+
 void write_spectrum(bin_struct *bin, char *name) {
 	FILE *fd;
 	int i,bl,ch,idx;
@@ -730,7 +731,7 @@ void getpolstr(dataset_struct *visdata, int p, char *str) {
  * Determine flags from a calibrator scan.
  */
 void calflag(bin_struct *bin) {
-	vis_struct *vis;
+	vis_struct *vis, *tmpvis;
 	complex float *med_spec, *rms_spec, *median, *deviation;
 	complex float **data;
 	unsigned *n, *n_bad, n_chan, nflag=0, start, end;
@@ -822,6 +823,17 @@ void calflag(bin_struct *bin) {
 			vis = vis->next;
 		}
 	}
+
+	/* Delete the visibility linked list to save memory. */
+	vis=bin->data;
+	while(vis) {
+		tmpvis=vis;
+		vis=vis->next;
+		free(tmpvis->data);
+		free(tmpvis->flags);
+		free(tmpvis);
+	}
+	bin->data = NULL;
 
 	// Get median and scatter
         for (i=0; i<2*n_bl*n_chan; i++) meddev_cmplx(data[i],n[i],&(med_spec[i]),&(rms_spec[i]));
@@ -1099,7 +1111,7 @@ void calflag(bin_struct *bin) {
 
 void noncal_stats(dataset_struct *visdata) {
 	bin_struct *bin;
-	vis_struct *vis;
+	vis_struct *vis, *tmpvis;
 	complex float *med_spec, *rms_spec, *median, *deviation;
 	complex float **data;
 	unsigned *n, *n_bad, n_chan, nflag=0;
@@ -1180,6 +1192,17 @@ void noncal_stats(dataset_struct *visdata) {
 				vis = vis->next;
 			}
 		}
+
+		/* Delete the visibility linked list to save memory. */
+		vis=bin->data;
+		while(vis) {
+			tmpvis=vis;
+			vis=vis->next;
+			free(tmpvis->data);
+			free(tmpvis->flags);
+			free(tmpvis);
+		}
+		bin->data = NULL;
 
 		// Get median and scatter
         	for (i=0; i<2*n_bl*n_chan; i++) meddev_cmplx(data[i],n[i],&(med_spec[i]),&(rms_spec[i]));

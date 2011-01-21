@@ -9,6 +9,13 @@
 # TODO:
 # Statistical flagging: flag whole antennas if >X% of data are bad
 # Get someone to fix the ATA data catcher so it properly sorts visibilities
+#
+# From Karto:
+# newcalcal.csh will normally take care of dead antennas (by scanning for phase
+# RMS), but there is a little tool called "neweprms.csh" that is part of the
+# RAPID suite that can be used to ID problematic antennas. The help file for
+# neweprms.csh can be accessed by invoking it on the command line with no
+# arguments. Let me know if you have any questions.
 
 SYSTEM=`uname`
 if [ $SYSTEM == SunOS ] ;
@@ -22,7 +29,7 @@ else
   $TMPDIR = `pwd`  
 fi
 
-NITER=2
+NITER=4
 TMP1=`mktemp -u $TMPDIR/atadata.XXXXXX`
 TMP2=`mktemp -u $TMPDIR/atadata.XXXXXX`
 TMP3=`mktemp -u $TMPDIR/atadata.XXXXXX`

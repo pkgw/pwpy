@@ -22,29 +22,23 @@ while true ; do
 done
 
 files=$@;
+TMPDIR=/dev/shm
 echo "Reference antenna: $refant"
 echo "Using slices of $nchan channels"
 echo "Will process: $files"
 
 
 for file in $files;
-  do if [ ! -e $file-tmp ];
-    then uvaver vis=$file out=$file-tmp interval=0.000001 options=nocal,nopass,nopol ;
-  fi
-
-  for i in `seq $startch $nchan $endch` ;
-    do j=`echo $i + $nchan - 1 | bc`;
-    uvaver vis=$file-tmp out=$file-$i line=ch,$nchan,$i,1,1 interval=0.000001 options=nocal,nopass,nopol
-
+  do for i in `seq $startch $nchan $endch` ;
+    do uvaver vis=$file out="$TMPDIR"/"$file"-"$i" line=ch,1,$i,$nchan interval=0.000001 options=nocal,nopass,nopol
     echo '**************************'
     echo "  Calibrating $file-$i"
     echo '**************************'
-    mfcal vis=$file-$i refant=$refant interval=10 tol=0.00005
-    gpcal vis=$file-$i refant=$refant options=xyref,polref interval=2880
+    mfcal vis=$TMPDIR/$file-$i refant=$refant interval=10 tol=0.00005
+    gpcal vis=$TMPDIR/$file-$i refant=$refant options=xyref,polref interval=2880
     # or loop through gpcal/mfcal to iterate to gain and leakage solution?
-    echo $file-$i >> .tmpcatfile
+    echo $TMPDIR/$file-$i >> .tmpcatfile
   done
-  echo $file-tmp >> .tmpcatfile
   # merge cals into original data
   uvcat vis=@.tmpcatfile out=$file-join
   rm -rf `cat .tmpcatfile`
