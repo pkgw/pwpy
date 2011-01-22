@@ -15,6 +15,7 @@ def rewriteData (vis, out):
     i = 0
     for inp, preamble, data, flags, nread in vis.readLowlevel (False, maxchan=64):
 
+
         if i == 0:
             nants = inp.getVarFirstInt ('nants', 0)
             inttime = inp.getVarFirstFloat ('inttime', 10.0)
@@ -34,7 +35,11 @@ def rewriteData (vis, out):
             dOut.writeVarDouble ('sfreq', inp.getVarDouble ('sfreq', nspect))
             dOut.writeVarDouble ('restfreq', inp.getVarDouble ('restfreq', nspect))
 
+        bp = util.mir2aps (inp, preamble)
+        pol = util.aps2ants (bp)[2]
+
         inp.copyLineVars (dOut)
+        dOut.writeVarInt ('pol', pol)
         dOut.write (preamble, data, flags)
 
         i = i+1
