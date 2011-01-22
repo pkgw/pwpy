@@ -251,10 +251,11 @@ class poco:
 
         self.dmt0arr = dmt0arr
 
-#        ax = p.imshow(accummask, aspect='auto')
-#        p.axis([-0.5,len(chans)+0.5,max(time),min(time)])
 
-
+    def writetrack(track):
+        """Wries data from track out as miriad visibility file.
+        """
+        pass
 
 
     def plotdmt0(self, sig=5., save=0):
@@ -455,6 +456,10 @@ if __name__ == '__main__':
                 pv.dedisperse()
                 peaks, peakssig = pv.plotdmt0(save=1)
                 file.close()
+            else:
+                # write dmtrack data out for imaging
+                pv.writetrack(track)
+
         else:
             print 'No significant detection.  Moving on...'
     else:
