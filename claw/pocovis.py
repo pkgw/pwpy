@@ -251,16 +251,18 @@ class poco:
         self.dmt0arr = dmt0arr
 
 
-    def writetrack(self, track):
+    def writetrack(self, track, intoff = 0):
         """Wries data from track out as miriad visibility file.
         Assumes a template file is "template.mir" and has same baseline order, chans, etc..
+        Optional shift to time of track by intoff integrations.
         """
 
-        # template and output miriad visibility file names
-        inname = 'template.mir'
-        outname = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl) + '.mir'
+        # shift track integrations by intoff
+        track = ( list(n.array(track[0]) + intoff), track[1])
 
-        # generate output new single-int visibility file
+        # define input metadata source and output visibility file names
+        inname = self.file
+        outname = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl + intoff) + '-' + 'dm' + '.mir'
 
         vis = miriad.VisData(inname)
         out = miriad.VisData(outname)
@@ -272,8 +274,14 @@ class poco:
         for inp, preamble, data, flags in vis.readLowlevel ('dsl3', False):
             # since template has only one int, this loop gets spectra by iterating over baselines.
 
-            if i < self.nbl:
-                if i == 0:
+            if i < (track[0][len(track[0])/2]) * self.nbl:  # need to grab only integration at pulse+intoff
+                i = i+1
+                continue
+            elif i == (track[0][len(track[0])/2]) * self.nbl:     # start counting with int0
+                int0 = i
+
+            if i < int0 + self.nbl:   # for one integration starting at int0
+                if i == int0:
                     nants = inp.getVarFirstInt ('nants', 0)
                     inttime = inp.getVarFirstFloat ('inttime', 10.0)
                     nspect = inp.getVarFirstInt ('nspect', 0)
@@ -299,18 +307,20 @@ class poco:
                 for j in range(self.nchan):
                     if j in self.chans:
                         matches = n.where( (j - min(self.chans)) == n.array(track[1]) )[0]   # hack, since chans are from 0-64, but track is in trimmed chan space
-                        raw = self.rawdata[track[0], i, track[1]][matches]   # all baselines for the known pulse
+                        raw = self.rawdata[track[0], i-int0, track[1]][matches]   # all baselines for the known pulse
                         raw = raw.mean(axis=0)   # create spectrum for each baseline by averaging over time
                         data[j] = raw
                     else:
                         data[j] = 0. + 0.j
 
+#                ants = util.decodeBaseline (preamble[4])
+#                print preamble[3], ants
                 dOut.write (preamble, data, flags)
 
-            elif i >= self.nbl: 
+            elif i >= int0 + self.nbl: 
                 break
 
-            i = i+1  # essentially a baseline number
+            i = i+1  # essentially a baseline*int number
 
         dOut.close ()
 
