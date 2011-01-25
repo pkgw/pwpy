@@ -66,8 +66,7 @@ class poco:
 
         # read data
         # You can pass traditional Miriad UV keywords to readLowlevel as keyword arguments
-        for inp, preamble, data, flags, nread in vis.readLowlevel (False):
-#        for inp, preamble, data, flags, nread in uvdat.readAll ():
+        for inp, preamble, data, flags in vis.readLowlevel ('dsl3', False):
 
             # Loop to skip some data and read shifted data into original data arrays
             if i < nskip:
@@ -75,8 +74,8 @@ class poco:
                 continue 
 
             # Reduce these arrays to the correct size
-            data = data[0:nread]
-            flags = flags[0:nread]
+#            data = data[0:nread]
+#            flags = flags[0:nread]
 
     # Decode the preamble
     #        u, v, w = preamble[0:3]
@@ -252,10 +251,68 @@ class poco:
         self.dmt0arr = dmt0arr
 
 
-    def writetrack(track):
+    def writetrack(self, track):
         """Wries data from track out as miriad visibility file.
+        Assumes a template file is "template.mir" and has same baseline order, chans, etc..
         """
-        pass
+
+        # template and output miriad visibility file names
+        inname = 'template.mir'
+        outname = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl) + '.mir'
+
+        # generate output new single-int visibility file
+
+        vis = miriad.VisData(inname)
+        out = miriad.VisData(outname)
+
+        dOut = out.open ('c')
+        dOut.setPreambleType ('uvw', 'time', 'baseline')
+
+        i = 0
+        for inp, preamble, data, flags in vis.readLowlevel ('dsl3', False):
+            # since template has only one int, this loop gets spectra by iterating over baselines.
+
+            if i < self.nbl:
+                if i == 0:
+                    nants = inp.getVarFirstInt ('nants', 0)
+                    inttime = inp.getVarFirstFloat ('inttime', 10.0)
+                    nspect = inp.getVarFirstInt ('nspect', 0)
+                    nwide = inp.getVarFirstInt ('nwide', 0)
+                    sdf = inp.getVarDouble ('sdf', nspect)
+                    inp.copyHeader (dOut, 'history')
+                    inp.initVarsAsInput (' ') # ???
+
+                    dOut.writeVarInt ('nants', nants)
+                    dOut.writeVarFloat ('inttime', inttime)
+                    dOut.writeVarInt ('nspect', nspect)
+                    dOut.writeVarDouble ('sdf', sdf)
+                    dOut.writeVarInt ('nwide', nwide)
+                    dOut.writeVarInt ('nschan', inp.getVarInt ('nschan', nspect))
+                    dOut.writeVarInt ('ischan', inp.getVarInt ('ischan', nspect))
+                    dOut.writeVarDouble ('sfreq', inp.getVarDouble ('sfreq', nspect))
+                    dOut.writeVarDouble ('restfreq', inp.getVarDouble ('restfreq', nspect))
+                    dOut.writeVarInt ('pol', inp.getVarInt ('pol'))
+                    
+                    inp.copyLineVars (dOut)
+
+                # prep data (and check that it matches expected?)
+                for j in range(self.nchan):
+                    if j in self.chans:
+                        matches = n.where( (j - min(self.chans)) == n.array(track[1]) )[0]   # hack, since chans are from 0-64, but track is in trimmed chan space
+                        raw = self.rawdata[track[0], i, track[1]][matches]   # all baselines for the known pulse
+                        raw = raw.mean(axis=0)   # create spectrum for each baseline by averaging over time
+                        data[j] = raw
+                    else:
+                        data[j] = 0. + 0.j
+
+                dOut.write (preamble, data, flags)
+
+            elif i >= self.nbl: 
+                break
+
+            i = i+1  # essentially a baseline number
+
+        dOut.close ()
 
 
     def plotdmt0(self, sig=5., save=0):

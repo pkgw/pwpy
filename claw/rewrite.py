@@ -5,16 +5,13 @@
 # Crude copy of pkgw function in calctsys.py.
 
 from miriad import *
-from mirtask import keys, util
-import shutil
 
 def rewriteData (vis, out):
     dOut = out.open ('c')
     dOut.setPreambleType ('uvw', 'time', 'baseline')
 
     i = 0
-    for inp, preamble, data, flags, nread in vis.readLowlevel (False, maxchan=64):
-
+    for inp, preamble, data, flags in vis.readLowlevel ('dsl3', False):
 
         if i == 0:
             nants = inp.getVarFirstInt ('nants', 0)
@@ -34,25 +31,20 @@ def rewriteData (vis, out):
             dOut.writeVarInt ('ischan', inp.getVarInt ('ischan', nspect))
             dOut.writeVarDouble ('sfreq', inp.getVarDouble ('sfreq', nspect))
             dOut.writeVarDouble ('restfreq', inp.getVarDouble ('restfreq', nspect))
-
-        bp = util.mir2aps (inp, preamble)
-        pol = util.aps2ants (bp)[2]
+            dOut.writeVarInt ('pol', inp.getVarInt ('pol'))
 
         inp.copyLineVars (dOut)
-        dOut.writeVarInt ('pol', pol)
         dOut.write (preamble, data, flags)
 
         i = i+1
-        if i > 100: break
+        if i > 35: break
 
     dOut.close ()
 
 
 if __name__ == '__main__':
-    inname = 'tmp.mir'   # template data with one integration
+    inname = 'poco_crab_201103_9.mir'   # template data with one integration
     outname = 'tmp2.mir'  # should not exist yet
-
-#    shutil.copytree(inname, outname)
 
     vis = VisData(inname)
     out = VisData(outname)
