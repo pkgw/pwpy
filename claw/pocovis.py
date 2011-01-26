@@ -251,18 +251,16 @@ class poco:
         self.dmt0arr = dmt0arr
 
 
-    def writetrack(self, track, intoff = 0):
-        """Wries data from track out as miriad visibility file.
-        Assumes a template file is "template.mir" and has same baseline order, chans, etc..
+    def writetrack(self, dmbin, tbin):
+        """Writes data from track out as miriad visibility file.
         Optional shift to time of track by intoff integrations.
         """
 
-        # shift track integrations by intoff
-        track = ( list(n.array(track[0]) + intoff), track[1])
+        track = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[tbin], show=0)  # needs to be shifted by -1 bin in reltime?
 
         # define input metadata source and output visibility file names
         inname = self.file
-        outname = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl + intoff) + '-' + 'dm' + '.mir'
+        outname = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl) + '-' + 'dm' + str(dmbin) + 't' + str(tbin) + '.mir'
 
         vis = miriad.VisData(inname)
         out = miriad.VisData(outname)
@@ -323,6 +321,56 @@ class poco:
             i = i+1  # essentially a baseline*int number
 
         dOut.close ()
+
+
+    def dmlc(self, dmbin, tbin, nints = 50):
+        """Plots lc for DM bin over range of timebins.
+        In principle, should produce lightcurve as if it is a slice across dmt0 plot.
+        Actually designed to test writetrack function.
+        """
+
+        # define input metadata source and output visibility file names
+        inname = self.file
+        vis = miriad.VisData(inname)
+
+        lc = []
+        for tbintrial in range(tbin, tbin+nints):
+
+            # shift track integrations by intoff
+            track = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[tbintrial], show=0)  # needs to be shifted by -1 bin in reltime?
+
+            dataarr = []
+            i = 0
+            for inp, preamble, data, flags in vis.readLowlevel ('dsl3', False):
+                # since template has only one int, this loop gets spectra by iterating over baselines.
+
+                if i < (track[0][len(track[0])/2]) * self.nbl:  # need to grab only integration at pulse+intoff
+                    i = i+1
+                    continue
+                elif i == (track[0][len(track[0])/2]) * self.nbl:     # start counting with int0
+                    int0 = i
+
+                if i < int0 + self.nbl:   # for one integration starting at int0
+                    # prep data (and check that it matches expected?)
+                    for j in range(self.nchan):
+                        if j in self.chans:
+                            matches = n.where( (j - min(self.chans)) == n.array(track[1]) )[0]   # hack, since chans are from 0-64, but track is in trimmed chan space
+                            raw = self.rawdata[track[0], i-int0, track[1]][matches]   # all baselines for the known pulse
+                            raw = raw.mean(axis=0)   # create spectrum for each baseline by averaging over time
+                            data[j] = raw
+                        else:
+                            data[j] = 0. + 0.j
+
+                elif i >= int0 + self.nbl: 
+                    break
+
+                dataarr.append(n.array(data))
+                i = i+1  # essentially a baseline*int number
+
+            dataarr = n.abs((n.array(dataarr))[self.noautos, :])
+            lc.append(dataarr.mean())
+
+        return n.array(lc)
 
 
     def plotdmt0(self, sig=5., save=0):
