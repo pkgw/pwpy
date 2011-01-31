@@ -32,9 +32,19 @@
 #include "autoflag.h"
 #include "list.h"
 
+#undef _Imaginary_I
+#define _Imaginary_I _Complex_I
+#ifndef _Complex_I
+#define _Complex_I (__extension__ 1.0iF)
+#endif
+#undef I
+#define I (__extension__ 1.0iF)
+
 #define CORR_SIGMA 6.0
+#ifndef M_PI
 #define M_PI (3.141592653589793238462643383279502884197169399375105\
 820974944592307816406286208998628034825342117067982148086513282306647L)
+#endif
 
 extern void options_c(char *, char *[], char *, int);
 
@@ -1277,7 +1287,7 @@ bin_struct *make_bin(vis_struct *vis) {
 	bin_struct *bin;
 	unsigned i;
 
-	bin = malloc(sizeof(bin_struct));
+	bin = calloc(1, sizeof(bin_struct));
 	if (!bin) bug_c('f',"make_bin: Out of virtual address space.");
 	bin->data = vis;
 	bin->visdata = vis->visdata;
@@ -1356,7 +1366,7 @@ vis_struct *read_vis(dataset_struct *visdata) {
 		bug_c('f',"Number of channels changed.");
 	}
 
-	vis = malloc(sizeof (vis_struct));
+	vis = calloc(1, sizeof (vis_struct));
 	if (!vis) bug_c('f',"Out of virtual address space. Too much data?");
 	vis->flags = malloc(1 + visdata->n_chan / 8);
 	if (!vis->flags) bug_c('f',"Out of virtual address space. Too much data?");
@@ -1452,9 +1462,13 @@ void write_flags(dataset_struct *visdata) {
 				if (!noband && bin->gains && (!norfi || !nodistro)) {
 					unsigned int idx1;
 					unsigned int idx2;
-					idx1 = pol*visdata->n_ants*visdata->n_chan + vis->ant[0] * visdata->n_chan + ch;
-					idx2 = pol*visdata->n_ants*visdata->n_chan + vis->ant[1] * visdata->n_chan + ch;
-					vis->data[ch] *= bin->gains[idx1] * ~ bin->gains[idx2];
+					if (pol < 2) {
+					    for (ch=0; ch<visdata->n_chan; ch++) {
+						idx1 = pol*visdata->n_ants*visdata->n_chan + vis->ant[0] * visdata->n_chan + ch;
+						idx2 = pol*visdata->n_ants*visdata->n_chan + vis->ant[1] * visdata->n_chan + ch;
+						vis->data[ch] *= bin->gains[idx1] * ~ bin->gains[idx2];
+					    }
+					}
 				}
 				if (bin->median && bin->deviation) {
 					if (pol < 2) for (ch=0; ch<visdata->n_chan; ch++) {
@@ -1624,7 +1638,7 @@ void cleanup(dataset_struct *visdata) {
 		}
 		tmpbin = bin;
 		bin = bin->next;
-		free(bin);
+		free(tmpbin);
 	}
 	free(visdata);
 }
@@ -1634,7 +1648,7 @@ plist list_insert(plist list, bin_struct *bin) {
         plist tmp, loc;
 	bin_struct *b;
 
-        tmp = (plist) malloc(sizeof(struct list));
+        tmp = (plist) calloc(1, sizeof(struct list));
         tmp->data = (void *) bin;
 
 	// First handle the case where the bin is inserted as the first element,
@@ -1730,7 +1744,7 @@ int main(int argc, char *argv[]) {
 //	float line_start, line_width, line_step;
 //	float sels[maxsels];
 	bin_struct *bin;
-	plist binlist;
+	plist binlist = NULL;
 
 	f_setarg(argc,argv);
 	f_setsig();
@@ -1752,11 +1766,11 @@ int main(int argc, char *argv[]) {
 	keyf_c("cal",str,&blank);
 	while (str[0]) {
 		if (firstcaldata == NULL) {
-			firstcaldata = malloc(sizeof(dataset_struct));
+		    firstcaldata = calloc(1, sizeof(dataset_struct));
 			visdata = firstcaldata;
 		}
 		else {
-			visdata->next = malloc(sizeof(dataset_struct));				// FIXME memory leak
+		    visdata->next = calloc(1, sizeof(dataset_struct));				// FIXME memory leak
 			visdata = visdata->next;
 		}
 		if (!visdata) bug_c('f',"Failure in an early malloc() call. Bad.");
@@ -1769,11 +1783,11 @@ int main(int argc, char *argv[]) {
 	keyf_c("vis",str,&blank);
 	while (str[0]) {
 		if (!firstvisdata) {
-			firstvisdata = malloc(sizeof(dataset_struct));
+		    firstvisdata = calloc(1, sizeof(dataset_struct));
 			visdata = firstvisdata;
 		}
 		else {
-			visdata->next = malloc(sizeof(dataset_struct));
+		    visdata->next = calloc(1, sizeof(dataset_struct));
 			visdata = visdata->next;
 		}
 		if (!visdata) bug_c('f',"Failure in an early malloc() call. Bad.");
