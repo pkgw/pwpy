@@ -61,7 +61,17 @@ datasets with "uvlwrevert".
 try:
     from os.path import relpath
 except ImportError:
-    die ('your Python is too old; no os.path.relpath')
+    def relpath (path, start='.'):
+        from os.path import abspath, commonprefix, join, sep, pardir
+        if not path:
+            raise ValueError("no path specified")
+        start_list = abspath(start).split(sep)
+        path_list = abspath(path).split(sep)
+        i = len(commonprefix([start_list, path_list]))
+        rel_list = [pardir] * (len(start_list)-i) + path_list[i:]
+        if not rel_list:
+            return curdir
+        return join(*rel_list)
 
 from os.path import isabs, join, exists, isdir, basename
 
