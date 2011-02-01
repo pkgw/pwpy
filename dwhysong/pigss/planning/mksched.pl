@@ -9,8 +9,50 @@ use DateTime;
 use DateTime::Format::Strptime;
 use Getopt::Long;
 use Math::Trig 'great_circle_distance';
+use Astro::Telescope;
+use Astro::Time;
+use Astro::SLA ();
+use ATA;
+
+$daily='coma';
 
 BEGIN {
+	$pass = 2;
+	$ENV{"PATH"}="/home/dwhysong/pigss:/home/dwhysong/bin:/bin:/usr/bin";
+	$PI = 3.1415926535897932384626433832795028841971693993751;
+	$PI_2 = $PI/2.0;
+	$TZ='America/Los_Angeles';
+
+	Getopt::Long::Configure ("bundling");
+	GetOptions     ('file|f=s' => \$filename,
+                	'help|h' => \$help,
+                	'number|n=f' => \$selectnfields,
+                	'date|d=s' => \$selectdate,
+			'interactive|i' => \$interactive,
+			'block|b:f' => \$minblock,
+			'test|t' => \$test,
+			'pass|p=i' => \$pass,
+			'unsafe|u' => \$unsafe,
+                	'verbose|v' => \$verbose);
+
+	if ($help) {
+        	print "Survey schedule planner\tCopyright (c) 2010 David Whysong\n\n";
+        	print "Arguments:\n";
+        	print "\t--help\t\tshow this text.\n";
+        	print "\t--file [name]\tread schedule from file [name]\n";
+        	print "\t--interactive\tselect targets manually from ds9 plot\n";
+        	print "\t--number [#]\tnumber of fields to observe per hour\n";
+        	print "\t--date [mm/dd/yyyy]\tschedule only a particular date\n";
+		print "\t--block [#]\tbreak up observations into blocks of at least # hours\n";
+		print "\t--pass [#]\tobserve pass [#]\n";
+		print "\t--test\ttest mode; do not generate schedules\n";
+		print "\t--unsafe\tdo not perform (slow) consistency check\n";
+        	print "\t--verbose\tprint extra information\n";
+        	exit();
+	}
+
+	print "Finding targets for pass #$pass\n\n";
+
 	if (!defined($PIGSS_DATABASE)) {
 		$PIGSS_DATABASE='/etc/observatory/pfhex';
 	} else {
@@ -48,44 +90,6 @@ BEGIN {
 }
 
 
-
-
-
-$ENV{"PATH"}="/home/dwhysong/pigss:/home/dwhysong/bin:/bin:/usr/bin";
-$PI = 3.1415926535897932384626433832795028841971693993751;
-$PI_2 = $PI/2.0;
-$TZ='America/Los_Angeles';
-$pass = 1;
-
-Getopt::Long::Configure ("bundling");
-GetOptions     ('file|f=s' => \$filename,
-                'help|h' => \$help,
-                'number|n=f' => \$selectnfields,
-                'date|d=s' => \$selectdate,
-		'interactive|i' => \$interactive,
-		'block|b:f' => \$minblock,
-		'test|t' => \$test,
-		'pass|p=i' => \$pass,
-		'unsafe|u' => \$unsafe,
-                'verbose|v' => \$verbose);
-
-if ($help) {
-        print "Survey schedule planner\tCopyright (c) 2010 David Whysong\n\n";
-        print "Arguments:\n";
-        print "\t--help\t\tshow this text.\n";
-        print "\t--file [name]\tread schedule from file [name]\n";
-        print "\t--interactive\tselect targets manually from ds9 plot\n";
-        print "\t--number [#]\tnumber of fields to observe per hour\n";
-        print "\t--date [mm/dd/yyyy]\tschedule only a particular date\n";
-	print "\t--block [#]\tbreak up observations into blocks of at least # hours\n";
-	print "\t--pass [#]\tobserve pass [#]\n";
-	print "\t--test\ttest mode; do not generate schedules\n";
-	print "\t--unsafe\tdo not perform (slow) consistency check\n";
-        print "\t--verbose\tprint extra information\n";
-        exit();
-}
-
-
 sub command_line {
 	my $str;
 	my $done = 0;
@@ -102,6 +106,33 @@ sub command_line {
 	} while ($done == 0);
 }
 
+
+sub mysystem {
+	$str = shift;
+	print "system($str)\n" if $verbose;
+	system($str);
+	if ($? == -1) {
+		die "failed to execute: $!\n";
+	}
+	elsif ($? & 127) {
+		printf "child died with signal %d, %s coredump\n", ($? & 127), ($? & 128) ? 'with' : 'without';
+		die;
+	}
+	elsif ($? >> 8) {
+		printf "child exited with value %d\n", $? >> 8;
+		die;
+	}
+}
+
+sub mark_observed {
+	my $date = shift;
+	my @targets = @_;
+	chomp @targets;
+	print "Marking targets as observed.\n" if $verbose;
+	my $fields = join(",",@targets);
+	my $datestr=$date->strftime("%m/%d/%Y");
+        mysystem("schedule.pl -f $PIGSS_DATABASE -o $datestr,$fields");
+}
 
 
 sub read_sched {
@@ -140,33 +171,6 @@ sub parse_string_date {
 	return $date;
 }
 
-
-sub parse_string_time {
-	# Using DateTime::Format::Strptime is unnecessary
-	my $str = shift;
-	my $date;
-	my $nfields = split(/:|\//,$str);
-	if ($nfields==3) {  # Time only
-		$date = DateTime->now(time_zone=>$TZ);
-		$date->set(hour=>$tmp[0]);
-		$date->set(minute=>$tmp[1]);
-		$date->set(second=>$tmp[2]);
-		$date->set(nanosecond=>0);
-	}
-	elsif ($nfields==6) {  # Date and time
-		$date = DateTime->new(year=>$tmp[2],
-				month=>$tmp[1],
-				day=>$tmp[0],
-				hour=>$tmp[3],
-				minute=>$tmp[4],
-				second=>$tmp[5],
-				nanosecond=>0,
-				time_zone=>$TZ);
-	}
-	else { die "Bad time string $str. Format is: dd/mm/yyyy/hh:mm:ss\n"; }
-	
-	return $date;
-}
 
 sub parse_decimal_time {
 	my $t = shift;
@@ -220,8 +224,26 @@ if (!defined($PIGSS_CATALOG)) {
 die "Please specify a schedule file.\n" if (!defined($filename));
 @obs=read_sched($filename);
 if (!defined($selectnfields)) {
-	$selectnfields=5.1;
+	$selectnfields=5.0;
 }
+
+$tel=observatory_load();
+$long = (defined $tel ? $tel->long : 0.0);
+$long == 0.0 and warn "Telescope longitude is zero; undefined telescope?\n";
+
+# Find the median RA for the daily files
+$dailyfile=$daily.'.cat';
+open FILE, "< $dailyfile" or die "Error: $dailyfile $!\n";
+foreach (<FILE>) {
+	chomp;
+	(undef, undef, undef, $ra) = split;
+	push @list, $ra;
+}
+@tmp = sort {$a<=>$b} @list;
+$daily_ra = $tmp[($#tmp/2)];
+close FILE;
+undef @tmp;
+undef @list;
 
 
 open FILE, "< $PIGSS_CATALOG" or die "Error: $PIGSS_CATALOG $!\n";
@@ -262,7 +284,7 @@ foreach (@obs) {
 	}
 
 	if ($obsend < $now) {
-		warn "Observation at $startstr has already ended; skipping.\n";
+		print "Observation at $startstr has already ended; skipping.\n" if $verbose;
 		next;
 	}
 	if ($obsstart < $now) {
@@ -279,10 +301,29 @@ foreach (@obs) {
 	$fname="pigss.targets-$DATE.$obsnum";			# Output target file name
 	$regname="status/ds9reg-$DATE-$obsnum";			# Output ds9 region file name
 	if (defined($selectdate)) {				# If specified, we only process the selected date
-		next if ($mydate != $date);			# Ignore all the rest
+		if ($mydate > $date) {
+			if ( -f $fname ) {
+				@targets = `grep ^pfhex $fname`;
+				mark_observed($date,@targets);
+			}
+			next;
+		}
+		elsif ($mydate < $date) {
+			next;
+		}
 	}
 	elsif (-e "pigss.targets-$DATE.$obsnum") {		# In batch mode, skip this observation if the target file exists
 		print "pigss.targets-$DATE.$obsnum already exists; skipping this observation\n";
+
+		# Mark these targets as observed on the corresponding date
+		@fields = `grep ^pfhex pigss.targets-$DATE.$obsnum`;
+		chomp @fields;
+		$fields = join ',', @fields;
+		$datestr = $date->strftime("%m/%d/%Y");
+
+		#print("/home/dwhysong/pigss/schedule.pl -f $PIGSS_DATABASE -vo $datestr,$fields\n\n");
+		system("/home/dwhysong/pigss/schedule.pl -f $PIGSS_DATABASE -vo $datestr,$fields");
+
 		next;
 	}
 	print "Scheduling for: $obsstart $obsend\n" if ($verbose or $interactive);
@@ -300,7 +341,7 @@ foreach (@obs) {
 	$blkint = $obslen / $nblocks;
 	$blkminutes = POSIX::floor(60*$blkint);
 	$blkend = $obsstart;
-	print "  Breaking the observation into $nblocks blocks.\n" if $verbose and $nblocks > 1;
+	print "  Breaking the observation into $nblocks blocks of $blkint hours.\n" if $verbose and $nblocks > 1;
 
 	for ($blk=0; $blk < $nblocks; $blk++) {
 		$tmpregname=".tmp/ds9reg-$DATE-$blk";			# Temporary ds9 region file name
@@ -309,12 +350,18 @@ foreach (@obs) {
 		}
 		@targets=();						# Don't keep previous iteration's targets!
 		$blkstart = $blkend;
+		$blkmid = $blkstart->clone;
+		$blkmid->add(DateTime::Duration->new(seconds=>$blkminutes * 30));
 		$blkend = $blkstart->clone;
 		$blkend->add(DateTime::Duration->new(minutes=>$blkminutes));
 		die "Block $blk ran over the end of the observation\n" if ($blkend > $obsend);
 
+		# need to convert to UTC for ut2lst. We'll switch back to local time immediately afterward.
+		$blkmid->set_time_zone('UTC');
+		$lst = 12/$PI*(Astro::SLA::ut2lst($blkmid->year,$blkmid->mon,$blkmid->mday,$blkmid->hour,$blkmid->min,$blkmid->sec,$long))[0];
+		$blkmid->set_time_zone($TZ);
 		$nfields=POSIX::floor($blkint * $selectnfields);	# Number of fields to observe.
-		print "  block $blk: selecting $nfields targets.\n" if $verbose;
+		print "  block $blk centered at $blkmid and LST $lst: selecting $nfields targets.\n" if $verbose;
 		next if $test;
 		$STARTTIME=$blkstart->strftime("%d/%m/%Y/%H:%M:%S");
 		$ENDTIME=make_decimal_hours($blkend);
@@ -410,14 +457,14 @@ foreach (@obs) {
 			unshift @possible, $key;			# @possible is now sorted by distance to $selected
 		}
 
-		if ($obsnum == 0 and $blk == $nblocks-1) {		# Elias fields are at higher RA, so observe them in the last block
-			print("    Including EliasN1 fields.\n") if $verbose;
+		if ($obsnum == 0 and abs($lst - $daily_ra) < $blkint/2.0) {	# Observe daily fields
+			print("    Including daily ($daily) fields.\n") if $verbose;
 			for ($i=1; $i<=7; $i++) {
-				push @targets, "eliasn1-000$i";
+				push @targets, "$daily-000$i";
 				$nfields--;
 			}
 			if ($nfields < 1) {
-				warn "Not enough time to observe EliasN1; continuing anyway.\n";
+				warn "Not enough time to observe daily fields; continuing anyway.\n";
 				$nfields = 0;
 			}
 		}
@@ -440,11 +487,12 @@ foreach (@obs) {
 		# Modify target priority in the database, so we don't select the same targest over and over again
 		# Note, we don't set the date field, as that is a destructive operation so it shouldn't be done until
 		# the observation has been completed.
-		print "Modifying target priority.\n";
-		$prio = 4 - $pass;
-		$priostr = join("=$prio -p ",@targets);
-		$priostr = "-p " . $priostr . "=$prio";
-		system("schedule.pl $SCHEDARGS $priostr");
+		mark_observed($date,@targets);
+		#print "Modifying target priority.\n";
+		#$prio = 4 - $pass;
+		#$priostr = join("=$prio -p ",@targets);
+		#$priostr = "-p " . $priostr . "=$prio";
+		#system("schedule.pl $SCHEDARGS $priostr");
 
 		open REGFILE, "> $tmpregname" or die "Error: $tmpregname : $!\n";	# Write a new region file
 		foreach(@fieldline) {

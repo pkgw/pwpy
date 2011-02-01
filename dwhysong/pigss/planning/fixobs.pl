@@ -32,6 +32,7 @@ if (scalar(@ARGV) == 0) {
 foreach $filename (@ARGV) {
 	@fields = `grep pfhex $filename`;
 	chomp @fields;
+	print "Clearing fields: @fields\n";
 
 	# Clear all obsdate fields and set priority to 4
 	$priostr = join("=4 -p ",@fields);
@@ -39,7 +40,7 @@ foreach $filename (@ARGV) {
 	system("schedule.pl $priostr");
 
 	foreach $field (@fields) {
-		@filelist = `grep -l $field done/pigss.targets*`;
+		@filelist = `grep -l ^$field done/pigss.targets*`;
 		chomp @filelist;
 		foreach(@filelist) {
 			s/done\///;

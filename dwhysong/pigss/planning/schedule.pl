@@ -329,7 +329,7 @@ sub observable {
 #	list all targets withing some radius of a specified RA/DEC
 
 
-$filename = '';
+$filename = '/etc/observatory/pfhex';
 $add = $mod = $query = $timestr = $list = $remove = $prio = $observe = $fixdate = '';
 $get = $init = $usedist = $status = $verify = 0;
 @prio = ();
@@ -387,7 +387,6 @@ if ($help) {
 	exit();
 }
 
-die "Error: please specify the database file." if ($filename eq '');
 die "Error: invalid value, pass < 1\n" if ($pass < 1);
 if ($pass == 2) { $myprio = 3; } 
 elsif ($pass > 2) { die("Error: invalid value, pass > 2 not supported\n"); }
@@ -803,7 +802,6 @@ if ($fixdate) {
 
 
 
-# FIXME no-op if elapsed time is too short...
 if ($observe) {
 	@observe = split ',',$observe;
 	open_sched_rw();
@@ -826,23 +824,24 @@ if ($observe) {
 		# observation, print a warning and update the PREVIOUS obsdate
 		$prevkey = "obsdate" . (4-$obj{prio});	# key to the date of the previous observation
 
-		if (defined($ref->{$prevkey})) {
-			if ($date < $ref->{$prevkey}) {
-				die "Error: $ref->{name} is marked as observed on $ref->{$prevkey} which is later than $date";
+		if (defined($obj{$prevkey})) {
+			if ($date < $obj{$prevkey}) {
+				die "Error: $obj{name} is marked as observed on $obj{$prevkey} which is later than $date";
 			}
-			$delta = $date->subtract_datetime_absolute($ref->{$prevkey})->seconds;
+			$delta = $date->subtract_datetime_absolute($obj{$prevkey})->seconds;
 			if ($delta == 0) {
 				warn "$name is already marked as observed on this date. Skipping...\n";
 				next;
 			}
 			elsif ($delta < $MINDELTA) {
-				warn "Warning: $ref->{name}: minimum elapsed time has not passed. Updating timestamp but not marking as observed.\n";
-				$pr++;
-				$key--;
+				warn "Warning: $obj{name}: minimum elapsed time has not passed. Updating timestamp but not marking as observed.\n";
+				$obj{$prevkey} = $date;
+				$data{$num} = \%obj;
+				next;
 			}
 		}
-		elsif ($ref->{prio} < 4) {	# Prio is not 4, but we have no obsdate...
-			die "Error: corrupt database: $ref->{name} has priority $ref->{prio} but $prevkey is not defined.\n";
+		elsif ($obj{prio} < 4) {	# Prio is not 4, but we have no obsdate...
+			die "Error: corrupt database: $obj{name} has priority $obj{prio} but $prevkey is not defined.\n";
 		}
 
 		if (defined($obj{$key})) {

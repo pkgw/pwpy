@@ -1,5 +1,14 @@
 #!/usr/bin/env perl
 
+#
+# mapgrid.pl
+#
+# This program approximates a sensitivity map over a limited strip of DEC for the pfhex grid.
+#
+# It is not perfect...
+#
+
+
 use PDL;
 use PDL::ImageND;
 use POSIX;
