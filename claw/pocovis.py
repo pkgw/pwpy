@@ -32,7 +32,7 @@ class poco:
         self.baseline_order = n.array([ 257, 258, 514, 261, 517, 1285, 262, 518, 1286, 1542, 259, 515, 773, 774, 771, 516, 1029, 1030, 772, 1028, 1287, 1543, 775, 1031, 1799, 1544, 776, 1032, 1800, 2056, 260, 263, 264, 519, 520, 1288])   # second iteration of bl nums
         self.autos = []
         self.noautos = []
-        self.dmarr = n.arange(52,63,1)       # dm trial range in pc/cm3
+        self.dmarr = n.arange(52,63,5)       # dm trial range in pc/cm3
 #        self.tshift = 0.2     # not implemented yet
         self.nskip = nskip*self.nbl    # number of iterations to skip (for reading in different parts of buffer)
         nskip = self.nskip
@@ -222,6 +222,7 @@ class poco:
     def dedisperse(self):
         """Integrates over data*dmmask or data at dmtrack for each pair of elements in dmarr, time.
         Not threaded.  Uses dmmask or dmthread directly.
+        Stores mean of detected signal after dmtrack.
         """
 
         dmarr = self.dmarr
@@ -532,76 +533,104 @@ def dmtrack2(data, reltime, dm = 0., t0 = 0.):
         
     return dmt0
 
+def process_pickle(filename, nints=10000, dedisperse=0):
+    """Processes a pickle file to produce a spectrum of a candidate pulse.
+    dedisperse flag tells (1) whether to produce dmt0 plot or (0) a spectrogram, or
+    (else) dump the visibilities to a file.
+    TO DO:  (maybe) modify format of pickle file.  This works with v1.0
+    """
 
-if __name__ == '__main__':
-    # default stuff
-    print 'Greetings, human.'
-    print ''
-    dedisperse = 0
+    file = open(filename, 'rb')
+    dump = pickle.load(file)
+    print 'Loaded pickle file for %s' % (dump[0])
+    print 'Has peaks at DM = ', dump[4]
+    if len(dump[4]) >= 1:
+        print 'Grabbing %d ints at %d' % (nints, dump[1])
+        pv = poco(dump[0], nints=nints, nskip=dump[1])    # format defined by pickle dump below
+        pv.prep()
 
-    if len(sys.argv) == 2:
-# if pickle, then plot data or dm search results
-        print 'Assuming input file is pickle of candidate...'
-#    To Do:  need to also use pickle to select data in raw format for imaging.
+        midtrial = len(dump[4])/2   # guess at peak snr
+        track = pv.dmtrack(dm=dump[4][midtrial], t0=pv.reltime[dump[5][midtrial]], show=0)  # needs to be shifted by -1 bin in reltime?
+        int0 = track[0][len(track[0])-1]
+        # print track, int0
 
-        file = open(sys.argv[1], 'rb')
-        dump = pickle.load(file)
-        print 'Loaded pickle file for %s' % (dump[0])
-        print 'Has peaks at DM = ', dump[4]
-        if len(dump[4]) >= 1:
-            print 'Grabbing 10000 ints at %d' % (dump[1])
-            pv = poco(dump[0], nints=10000, nskip=dump[1])    # format defined by pickle dump below
+        if dedisperse == 0:  # just show spectrum
+            raw = pv.rawdata[n.array(track[0], dtype='int'), :, track[1]]   # all baselines for the known pulse
+            raw = n.abs(raw[:, pv.noautos]).mean(axis=1)   # create array of all time,freq bins containing pulse
+            print 'Mean, std in mean: %f, %f' % (raw.mean(), raw.std()/n.sqrt(len(raw)))
+            pv.data = pv.data[int0:int0+100,:]
+            pv.reltime = pv.reltime[int0:int0+100]
+            # print track[0][len(track[0])-1] - int0, int0, pv.reltime[track[0][len(track[0])-1] - int0]
+            p.plot(pv.reltime[n.array(track[0]-int0, dtype='int')], pv.chans[track[1]], ',')
+            pv.spec(save=1)
+        elif dedisperse == 1:
+            pv.dedisperse()
+            peaks, peakssig = pv.plotdmt0(save=1)
+            file.close()
+        else:
+            # write dmtrack data out for imaging
+            pv.writetrack(track)
+    else:
+        print 'No significant detection.  Moving on...'
+
+def pulse_search(nints=10000):
+    """Blind search for pulses.
+    TO DO:  improve handling of edge times and ignoring data without complete DM track.
+    TO DO:  search over position in primary beam, by either:
+         (1) dedisperse visibilities, then uv fit,
+         (2) form synthesized beams, then dm search over time series, or
+         (3) dedisperse visibilities, image, and search images.
+    """
+
+    fileroot = 'poco_crab_201103.mir'
+    filelist = []
+    for i in range(0,11):
+        filelist.append(string.join(fileroot.split('.')[:-1]) + '_' + str(i) + '.mir')
+        
+    filelist.reverse()  # get the last one first for testing purposes
+    print 'Looping over filelist: ', filelist
+
+    # loop over miriad data and time chunks
+    for file in filelist:
+        for nskip in range(0,nints*9,nints*0.7):
+            print 'Starting file %s with nskip %d' % (file, nskip)
+            fileout = open(string.join(file.split('.')[:-1]) + '.txt', 'a')
+            pklout = open(string.join(file.split('.')[:-1]) + '.' + str(nskip) + '.pkl', 'wb')
+
+            # load data
+            pv = poco(file, nints=nints, nskip=nskip)
             pv.prep()
 
-            midtrial = len(dump[4])/2   # guess at peak snr
-            track = pv.dmtrack(dm=dump[4][midtrial], t0=pv.reltime[dump[5][midtrial]], show=0)  # needs to be shifted by -1 bin in reltime?
-            int0 = track[0][len(track[0])-1]
-#            print track, int0
+            # searches at phase center  ## TO DO:  need to search over position in primary beam
+            pv.dedisperse()
+            peaks, peakssig = pv.plotdmt0(save=0)
+            print >> fileout, file, nskip, nints, peaks
 
-            if dedisperse == 0:  # just show spectrum
-                raw = pv.rawdata[n.array(track[0], dtype='int'), :, track[1]]   # all baselines for the known pulse
-                raw = n.abs(raw[:, pv.noautos]).mean(axis=1)   # create array of all time,freq bins containing pulse
-                print 'Mean, std in mean: %f, %f' % (raw.mean(), raw.std()/n.sqrt(len(raw)))
-                pv.data = pv.data[int0:int0+100,:]
-                pv.reltime = pv.reltime[int0:int0+100]
-#                print track[0][len(track[0])-1] - int0, int0, pv.reltime[track[0][len(track[0])-1] - int0]
-                p.plot(pv.reltime[n.array(track[0]-int0, dtype='int')], pv.chans[track[1]], ',')
-                pv.spec(save=1)
-            elif dedisperse == 1:
-                pv.dedisperse()
-                peaks, peakssig = pv.plotdmt0(save=1)
-                file.close()
-            else:
-                # write dmtrack data out for imaging
-                pv.writetrack(track)
+            # save all results (v1.0 pickle format)
+            pickle.dump((file, nskip, nints, peaks[0], pv.dmarr[peaks[0]], peaks[1], peakssig), pklout)
 
-        else:
-            print 'No significant detection.  Moving on...'
+            # TO DO:  think of v2.0 of pickle format
+#            pickle.dump((file, nskip, nints, peaks[0], peaks[1]), pklout)
+
+            pklout.close()
+
+    fileout.close
+
+
+if __name__ == '__main__':
+    """From the command line, pocovis can either load pickle of candidate to interact with data, or
+    it will search for pulses blindly.
+    """
+
+    print 'Greetings, human.'
+    print ''
+
+    if len(sys.argv) == 2:
+        # if pickle, then plot data or dm search results
+        print 'Assuming input file is pickle of candidate...'
+        dedisperse = 1
+        process_pickle(sys.argv[1], nints=10000, dedisperse=dedisperse)
+
     else:
-# else search for pulses
-        nints = 10000
-        fileroot = 'poco_crab_201103.mir'
-        filelist = []
-        for i in range(0,11):
-            filelist.append(string.join(fileroot.split('.')[:-1]) + '_' + str(i) + '.mir')
-
-        filelist.reverse()  # get the last one first for testing purposes
-        print 'Looping over filelist: ', filelist
-
-# loop over miriad data and time chunks
-        for file in filelist:
-            for nskip in range(0,nints*9,nints*0.7):
-                print 'Starting file %s with nskip %d' % (file, nskip)
-                fileout = open(string.join(file.split('.')[:-1]) + '.txt', 'a')
-                pklout = open(string.join(file.split('.')[:-1]) + '.' + str(nskip) + '.pkl', 'wb')
-
-                pv = poco(file, nints=nints, nskip=nskip)
-                pv.prep()
-                pv.dedisperse()
-                peaks, peakssig = pv.plotdmt0(save=0)
-                print >> fileout, file, nskip, nints, peaks
-
-                pickle.dump((file, nskip, nints, peaks[0], pv.dmarr[peaks[0]], peaks[1], peakssig), pklout)
-                pklout.close()
-
-        fileout.close
+        # else search for pulses
+        pulse_search(nints=10000)
