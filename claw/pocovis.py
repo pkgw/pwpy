@@ -11,6 +11,7 @@
 import sys, string
 #import mirtask
 #from mirtask import uvdat, keys, util
+from mirtask import TaskInvert, TaskClean, TaskRestor, TaskImFit
 import miriad, pickle
 import numpy as n
 import pylab as p
@@ -32,7 +33,7 @@ class poco:
         self.baseline_order = n.array([ 257, 258, 514, 261, 517, 1285, 262, 518, 1286, 1542, 259, 515, 773, 774, 771, 516, 1029, 1030, 772, 1028, 1287, 1543, 775, 1031, 1799, 1544, 776, 1032, 1800, 2056, 260, 263, 264, 519, 520, 1288])   # second iteration of bl nums
         self.autos = []
         self.noautos = []
-        self.dmarr = n.arange(52,63,5)       # dm trial range in pc/cm3
+        self.dmarr = n.arange(55,59,1)       # dm trial range in pc/cm3
 #        self.tshift = 0.2     # not implemented yet
         self.nskip = nskip*self.nbl    # number of iterations to skip (for reading in different parts of buffer)
         nskip = self.nskip
@@ -219,10 +220,10 @@ class poco:
         return track
 
 
-    def dedisperse(self):
+    def makedmt0(self):
         """Integrates over data*dmmask or data at dmtrack for each pair of elements in dmarr, time.
         Not threaded.  Uses dmmask or dmthread directly.
-        Stores mean of detected signal after dmtrack.
+        Stores mean of detected signal after dmtrack, effectively forming beam at phase center.
         """
 
         dmarr = self.dmarr
@@ -252,9 +253,10 @@ class poco:
         self.dmt0arr = dmt0arr
 
 
-    def writetrack(self, dmbin, tbin):
+    def writetrack(self, dmbin, tbin, output='c'):
         """Writes data from track out as miriad visibility file.
         Optional shift to time of track by intoff integrations.
+        Output parameter says whether to 'c'reate a new file or 'a'ppend to existing one. **?**
         """
 
         track = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[tbin], show=0)  # needs to be shifted by -1 bin in reltime?
@@ -266,7 +268,7 @@ class poco:
         vis = miriad.VisData(inname)
         out = miriad.VisData(outname)
 
-        dOut = out.open ('c')
+        dOut = out.open (output)
         dOut.setPreambleType ('uvw', 'time', 'baseline')
 
         i = 0
@@ -374,11 +376,49 @@ class poco:
         return n.array(lc)
 
 
-    def plotdmt0(self, sig=5., save=0):
+    def plotdmt0(self, save=0):
         """calculates rms noise in dmt0 space, then plots circles for each significant point
         save=1 means plot to file.
         """
         dmarr = self.dmarr
+        arr = self.dmt0arr
+        reltime = self.reltime
+        tbuffer = 7  # number of extra iterations to trim from edge of dmt0 plot
+
+        # Trim data down to where dmt0 array is nonzero
+        arreq0 = n.where(arr == 0)
+        trimt = arreq0[1].min()
+        arr = arr[:,:trimt - tbuffer]
+        reltime = reltime[:trimt - tbuffer]
+        print 'dmt0arr/time trimmed to new shape:  ',n.shape(arr), n.shape(reltime)
+
+        # Plot
+        p.clf()
+        ax = p.imshow(arr, aspect='auto', origin='lower', interpolation='nearest', extent=(min(reltime),max(reltime),min(dmarr),max(dmarr)))
+        p.colorbar()
+
+        if len(peaks[0]) > 0:
+            print 'Peak of %f sigma at DM=%f, t0=%f' % (arr.max(), dmarr[peakmax[0][0]], reltime[peakmax[1][0]])
+
+            for i in range(len(peaks[1])):
+                ax = p.imshow(arr, aspect='auto', origin='lower', interpolation='nearest', extent=(min(reltime),max(reltime),min(dmarr),max(dmarr)))
+                p.axis((min(reltime),max(reltime),min(dmarr),max(dmarr)))
+                p.plot([reltime[peaks[1][i]]], [dmarr[peaks[0][i]]], 'o', markersize=2*arr[peaks[0][i],peaks[1][i]], markerfacecolor='white', markeredgecolor='blue', alpha=0.5)
+
+        p.xlabel('Time (s)')
+        p.ylabel('DM (pc/cm3)')
+        p.title('Signal to Noise Ratio of Dedispersed Pulse')
+        if save:
+            savename = self.file.split('.')[:-1]
+            savename.append(str(self.nskip/self.nbl) + '.png')
+            savename = string.join(savename,'.')
+            p.savefig(savename)
+
+
+    def peakdmt0(self, sig=5.):
+        """ Method to find peaks in dedispersed data (in dmt0 space).
+        Clips noise, also.
+        """
         arr = self.dmt0arr
         reltime = self.reltime
         tbuffer = 7  # number of extra iterations to trim from edge of dmt0 plot
@@ -406,28 +446,6 @@ class poco:
         peaks = n.where(arr > sig)   # this is probably biased
         peakmax = n.where(arr == arr.max())
         print 'peaks:  ', peaks
-
-        # Plot
-        p.clf()
-        ax = p.imshow(arr, aspect='auto', origin='lower', interpolation='nearest', extent=(min(reltime),max(reltime),min(dmarr),max(dmarr)))
-        p.colorbar()
-
-        if len(peaks[0]) > 0:
-            print 'Peak of %f sigma at DM=%f, t0=%f' % (arr.max(), dmarr[peakmax[0][0]], reltime[peakmax[1][0]])
-
-            for i in range(len(peaks[1])):
-                ax = p.imshow(arr, aspect='auto', origin='lower', interpolation='nearest', extent=(min(reltime),max(reltime),min(dmarr),max(dmarr)))
-                p.axis((min(reltime),max(reltime),min(dmarr),max(dmarr)))
-                p.plot([reltime[peaks[1][i]]], [dmarr[peaks[0][i]]], 'o', markersize=2*arr[peaks[0][i],peaks[1][i]], markerfacecolor='white', markeredgecolor='blue', alpha=0.5)
-
-        p.xlabel('Time (s)')
-        p.ylabel('DM (pc/cm3)')
-        p.title('Signal to Noise Ratio of Dedispersed Pulse')
-        if save:
-            savename = self.file.split('.')[:-1]
-            savename.append(str(self.nskip/self.nbl) + '.png')
-            savename = string.join(savename,'.')
-            p.savefig(savename)
 
         return peaks,arr[peaks]
 
@@ -564,56 +582,98 @@ def process_pickle(filename, nints=10000, dedisperse=0):
             p.plot(pv.reltime[n.array(track[0]-int0, dtype='int')], pv.chans[track[1]], ',')
             pv.spec(save=1)
         elif dedisperse == 1:
-            pv.dedisperse()
-            peaks, peakssig = pv.plotdmt0(save=1)
-            file.close()
+            pv.makedmt0()
+            peaks, peakssig = pv.peakdmt0()
+            pv.plotdmt0(save=1)
         else:
             # write dmtrack data out for imaging
             pv.writetrack(track)
     else:
         print 'No significant detection.  Moving on...'
 
-def pulse_search(nints=10000):
-    """Blind search for pulses.
-    TO DO:  improve handling of edge times and ignoring data without complete DM track.
-    TO DO:  search over position in primary beam, by either:
-         (1) dedisperse visibilities, then uv fit,
-         (2) form synthesized beams, then dm search over time series, or
-         (3) dedisperse visibilities, image, and search images.
+    file.close()
+
+
+def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000):
+    """Blind search for pulses at phase center.
+    TO DO:  improve handling of edge times and ignoring data without complete DM track?
     """
 
-    fileroot = 'poco_crab_201103.mir'
+    maxints = 131000
+
     filelist = []
-    for i in range(0,11):
-        filelist.append(string.join(fileroot.split('.')[:-1]) + '_' + str(i) + '.mir')
+    for i in range(7,8):     # **default set to find known bright pulse**
+        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
         
     filelist.reverse()  # get the last one first for testing purposes
     print 'Looping over filelist: ', filelist
 
     # loop over miriad data and time chunks
     for file in filelist:
-        for nskip in range(0,nints*9,nints*0.7):
+        for nskip in [27000]:   # range(0, maxints-nints, 0.7*nints):
             print 'Starting file %s with nskip %d' % (file, nskip)
-            fileout = open(string.join(file.split('.')[:-1]) + '.txt', 'a')
-            pklout = open(string.join(file.split('.')[:-1]) + '.' + str(nskip) + '.pkl', 'wb')
+            fileout = open(pathout + string.join(file.split('.')[:-1]) + '.txt', 'a')
+            pklout = open(pathout + string.join(file.split('.')[:-1]) + '.' + str(nskip) + '.pkl', 'wb')
 
             # load data
-            pv = poco(file, nints=nints, nskip=nskip)
+            pv = poco(pathin + file, nints=nints, nskip=nskip)
             pv.prep()
 
             # searches at phase center  ## TO DO:  need to search over position in primary beam
-            pv.dedisperse()
-            peaks, peakssig = pv.plotdmt0(save=0)
+            pv.makedmt0()
+            peaks, peakssig = pv.peakdmt0()
             print >> fileout, file, nskip, nints, peaks
 
             # save all results (v1.0 pickle format)
             pickle.dump((file, nskip, nints, peaks[0], pv.dmarr[peaks[0]], peaks[1], peakssig), pklout)
 
             # TO DO:  think of v2.0 of pickle format
-#            pickle.dump((file, nskip, nints, peaks[0], peaks[1]), pklout)
-
+            # pickle.dump((file, nskip, nints, peaks[0], peaks[1]), pklout)
             pklout.close()
 
+    fileout.close
+
+
+def pulse_search_image():
+    """
+    TO DO:  search over position in primary beam, by either:
+    (1) dedisperse visibilities, then uv fit,
+    (2) form all possible synthesized beams, then dm search over time series, or
+    (3) dedisperse visibilities, image, and search images.
+    """
+
+    maxints = 131000
+
+    filelist = []
+    for i in range(7,8):     # **default set to find known bright pulse**
+        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+        
+    filelist.reverse()  # get the last one first for testing purposes
+    print 'Looping over filelist: ', filelist
+
+    # loop over miriad data and time chunks
+    for file in filelist:
+        for nskip in [27000]:   # range(0, maxints-nints, 0.7*nints):
+            print 'Starting file %s with nskip %d' % (file, nskip)
+            fileout = open(pathout + string.join(file.split('.')[:-1]) + '.txt', 'a')
+            pklout = open(pathout + string.join(file.split('.')[:-1]) + '.' + str(nskip) + '.pkl', 'wb')
+
+            # load data
+            pv = poco(pathin + file, nints=nints, nskip=nskip)
+            pv.prep()
+
+            # not working yet...
+            TaskInvert (vis=pv.vis, map='map', beam='beam', options='mfs, double', flagval='f').run () 
+            TaskClean (beam='beam', map='map', out='clean', flagval='f').run () 
+            TaskRestor (beam='beam', map='map', model='clean', out='restor', flagval='f').run () 
+            TaskImFit (in_='restor', flagval='f').run () 
+
+            # parse imfit output...
+
+            if pulse:
+                print 'Writing visibilities...'
+                # do bg subtraction?
+                pv.writetrack(dmbin, trelbin, 'c')   # output file at dmbin, trelbin
     fileout.close
 
 
@@ -630,7 +690,9 @@ if __name__ == '__main__':
         print 'Assuming input file is pickle of candidate...'
         dedisperse = 1
         process_pickle(sys.argv[1], nints=10000, dedisperse=dedisperse)
-
     else:
         # else search for pulses
-        pulse_search(nints=10000)
+        fileroot = 'poco_crab_201103.mir'
+        pathin = 'data/'
+        pathout = 'working3/'
+        pulse_search_phasecenter(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=10000)
