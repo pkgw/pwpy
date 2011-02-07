@@ -8,10 +8,11 @@
 --
 """
 
-import sys, string
+import sys, string, os
+from os.path import join
 #import mirtask
 #from mirtask import uvdat, keys, util
-from mirtask import TaskInvert, TaskClean, TaskRestor, TaskImFit
+from mirexec import TaskInvert, TaskClean, TaskRestore, TaskImFit
 import miriad, pickle
 import numpy as n
 import pylab as p
@@ -33,7 +34,7 @@ class poco:
         self.baseline_order = n.array([ 257, 258, 514, 261, 517, 1285, 262, 518, 1286, 1542, 259, 515, 773, 774, 771, 516, 1029, 1030, 772, 1028, 1287, 1543, 775, 1031, 1799, 1544, 776, 1032, 1800, 2056, 260, 263, 264, 519, 520, 1288])   # second iteration of bl nums
         self.autos = []
         self.noautos = []
-        self.dmarr = n.arange(55,59,1)       # dm trial range in pc/cm3
+        self.dmarr = n.arange(57,58,1)       # dm trial range in pc/cm3
 #        self.tshift = 0.2     # not implemented yet
         self.nskip = nskip*self.nbl    # number of iterations to skip (for reading in different parts of buffer)
         nskip = self.nskip
@@ -253,7 +254,7 @@ class poco:
         self.dmt0arr = dmt0arr
 
 
-    def writetrack(self, dmbin, tbin, output='c'):
+    def writetrack(self, dmbin, tbin, output='c', bgsub=False):
         """Writes data from track out as miriad visibility file.
         Optional shift to time of track by intoff integrations.
         Output parameter says whether to 'c'reate a new file or 'a'ppend to existing one. **?**
@@ -274,6 +275,8 @@ class poco:
         i = 0
         for inp, preamble, data, flags in vis.readLowlevel ('dsl3', False):
             # since template has only one int, this loop gets spectra by iterating over baselines.
+
+            # TO DO:  add option to write bg-subtracted data
 
             if i < (track[0][len(track[0])/2]) * self.nbl:  # need to grab only integration at pulse+intoff
                 i = i+1
@@ -551,6 +554,17 @@ def dmtrack2(data, reltime, dm = 0., t0 = 0.):
         
     return dmt0
 
+
+def removefile (file):
+    """ Shortcut to remove a miriad file.
+    """
+    if not os.path.exists(file): return
+
+    for e in os.listdir (file):
+        os.remove (join (file, e))
+    os.rmdir (file)
+
+
 def process_pickle(filename, nints=10000, dedisperse=0):
     """Processes a pickle file to produce a spectrum of a candidate pulse.
     dedisperse flag tells (1) whether to produce dmt0 plot or (0) a spectrogram, or
@@ -634,7 +648,7 @@ def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000):
     fileout.close
 
 
-def pulse_search_image():
+def pulse_search_image(fileroot, pathin, pathout, nints=10000):
     """
     TO DO:  search over position in primary beam, by either:
     (1) dedisperse visibilities, then uv fit,
@@ -648,10 +662,9 @@ def pulse_search_image():
     for i in range(7,8):     # **default set to find known bright pulse**
         filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
         
-    filelist.reverse()  # get the last one first for testing purposes
+        filelist.reverse()  # get the last one first for testing purposes
     print 'Looping over filelist: ', filelist
 
-    # loop over miriad data and time chunks
     for file in filelist:
         for nskip in [27000]:   # range(0, maxints-nints, 0.7*nints):
             print 'Starting file %s with nskip %d' % (file, nskip)
@@ -662,18 +675,32 @@ def pulse_search_image():
             pv = poco(pathin + file, nints=nints, nskip=nskip)
             pv.prep()
 
-            # not working yet...
-            TaskInvert (vis=pv.vis, map='map', beam='beam', options='mfs, double', flagval='f').run () 
-            TaskClean (beam='beam', map='map', out='clean', flagval='f').run () 
-            TaskRestor (beam='beam', map='map', model='clean', out='restor', flagval='f').run () 
-            TaskImFit (in_='restor', flagval='f').run () 
+            # dedisperse
+            for i in range(len(pv.dmarr)):
+                for j in [9059]:
+#                for j in range(len(pv.reltime)):
+                    # clean up
+                    outname = pathin + string.join(file.split('.')[:-1]) + '.' + str(nskip) + '-' + 'dm' + str(i) + 't' + str(j) + '.mir'
+                    removefile (pathout + 'tmp.map'); removefile (pathout + 'tmp.beam'); removefile (pathout + 'tmp.clean'); removefile (pathout + 'tmp.restor')
+                    removefile (outname)
 
-            # parse imfit output...
+                    # make dm trial and image
+                    dmtrack = pv.dmtrack(dm=pv.dmarr[i], t0=pv.reltime[j])
+                    if len(dmtrack[0]) >= len(pv.chans):               # ignore tiny, noise-dominated tracks
+                        # TO DO:  test bgsub writetrack
+                        pv.writetrack(i, j, 'c', bgsub=False)   # output file at dmbin, trelbin
 
-            if pulse:
-                print 'Writing visibilities...'
-                # do bg subtraction?
-                pv.writetrack(dmbin, trelbin, 'c')   # output file at dmbin, trelbin
+                        TaskInvert (vis=outname, map=pathout+'tmp.map', beam=pathout+'tmp.beam', mfs=True, double=True).run () 
+                        TaskClean (beam=pathout+'tmp.beam', map=pathout+'tmp.map', out=pathout+'tmp.clean').run () 
+                        TaskRestore (beam=pathout+'tmp.beam', map=pathout+'tmp.map', model=pathout+'tmp.clean', out=pathout+'tmp.restor').run () 
+                        TaskImFit (in_=pathout+'tmp.restor', object='point').run () 
+
+#                        if pulse:
+#                            print 'Writing visibilities...'
+#                            # do bg subtraction?
+#                            pv.writetrack(i, j, 'c')   # output file at dmbin, trelbin
+#                            print 'dedispersed for ', dmarr[i]
+
     fileout.close
 
 
@@ -695,4 +722,4 @@ if __name__ == '__main__':
         fileroot = 'poco_crab_201103.mir'
         pathin = 'data/'
         pathout = 'working3/'
-        pulse_search_phasecenter(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=10000)
+        pulse_search_image(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=10000)
