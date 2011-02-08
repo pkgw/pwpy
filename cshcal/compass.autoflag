@@ -6,17 +6,10 @@
 # awesome. Oh yes, it WILL be awesome.
 
 set corr = $1
-
-set cal
-set freq
-set nchan
-set sdf
-set addflux
-set sysflux
-
 set vis = $2
 set times = ($3 $4)
 set inst = (`echo $5 | tr ':' ' '`)
+
 set marker = (`echo $times[1] | tr '[a-z]' '[A-Z]' | sed 's/\([0-9][0-9]\)\([A-Z][A-Z][A-Z]\)\([0-9][0-9]\):/\3 \2 \1 /'`)
 set marker = (`date -d "$marker +0000" +%Y" "%m" "%d" "%H%M%S`)
 
@@ -41,7 +34,6 @@ cp -r caldata $histview/$corr/.
 
 set sourceline = (`uvlist vis=caldata options=var | grep "source" | tr ':' ' '`)
 
-set fr
 set cal
 #Get the name of the calibrator
 while ("$cal" == "")
@@ -54,6 +46,7 @@ while ("$cal" == "")
     endif
 end
 
+set freq
 set freqline = (`uvlist vis=caldata options=var | grep "freq    :" | tr ':' ' '`)
 #Get the obs freq of the calibratior (in MHZ)
 while ("$freq" == "")
@@ -66,6 +59,7 @@ while ("$freq" == "")
     endif
 end
 
+set nchan
 set nchanline = (`uvlist vis=caldata options=var,full | grep "nchan" |  tr ':' ' '`)
 
 while ("$nchan" == "")
@@ -78,6 +72,7 @@ while ("$nchan" == "")
     endif
 end
 
+set sdf
 set sdfline = (`uvlist vis=caldata options=var,full | grep "sdf" |  tr ':' ' '`)
 
 while ("$sdf" == "")
