@@ -15,27 +15,21 @@ set marker = (`date -d "$marker +0000" +%Y" "%m" "%d" "%H%M%S`)
 
 set histview = /ataarchive/$marker[1]/$marker[2]/$marker[3]
 set histview = $histview/status/compass-autoflag-$marker[4]/$corr
-mkdir -p $histview
+mkdir -p $histview || exit 1
+cd $histview || exit 1
 
-set scratch = /ataarchive/scratch/obs/compass-autoflag/$corr
-mkdir -p $scratch
-
-# Take data to a temp directory for processing
+# Copy data for processing
 
 uvaver vis=$vis select="time($times[1],$times[2])" \
-    options=relax,nocal,nopass,nopol out=$scratch/caldata \
-    |& tee -ia $histview/dataread
+    options=relax,nocal,nopass,nopol out=caldata \
+    |& tee -ia dataread
 
 if ($status) then
-    rm -rf $scratch/caldata
-    echo "Data read failed!" >> $histview/dataread
+    rm -rf caldata
+    echo "Data read failed!" >> dataread
     echo COMPASS-AUTOFLAG `date`: "couldn't copy data for analysis; giving up on this scan."
     exit 1
 endif
-
-cd $scratch
-
-cp -r caldata $histview
 
 set sourceline = (`uvlist vis=caldata options=var | grep "source" | tr ':' ' '`)
 
@@ -114,10 +108,12 @@ fxhealth > fxstatus
 uvflag vis=caldata flagval=f edge=100
 uvflag vis=caldata flagval=f select="uvrange(0,0.11)"
 ~/mmm/dwhysong/pigss/autoflag/autoflag cal=caldata \
-    options=ata,nonoise |tee -ia $histview/autoflag.log
+    options=ata,nonoise |tee -ia /autoflag.log
 newcalcal.csh vis=caldata sysflux=$sysflux addflux=$addflux \
     flux=$flux plim=$plim options=polsplit,sefd \
-    |tee -ia $histview/newcalcal.log
+    |tee -ia newcalcal.log
+
+rm -rf caldata
 
 # TODO: generate image png for comparison to newrfisweep images. And other states.
 exit 0
