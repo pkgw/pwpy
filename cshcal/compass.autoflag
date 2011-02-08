@@ -2,9 +2,9 @@
 # Calibrator Observing and Measurement Processing 
 #         for Array Statistics and Status       
 #
-# This is going to be the cal observation program. Put simply, it will be awesome. Oh yes, it WILL be awesome.
+# This is going to be the cal observation program. Put simply, it will be
+# awesome. Oh yes, it WILL be awesome.
 
-set datapath = /home/obs/mmm/karto/cals
 set corr = $1
 
 set cal
@@ -22,7 +22,6 @@ set marker = (`date -d "$marker +0000" +%Y" "%m" "%d" "%H%M%S`)
 
 #set histview = /ataarchive/`date +%Y`/`date +%m`/`date +%d`/status/compass-autoflag-`date +%H%M`
 set histview = /ataarchive/$marker[1]/$marker[2]/$marker[3]/status/compass-autoflag-$marker[4]
-mkdir -p /ataarchive/scratch/obs/compass-autoflag/view
 mkdir -p $histview/$corr
 
 # Take data to a temp directory for processing

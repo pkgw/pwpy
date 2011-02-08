@@ -5,7 +5,6 @@
 # This is going to be the cal observation program. Put simply, it will be
 # awesome. Oh yes, it WILL be awesome.
 
-set datapath = /home/obs/mmm/karto/cals
 set corr = $1
 set stem = compass
 
