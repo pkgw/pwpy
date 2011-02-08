@@ -1,0 +1,120 @@
+#! /usr/bin/tcsh -f
+# Calibrator Observing and Measurement Processing 
+#         for Array Statistics and Status       
+#
+# This is going to be the cal observation program. Put simply, it will be awesome. Oh yes, it WILL be awesome.
+
+set datapath = /home/obs/mmm/karto/cals
+set corr = $1
+
+set cal
+set freq
+set nchan
+set sdf
+set addflux
+set sysflux
+
+set vis = $2
+set times = ($3 $4)
+set inst = (`echo $5 | tr ':' ' '`)
+set marker = (`echo $times[1] | tr '[a-z]' '[A-Z]' | sed 's/\([0-9][0-9]\)\([A-Z][A-Z][A-Z]\)\([0-9][0-9]\):/\3 \2 \1 /'`)
+set marker = (`date -d "$marker +0000" +%Y" "%m" "%d" "%H%M%S`)
+
+#set histview = /ataarchive/`date +%Y`/`date +%m`/`date +%d`/status/compass-autoflag-`date +%H%M`
+set histview = /ataarchive/$marker[1]/$marker[2]/$marker[3]/status/compass-autoflag-$marker[4]
+mkdir -p /ataarchive/scratch/obs/compass-autoflag/view
+mkdir -p $histview/$corr
+
+# Take data to a temp directory for processing
+
+uvaver vis=$vis select="time($times[1],$times[2])" options=relax,nocal,nopass,nopol out=/ataarchive/scratch/obs/compass-autoflag/$corr/caldata |& tee -ia $histview/$corr/dataread
+
+if ($status) then
+    rm -rf /ataarchive/scratch/obs/compass-autoflag/$corr/caldata
+    echo "Data read failed!" >> $histview/$corr/dataread
+    echo COMPASS-AUTOFLAG `date`: "couldn't copy data for analysis; giving up on this scan."
+    exit 1
+endif
+
+cd /ataarchive/scratch/obs/compass-autoflag/$corr/
+
+cp -r caldata $histview/$corr/.
+
+set sourceline = (`uvlist vis=caldata options=var | grep "source" | tr ':' ' '`)
+
+set fr
+set cal
+#Get the name of the calibrator
+while ("$cal" == "")
+    if ($sourceline[1] == "source") then
+	set cal = `echo $sourceline[2]`
+    else if ($#sourceline == 1) then
+	set cal == "UNK" # Default to name UNK if cannot be found
+    else
+	shift sourceline
+    endif
+end
+
+set freqline = (`uvlist vis=caldata options=var | grep "freq    :" | tr ':' ' '`)
+#Get the obs freq of the calibratior (in MHZ)
+while ("$freq" == "")
+    if ($freqline[1] == "freq") then
+	set freq = `echo $freqline[2] | awk '{print $1}'` 
+    else if ($#freqline == 1) then
+	set freq == "1.42" # Default to 20 cm measurements
+    else
+	shift freqline
+    endif
+end
+
+set nchanline = (`uvlist vis=caldata options=var,full | grep "nchan" |  tr ':' ' '`)
+
+while ("$nchan" == "")
+    if ($nchanline[1] == "nchan") then
+	set nchan = `echo $nchanline[2] | awk '{print $1}'` 
+    else if ($#nchanline == 1) then
+	set nchan == "1024" # Default to 100 MHz
+    else
+	shift nchanline
+    endif
+end
+
+set sdfline = (`uvlist vis=caldata options=var,full | grep "sdf" |  tr ':' ' '`)
+
+while ("$sdf" == "")
+    if ($sdfline[1] == "sdf") then
+	set sdf = `echo $sdfline[2] | awk '{print $1}'` 
+    else if ($#sdfline == 1) then
+	set sdf = "1.02400E-04" # Default to 100 MHz
+    else
+	shift sdfline
+    endif
+end
+
+set mfreq = `echo $freq | awk '{print int($1*1000)}'`
+
+set calvals = (`calinfo target=$cal freq=$freq options=auto`)
+if ("$calvals[1]" == "FATAL") then
+    rm -rf caldata
+    echo COMPASS-AUTOFLAG `date`: "data not found about the calibrator ($cal $freq)! Giving up on this scan."
+    exit 1
+endif
+
+set flux = "$calvals[1],$calvals[2],$calvals[3]"
+set addflux = "$calvals[8]"
+set sysflux = `echo $freq $sdf $nchan | awk '{print (4+($1/5)^2)*sqrt(0.10486/($2*$3))}'`
+set check = `echo $sysflux $calvals[1] |awk '{if ($1 > $2) print 1; else print 0}'`
+if ($check == 1) then
+    echo "NOTICE: estimating lots of phase noise, setting limit loosely"
+    set plim = 60
+else
+    set plim = `calc "asin($sysflux/$calvals[1])*180/pi"`
+endif
+
+fxhealth > fxstatus
+uvflag vis=caldata flagval=f edge=100
+uvflag vis=caldata flagval=f select="uvrange(0,0.11)"
+~/mmm/dwhysong/pigss/autoflag/autoflag cal=caldata options=ata,nonoise |tee -ia $histview/$corr/autoflag.log
+newcalcal.csh vis=caldata sysflux=$sysflux addflux=$addflux flux=$flux plim=$plim options=polsplit,sefd |tee -ia $histview/$corr/newcalcal.log
+# TODO: generate image png for comparison to newrfisweep images. And other states.
+exit 0
