@@ -17,18 +17,21 @@ set histview = /ataarchive/$marker[1]/$marker[2]/$marker[3]
 set histview = $histview/status/compass-autoflag-$marker[4]/$corr
 mkdir -p $histview
 
+set scratch = /ataarchive/scratch/obs/compass-autoflag/$corr
+mkdir -p $scratch
+
 # Take data to a temp directory for processing
 
-uvaver vis=$vis select="time($times[1],$times[2])" options=relax,nocal,nopass,nopol out=/ataarchive/scratch/obs/compass-autoflag/$corr/caldata |& tee -ia $histview/dataread
+uvaver vis=$vis select="time($times[1],$times[2])" options=relax,nocal,nopass,nopol out=$scratch/caldata |& tee -ia $histview/dataread
 
 if ($status) then
-    rm -rf /ataarchive/scratch/obs/compass-autoflag/$corr/caldata
+    rm -rf $scratch/caldata
     echo "Data read failed!" >> $histview/dataread
     echo COMPASS-AUTOFLAG `date`: "couldn't copy data for analysis; giving up on this scan."
     exit 1
 endif
 
-cd /ataarchive/scratch/obs/compass-autoflag/$corr/
+cd $scratch
 
 cp -r caldata $histview
 
