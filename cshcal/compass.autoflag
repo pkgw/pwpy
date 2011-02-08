@@ -13,24 +13,24 @@ set inst = (`echo $5 | tr ':' ' '`)
 set marker = (`echo $times[1] | tr '[a-z]' '[A-Z]' | sed 's/\([0-9][0-9]\)\([A-Z][A-Z][A-Z]\)\([0-9][0-9]\):/\3 \2 \1 /'`)
 set marker = (`date -d "$marker +0000" +%Y" "%m" "%d" "%H%M%S`)
 
-#set histview = /ataarchive/`date +%Y`/`date +%m`/`date +%d`/status/compass-autoflag-`date +%H%M`
-set histview = /ataarchive/$marker[1]/$marker[2]/$marker[3]/status/compass-autoflag-$marker[4]
-mkdir -p $histview/$corr
+set histview = /ataarchive/$marker[1]/$marker[2]/$marker[3]
+set histview = $histview/status/compass-autoflag-$marker[4]/$corr
+mkdir -p $histview
 
 # Take data to a temp directory for processing
 
-uvaver vis=$vis select="time($times[1],$times[2])" options=relax,nocal,nopass,nopol out=/ataarchive/scratch/obs/compass-autoflag/$corr/caldata |& tee -ia $histview/$corr/dataread
+uvaver vis=$vis select="time($times[1],$times[2])" options=relax,nocal,nopass,nopol out=/ataarchive/scratch/obs/compass-autoflag/$corr/caldata |& tee -ia $histview/dataread
 
 if ($status) then
     rm -rf /ataarchive/scratch/obs/compass-autoflag/$corr/caldata
-    echo "Data read failed!" >> $histview/$corr/dataread
+    echo "Data read failed!" >> $histview/dataread
     echo COMPASS-AUTOFLAG `date`: "couldn't copy data for analysis; giving up on this scan."
     exit 1
 endif
 
 cd /ataarchive/scratch/obs/compass-autoflag/$corr/
 
-cp -r caldata $histview/$corr/.
+cp -r caldata $histview
 
 set sourceline = (`uvlist vis=caldata options=var | grep "source" | tr ':' ' '`)
 
@@ -108,7 +108,7 @@ endif
 fxhealth > fxstatus
 uvflag vis=caldata flagval=f edge=100
 uvflag vis=caldata flagval=f select="uvrange(0,0.11)"
-~/mmm/dwhysong/pigss/autoflag/autoflag cal=caldata options=ata,nonoise |tee -ia $histview/$corr/autoflag.log
-newcalcal.csh vis=caldata sysflux=$sysflux addflux=$addflux flux=$flux plim=$plim options=polsplit,sefd |tee -ia $histview/$corr/newcalcal.log
+~/mmm/dwhysong/pigss/autoflag/autoflag cal=caldata options=ata,nonoise |tee -ia $histview/autoflag.log
+newcalcal.csh vis=caldata sysflux=$sysflux addflux=$addflux flux=$flux plim=$plim options=polsplit,sefd |tee -ia $histview/newcalcal.log
 # TODO: generate image png for comparison to newrfisweep images. And other states.
 exit 0
