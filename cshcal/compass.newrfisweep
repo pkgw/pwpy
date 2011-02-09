@@ -21,24 +21,23 @@ set inst = (`echo $5 | tr ':' ' '`)
 set marker = (`echo $times[1] | tr '[a-z]' '[A-Z]' | sed 's/\([0-9][0-9]\)\([A-Z][A-Z][A-Z]\)\([0-9][0-9]\):/\3 \2 \1 /'`)
 set marker = (`date -d "$marker +0000" +%Y" "%m" "%d" "%H%M%S`)
 
-#set histview = /ataarchive/`date +%Y`/`date +%m`/`date +%d`/status/compass-`date +%H%M`
-set histview = /ataarchive/$marker[1]/$marker[2]/$marker[3]/status/compass-$marker[4]
-mkdir -p $histview/$corr
+set histview = /ataarchive/$marker[1]/$marker[2]/$marker[3]/status/compass-$marker[4]/$corr
+mkdir -p $histview
 
 # Take data to a temp directory for processing
 
-uvaver vis=$vis select="time($times[1],$times[2])" options=relax,nocal,nopass,nopol out=/ataarchive/scratch/obs/compass/$corr/caldata |& tee -ia $histview/$corr/dataread
+uvaver vis=$vis select="time($times[1],$times[2])" options=relax,nocal,nopass,nopol out=/ataarchive/scratch/obs/compass/$corr/caldata |& tee -ia $histview/dataread
 
 if ($status) then
     rm -rf /ataarchive/scratch/obs/compass/$corr/caldata
-    echo "Data read failed!" >> $histview/$corr/dataread
+    echo "Data read failed!" >> $histview/dataread
     echo COMPASS `date`: "couldn't copy data for analysis; giving up on this scan."
     exit 1
 endif
 
 cd /ataarchive/scratch/obs/compass/$corr/
 
-cp -r caldata $histview/$corr/.
+cp -r caldata $histview
 
 set sourceline = (`uvlist vis=caldata options=var | grep "source" | tr ':' ' '`)
 
@@ -115,11 +114,11 @@ fxhealth > fxstatus
 
 # Remove RFI from data
 
-newrfisweep.csh vis=caldata options=autoedge scans=999 subint=999 |tee -ia $histview/$corr/newrfisweep.log
+newrfisweep.csh vis=caldata options=autoedge scans=999 subint=999 |tee -ia $histview/newrfisweep.log
 
 # Perform calibration on dataset
 
-newcalcal.csh vis=caldata sysflux=$sysflux addflux=$addflux flux=$flux plim=$plim options=polsplit,sefd |tee -ia $histview/$corr/newcalcal.log
+newcalcal.csh vis=caldata sysflux=$sysflux addflux=$addflux flux=$flux plim=$plim options=polsplit,sefd |tee -ia $histview/newcalcal.log
 
 # Move results to a "display" directory
 
@@ -279,9 +278,9 @@ cp -r caldata/gains.* data/.
 cp caldata/sefd data/sefd
 cp caldata/retmap data/retmap
 echo "cgdisp in=cal.cm,cal.cm region=relcenter,arcsec,box"'"'"(-$arc,-$arc,$arc,$arc)"'"'" device=1/xs labtyp=arcmin options=beambl,wedge,3value,mirr,full csize=0.6,1 olay=cal.olay type=contour,pix levs1=$levs range=0,0,$plotscale,3" > view/mapcmd
-cp -r view/* $histview/$corr/.
-cp -r data $histview/$corr/.
-cp *.png $histview/$corr/.
+cp -r view/* $histview
+cp -r data $histview
+cp *.png $histview
 scp *.png logbook:/srv/www/vhosts/log/files/plots/.
 rm -rf caldata
 rm -rf calreduc
