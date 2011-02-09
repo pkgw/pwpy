@@ -299,6 +299,5 @@ rm -rf caldata
 rm -rf calreduc
 rm *.png
 mv cal-$cal-$mfreq-maps calreduc
-echo COMPASS `date`: "reduction succeeded! Going back to sleep."
 
 exit 0

@@ -34,4 +34,6 @@ shift list
 ~/mmm/cshcal/compass.autoflag $corr $list &
 ~/mmm/cshcal/compass.newrfisweep $corr $list
 wait
+echo COMPASS `date`: "finished reducing! Going back to sleep."
+
 goto restart
