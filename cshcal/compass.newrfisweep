@@ -184,15 +184,16 @@ foreach badant2 ($badants2)
     set badants = $badants","$svals
 end
 
+set val = `sort -rnk2 temp.jypk2 |head -n1 |awk '{print $2+.5}'`
 cat >>wip.jypkstat <<EOF
 color 1
-move $llim `sort -rnk2 temp.jypk2 | head -n 1 | awk '{print $2+.5}'`
+move $llim $val
 label Bad Antennas: `echo $badants | sed 's/,//'`
 mtext t 2 1 .75 `date`
 end
 EOF
 
-wip wip.jypkstat -d jypkstat-$corr.png/png >& /dev/null
+wip wip.jypkstat -d jypkstat-$corr.png/png </dev/null >/dev/null
 
 set arc = `echo 4500 | awk '{print int($1*1.430/freq)}' freq=$freq`
 echo "arc = $arc"
