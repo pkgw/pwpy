@@ -184,12 +184,16 @@ foreach badant2 ($badants2)
     set badants = $badants","$svals
 end
 
-echo "color 1" >> wip.jypkstat
-echo "move $llim " `less temp.jypk2 | sort -rnk2 | head -n 1 | awk '{print $2+.5}'` >> wip.jypkstat
-echo "label Bad Antennas: `echo $badants | sed 's/,//'`" >> wip.jypkstat
-echo "mtext t 2 1 .75 "`date` >> wip.jypkstat
-echo end >> wip.jypkstat
+cat >>wip.jypkstat <<EOF
+color 1
+move $llim `sort -rnk2 temp.jypk2 | head -n 1 | awk '{print $2+.5}'`
+label Bad Antennas: `echo $badants | sed 's/,//'`
+mtext t 2 1 .75 `date`
+end
+EOF
+
 wip wip.jypkstat -d jypkstat-$corr.png/png >& /dev/null
+
 set arc = `echo 4500 | awk '{print int($1*1.430/freq)}' freq=$freq`
 echo "arc = $arc"
 set imstats = (`imstat in=cal-$cal-$mfreq-maps/$cal.rs | awk '{if (check == 1) print $0; else if ($1 == "Total") check = 1}' | sed 's/\([0-9][0-9]\)-/\1 -/g'`)
