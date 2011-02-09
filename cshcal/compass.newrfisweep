@@ -204,7 +204,13 @@ set levs = (`echo $imstats[3] $imstats2[4] | awk '{lim = 4*$1; while (lim < $2) 
 set levs = `echo $levs | tr ' ' ','`
 set alevel = `echo $imstats[3] $imstats2[5] | awk '{print (($2/$1)^2)^.5}'`
 
-cgdisp in=cal-$cal-$mfreq-maps/$cal.cm,cal-$cal-$mfreq-maps/$cal.cm region=relcenter,arcsec,box"(-$arc,-$arc,$arc,$arc)" device=cal-$corr.png/png labtyp=arcmin options=beambl,wedge,3value,mirr,full csize=0.6,1 olay=cal-$cal-$mfreq-maps/$cal.olay type=contour,pix levs1=$levs range=0,0,$plotscale,3 >& /dev/null
+cgdisp in=cal-$cal-$mfreq-maps/$cal.cm,cal-$cal-$mfreq-maps/$cal.cm \
+    region=relcenter,arcsec,box"(-$arc,-$arc,$arc,$arc)" \
+    device=cal-$corr.png/png \
+    labtyp=arcmin options=beambl,wedge,3value,mirr,full \
+    csize=0.6,1 olay=cal-$cal-$mfreq-maps/$cal.olay \
+    type=contour,pix levs1=$levs \
+    range=0,0,$plotscale,3 >& /dev/null
 
 set retstat = (`sed 1,3d caldata/retmap | awk '{if (NR == 1) {max = $2}; if (NR != 1) {if ($2*1 !=0) cnt+=1; idx+=1; dcnt+=$2; didx+=max}} END {print 100*cnt/idx,100*dcnt/didx}'`)
 
