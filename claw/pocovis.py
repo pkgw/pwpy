@@ -12,7 +12,7 @@ import sys, string, os
 from os.path import join
 #import mirtask
 #from mirtask import uvdat, keys, util
-from mirexec import TaskInvert, TaskClean, TaskRestore, TaskImFit
+from mirexec import TaskInvert, TaskClean, TaskRestore, TaskImFit, TaskCgDisp, TaskImStat
 import miriad, pickle
 import numpy as n
 import pylab as p
@@ -34,7 +34,7 @@ class poco:
         self.baseline_order = n.array([ 257, 258, 514, 261, 517, 1285, 262, 518, 1286, 1542, 259, 515, 773, 774, 771, 516, 1029, 1030, 772, 1028, 1287, 1543, 775, 1031, 1799, 1544, 776, 1032, 1800, 2056, 260, 263, 264, 519, 520, 1288])   # second iteration of bl nums
         self.autos = []
         self.noautos = []
-        self.dmarr = n.arange(57,58,1)       # dm trial range in pc/cm3
+        self.dmarr = n.arange(52,62,1)       # dm trial range in pc/cm3
 #        self.tshift = 0.2     # not implemented yet
         self.nskip = nskip*self.nbl    # number of iterations to skip (for reading in different parts of buffer)
         nskip = self.nskip
@@ -254,13 +254,24 @@ class poco:
         self.dmt0arr = dmt0arr
 
 
-    def writetrack(self, dmbin, tbin, output='c', bgsub=False):
+    def writetrack(self, dmbin, tbin, output='c', bgwindow=0):
         """Writes data from track out as miriad visibility file.
-        Optional shift to time of track by intoff integrations.
-        Output parameter says whether to 'c'reate a new file or 'a'ppend to existing one. **?**
+        Optional background subtraction bl-by-bl over bgwindow integrations.
+        Output parameter says whether to 'c'reate a new file or 'a'ppend to existing one. **not tested**
         """
 
         track = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[tbin], show=0)  # needs to be shifted by -1 bin in reltime?
+
+        if bgwindow > 1:
+            bgrange = range(-1/2. * bgwindow + tbin, 1/2. * bgwindow + tbin + 1)
+            bgrange.remove(tbin)
+            for i in bgrange:     # build up super track for background subtraction
+                if bgrange.index(i) == 0:   # first time through
+                    trackbg = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[tbin-i], show=0)
+                else:    # then extend arrays by next iterations
+                    tmp = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[tbin-i], show=0)
+                    trackbg[0].extend(tmp[0])
+                    trackbg[1].extend(tmp[1])
 
         # define input metadata source and output visibility file names
         inname = self.file
@@ -273,18 +284,16 @@ class poco:
         dOut.setPreambleType ('uvw', 'time', 'baseline')
 
         i = 0
+        int0 = (track[0][len(track[0])/2]) * self.nbl   # choose integration at center of dispersed track
+
         for inp, preamble, data, flags in vis.readLowlevel ('dsl3', False):
             # since template has only one int, this loop gets spectra by iterating over baselines.
 
-            # TO DO:  add option to write bg-subtracted data
-
-            if i < (track[0][len(track[0])/2]) * self.nbl:  # need to grab only integration at pulse+intoff
+            if i < int0:  # need to grab only integration at pulse+intoff
                 i = i+1
                 continue
-            elif i == (track[0][len(track[0])/2]) * self.nbl:     # start counting with int0
-                int0 = i
 
-            if i < int0 + self.nbl:   # for one integration starting at int0
+            elif i < int0 + self.nbl:   # for one integration starting at int0
                 if i == int0:
                     nants = inp.getVarFirstInt ('nants', 0)
                     inttime = inp.getVarFirstFloat ('inttime', 10.0)
@@ -307,24 +316,30 @@ class poco:
                     
                     inp.copyLineVars (dOut)
 
-                # prep data (and check that it matches expected?)
-                for j in range(self.nchan):
-                    if j in self.chans:
-                        matches = n.where( (j - min(self.chans)) == n.array(track[1]) )[0]   # hack, since chans are from 0-64, but track is in trimmed chan space
-                        raw = self.rawdata[track[0], i-int0, track[1]][matches]   # all baselines for the known pulse
-                        raw = raw.mean(axis=0)   # create spectrum for each baseline by averaging over time
-                        data[j] = raw
-                    else:
-                        data[j] = 0. + 0.j
+                # write out track, if not flagged
+                if n.any(flags):
+                    for j in range(self.nchan):
+                        if j in self.chans:
+                            matches = n.where( (j - min(self.chans)) == n.array(track[1]) )[0]   # hack, since chans are from 0-64, but track is in trimmed chan space
+                            raw = self.rawdata[track[0], i-int0, track[1]][matches]   # all baselines for the known pulse
+                            raw = raw.mean(axis=0)   # create spectrum for each baseline by averaging over time
+                            if bgwindow > 1:   # same as above, but for bg
+                                matchesbg = n.where( (j - min(self.chans)) == n.array(trackbg[1]) )[0]
+                                rawbg = self.rawdata[trackbg[0], i-int0, trackbg[1]][matchesbg]
+                                rawbg = rawbg.mean(axis=0)
+                                data[j] = raw - rawbg
+                            else:
+                                data[j] = raw
+                        else:
+                            flags[j] = False
 
 #                ants = util.decodeBaseline (preamble[4])
 #                print preamble[3], ants
                 dOut.write (preamble, data, flags)
+                i = i+1  # essentially a baseline*int number
 
             elif i >= int0 + self.nbl: 
                 break
-
-            i = i+1  # essentially a baseline*int number
 
         dOut.close ()
 
@@ -648,7 +663,7 @@ def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000):
     fileout.close
 
 
-def pulse_search_image(fileroot, pathin, pathout, nints=10000):
+def pulse_search_image(fileroot, pathin, pathout, nints=10000, sig=5.0, show=1):
     """
     TO DO:  search over position in primary beam, by either:
     (1) dedisperse visibilities, then uv fit,
@@ -666,10 +681,9 @@ def pulse_search_image(fileroot, pathin, pathout, nints=10000):
     print 'Looping over filelist: ', filelist
 
     for file in filelist:
-        for nskip in [27000]:   # range(0, maxints-nints, 0.7*nints):
+        for nskip in range(0, int(maxints-0.7*nints), 0.7*nints):
             print 'Starting file %s with nskip %d' % (file, nskip)
             fileout = open(pathout + string.join(file.split('.')[:-1]) + '.txt', 'a')
-            pklout = open(pathout + string.join(file.split('.')[:-1]) + '.' + str(nskip) + '.pkl', 'wb')
 
             # load data
             pv = poco(pathin + file, nints=nints, nskip=nskip)
@@ -677,31 +691,68 @@ def pulse_search_image(fileroot, pathin, pathout, nints=10000):
 
             # dedisperse
             for i in range(len(pv.dmarr)):
-                for j in [9059]:
-#                for j in range(len(pv.reltime)):
-                    # clean up
-                    outname = pathin + string.join(file.split('.')[:-1]) + '.' + str(nskip) + '-' + 'dm' + str(i) + 't' + str(j) + '.mir'
+#                for j in range(9058,9061):
+                for j in range(len(pv.reltime)):
+                    # set up
+                    outname = pathin + string.join(file.split('.')[:-1]) + '.' + str(nskip) + '-dm' + str(i) + 't' + str(j) + '.mir'
                     removefile (pathout + 'tmp.map'); removefile (pathout + 'tmp.beam'); removefile (pathout + 'tmp.clean'); removefile (pathout + 'tmp.restor')
                     removefile (outname)
 
                     # make dm trial and image
                     dmtrack = pv.dmtrack(dm=pv.dmarr[i], t0=pv.reltime[j])
                     if len(dmtrack[0]) >= len(pv.chans):               # ignore tiny, noise-dominated tracks
-                        # TO DO:  test bgsub writetrack
-                        pv.writetrack(i, j, 'c', bgsub=False)   # output file at dmbin, trelbin
+                        print
+                        pv.writetrack(i, j, 'c', bgwindow=10)   # output file at dmbin, trelbin
 
-                        TaskInvert (vis=outname, map=pathout+'tmp.map', beam=pathout+'tmp.beam', mfs=True, double=True).run () 
-                        TaskClean (beam=pathout+'tmp.beam', map=pathout+'tmp.map', out=pathout+'tmp.clean').run () 
-                        TaskRestore (beam=pathout+'tmp.beam', map=pathout+'tmp.map', model=pathout+'tmp.clean', out=pathout+'tmp.restor').run () 
-                        TaskImFit (in_=pathout+'tmp.restor', object='point').run () 
+                        # make image, clean, restor, fit point source
+                        print
+                        print 'Making dirty image at dm[%d] = %.1f and trel[%d] = %.3f.' % (i, pv.dmarr[i], j, pv.reltime[j])
+                        txt = TaskInvert (vis=outname, map=pathout+'tmp.map', beam=pathout+'tmp.beam', mfs=True, double=True, cell=80, rob=0).snarf()
+                        if show:  txt = TaskCgDisp (in_=pathout+'tmp.map', device='/xs', wedge=True, beambl=True).snarf () 
+                        txt = TaskImStat (in_=pathout+'tmp.map').snarf()
+                        # get noise level in image
+                        noise = txt[0][10][41:47]    # OMG!!
+                        txt = TaskClean (beam=pathout+'tmp.beam', map=pathout+'tmp.map', out=pathout+'tmp.clean', cutoff=float(noise)).snarf () 
+                        print
+                        print 'Cleaned to %.2f Jy after %d iterations' % (float(noise), int(txt[0][-4][19:]))
+                        txt = TaskRestore (beam=pathout+'tmp.beam', map=pathout+'tmp.map', model=pathout+'tmp.clean', out=pathout+'tmp.restor').snarf () 
+                        if show:  txt = TaskCgDisp (in_=pathout+'tmp.restor', device='/xs', wedge=True, beambl=True).snarf () 
+                        txt = TaskImFit (in_=pathout+'tmp.restor', object='point').snarf () 
 
-#                        if pulse:
-#                            print 'Writing visibilities...'
-#                            # do bg subtraction?
-#                            pv.writetrack(i, j, 'c')   # output file at dmbin, trelbin
-#                            print 'dedispersed for ', dmarr[i]
+                        try:
+                        # parse output of imfit
+                        # print '012345678901234567890123456789012345678901234567890123456789'
+                        # print txt[0][14]
+
+                            peak = float(txt[0][14][30:36])
+                            epeak = float(txt[0][14][44:])
+                            off_ra = float(txt[0][15][28:39])
+                            eoff_ra = float(txt[0][16][30:39])
+                            off_dec = float(txt[0][15][40:])
+                            eoff_dec = float(txt[0][16][40:])
+
+                            print 'Fit peak %.2f +- %.2f' % (peak, epeak)
+
+                            if peak/epeak >= sig:
+                                print '\tDetection!'
+                                print '\tRA, Dec offset (arcsec):  %.2f +- %.2f, %.2f +- %.2f' % (off_ra, eoff_ra, off_dec, eoff_dec)
+                                print >> fileout, file, nskip, nints, (i, j)
+
+                                # save all results (v1.0 pickle format)
+                                pklout = open(pathout + string.join(file.split('.')[:-1]) + '.' + str(nskip) + '-dm' + str(i) + 't' + str(j) + '.pkl', 'wb')
+                                pickle.dump((file, nskip, nints, [i], pv.dmarr[i], [j], peak/epeak), pklout)
+                                pklout.close()
+                        except:
+                            print
+                            print 'Something broke in/after imfit!'
+
+                        removefile (outname)
+
+                    else:
+                        continue
 
     fileout.close
+
 
 
 if __name__ == '__main__':
@@ -722,4 +773,4 @@ if __name__ == '__main__':
         fileroot = 'poco_crab_201103.mir'
         pathin = 'data/'
         pathout = 'working3/'
-        pulse_search_image(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=10000)
+        pulse_search_image(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=30000, show=0)
