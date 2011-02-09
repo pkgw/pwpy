@@ -22,7 +22,7 @@ def ataArgs (command, *rest):
 
 
 def obsArgs (command, *rest):
-    a = ['/bin/csh', _obsbindir + command]
+    a = ['/bin/tcsh', _obsbindir + command]
     for x in rest: a.append (str (x))
     return a
 
