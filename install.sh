@@ -1,4 +1,6 @@
 #! /bin/bash
+#
+# Life is good when installation is so simple.
 
 if [ ! -f instdest ] ; then
     echo "Create a file named 'instdest' specifying the install destination." >&2
