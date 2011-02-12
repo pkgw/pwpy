@@ -499,7 +499,7 @@ class poco:
             txt = TaskImStat (in_='tmp.map').snarf()
             # get noise level in image
             noise = txt[0][10][41:47]    # OMG!!
-            txt = TaskClean (beam='tmp.beam', map='tmp.map', out='tmp.clean', cutoff=3*float(noise)).snarf () 
+            txt = TaskClean (beam='tmp.beam', map='tmp.map', out='tmp.clean', cutoff=2*float(noise)).snarf () 
             print
             print 'Cleaned to %.2f Jy after %d iterations' % (float(noise), int(txt[0][-4][19:]))
             txt = TaskRestore (beam='tmp.beam', map='tmp.map', model='tmp.clean', out='tmp.restor').snarf () 
@@ -519,14 +519,11 @@ class poco:
                 eoff_dec = float(txt[0][16][40:])
 
                 print 'Fit peak %.2f +- %.2f' % (peak, epeak)
-
+                return peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
             except:
                 print
                 print 'Something broke in/after imfit!'
-
-        removefile (outname)
-
-        return peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
+                removefile (outname)
 
 
     def dedisperse2(self):
@@ -678,7 +675,7 @@ def pulse_search_image(fileroot, pathin, pathout, nints=10000, sig=5.0, show=1):
                 for j in range(len(pv.reltime)):
                     print
                     print 'Starting dmbin %d and timebin %d' % (i, j)
-                    peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = pv.imagedmt0(i,j, show=0)
+                    peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = pv.imagedmt0(i,j, show=show)
 
                     if peak/epeak >= sig:
                         print '\tDetection!'
@@ -761,4 +758,4 @@ if __name__ == '__main__':
         fileroot = 'poco_crab_201103.mir'
         pathin = 'data/'
         pathout = 'working4/'
-        pulse_search_image(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=20000, show=1)
+        pulse_search_image(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=10000, show=0)
