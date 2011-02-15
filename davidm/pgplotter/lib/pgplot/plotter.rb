@@ -55,14 +55,27 @@ module Pgplot
   class Plotter
     include Pgplot
 
-    VERSION = '0.0.4'
+    VERSION = '0.0.5'
 
     @@instances = {}
     @@last_selected = nil
 
+    # PGPLOT's ID for this Plotter instance.
     attr_reader :pgid
+
+    # PGPLOT device for this Plotter instance.
     attr_reader :device
 
+    # Creates and selects a new Plotter instance.
+    #
+    # The following +opts+ keys are recognized:
+    #
+    #   :device => The PGPLOT device to use.  Defaults to ENV['PGPLOT_DEV'] if
+    #              defined, otherwise '/xs'.
+    #   :ask    => The value is passed to pgask() to control pausing before
+    #              starting a new page.  Defaults to false.
+    #   :nx     => Number of subplots per page in the X direction.  Defaults to 1.
+    #   :ny     => Number of subplots per page in the Y direction.  Defaults to 1.
     def initialize(opts={})
       opts = {
         :device => nil,
@@ -87,14 +100,18 @@ module Pgplot
     #  raise "invalid id (#{id})" unless @@instances[id]
     #end
 
+    # Returns the last (i.e. most recently) selected Plotter instance.
     def self.last_selected
       @@last_selected
     end
 
+    # Returns an Array of Plotter instances.
     def self.instances
       @@instances
     end
 
+    # Selects the Plotter instance corresponding to the PGPLOT ID given by
+    # +pgid+ (defaulting to this Plotter's ID).
     def select(pgid=@pgid)
       raise 'pgid #{pgid} not opened by Pgplot::Plotter' unless @@instances[pgid]
 
@@ -125,6 +142,7 @@ module Pgplot
       @@last_selected
     end
 
+    # Closes this Plotter.
     def close
       select
       Pgplot.pgclos
@@ -133,6 +151,7 @@ module Pgplot
     alias :clos   :close
     alias :pgclos :close
 
+    # Shortcut way to call Pgplot functions (without the +pg+ prefix).
     def method_missing(sym, *args)
       select
       m = sym.to_s
@@ -140,6 +159,9 @@ module Pgplot
       Pgplot.send(m, *args)
     end
 
+    # Attempts to convert +a+ to a class that is plotable (e.g. NArray, Array).
+    # Simply returns +a+ if it is already plotable or if no conversion is
+    # known.
     def to_plotable(a)
       case a
       when Array, NArray: a
@@ -168,6 +190,46 @@ module Pgplot
     end
     private :plot_args
 
+    # Creates a line plot of real data.  Various styles are available.  This
+    # method can be called using the following forms:
+    #
+    #   plot(yy)
+    #   plot(yy, opts)
+    #   plot(xx, yy)
+    #   plot(xx, yy, opts)
+    #
+    # The following keys (shown here with their default values) are recognized
+    # in the optional +opts+ Hash:
+    #
+    #   :just => 0
+    #   :title => 'Untitled Plot'
+    #   :title2 => nil
+    #   :xlabel => 'X Axis'
+    #   :ylabel => 'Y Axis'
+    #   :use_color => true
+    #   :border_color => Color::WHITE
+    #   :line_color => Color::BLUE
+    #   :line => :line
+    #            Available line styles are:
+    #              :none - Draw no line
+    #              :bin, :stairs, :steps - Draw a "staircase" line through points
+    #              :line - Draw straight lines connecting points
+    #              :impulse - Draw vertical line from x axis to each point
+    #   :marker => nil
+    #              Can be any constant from Pgplot::Marker or any PGPLOT marker
+    #              number.
+    #   :overlay => false
+    #   :xrange => nil
+    #   :yrange => nil
+    #   :yscale => :linear
+    #              Other scales are:
+    #                :log - Plot Y axis in logarithmic scale
+    #                :db  = Plot Y axis in dB scale
+    #   :log_floor => 1e-10
+    #                 Y values below :log_floor will be plotted as :log_floor
+    #                 when plotting in logarithic or dB scales.
+    #   :xpad => 0
+    #   :ypad => 0.1
     def plot(*args)
       xx, yy, opts = plot_args(*args)
                              
@@ -340,6 +402,36 @@ module Pgplot
       end
     end
 
+    # Creates a magnitude-phase plot of complex data.  Various styles are
+    # available.  This method can be called using the following forms:
+    #
+    #   magphase(zz)
+    #   magphase(zz, opts)
+    #   magphase(xx, zz)
+    #   magphase(xx, zz, opts)
+    #
+    # The following keys (shown here with their default values) are recognized
+    # in the optional +opts+ Hash:
+    #
+    #   :just => 0
+    #   :title => 'Magnitude/Phase Plot'
+    #   :title2 => nil
+    #   :xlabel => 'X Axis'
+    #   :mag_label => 'Magnitude'
+    #   :phase_label => 'Phase (degrees)'
+    #   :use_color => true
+    #   :border_color => Color::WHITE
+    #   :mag_color => Color::BLUE
+    #   :phase_color => Color::YELLOW
+    #   :ph_range => [-180, 180]
+    #   :mag_scale => :linear
+    #                 Other scales are:
+    #                   :log - Plot Y axis in logarithmic scale
+    #                   :db  = Plot Y axis in dB scale
+    #   :log_floor => 1e-10
+    #                 Y values below :log_floor will be plotted as :log_floor
+    #                 when plotting in logarithic or dB scales.
+    #   :overlay => false
     def magphase(*args)
       xx, zz, opts = plot_args(*args)
                              
@@ -354,7 +446,6 @@ module Pgplot
         :border_color => Color::WHITE,
         :mag_color => Color::BLUE,
         :phase_color => Color::YELLOW,
-        :device => '/xs',
         :ph_range => [-180, 180],
         :mag_scale => :linear,
         :log_floor => 1e-10,
