@@ -55,7 +55,7 @@ module Pgplot
   class Plotter
     include Pgplot
 
-    VERSION = '0.0.5'
+    VERSION = '0.0.6'
 
     @@instances = {}
     @@last_selected = nil
@@ -581,7 +581,8 @@ module Pgplot
       end
       # Plot phase points
       marker = xx.length > 100 ? Marker::DOT : Marker::STAR
-      xx.length.times do |i|
+      npts = [xx.length, zzangle.length].min
+      npts.times do |i|
         pgpt1(xx[i], zzangle[i], marker)
       end
 
