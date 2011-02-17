@@ -206,7 +206,7 @@ set now = `date`
 set nowsecs = `date +%s`
 set retstat = (`sed 1,3d caldata/retmap | awk '{if (NR == 1) {max = $2}; if (NR != 1) {if ($2*1 !=0) cnt+=1; idx+=1; dcnt+=$2; didx+=max}} END {print 100*cnt/idx,100*dcnt/didx}'`)
 
-echo $obstime $retstat[1] $retstat[2] $range $imstats[3] $alevel >>$obsstats
+echo $obstime $retstat[1] $retstat[2] $range $imstats[3] $alevel $mfreq $nchan $sdf >>$obsstats
 
 awk '{if ($1-now < 100000) print ($1-now)/3600,$2,$3,$4,1/($5+1e-12),$6}' now=$nowsecs $obsstats >$tmp/retention
 echo "data $tmp/retention" >$tmp/retention.wip
