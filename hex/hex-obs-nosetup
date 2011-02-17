@@ -308,12 +308,10 @@ foreach pnt (`seq 1 $npnt`)
     frot.csh $inst1 $ephem $freq1 `pwd` kill
     frot.csh $inst2 $ephem $freq2 `pwd` kill
 
-    # Notify COMPASS if we just did the central pointing
+    # If we just did the central pointing, notify the system of a cal obs
     if ($pnt == 1) then
-	set justinst = `echo $inst1 |cut -d: -f1`
-	echo "compass `pwd`/$vpf1 $tstart $tend $inst1" > ~/karto/compass.$justinst
-	set justinst = `echo $inst2 |cut -d: -f1`
-	echo "compass `pwd`/$vpf2 $tstart $tend $inst2" > ~/karto/compass.$justinst
+	announce-cal-data `pwd`/$vpf1 $tstart $tend $inst1
+	announce-cal-data `pwd`/$vpf2 $tstart $tend $inst2
     endif
 
     # Note these observations in the summary files
