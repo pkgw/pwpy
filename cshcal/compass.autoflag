@@ -13,13 +13,38 @@ set inst = (`echo $5 | tr ':' ' '`)
 set marker = (`echo $times[1] | tr '[a-z]' '[A-Z]' | sed 's/\([0-9][0-9]\)\([A-Z][A-Z][A-Z]\)\([0-9][0-9]\):/\3 \2 \1 /'`)
 set marker = (`date -d "$marker +0000" +%Y" "%m" "%d" "%H%M%S`)
 
+
+# Collect some info from the data, using defaults
+
+set listdata = `mktemp`
+uvlist vis=$vis select="time($times[1],$times[2])" options=var,full >$listdata
+
+set cal=`egrep '(^| )source *:' $listdata |sed -e 's/.*source *: *\([^ ]*\).*/\1/'`
+set freq=`egrep '(^| )freq *:' $listdata |sed -e 's/.*freq *: *\([^ ]*\).*/\1/'`
+set nchan=`egrep '(^| )nchan *:' $listdata |sed -e 's/.*nchan *: *\([^ ]*\).*/\1/'`
+set sdf=`egrep '(^| )sdf *:' $listdata |sed -e 's/.*sdf *: *\([^ ]*\).*/\1/'`
+
+set mfreq = `echo $freq | awk '{print int($1*1000)}'`
+echo "Observation parameters: cal=$cal freq=$freq mfreq=$mfreq nchan=$nchan sdf=$sdf"
+if (!($%cal && $%freq && $%nchan && $%sdf)) then
+    echo COMPASS-AUTOFLAG `date`: "missing vars in dataset; see $listdata."
+    exit 1
+endif
+
+rm -f $listdata
+
+
+# Set up processing directory
+
 set histview = /ataarchive/$marker[1]/$marker[2]/$marker[3]
-set histview = $histview/status/compass-autoflag-$marker[4]/$corr
+set histview = $histview/status/compass-autoflag-$marker[4]/$corr-$mfreq
 mkdir -p $histview || exit 1
 cd $histview || exit 1
 
+
 # Copy data for processing
 
+echo "uvaver vis=$vis select=time($times[1],$times[2]) ..." >>dataread
 uvaver vis=$vis select="time($times[1],$times[2])" \
     options=relax,nocal,nopass,nopol out=caldata \
     |& tee -ia dataread
@@ -31,60 +56,16 @@ if ($status) then
     exit 1
 endif
 
-set sourceline = (`uvlist vis=caldata options=var | grep "source" | tr ':' ' '`)
 
-set cal
-#Get the name of the calibrator
-while ("$cal" == "")
-    if ($sourceline[1] == "source") then
-	set cal = `echo $sourceline[2]`
-    else if ($#sourceline == 1) then
-	set cal == "UNK" # Default to name UNK if cannot be found
-    else
-	shift sourceline
-    endif
-end
+# Flag
 
-set freq
-set freqline = (`uvlist vis=caldata options=var | grep "freq    :" | tr ':' ' '`)
-#Get the obs freq of the calibratior (in MHZ)
-while ("$freq" == "")
-    if ($freqline[1] == "freq") then
-	set freq = `echo $freqline[2] | awk '{print $1}'` 
-    else if ($#freqline == 1) then
-	set freq == "1.42" # Default to 20 cm measurements
-    else
-	shift freqline
-    endif
-end
+uvflag vis=caldata flagval=u |tee -ia autoflag.log
+~/mmm/dwhysong/pigss/autoflag/autoflag cal=caldata \
+    options=ata,nonoise |tee -ia autoflag.log
+uvflag vis=caldata flagval=f edge=100,100,3 |tee -ia autoflag.log
 
-set nchan
-set nchanline = (`uvlist vis=caldata options=var,full | grep "nchan" |  tr ':' ' '`)
 
-while ("$nchan" == "")
-    if ($nchanline[1] == "nchan") then
-	set nchan = `echo $nchanline[2] | awk '{print $1}'` 
-    else if ($#nchanline == 1) then
-	set nchan == "1024" # Default to 100 MHz
-    else
-	shift nchanline
-    endif
-end
-
-set sdf
-set sdfline = (`uvlist vis=caldata options=var,full | grep "sdf" |  tr ':' ' '`)
-
-while ("$sdf" == "")
-    if ($sdfline[1] == "sdf") then
-	set sdf = `echo $sdfline[2] | awk '{print $1}'` 
-    else if ($#sdfline == 1) then
-	set sdf = "1.02400E-04" # Default to 100 MHz
-    else
-	shift sdfline
-    endif
-end
-
-set mfreq = `echo $freq | awk '{print int($1*1000)}'`
+# Calibrate
 
 set calvals = (`calinfo target=$cal freq=$freq options=auto`)
 if ("$calvals[1]" == "FATAL") then
@@ -104,16 +85,13 @@ else
     set plim = `calc "asin($sysflux/$calvals[1])*180/pi"`
 endif
 
-fxhealth > fxstatus
-uvflag vis=caldata flagval=f edge=100
-uvflag vis=caldata flagval=f select="uvrange(0,0.11)"
-~/mmm/dwhysong/pigss/autoflag/autoflag cal=caldata \
-    options=ata,nonoise |tee -ia autoflag.log
 newcalcal.csh vis=caldata sysflux=$sysflux addflux=$addflux \
     flux=$flux plim=$plim options=polsplit,sefd \
     |tee -ia newcalcal.log
 
-rm -rf caldata
 
+# All done.
 # TODO: generate image png for comparison to newrfisweep images. And other states.
+
+rm -rf caldata
 exit 0
