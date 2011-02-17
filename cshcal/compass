@@ -22,7 +22,7 @@ sleep .01
 set list = (`cat ~/karto/$stem.$corr`)
 rm -rf ~/karto/$stem.$corr
 echo COMPASS `date`: "beginning processing of the following entry:"
-echo $list
+echo $list |tee -a /ataarchive/scratch/obs/compass/log
 
 if ($#list < 5) then
     echo COMPASS `date`: "entry seems to be in wrong format; giving up on this scan."
