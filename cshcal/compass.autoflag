@@ -5,10 +5,9 @@
 # This is going to be the cal observation program. Put simply, it will be
 # awesome. Oh yes, it WILL be awesome.
 
-set corr = $1
-set vis = $2
-set times = ($3 $4)
-set inst = (`echo $5 | tr ':' ' '`)
+set vis = $1
+set times = ($2 $3)
+set corr = `echo $4 |cut -d: -f1`
 
 set marker = (`echo $times[1] | tr '[a-z]' '[A-Z]' | sed 's/\([0-9][0-9]\)\([A-Z][A-Z][A-Z]\)\([0-9][0-9]\):/\3 \2 \1 /'`)
 set marker = (`date -d "$marker +0000" +%Y" "%m" "%d" "%H%M%S`)

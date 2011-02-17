@@ -31,8 +31,8 @@ endif
 
 shift list
 
-~/mmm/cshcal/compass.autoflag $corr $list &
-~/mmm/cshcal/compass.newrfisweep $corr $list
+~/mmm/cshcal/compass.autoflag $list &
+~/mmm/cshcal/compass.newrfisweep $list
 wait
 echo COMPASS `date`: "finished reducing! Going back to sleep."
 
