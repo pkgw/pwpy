@@ -132,7 +132,7 @@ end
 # "day", which is assumed to be 86,400 "seconds" long.  Differences between
 # time scales can be fixed or variable.  Fixed differences are defined as
 # constants; variable differences are defined as methods.  The difference
-# between timescale +XXx+ and timescale +yyy+ is expressed as xxx_yyy+ (or
+# between timescale +xxx+ and timescale +yyy+ is expressed as xxx_yyy+ (or
 # +XXX_YYY+ if it is a constant).  The underscore is a mnemonic for a minus
 # sign.  For example, +TAI_GPS+ is the constant difference between the TAI time
 # scale and the GPS time scale (i.e. <tt>TAI-GPS</tt>), which is defined as 19
