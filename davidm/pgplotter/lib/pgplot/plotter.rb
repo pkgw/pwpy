@@ -55,7 +55,7 @@ module Pgplot
   class Plotter
     include Pgplot
 
-    VERSION = '0.0.6'
+    VERSION = '0.0.7'
 
     @@instances = {}
     @@last_selected = nil
@@ -256,9 +256,8 @@ module Pgplot
       # Convert true to 1
       opts[:just] = 1 if opts[:just] == true
 
-      xxmin, xxmax = opts[:xrange]
-      xxmin ||= xx.min
-      xxmax ||= xx.max
+      xxmin = opts[:xrange] ? opts[:xrange].first : xx.min
+      xxmax = opts[:xrange] ? opts[:xrange].last : xx.max
       # Round to sfloat precision
       xxmin, xxmax = NArray[xxmin, xxmax].to_type(NArray::SFLOAT).to_a
       if xxmin == xxmax
@@ -285,9 +284,8 @@ module Pgplot
         yy.mul!(2) if opts[:yscale].to_s =~ /db2/i
       end
 
-      yymin, yymax = opts[:yrange]
-      yymin ||= yy.min
-      yymax ||= yy.max
+      yymin = opts[:yrange] ? opts[:yrange].first : yy.min
+      yymax = opts[:yrange] ? opts[:yrange].last : yy.max
       # Round to sfloat precision
       yymin, yymax = NArray[yymin, yymax].to_type(NArray::SFLOAT).to_a
       if yymin == yymax
@@ -423,6 +421,8 @@ module Pgplot
     #   :border_color => Color::WHITE
     #   :mag_color => Color::BLUE
     #   :phase_color => Color::YELLOW
+    #   :xrange => nil,
+    #   :mag_range => nil,
     #   :ph_range => [-180, 180]
     #   :mag_scale => :linear
     #                 Other scales are:
@@ -446,14 +446,18 @@ module Pgplot
         :border_color => Color::WHITE,
         :mag_color => Color::BLUE,
         :phase_color => Color::YELLOW,
+        :xrange => nil,
+        :mag_range => nil,
         :ph_range => [-180, 180],
         :mag_scale => :linear,
         :log_floor => 1e-10,
         :overlay => false,
       }.merge!(opts)
 
+      xxmin = opts[:xrange] ? opts[:xrange].first : xx.min
+      xxmax = opts[:xrange] ? opts[:xrange].last : xx.max
       # Round to sfloat precision
-      xxmin, xxmax = NArray[xx.min, xx.max].to_type(NArray::SFLOAT).to_a
+      xxmin, xxmax = NArray[xxmin, xxmax].to_type(NArray::SFLOAT).to_a
       if xxmin == xxmax
         xxmin -= 1
         xxmax += 1
@@ -483,8 +487,10 @@ module Pgplot
         zzabs.mul!(2) if opts[:mag_scale].to_s =~ /db2/i
       end
 
+      zzmin = opts[:mag_range] ? opts[:mag_range].first : zzabs.min
+      zzmax = opts[:mag_range] ? opts[:mag_range].last : zzabs.max
       # Round to sfloat precision
-      zzmin, zzmax = NArray[zzabs.min, zzabs.max].to_type(NArray::SFLOAT).to_a
+      zzmin, zzmax = NArray[zzmin, zzmax].to_type(NArray::SFLOAT).to_a
       if zzmin == zzmax
         zzmin -= 1
         zzmax += 1
@@ -537,9 +543,8 @@ module Pgplot
       bin(xx, zzabs)
 
       if !opts[:overlay]
-        zzmin, zzmax = opts[:ph_range]
-        zzmin ||= zzangle.min
-        zzmax ||= zzangle.max
+        zzmin = opts[:ph_range] ? opts[:ph_range].first : zzangle.min
+        zzmax = opts[:ph_range] ? opts[:ph_range].last : zzangle.max
         zzmin = -180 if zzmin < -180
         zzmax =  180 if zzmax >  180
         # Round to sfloat precision
