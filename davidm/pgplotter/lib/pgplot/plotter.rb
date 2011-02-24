@@ -55,7 +55,7 @@ module Pgplot
   class Plotter
     include Pgplot
 
-    VERSION = '0.0.8'
+    VERSION = '0.0.9'
 
     @@instances = {}
     @@last_selected = nil
@@ -421,8 +421,9 @@ module Pgplot
     #   :border_color => Color::WHITE
     #   :mag_color => Color::BLUE
     #   :phase_color => Color::YELLOW
-    #   :xrange => nil,
-    #   :mag_range => nil,
+    #   :phase_marker => Marker::STAR
+    #   :xrange => nil
+    #   :mag_range => nil
     #   :ph_range => [-180, 180]
     #   :mag_scale => :linear
     #                 Other scales are:
@@ -446,6 +447,7 @@ module Pgplot
         :border_color => Color::WHITE,
         :mag_color => Color::BLUE,
         :phase_color => Color::YELLOW,
+        :phase_marker => Marker::STAR,
         :xrange => nil,
         :mag_range => nil,
         :ph_range => [-180, 180],
@@ -585,7 +587,7 @@ module Pgplot
         pgswin(*@state[:wc_phase])
       end
       # Plot phase points
-      marker = xx.length > 100 ? Marker::DOT : Marker::STAR
+      marker = xx.length > 100 ? Marker::DOT : opts[:phase_marker]
       npts = [xx.length, zzangle.length].min
       npts.times do |i|
         pgpt1(xx[i], zzangle[i], marker)
