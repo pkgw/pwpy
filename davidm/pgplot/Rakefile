@@ -4,7 +4,7 @@ require 'rake/gempackagetask'
 spec = Gem::Specification.new do |s|
   # Basics
   s.name = 'pgplot'
-  s.version = '0.1.3.1'
+  s.version = '0.1.3.2'
   s.summary = 'Ruby interface to PGPLOT'
   s.description = 'Provides PGPLOT functions in a Ruby module.'
   #s.platform = Gem::Platform::Ruby
