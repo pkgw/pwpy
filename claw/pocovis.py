@@ -34,7 +34,10 @@ class poco:
         self.baseline_order = n.array([ 257, 258, 514, 261, 517, 1285, 262, 518, 1286, 1542, 259, 515, 773, 774, 771, 516, 1029, 1030, 772, 1028, 1287, 1543, 775, 1031, 1799, 1544, 776, 1032, 1800, 2056, 260, 263, 264, 519, 520, 1288])   # second iteration of bl nums
         self.autos = []
         self.noautos = []
-        self.dmarr = n.arange(52,62,1)       # dm trial range in pc/cm3
+        # set dmarr
+        self.dmarr = [56.8]
+#        self.dmarr = n.arange(52,62,1.6)       # dm trial range in pc/cm3, spacing set for 50% efficiency in PoCo 770 MHz, 1.2 ms integrations
+#        self.dmarr = n.arange(52,62,2.6)       # dm trial range in pc/cm3, spacing set for 50% efficiency in PoCo 1430 MHz, 0.3 ms integrations
 #        self.tshift = 0.2     # not implemented yet
         self.nskip = nskip*self.nbl    # number of iterations to skip (for reading in different parts of buffer)
         nskip = self.nskip
@@ -148,7 +151,40 @@ class poco:
         if save:
             savename = self.file.split('.')[:-1]
             savename.append(str(self.nskip/self.nbl) + '.spec.png')
-            savename = string.join(savename,',')
+            savename = string.join(savename,'.')
+            print 'Saving file as ', savename
+            p.savefig(savename)
+
+
+    def fitspec(self, save=1):
+        """
+        Assuming a single integration, fit a powerlaw to the spectrum.
+        Returns fit parameters.
+        """
+        # To do: need to account for noise bias?
+
+        if n.shape(self.data)[0] != 1:
+            print 'Data does not have one integration!'
+            exit(0)
+
+        freq = self.sfreq + self.chans * self.sdf             # freq array in GHz
+
+        plaw = lambda a,b,x: a * (x/x[0]) ** b
+        fitfunc = lambda p, x:  plaw(p[0], p[1], x)
+        errfunc = lambda p, x, y: y - fitfunc(p, x)
+
+        p0 = [0.,0.]
+        p1, success = opt.leastsq(errfunc, p0[:], args = (freq, n.abs(self.data[0])))
+        print 'Success!  Results: ', p1
+
+        if save == 1:
+            p.figure(2)
+            p.plot(freq, n.abs(self.data[0]))
+            p.plot(freq, fitfunc(p1, freq))
+            p.xlabel('Frequency'); p.ylabel('Flux Density (Jy)')
+            savename = self.file.split('.')[:-1]
+            savename.append(str(self.nskip/self.nbl) + '.fitsp.png')
+            savename = string.join(savename,'.')
             p.savefig(savename)
 
 
@@ -412,13 +448,18 @@ class poco:
         reltime = reltime[:trimt - tbuffer]
         print 'dmt0arr/time trimmed to new shape:  ',n.shape(arr), n.shape(reltime)
 
+        mean = arr.mean()
+        std = arr.std()
+        arr = (arr - mean)/std
+        peakmax = n.where(arr == arr.max())
+
         # Plot
 #        p.clf()
         ax = p.imshow(arr, aspect='auto', origin='lower', interpolation='nearest', extent=(min(reltime),max(reltime),min(dmarr),max(dmarr)))
         p.colorbar()
 
         if len(peaks[0]) > 0:
-            print 'Peak of %f sigma at DM=%f, t0=%f' % (arr.max(), dmarr[peakmax[0][0]], reltime[peakmax[1][0]])
+            print 'Peak of %f at DM=%f, t0=%f' % (arr.max(), dmarr[peakmax[0][0]], reltime[peakmax[1][0]])
 
             for i in range(len(peaks[1])):
                 ax = p.imshow(arr, aspect='auto', origin='lower', interpolation='nearest', extent=(min(reltime),max(reltime),min(dmarr),max(dmarr)))
@@ -669,8 +710,6 @@ def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000):
             pv = poco(pathin + file, nints=nints, nskip=nskip)
             pv.prep()
 
-            pv.dmarr=[56.8]
-
             # searches at phase center  ## TO DO:  need to search over position in primary beam
             pv.makedmt0()
             peaks, peakssig = pv.peakdmt0()
@@ -680,7 +719,7 @@ def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000):
             # TO DO:  think of v2.0 of pickle format
             if len(peaks[0]) > 0:
                 pklout = open(pathout + string.join(file.split('.')[:-1]) + '.' + str(nskip) + '.pkl', 'wb')
-                pickle.dump((file, nskip, nints, peaks[0], pv.dmarr[peaks[0]], peaks[1], peakssig), pklout)
+                pickle.dump((file, nskip, nints, peaks[0], pv.dmarr[peaks[0][0]], peaks[1], peakssig), pklout)
                 pklout.close()
 
         fileout.close
@@ -688,25 +727,24 @@ def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000):
 
 def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=1):
     """
-    TO DO:  search over position in primary beam, by either:
-    (1) dedisperse visibilities, then uv fit,
-    (2) form all possible synthesized beams, then dm search over time series, or
-    (3) dedisperse visibilities, image, and search images.
+    Searches for pulses by imaging dedispersed trials.
     """
 
     maxints = 131000  # biggest file in integrations
     edge = 360   # number of integrations lost over small Crab DM range
 
     filelist = []
-    for i in range(8,9):     # **default set to find known bright pulse**
+    for i in [0,1,4,5,6,7,8,9]:
         filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+    for i in range(0,8):
+        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
         
     print 'Looping over filelist: ', filelist
     for file in filelist:
+        fileout = open(pathout + string.join(file.split('.')[:-1]) + '.txt', 'a')
+
         for nskip in range(0, maxints-(nints-edge), nints-edge):
-            print
             print 'Starting file %s with nskip %d' % (file, nskip)
-            fileout = open(pathout + string.join(file.split('.')[:-1]) + '.txt', 'a')
 
             # load data
             pv = poco(pathin + file, nints=nints, nskip=nskip)
@@ -727,30 +765,29 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=1):
                             pklout.close()
                     except:
                         continue
-            fileout.close
+        fileout.close
 
 
 def pulse_search_uvfit(fileroot, pathin, pathout, nints=12000, sig=5.0, show=1):
     """
-    TO DO:  search over position in primary beam, by either:
-    (1) dedisperse visibilities, then uv fit,
-    (2) form all possible synthesized beams, then dm search over time series, or
-    (3) dedisperse visibilities, image, and search images.
+    Searches for pulses by fitting visibilities of dedispersed trials.
     """
 
     maxints = 131000  # biggest file in integrations
     edge = 360   # number of integrations lost over small Crab DM range
 
     filelist = []
-    for i in range(8,9):     # **default set to find known bright pulse**
+    for i in [0,1,4,5,6,7,8,9]:
         filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+    for i in range(0,8):
+        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
         
     print 'Looping over filelist: ', filelist
     for file in filelist:
+        fileout = open(pathout + string.join(file.split('.')[:-1]) + '.txt', 'a')
+
         for nskip in range(0, maxints-(nints-edge), nints-edge):
-            print
             print 'Starting file %s with nskip %d' % (file, nskip)
-            fileout = open(pathout + string.join(file.split('.')[:-1]) + '.txt', 'a')
 
             # load data
             pv = poco(pathin + file, nints=nints, nskip=nskip)
@@ -771,51 +808,64 @@ def pulse_search_uvfit(fileroot, pathin, pathout, nints=12000, sig=5.0, show=1):
                             pklout.close()
                     except:
                         continue
-            fileout.close
+        fileout.close
 
 
 def process_pickle(filename, pathin, mode='image'):
     """Processes a pickle file to produce a spectrum of a candidate pulse.
-    mode tells whether to produce dmt0 plot ('dmt0'), a spectrogram ('spectrum'), 
+    mode tells whether to produce dmt0 plot ('dmt0'), a spectrogram ('spec'), 
     image the dm track ('image'), or write visibilities to a file ('dump')
     TO DO:  (maybe) modify format of pickle file.
     """
 
     file = open(filename, 'rb')
     dump = pickle.load(file)
+    name = dump[0]
+    nintskip = dump[1]
+    dmbinarr = dump[3]
+    dmarr = dump[4]
+    tbinarr = dump[5]
+    snrarr = dump[6]
+    peaktrial = n.where(snrarr == max(snrarr))[0][0]
+
     nints=500
     bgwindow = 15
-    print 'Loaded pickle file for %s' % (dump[0])
-    print 'Has peaks at DM = ', dump[4]
-    if len(dump[3]) >= 1:
-        print 'Grabbing %d ints at %d' % (nints, dump[1] + dump[5][0] - bgwindow)
-        pv = poco(pathin + dump[0], nints=nints, nskip=dump[1]+dump[5][0] - bgwindow)    # format defined by pickle dump below
-        pv.nskip=dump[1]*pv.nbl    # preserves naming of pickle, but searches over smaller space
+    
+    print 'Loaded pickle file for %s' % (name)
+    print 'Has peaks at DM = ', dmarr
+    if len(dmbinarr) >= 1:
+        print 'Grabbing %d ints at %d' % (nints, nintskip)
+        pv = poco(pathin + name, nints=nints, nskip=nintskip + tbinarr[peaktrial] - bgwindow)    # format defined by pickle dump below
+        pv.nskip=nintskip*pv.nbl    # preserves naming of pickle, but searches over smaller space
         pv.prep()
+        track = pv.dmtrack(dm=pv.dmarr[dmbinarr[peaktrial]], t0=pv.reltime[bgwindow], show=0)  # needs to be shifted by -1 bin in reltime?
 
-        midtrial = len(dump[3])/2   # guess at peak snr
-        track = pv.dmtrack(dm=pv.dmarr[dump[3][midtrial]], t0=pv.reltime[dump[5][midtrial] - dump[5][0] + bgwindow], show=0)  # needs to be shifted by -1 bin in reltime?
-        if mode == 'spectrum':  # just show spectrum
-#            int0 = track[0][len(track[0])-1]
+        if mode == 'spec':  # just show spectrum
+            # calculate snr and plot spectrogram
             raw = pv.rawdata[n.array(track[0], dtype='int'), :, track[1]]   # all baselines for the known pulse
             raw = n.abs(raw[:, pv.noautos]).mean(axis=1)   # create array of all time,freq bins containing pulse
             print 'Mean, std in mean: %f, %f' % (raw.mean(), raw.std()/n.sqrt(len(raw)))
-#            pv.data = pv.data[int0:int0+100,:]
-#            pv.reltime = pv.reltime[int0:int0+100]
-            # print track[0][len(track[0])-1] - int0, int0, pv.reltime[track[0][len(track[0])-1] - int0]
-#            p.plot(pv.reltime[n.array(track[0]-int0, dtype='int')], pv.chans[track[1]], '.')
-            p.plot(pv.reltime[track[0]], pv.chans[track[1]], '.')
+            p.figure(1)
+            p.plot(pv.reltime[track[0]], pv.chans[track[1]], 'w,')
             pv.spec(save=1)
+            # write out bg-subbed track, read back in to fit spectrum
+            pv.writetrack(dmbinarr[peaktrial], bgwindow, tshift=0, bgwindow=bgwindow)
+            newfile = string.join(pv.file.split('.')[:-1]) + '.' + str(pv.nskip/pv.nbl) + '-' + 'dm' + str(dmbinarr[peaktrial]) + 't' + str(bgwindow) + '.mir'
+            print 'Loading file', newfile
+            pv2 = poco(newfile, nints=1)
+            pv2.prep()
+            pv2.fitspec(save=1)
+            removefile(newfile)
         elif mode == 'dmt0':
             pv.makedmt0()
             peaks, peakssig = pv.peakdmt0()
-            p.plot(pv.reltime[dump[5][midtrial] - dump[5][0] + bgwindow], pv.dmarr[dump[3][midtrial]], '*' )   # not working?
+            p.plot(pv.reltime[bgwindow], pv.dmarr[dmbinarr[peaktrial]], '*' )   # not working?
             pv.plotdmt0(save=1)
         elif mode == 'image':
-            peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = pv.imagedmt0(dump[3][midtrial], dump[5][midtrial], tshift=dump[5][0] - bgwindow)
+            peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = pv.imagedmt0(dmbinarr[peaktrial], bgwindow)
             print peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
         elif mode == 'uvfit':
-            peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = pv.uvfitdmt0(dump[3][midtrial], dump[5][midtrial], tshift=dump[5][0] - bgwindow)
+            peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = pv.uvfitdmt0(dmbinarr[peaktrial], bgwindow)
             print peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
         elif mode == 'dump':
             # write dmtrack data out for imaging
@@ -838,16 +888,17 @@ if __name__ == '__main__':
 
     fileroot = 'poco_crab_201103.mir'
     pathin = 'data/'
-    pathout = 'crab_fixdm/'
+    pathout = 'crab_fixdm_im/'
     if len(sys.argv) == 1:
         # if no args, search for pulses
         print 'Searching for pulses...'
-        pulse_search_phasecenter(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=12000)
+        pulse_search_image(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, show=0)
+#        pulse_search_phasecenter(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000)
     elif len(sys.argv) == 2:
         # if pickle, then plot data or dm search results
         print 'Assuming input file is pickle of candidate...'
         dedisperse = 1
-        process_pickle(sys.argv[1], pathin=pathin, pathout=pathout, mode='dmt0')
+        process_pickle(sys.argv[1], pathin=pathin, mode='spec')
     elif len(sys.argv) == 6:
         # if full spec of trial, image it
         print 'Imaging DM trial...'
