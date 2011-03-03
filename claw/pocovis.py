@@ -154,14 +154,16 @@ class poco:
             savename = string.join(savename,'.')
             print 'Saving file as ', savename
             p.savefig(savename)
+        else:
+            p.show()
+            
 
-
-    def fitspec(self, save=1):
+    def fitspec(self, obsrms=30., save=0):
         """
-        Assuming a single integration, fit a powerlaw to the spectrum.
+        Assuming a single integration, fit a powerlaw to the spectrum. 
+        obsrms is the noise per channel used for noise bias correction during spectral index fit.
         Returns fit parameters.
         """
-        # To do: need to account for noise bias?
 
         if n.shape(self.data)[0] != 1:
             print 'Data does not have one integration!'
@@ -169,23 +171,32 @@ class poco:
 
         freq = self.sfreq + self.chans * self.sdf             # freq array in GHz
 
-        plaw = lambda a,b,x: a * (x/x[0]) ** b
-        fitfunc = lambda p, x:  plaw(p[0], p[1], x)
-        errfunc = lambda p, x, y: y - fitfunc(p, x)
+        plaw = lambda a, b, x: a * (x/x[0]) ** b
+        fitfunc = lambda p, x, rms:  n.sqrt(plaw(p[0], p[1], x)**2 + rms**2)
+        errfunc = lambda p, x, y, rms: y - fitfunc(p, x, rms)
 
-        p0 = [0.,0.]
-        p1, success = opt.leastsq(errfunc, p0[:], args = (freq, n.abs(self.data[0])))
-        print 'Success!  Results: ', p1
+        p0 = [50.,0.]
+        p1, success = opt.leastsq(errfunc, p0[:], args = (freq, n.abs(self.data[0]), obsrms))
+        print 'Fit results: ', p1
 
+#        obsrms = n.sqrt((errfunc(p1, freq, n.abs(self.data[0]), obsrms)**2).mean())
+#        print 'RMS per channel =', obsrms
+#        p1, success = opt.leastsq(errfunc, p0[:], args = (freq, n.abs(self.data[0]), obsrms))
+#        print 'Second fit results: ', p1
+#        obsrms = n.sqrt((errfunc(p1, freq, n.abs(self.data[0]), obsrms)**2).mean())
+
+        p.figure(2)
+        p.plot(freq, n.abs(self.data[0]))
+        p.plot(freq, fitfunc(p1, freq, obsrms))
+        p.xlabel('Frequency'); p.ylabel('Flux Density (Jy)')
         if save == 1:
-            p.figure(2)
-            p.plot(freq, n.abs(self.data[0]))
-            p.plot(freq, fitfunc(p1, freq))
-            p.xlabel('Frequency'); p.ylabel('Flux Density (Jy)')
             savename = self.file.split('.')[:-1]
             savename.append(str(self.nskip/self.nbl) + '.fitsp.png')
             savename = string.join(savename,'.')
+            print 'Saving file as ', savename
             p.savefig(savename)
+        else:
+            p.show()
 
 
     def dmmask(self, dm = 0., t0 = 0., show=0,):
@@ -355,6 +366,7 @@ class poco:
 
                 # write out track, if not flagged
                 if n.any(flags):
+                    bgarr = []
                     for j in range(self.nchan):
                         matches = n.where( (j - min(self.chans) ) == n.array(track[1]) )[0]   # hack, since chans are from 0-64, but track is in trimmed chan space
                         if len(matches) >= 1:
@@ -364,16 +376,19 @@ class poco:
                                 matchesbg = n.where( (j - min(self.chans)) == n.array(trackbg[1]) )[0]
                                 rawbg = self.rawdata[trackbg[0], i-int0, trackbg[1]][matchesbg]
                                 rawbg = rawbg.mean(axis=0)
+                                bgarr.append(rawbg)
                                 data[j] = raw - rawbg
                             else:
                                 data[j] = raw
                         else:
                             flags[j] = False
+#                    print 'BG spectrum std =', (n.abs(bgarr)).std()
 
 #                ants = util.decodeBaseline (preamble[4])
 #                print preamble[3], ants
                 dOut.write (preamble, data, flags)
                 i = i+1  # essentially a baseline*int number
+
 
             elif i >= int0 + self.nbl:
                 break
@@ -847,14 +862,14 @@ def process_pickle(filename, pathin, mode='image'):
             print 'Mean, std in mean: %f, %f' % (raw.mean(), raw.std()/n.sqrt(len(raw)))
             p.figure(1)
             p.plot(pv.reltime[track[0]], pv.chans[track[1]], 'w,')
-            pv.spec(save=1)
+            pv.spec(save=0)
             # write out bg-subbed track, read back in to fit spectrum
             pv.writetrack(dmbinarr[peaktrial], bgwindow, tshift=0, bgwindow=bgwindow)
             newfile = string.join(pv.file.split('.')[:-1]) + '.' + str(pv.nskip/pv.nbl) + '-' + 'dm' + str(dmbinarr[peaktrial]) + 't' + str(bgwindow) + '.mir'
             print 'Loading file', newfile
             pv2 = poco(newfile, nints=1)
             pv2.prep()
-            pv2.fitspec(save=1)
+            pv2.fitspec(obsrms=30., save=0)
             removefile(newfile)
         elif mode == 'dmt0':
             pv.makedmt0()
