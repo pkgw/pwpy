@@ -121,28 +121,33 @@ class poco:
 
 
     def prep(self):
-        self.data = (self.rawdata * self.flags)[:,self.noautos].mean(axis=1)
-        self.data = self.data[:,self.chans] 
-        self.rawdata = (self.rawdata * self.flags)[:,:,self.chans]
+        """
+        Reshapes data for usage by other functions.
+        Note that it assumes that any integration with bad data has an entire baseline flagged.
+        """
+        data = ((self.rawdata * self.flags)[:,self.noautos])[:,:,self.chans]
+        totallen = data[self.flags[:,self.noautos][:,:,self.chans]].shape[0]
+        tlen = data.shape[0]
+        chlen = len(self.chans)
+        self.data = n.reshape(data[self.flags[:,self.noautos][:,:,self.chans]], (tlen, totallen/(tlen*chlen), chlen)) # data is what is typically needed
+        self.dataph = n.abs(self.data.mean(axis=1))  #dataph is summed to form beam at phase center
+        self.rawdata = (self.rawdata * self.flags)
 
         print 'Data flagged, trimmed in channels, and averaged across baselines.'
-        print 'New shape:'
-        print self.data.shape
+        print 'New rawdata, data, dataph shapes:'
+        print self.rawdata.shape, self.data.shape, self.dataph.shape
 
 
     def spec(self, save=0):
         chans = self.chans
         reltime = self.reltime
-        data = self.data
 
 # does not account for noise bias.  assumes lots of flux in the field
-        print 'Renormalizing the data.  No noise bias correction.'
-        abs = n.abs(data)
-        mean = abs.mean()
-        std = abs.std()
-        abs = (abs - mean)/std
+        mean = self.dataph.mean()
+        std = self.dataph.std()
+        abs = (self.dataph - mean)/std
+        print 'Data mean, std: %f, %f' % (mean, std)
 
-        print 'Plotting spectrgram.'
         p.figure(1)
         ax = p.imshow(n.rot90(abs), aspect='auto', origin='upper', interpolation='nearest', extent=(min(reltime),max(reltime),min(chans),max(chans)))
         p.colorbar(ax)
@@ -160,14 +165,10 @@ class poco:
 
     def fitspec(self, obsrms=30., save=0):
         """
-        Assuming a single integration, fit a powerlaw to the spectrum. 
+        Fits a powerlaw to the mean spectrum at the phase center.
         obsrms is the noise per channel used for noise bias correction during spectral index fit.
         Returns fit parameters.
         """
-
-        if n.shape(self.data)[0] != 1:
-            print 'Data does not have one integration!'
-            exit(0)
 
         freq = self.sfreq + self.chans * self.sdf             # freq array in GHz
 
@@ -176,17 +177,17 @@ class poco:
         errfunc = lambda p, x, y, rms: y - fitfunc(p, x, rms)
 
         p0 = [50.,0.]
-        p1, success = opt.leastsq(errfunc, p0[:], args = (freq, n.abs(self.data[0]), obsrms))
+        p1, success = opt.leastsq(errfunc, p0[:], args = (freq, (self.dataph).mean(axis=0), obsrms))
         print 'Fit results: ', p1
 
-#        obsrms = n.sqrt((errfunc(p1, freq, n.abs(self.data[0]), obsrms)**2).mean())
+#        obsrms = n.sqrt((errfunc(p1, freq, self.dataph[0], obsrms)**2).mean())
 #        print 'RMS per channel =', obsrms
-#        p1, success = opt.leastsq(errfunc, p0[:], args = (freq, n.abs(self.data[0]), obsrms))
+#        p1, success = opt.leastsq(errfunc, p0[:], args = (freq, self.dataph[0], obsrms))
 #        print 'Second fit results: ', p1
-#        obsrms = n.sqrt((errfunc(p1, freq, n.abs(self.data[0]), obsrms)**2).mean())
+#        obsrms = n.sqrt((errfunc(p1, freq, self.dataph[0], obsrms)**2).mean())
 
         p.figure(2)
-        p.plot(freq, n.abs(self.data[0]))
+        p.plot(freq, self.dataph[0])
         p.plot(freq, fitfunc(p1, freq, obsrms))
         p.xlabel('Frequency'); p.ylabel('Flux Density (Jy)')
         if save == 1:
@@ -209,7 +210,7 @@ class poco:
         chans = self.chans
 
         # initialize mask (false=0)
-        mask = n.zeros((self.data.shape[0],self.data.shape[1]),dtype=bool)   # could get clever here.  use integer code to stack dm masks in unique way
+        mask = n.zeros((self.dataph.shape[0],self.dataph.shape[1]),dtype=bool)   # could get clever here.  use integer code to stack dm masks in unique way
         freq = self.sfreq + chans * self.sdf             # freq array in GHz
 
         # given freq, dm, dfreq, calculate pulse time and duration
@@ -248,7 +249,8 @@ class poco:
         chanbin = []
 
         for ch in range(len(chans)):
-            ontime = n.where(((pulset[ch] + pulsedt[ch]/2.) >= reltime) & ((pulset[ch] - pulsedt[ch]/2.) <= reltime))
+            ontime = n.where(((pulset[ch] + pulsedt[ch]) >= reltime) & ((pulset[ch] - pulsedt[ch]) <= reltime))
+#            ontime = n.where(((pulset[ch] + pulsedt[ch]/2.) >= reltime) & ((pulset[ch] - pulsedt[ch]/2.) <= reltime))
             timebin = n.concatenate((timebin, ontime[0]))
             chanbin = n.concatenate((chanbin, (ch * n.ones(len(ontime[0]), dtype=int))))
 
@@ -268,24 +270,25 @@ class poco:
         """
 
         dmarr = self.dmarr
+#        reltime = n.arange(2*len(self.reltime))/2.  # danger!
         reltime = self.reltime
         minintersect = len(self.chans)
         chans = self.chans
 
         dmt0arr = n.zeros((len(dmarr),len(reltime)), dtype='float64')
-#        accummask = n.zeros(self.data.shape, dtype='bool')
+#        accummask = n.zeros(self.dataph.shape, dtype='bool')
 
         for i in range(len(dmarr)):
             for j in range(len(reltime)):
                 if self.usedmmask:    # slower by factor of 2 than dmtracks
                     dmmask = self.dmmask(dm=dmarr[i], t0=reltime[j])
                     if dmmask.sum() >= minintersect:               # ignore tiny, noise-dominated tracks
-                        dmt0arr[i,j] = n.mean(n.abs (self.data * dmmask)[n.where(dmmask == True)])
+                        dmt0arr[i,j] = n.mean((self.dataph * dmmask)[n.where(dmmask == True)])
 #                   accummask = accummask + dmmask
                 else:
                     dmtrack = self.dmtrack(dm=dmarr[i], t0=reltime[j])
                     if len(dmtrack[0]) >= minintersect:               # ignore tiny, noise-dominated tracks
-                        dmt0arr[i,j] = n.mean(n.abs (self.data[dmtrack[0],dmtrack[1]]))
+                        dmt0arr[i,j] = n.mean(self.dataph[dmtrack[0],dmtrack[1]])
             print 'dedispersed for ', dmarr[i]
 
         self.dmt0arr = dmt0arr
@@ -298,6 +301,7 @@ class poco:
         """
 
         minintersect = len(self.chans)
+        rawdatatrim = self.rawdata[:,:,self.chans]
 
         track = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[tbin-tshift], show=0)  # needs to be shifted by -1 bin in reltime?
 
@@ -307,7 +311,7 @@ class poco:
 
         if bgwindow > 3:
             bgrange = range(int(-bgwindow/2.) + tbin - tshift, int(bgwindow/2.) + tbin - tshift + 1)
-            bgrange.remove(tbin - tshift); bgrange.remove(tbin - tshift + 1); bgrange.remove(tbin - tshift - 1)
+            bgrange.remove(tbin - tshift); bgrange.remove(tbin - tshift + 1); bgrange.remove(tbin - tshift - 1); bgrange.remove(tbin - tshift + 2); bgrange.remove(tbin - tshift - 2)
             for i in bgrange:     # build up super track for background subtraction
                 if bgrange.index(i) == 0:   # first time through
                     trackbg = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[i], show=0)
@@ -317,9 +321,9 @@ class poco:
                     trackbg[1].extend(tmp[1])
 
 #                print 'trackbg'
-#            print self.rawdata[trackbg[0], 1, trackbg[1]]
+#            print self.rawdata[:,:,self.chans][trackbg[0], 1, trackbg[1]]
 #        print 'track'
-#        print self.rawdata[track[0], 1, track[1]]
+#        print self.rawdata[:,:,self.chans][track[0], 1, track[1]]
 
         # define input metadata source and output visibility file names
         inname = self.file
@@ -370,11 +374,11 @@ class poco:
                     for j in range(self.nchan):
                         matches = n.where( (j - min(self.chans) ) == n.array(track[1]) )[0]   # hack, since chans are from 0-64, but track is in trimmed chan space
                         if len(matches) >= 1:
-                            raw = self.rawdata[track[0], i-int0, track[1]][matches]   # all baselines for the known pulse
+                            raw = rawdatatrim[track[0], i-int0, track[1]][matches]   # all baselines for the known pulse
                             raw = raw.mean(axis=0)   # create spectrum for each baseline by averaging over time
                             if bgwindow > 1:   # same as above, but for bg
                                 matchesbg = n.where( (j - min(self.chans)) == n.array(trackbg[1]) )[0]
-                                rawbg = self.rawdata[trackbg[0], i-int0, trackbg[1]][matchesbg]
+                                rawbg = rawdatatrim[trackbg[0], i-int0, trackbg[1]][matchesbg]
                                 rawbg = rawbg.mean(axis=0)
                                 bgarr.append(rawbg)
                                 data[j] = raw - rawbg
@@ -406,6 +410,7 @@ class poco:
         inname = self.file
         vis = miriad.VisData(inname)
 
+        rawdatatrim = self.rawdata[:,:,self.chans]
         lc = []
         for tbintrial in range(tbin, tbin+nints):
 
@@ -428,7 +433,7 @@ class poco:
                     for j in range(self.nchan):
                         if j in self.chans:
                             matches = n.where( (j - min(self.chans)) == n.array(track[1]) )[0]   # hack, since chans are from 0-64, but track is in trimmed chan space
-                            raw = self.rawdata[track[0], i-int0, track[1]][matches]   # all baselines for the known pulse
+                            raw = rawdatatrim[track[0], i-int0, track[1]][matches]   # all baselines for the known pulse
                             raw = raw.mean(axis=0)   # create spectrum for each baseline by averaging over time
                             data[j] = raw
                         else:
@@ -526,7 +531,7 @@ class poco:
         return self.peaks,arr[self.peaks]
 
 
-    def imagedmt0(self, dmbin, t0bin, tshift=0, show=1):
+    def imagedmt0(self, dmbin, t0bin, tshift=0, bgwindow=15, show=1, clean=1):
         """ Makes and fits an background subtracted image for a given dmbin and t0bin.
         tshift can shift the actual t0bin earlier to allow reading small chunks of data relative to pickle.
         """
@@ -541,7 +546,7 @@ class poco:
 
         if len(dmtrack[0]) >= len(self.chans):               # ignore tiny, noise-dominated tracks
             print
-            self.writetrack(dmbin, t0bin, 'c', tshift=tshift, bgwindow=15)   # output file at dmbin, trelbin
+            self.writetrack(dmbin, t0bin, 'c', tshift=tshift, bgwindow=bgwindow)   # output file at dmbin, trelbin
 
             # make image, clean, restor, fit point source
             print
@@ -571,14 +576,16 @@ class poco:
                 eoff_dec = float(txt[0][16][40:])
 
                 print 'Fit peak %.2f +- %.2f' % (peak, epeak)
-                removefile (outroot + '.mir')
-                removefile (outroot+'.map'); removefile (outroot+'.beam'); removefile (outroot+'.clean'); removefile (outroot+'.restor')
+                if clean:
+                    removefile (outroot + '.mir')
+                    removefile (outroot+'.map'); removefile (outroot+'.beam'); removefile (outroot+'.clean'); removefile (outroot+'.restor')
                 return peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
             except:
                 print
                 print 'Something broke in/after imfit!'
-                removefile (outroot + '.mir')
-                removefile (outroot+'.map'); removefile (outroot+'.beam'); removefile (outroot+'.clean'); removefile (outroot+'.restor')
+                if clean:
+                    removefile (outroot + '.mir')
+                    removefile (outroot+'.map'); removefile (outroot+'.beam'); removefile (outroot+'.clean'); removefile (outroot+'.restor')
 
 
     def uvfitdmt0(self, dmbin, t0bin, tshift=0, show=1):
@@ -634,7 +641,7 @@ class poco:
         chans = self.chans
 
         self.dmt0arr = n.zeros((len(dmarr),len(reltime)), dtype='float64')
-#        accummask = n.zeros(self.data.shape, dtype='bool')
+#        accummask = n.zeros(self.dataph.shape, dtype='bool')
 
         threadlist = []
         for i in range(len(dmarr)):
@@ -663,7 +670,7 @@ class poco:
         ids = mec.get_ids()
         print 'Got engines: ', ids
 #        mec.push_function(dict(dmtrack2 = dmtrack2))    # set up function for later
-#        mec.push(dict(data=self.data, reltime=reltime))
+#        mec.push(dict(data=self.dataph, reltime=reltime))
 #        mec.execute('import numpy as n')
 #        mec.push_function(dict(dmtrack2 = dmtrack2))    # set up function for later
 
@@ -674,7 +681,7 @@ class poco:
 #                iarr.append(i)
 #                jarr.append(j)
 #                k = (j + len(reltime) * i) % len(ids)   # queue each iter amongst targets
-                st = client.StringTask('dmt0 = dmtrack2(data, reltime, %f, %f)' % (dmarr[i], reltime[j]), pull='dmt0', push=dict(data = self.data,reltime = reltime))
+                st = client.StringTask('dmt0 = dmtrack2(data, reltime, %f, %f)' % (dmarr[i], reltime[j]), pull='dmt0', push=dict(data = self.dataph,reltime = reltime))
                 pr_list.append(tc.run(task=st))
                 if len(pr_list) == len(ids):     # wait until node queue is full
                     for l in range(len(pr_list)):
@@ -747,6 +754,7 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=1):
 
     maxints = 131000  # biggest file in integrations
     edge = 360   # number of integrations lost over small Crab DM range
+    bgwindow = 15  # where bg subtraction is made
 
     filelist = []
     for i in [0,1,4,5,6,7,8,9]:
@@ -769,7 +777,7 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=1):
             for i in range(len(pv.dmarr)):
                 for j in range(len(pv.reltime)):
                     try: 
-                        peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = pv.imagedmt0(i,j, show=show)
+                        peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = pv.imagedmt0(i,j, show=show, bgwindow=bgwindow, clean=1)
                         print >> fileout, file, nskip, nints, (i, j), 'Peak, RA, Dec: ', peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
 
                         if peak/epeak >= sig:
@@ -856,10 +864,7 @@ def process_pickle(filename, pathin, mode='image'):
         track = pv.dmtrack(dm=pv.dmarr[dmbinarr[peaktrial]], t0=pv.reltime[bgwindow], show=0)  # needs to be shifted by -1 bin in reltime?
 
         if mode == 'spec':  # just show spectrum
-            # calculate snr and plot spectrogram
-            raw = pv.rawdata[n.array(track[0], dtype='int'), :, track[1]]   # all baselines for the known pulse
-            raw = n.abs(raw[:, pv.noautos]).mean(axis=1)   # create array of all time,freq bins containing pulse
-            print 'Mean, std in mean: %f, %f' % (raw.mean(), raw.std()/n.sqrt(len(raw)))
+            # plot track and spectrogram
             p.figure(1)
             p.plot(pv.reltime[track[0]], pv.chans[track[1]], 'w,')
             pv.spec(save=0)
@@ -874,7 +879,7 @@ def process_pickle(filename, pathin, mode='image'):
         elif mode == 'dmt0':
             pv.makedmt0()
             peaks, peakssig = pv.peakdmt0()
-            p.plot(pv.reltime[bgwindow], pv.dmarr[dmbinarr[peaktrial]], '*' )   # not working?
+#            p.plot(pv.reltime[bgwindow], pv.dmarr[dmbinarr[peaktrial]], '*' )   # not working?
             pv.plotdmt0(save=1)
         elif mode == 'image':
             peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = pv.imagedmt0(dmbinarr[peaktrial], bgwindow)
@@ -903,12 +908,12 @@ if __name__ == '__main__':
 
     fileroot = 'poco_crab_201103.mir'
     pathin = 'data/'
-    pathout = 'crab_fixdm_im/'
+    pathout = 'crab_fixdm_ph2/'
     if len(sys.argv) == 1:
         # if no args, search for pulses
         print 'Searching for pulses...'
-        pulse_search_image(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, show=0)
-#        pulse_search_phasecenter(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000)
+#        pulse_search_image(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, show=0)
+        pulse_search_phasecenter(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000)
     elif len(sys.argv) == 2:
         # if pickle, then plot data or dm search results
         print 'Assuming input file is pickle of candidate...'
