@@ -159,7 +159,7 @@ def feedID(antnum, julday):
     """Return feed number for antenna antum on day julday"""
   
     # Read in feedswapjd.txt file
-    feedlog = np.genfromtxt(infopath('feedswapjd.txt'), dtype=('f' + ',i2' * 43), delimiter=',')
+    feedlog = np.genfromtxt(infopath('feedswapjd.txt'), dtype=('f' + ',f' * 43), delimiter=',')
     
     # Find all swaps before requested julday, take ant from latest one
     afterswitch = np.where(feedlog['f0'] < julday * np.ones(np.shape(feedlog['f0'])))
@@ -249,7 +249,7 @@ def gaussread(path):
         #return 'NO_SQUINT_PAIRS', 0, 0, 0
     
     # Define types and names for the squint ndarray
-    SDTYPES = 'i S2 i f f f f f f'.split ()
+    SDTYPES = 'i S2 f f f f f f f'.split ()
     SNAMES = ['antnum', 'antname', 'feed', 'squintaz', 'squintaz_uc',
               'squintel', 'squintel_uc', 'sefd', 'sumchisq']
     squint = np.zeros(sqpairs, dtype = zip(SNAMES, SDTYPES))
@@ -350,8 +350,8 @@ def gausstosql(path, replacedups=True):
     # Insert data. NULL values will be replaced with automatic object ids.
     cursor.execute('INSERT INTO runs VALUES (NULL,?,?,?,?,?)', info)
     runID = cursor.lastrowid
-    cursor.executemany ('INSERT INTO obs VALUES (NULL,?,?,?,?,?,?,?,?,?,?)',
-                        ((runID, ) + tuple (row) for row in squint))
+    cursor.executemany ('INSERT INTO obs VALUES (NULL,?,?,?,?,?,?,?,?,?,?,?)',
+                        ((runID, ) + tuple(row) + (0,) for row in squint))
     
     # Finish up!
     connection.commit()
@@ -379,13 +379,14 @@ def resetsql():
                                    rid int,
                                    antnum int,
                                    antname text,
-                                   feed int,
+                                   feed float,
                                    squintaz float,
                                    squintaz_uc float,
                                    squintel float,
                                    squintel_uc float,
                                    sefd float,
-                                   sumchisq float);"""
+                                   sumchisq float,
+                                   flag int);"""
     cursor.execute(sql_cmd)
     
     # Create table to hold runs
@@ -427,7 +428,40 @@ def buildsql(rootdir):
             gausstosql (dirname)
 
     os.path.walk (rootdir, load, None)
-
+    
+    
+def flagsql(wherecmd='', num=1):
+    """
+    flagsql
+    =======
+    
+    PURPOSE:
+        Flags data in squint.db to exlcude from plotting
+        Reset flags using    flagsql(num=0)
+        
+    CALLING SEQUENCE:
+        flagsql(wherecmd='', num=1):
+        
+    INPUTS:
+        wherecmd        :=  SQL WHERE command specifying data to be flagged
+                            'WHERE ...'
+        num             :=  flag number:
+  
+                            1   -   Uncertainty magnitude
+                            2   -   Squint magnitude
+        
+    """
+    
+    # Connect to sqlite database
+    connection = sqlite3.connect(getdbpath())
+    cursor = connection.cursor()
+    
+    sql_cmd = 'UPDATE obs SET flag=%i ' %num + wherecmd
+    cursor.execute(sql_cmd)
+    
+    connection.commit()
+    connection.close()
+    
 
 def hexfromtxt(fname, dtype=float, names=None, skip_header=0, colnum=0):    
     """

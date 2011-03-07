@@ -12,9 +12,9 @@ import matplotlib.pyplot as plt
 import hextoolkit
 
 
-def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None, sqlfilter=None, 
-            wherecmd='', saveas='squintplots.pdf', title=None,
-            lines=False, errorbars=True, xlim=None, ylim=None):
+def hexplot(xdata, ydata, groupby=None, colorby=None, wherecmd='',
+            saveas='squintplots.pdf', title=None, lines=False, errorbars=True, 
+            xlim=None, ylim=None):
     """
     hexplot
     =======
@@ -23,23 +23,22 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None, sqlfilter=N
         Plots data from squint.db, grouped and colored as requested
     
     CALLING SEQUENCE:
-        hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None,
-            sqlfilter=None, wherecmd='', saveas='squintplots.pdf',
-            lines=False, errorbars=True, xlim=None, ylim=None)
+        hexplot(xdata, ydata, groupby=None, colorby=None, wherecmd='',
+                saveas='squintplots.pdf', title=None, lines=False, errorbars=True, 
+                exclude_flagged=True, xlim=None, ylim=None)
     
     INPUTS:
         xdata       :=  tag for x-data in plots
         ydata       :=  tag for y-data in plots
         groupby     :=  group into separate plots by this tag
         <NOT IMPLEMENTED>colorby     :=  color by this tag
-        <NOT IMPLEMENTED>pyfilter    :=
-        <NOT IMPLEMENTED>sqlfilter   :=
         wherecmd    :=  'WHERE ...' command for specifying data in sql query
         saveas      :=  savename for pdf of plots
         title       :=  title to add to all plots
         lines       :=  whether to connect the plotted points with lines
                         (add ' ORDER BY ' to wherecmd to control line order)
         errorbars   :=  add errorbars when available
+        exclude_flagged :=  remove datapoints which have been flagged
         xlim        :=  user-specified x-axis limits (xmin, xmax)
         ylim        :=  user-specified y-axis limits (ymin, ymax)
     
@@ -70,7 +69,6 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None, sqlfilter=N
             
             
     TODO LIST:
-        -custom axis limits
         -look into interactive plotting
         -outlier identification & option to suppress (in database buildup)
         -color
@@ -78,9 +76,6 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None, sqlfilter=N
         -mag vs feed by ant
          
     """
-    
-    # Setup pdf output
-    pp = PdfPages(saveas)
     
     ###########
     ## Query ##
@@ -100,7 +95,9 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None, sqlfilter=N
                 inputs.append('squintel')
             elif i in ('antfeed'):
                 inputs.append('antnum')
-                inputs.append('feed')
+                inputs.append('round(feed,1) as feed')
+            elif i in ('feed'):
+                inputs.append('round(feed,1) as feed')
             else:
                 inputs.append(i)
             
@@ -109,6 +106,13 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None, sqlfilter=N
                 
     # Get rid of duplicates
     inputs = list(set(inputs))
+    
+    # Take out flaggeg data
+    if exclude_flagged:
+        if wherecmd == '':
+            wherecmd = 'WHERE flag=0'
+        else:
+            wherecmd = 'WHERE flag=0 AND ' + wherecmd[6:]
             
     sql_cmd = 'SELECT ' + ','.join(inputs) + ' FROM runs NATURAL JOIN obs ' + wherecmd
     cursor.execute(sql_cmd)
@@ -131,7 +135,7 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None, sqlfilter=N
         extra_dtypes.append(('squintangle', '<f8'))
         extra_dtypes.append(('squintangle_uc', '<f8'))
     if getantfeed:
-        extra_dtypes.append(('antfeed', 'i'))
+        extra_dtypes.append(('antfeed', '<f8'))
 
     if len (extra_dtypes) == 0:
         data = sqldata
@@ -157,9 +161,13 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None, sqlfilter=N
     if getantfeed:
         data['antfeed'] = data['antnum'] * 1000 + data['feed']
 
+
     ##############
     ## Plotting ##
     ##############
+     
+    # Setup pdf output
+    pp = PdfPages(saveas)
     
     # Get number of and list of groups
     groupnum = 1
@@ -168,6 +176,18 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None, sqlfilter=N
         groupnum = np.size(grouplist)
         if groupnum > 100:
             print 'HEXPLOT: Requested grouping would yield over 100 plots'
+            print 'HEXPLOT: Quitting...'
+            pp.close()
+            return
+            
+    # Get number of and list of coloring groups
+    palette = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
+    colornum = 1
+    if colorby != None:
+        colorlist = np.unique(data[colorby])
+        colornum = np.size(colorlist)
+        if colornum > len(palette):
+            print 'HEXPLOT: Requested coloring would yield over', len(palette), 'colors'
             print 'HEXPLOT: Quitting...'
             pp.close()
             return
@@ -187,24 +207,38 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None, sqlfilter=N
         ixdata = data[xdata][igroup]
         iydata = data[ydata][igroup]
 
-        # Determine errorbars as requested       
+        # Determine errorbars as requested
+        [xuc, yuc] = [None, None]
+        
         if errorbars:
             if xdata in ['squintel', 'squintaz', 'squintmag', 'squintangle']:
                 xuc = data[xdata + '_uc'][igroup]
-            else: xuc = None
-            
+
             if ydata in ['squintel', 'squintaz', 'squintmag', 'squintangle']:
                 yuc = data[ydata + '_uc'][igroup]
-            else: yuc = None
-        else:
-            xuc = None
-            yuc = None
-        
-        # Plot the group
-        if lines: plotformat = 'bo-'
-        else: plotformat = 'bo'
 
-        plt.errorbar(ixdata, iydata, xerr=xuc, yerr=yuc, fmt=plotformat)
+        # Plot the group
+        if lines: linestyle = 'o-'
+        else: linestyle = 'o'
+
+        for j in xrange(colornum):
+            if colorby != None:
+                cgroup = np.where(data[colorby][igroup] == colorlist[j])
+            else:
+                cgroup = np.where(data[xdata][igroup] == data[xdata][igroup])
+                
+            if np.size(cgroup) == 0: continue
+            
+            plotformat = palette[j] + linestyle
+            
+            [cxuc, cyux] = [None, None]
+            if xuc != None: cxuc = xuc[cgroup]
+            if yuc != None: cyuc = yuc[cgroup]
+            
+            clabel = colorby + ' = ' + str(colorlist[j])
+            
+            plt.errorbar(ixdata[cgroup], iydata[cgroup], xerr=cxuc, yerr=cyuc, 
+                         fmt=plotformat, label=clabel)
         
         # Add labels and lines at axes
         title_list = []
@@ -215,6 +249,7 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, pyfilter=None, sqlfilter=N
         plt.ylabel(ydata)
         plt.axhline(0, linestyle=':', color='k')
         plt.axvline(0, linestyle=':', color='k')
+        plt.legend()
         
         # Data limits
         plotlimits = [np.min(ixdata), np.max(ixdata), np.min(iydata),np.max(iydata)]
