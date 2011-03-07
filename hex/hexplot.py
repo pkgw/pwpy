@@ -14,7 +14,7 @@ import hextoolkit
 
 def hexplot(xdata, ydata, groupby=None, colorby=None, wherecmd='',
             saveas='squintplots.pdf', title=None, lines=False, errorbars=True, 
-            xlim=None, ylim=None):
+            exclude_flagged=True, xlim=None, ylim=None):
     """
     hexplot
     =======
@@ -54,6 +54,7 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, wherecmd='',
             'antnum'
             'antname'
             'feed'
+            'feedrev'               Decimal feed revision
             'squintaz'
             'squintaz_uc'
             'squintel'
@@ -62,6 +63,7 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, wherecmd='',
             'sumchisq'
         Derived from SQL database:
             'antfeed'
+            'antfeedrev'
             'squintmag'
             'squintmag_uc'
             'squintangle'
@@ -95,9 +97,16 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, wherecmd='',
                 inputs.append('squintel')
             elif i in ('antfeed'):
                 inputs.append('antnum')
-                inputs.append('round(feed,1) as feed')
+                inputs.append('round(feed,0) as feed')
             elif i in ('feed'):
-                inputs.append('round(feed,1) as feed')
+                inputs.append('round(feed,0) as feed')
+                
+            elif i in ('antfeedrev'):
+                inputs.append('antnum')
+                inputs.append('round(feed,1) as feedrev')
+            elif i in ('feedrev'):
+                inputs.append('round(feed,1) as feedrev')
+                
             else:
                 inputs.append(i)
             
@@ -181,7 +190,7 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, wherecmd='',
             return
             
     # Get number of and list of coloring groups
-    palette = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
+    palette = ['b', 'g', 'r', 'c', 'm', 'y', 'k'] * 10
     colornum = 1
     if colorby != None:
         colorlist = np.unique(data[colorby])
@@ -224,18 +233,19 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, wherecmd='',
         for j in xrange(colornum):
             if colorby != None:
                 cgroup = np.where(data[colorby][igroup] == colorlist[j])
+                clabel = colorby + ' = ' + str(colorlist[j])
             else:
                 cgroup = np.where(data[xdata][igroup] == data[xdata][igroup])
+                clabel = colorby
                 
             if np.size(cgroup) == 0: continue
             
             plotformat = palette[j] + linestyle
             
-            [cxuc, cyux] = [None, None]
+            [cxuc, cyuc] = [None, None]
             if xuc != None: cxuc = xuc[cgroup]
             if yuc != None: cyuc = yuc[cgroup]
             
-            clabel = colorby + ' = ' + str(colorlist[j])
             
             plt.errorbar(ixdata[cgroup], iydata[cgroup], xerr=cxuc, yerr=cyuc, 
                          fmt=plotformat, label=clabel)
@@ -249,7 +259,7 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, wherecmd='',
         plt.ylabel(ydata)
         plt.axhline(0, linestyle=':', color='k')
         plt.axvline(0, linestyle=':', color='k')
-        plt.legend()
+        if colorby != None: plt.legend()
         
         # Data limits
         plotlimits = [np.min(ixdata), np.max(ixdata), np.min(iydata),np.max(iydata)]
