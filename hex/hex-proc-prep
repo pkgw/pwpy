@@ -107,6 +107,18 @@ set odecs = (`cut -d' ' -f2 <data-offsets.txt |awk '{print $1 * -206265}'`)
 
 # RFI flag everything
 
+set canpreflag=0
+
+type compass-newrfi-preflag >/dev/null
+if ($status) then
+    echo "No compass-newrfi-preflag; not preflagging."
+else if (! -f data-instrument.txt) then
+    echo "No data-instrument.txt; not preflagging."
+else
+    set instr=`cat data-instrument.txt`
+    set canpreflag=1
+endif
+
 foreach vis (vis00 $rest)
     # Remove dra/ddec headers that will mess up the modeling of the
     # offset pointings if they're there.
@@ -114,6 +126,13 @@ foreach vis (vis00 $rest)
     delhd in=$vis/ddec >&/dev/null
 
     if (! -d $vis/phoenix) then
+	if ($canpreflag) then 
+	    echo "Preflagging dataset $vis (instr $instr) before newrfisweep"
+	    echo ">>>>>>>>>>>>>>>>>>>>"
+	    compass-newrfi-preflag $instr $vis
+	    echo "<<<<<<<<<<<<<<<<<<<<"
+	endif
+
 	echo "RFI sweep dataset $vis"
 	echo ">>>>>>>>>>>>>>>>>>>>"
 	newrfisweep.csh vis=$vis $newrfiflags

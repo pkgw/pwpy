@@ -41,6 +41,7 @@ if (-f $1 && $#argv == 2) then
     set tstart = `grep tstart "$1" |cut -d' ' -f2`
     set tend = `grep tend "$1" |cut -d' ' -f2`
     set nfull = `grep nfull "$1" |cut -d' ' -f2`
+    set instr = `grep instr "$1" |cut -d' ' -f2`
 
     grep success "$1" >& /dev/null
     if ($status) then
@@ -141,5 +142,11 @@ end
 
 echo tstart "$tstart" >$workdir/data-databounds.txt
 echo tend "$tend" >>$workdir/data-databounds.txt
+
+# And the instrument
+
+if (x"$instr" != x) then
+    echo $instr >$workdir/data-instrument.txt
+endif
 
 exit 0

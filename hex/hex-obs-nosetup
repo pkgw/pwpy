@@ -236,8 +236,10 @@ while (1)
 end
 
 echo tstart `date -u +%y%b%d:%H:%M:%S.0` >$summfile1
+echo instr `echo $inst1 |cut -d: -f1` >>$summfile1
 echo nfull $npnt >>$summfile1
 echo tstart `date -u +%y%b%d:%H:%M:%S.0` >$summfile2
+echo instr `echo $inst2 |cut -d: -f1` >>$summfile2
 echo nfull $npnt >>$summfile2
 
 
