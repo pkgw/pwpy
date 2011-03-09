@@ -846,7 +846,7 @@ void calflag(bin_struct *bin) {
 	bin->data = NULL;
 
 	// Get median and scatter
-        for (i=0; i<2*n_bl*n_chan; i++) meddev_cmplx(data[i],n[i],&(med_spec[i]),&(rms_spec[i]));
+	for (i=0; i<2*n_bl*n_chan; i++) meddev_cmplx(data[i],n[i],&(med_spec[i]),&(rms_spec[i]));
 
 	// Compute a channel median for each baseline.
 	meddevspec(n_bl, n_chan, med_spec, median, deviation);
@@ -974,7 +974,7 @@ void calflag(bin_struct *bin) {
 			}
 		}
 		// Apply the flags found in bpcal
-        	for (i=0; i<2; i++)
+		for (i=0; i<2; i++)
 		for (bl=0; bl<n_bl; bl++)
 		for (ch=0; ch<n_chan; ch++)
 		if (get_bin_flag(bin,i,bl,ch)) {
@@ -987,7 +987,7 @@ void calflag(bin_struct *bin) {
 	// Re-calculate median and scatter, and channel median for each baseline
 // FIXME this may cause difficulties for the spectral corruption routine, as the worst of the corruption will
 // probably be flagged by the RFI algorithm. Not a problem until we re-calculate the statistics with medevspec()...
-        for (i=0; i<2*n_bl*n_chan; i++) meddev_cmplx(data[i],n[i],&(med_spec[i]),&(rms_spec[i]));
+	for (i=0; i<2*n_bl*n_chan; i++) meddev_cmplx(data[i],n[i],&(med_spec[i]),&(rms_spec[i]));
 	meddevspec(n_bl, n_chan, med_spec, median, deviation);
 
 //write_spectrum(bin,"cal-med.spec");
@@ -1085,7 +1085,7 @@ void calflag(bin_struct *bin) {
 	if (!nonoise) {
 		// Re-calculate median and scatter, and channel median for each baseline
 		printf("Looking for excessively noisy baselines:");
-        	for (i=0; i<2*n_bl*n_chan; i++) meddev_cmplx(data[i],n[i],&(med_spec[i]),&(rms_spec[i]));
+		for (i=0; i<2*n_bl*n_chan; i++) meddev_cmplx(data[i],n[i],&(med_spec[i]),&(rms_spec[i]));
 		meddevspec(n_bl, n_chan, med_spec, median, deviation);
 		// Flag entire baselines if the deviation is > 3 times the median deviation
 		nflag=0;
@@ -1215,7 +1215,7 @@ void noncal_stats(dataset_struct *visdata) {
 		bin->data = NULL;
 
 		// Get median and scatter
-        	for (i=0; i<2*n_bl*n_chan; i++) meddev_cmplx(data[i],n[i],&(med_spec[i]),&(rms_spec[i]));
+		for (i=0; i<2*n_bl*n_chan; i++) meddev_cmplx(data[i],n[i],&(med_spec[i]),&(rms_spec[i]));
 
 		// Compute a channel median for each baseline.
 		median = malloc(sizeof(complex float) * 2 * n_bl);
@@ -1243,18 +1243,19 @@ void noncal_stats(dataset_struct *visdata) {
 void check_phases(dataset_struct *first) {
 	bin_struct *bin;
 	dataset_struct *visdata;
-	unsigned int idx, pol, bl, ch, n_bl, n_chan, nflag;
+	unsigned int idx, pol, bl, ch, n_bl, n_chan, nflag, scan;
 	float phase_var, var, med;
 
 	n_bl = first->n_bl;
 	n_chan = first->n_chan;
 
-	printf("Examining calibrator phase variance:");
-	nflag=0;
+	printf("\nExamining calibrator phase variance:\n");
 	visdata = first;
 	while (visdata != NULL) {
 		bin = visdata->bin;
+		scan=0;
 		while (bin != NULL) {
+			nflag=0;
 			for (pol=0; pol<2; pol++)
 			for (bl=0; bl<n_bl; bl++) {
 				idx = pol*n_bl+bl;
@@ -1272,11 +1273,12 @@ void check_phases(dataset_struct *first) {
 					}
 				}
 			}
+			printf("  %s scan %u: flagged %u baseline/pols.\n",visdata->fname,scan,nflag);
 			bin = bin->next;
+			scan++;
 		}
 		visdata = visdata->next;
 	}
-	printf(" flagged %u baseline/pols.\n",nflag);
 }
 
 
@@ -1644,28 +1646,31 @@ void cleanup(dataset_struct *visdata) {
 }
 
 
-plist list_insert(plist list, bin_struct *bin) {
-        plist tmp, loc;
+plist sorted_list_insert(plist list, bin_struct *bin) {
+	plist tmp, loc;
 	bin_struct *b;
 
-        tmp = (plist) calloc(1, sizeof(struct list));
-        tmp->data = (void *) bin;
+	tmp = (plist) calloc(1, sizeof(struct list));
+	tmp->data = (void *) bin;
 
 	// First handle the case where the bin is inserted as the first element,
 	// either because the list was empty or because we have the earliest time.
 	if (list == NULL) {
-                tmp->next = NULL;
-        	tmp->prev = NULL;
-                return (tmp);
-        }
-	b = (bin_struct *) list->data;
-        if (bin->last_time < b->first_time) {
-                tmp->next = list;
-        	tmp->prev = NULL;
-        	list->prev = tmp;
-                return (tmp);
-        }
+		tmp->next = NULL;
+		tmp->prev = NULL;
+		return (tmp);
+	}
 
+	// ...we have the earliest time
+	b = (bin_struct *) list->data;
+	if (bin->last_time < b->first_time) {
+		tmp->next = list;
+		tmp->prev = NULL;
+		list->prev = tmp;
+		return (tmp);
+	}
+
+	// Now handle the general case
 	loc = list;
 	b = (bin_struct *) loc->data;
 	while (loc->next != NULL && bin->first_time > b->last_time) {
@@ -1675,7 +1680,7 @@ plist list_insert(plist list, bin_struct *bin) {
 	tmp->next = loc->next;
 	tmp->prev = loc;
 	loc->next = tmp;
-        return(tmp);
+	return(list);
 }
 
 
@@ -1691,7 +1696,7 @@ void interpolate_flags(plist binlist, dataset_struct *visdata) {
 		calbin = (bin_struct *) l->data;
 
 		// Find the first calibrator scan that occurs after our last time
-		while (l->next != NULL && bin->first_time < calbin->last_time) {
+		while (l->next != NULL && bin->first_time > calbin->last_time) {
 			l = l->next;
 			calbin = (bin_struct *) l->data;
 		}
@@ -1848,17 +1853,17 @@ int main(int argc, char *argv[]) {
 	}
 
 
-	// Make a time-sorted linked list of calibrator bins.
+	// Make a time-sorted linked list of calibrator scans (i.e. bins).
 	visdata = firstcaldata;
-	i=0;
 	while (visdata != NULL) {
 		bin = visdata->bin;
-		while (bin != NULL && i<15) {
-			binlist = list_insert(binlist, bin);
+		while (bin != NULL) {
+			binlist = sorted_list_insert(binlist, bin);
 			bin = bin->next;
 		}
 		visdata = visdata->next;
 	}
+
 
 	/* Process non-calibrator data */
 	if (n_vis_files) {
@@ -1879,8 +1884,6 @@ int main(int argc, char *argv[]) {
 			interpolate_flags(binlist,visdata);
 
 			noncal_stats(visdata);
-
-			// FIXME: run basic flagging algorithm on these data
 
 			if (!noflag) printf("Writing flag table for %s\n",visdata->fname);
 			write_flags(visdata);
