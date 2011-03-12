@@ -64,7 +64,7 @@ endif
 
 compass-newrfi-preflag $corr caldata
 newrfisweep.csh vis=caldata options=autoedge \
-    scans=999 subint=999 \
+    scans=25 subint=999 \
     |tee -ia newrfisweep.log
 
 
