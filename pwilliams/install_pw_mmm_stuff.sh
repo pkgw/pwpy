@@ -23,6 +23,7 @@ polsplit
 pwflag
 show
 sortinplace
+tiam
 tiph
 ucvc
 uvdam
