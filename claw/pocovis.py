@@ -26,7 +26,9 @@ class poco:
     def __init__(self,file,nints=1000,nskip=0):
         # initialize
         self.nchan = 64
-        self.chans = n.arange(6,58)
+#        self.chans = n.arange(6,58)
+        li = range(4,23) + range(37,49)
+        self.chans = n.array(li)
         self.nbl = 36
         initsize = nints*self.nbl   # number of integrations to read in a single chunk
         self.sfreq = 0.718  # freq for first channel in GHz
@@ -59,7 +61,7 @@ class poco:
 #        opts = keys.process ()
 
 # poor man's way
-        vis = miriad.VisData(file)
+        vis = miriad.VisData(file,)
 
         # initialize parameters
         nchan = self.nchan
@@ -125,13 +127,16 @@ class poco:
         Reshapes data for usage by other functions.
         Note that it assumes that any integration with bad data has an entire baseline flagged.
         """
-        data = ((self.rawdata * self.flags)[:,self.noautos])[:,:,self.chans]
-        totallen = data[self.flags[:,self.noautos][:,:,self.chans]].shape[0]
+        rawdata = self.rawdata
+        flags = self.flags
+
+        data = ((rawdata * flags)[:,self.noautos])[:,:,self.chans]
+        totallen = data[flags[:,self.noautos][:,:,self.chans]].shape[0]
         tlen = data.shape[0]
         chlen = len(self.chans)
-        self.data = n.reshape(data[self.flags[:,self.noautos][:,:,self.chans]], (tlen, totallen/(tlen*chlen), chlen)) # data is what is typically needed
+        self.data = n.reshape(data[flags[:,self.noautos][:,:,self.chans]], (tlen, totallen/(tlen*chlen), chlen)) # data is what is typically needed
         self.dataph = n.abs(self.data.mean(axis=1))  #dataph is summed to form beam at phase center
-        self.rawdata = (self.rawdata * self.flags)
+        self.rawdata = (rawdata * flags)
 
         print 'Data flagged, trimmed in channels, and averaged across baselines.'
         print 'New rawdata, data, dataph shapes:'
@@ -145,14 +150,16 @@ class poco:
 # does not account for noise bias.  assumes lots of flux in the field
         mean = self.dataph.mean()
         std = self.dataph.std()
-        abs = (self.dataph - mean)/std
+#        abs = (self.dataph - mean)/std
+        abs = (self.dataph - mean)
         print 'Data mean, std: %f, %f' % (mean, std)
 
         p.figure(1)
-        ax = p.imshow(n.rot90(abs), aspect='auto', origin='upper', interpolation='nearest', extent=(min(reltime),max(reltime),min(chans),max(chans)))
+        ax = p.imshow(n.rot90(abs), aspect='auto', origin='upper', interpolation='nearest', extent=(min(reltime),max(reltime),0,len(chans)))
+#        ax = p.imshow(n.rot90(abs), aspect='auto', origin='upper', interpolation='nearest', extent=(min(reltime),max(reltime),min(chans),max(chans)))
         p.colorbar(ax)
         p.xlabel('Relative time (s)')
-        p.ylabel('Channel ')
+        p.ylabel('Channel (flagged data removed)')
         if save:
             savename = self.file.split('.')[:-1]
             savename.append(str(self.nskip/self.nbl) + '.spec.png')
@@ -163,14 +170,18 @@ class poco:
             p.show()
             
 
-    def fitspec(self, obsrms=30., save=0):
+    def fitspec(self, save=0):
         """
         Fits a powerlaw to the mean spectrum at the phase center.
-        obsrms is the noise per channel used for noise bias correction during spectral index fit.
         Returns fit parameters.
         """
 
         freq = self.sfreq + self.chans * self.sdf             # freq array in GHz
+
+        # estimage of vis rms per channel from spread in imag space at phase center
+        obsrms = n.std(self.data.mean(axis=1).imag)
+        print
+        print 'obsrms = %.2f' % (obsrms)
 
         plaw = lambda a, b, x: a * (x/x[0]) ** b
         fitfunc = lambda p, x, rms:  n.sqrt(plaw(p[0], p[1], x)**2 + rms**2)
@@ -309,7 +320,7 @@ class poco:
             print 'Track length, %d, less than number of channels, %d.  Skipping.' % (len(track[1]), minintersect)
             return
 
-        if bgwindow > 3:
+        if bgwindow > 6:
             bgrange = range(int(-bgwindow/2.) + tbin - tshift, int(bgwindow/2.) + tbin - tshift + 1)
             bgrange.remove(tbin - tshift); bgrange.remove(tbin - tshift + 1); bgrange.remove(tbin - tshift - 1); bgrange.remove(tbin - tshift + 2); bgrange.remove(tbin - tshift - 2)
             for i in bgrange:     # build up super track for background subtraction
@@ -319,6 +330,8 @@ class poco:
                     tmp = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[i], show=0)
                     trackbg[0].extend(tmp[0])
                     trackbg[1].extend(tmp[1])
+        else:
+            print 'Not doing any background subtraction.'
 
 #                print 'trackbg'
 #            print self.rawdata[:,:,self.chans][trackbg[0], 1, trackbg[1]]
@@ -372,12 +385,12 @@ class poco:
                 if n.any(flags):
                     bgarr = []
                     for j in range(self.nchan):
-                        matches = n.where( (j - min(self.chans) ) == n.array(track[1]) )[0]   # hack, since chans are from 0-64, but track is in trimmed chan space
-                        if len(matches) >= 1:
+                        if j in self.chans:
+                            matches = n.where( j == n.array(self.chans[track[1]]) )[0]   # hack, since chans are from 0-64, but track is in trimmed chan space
                             raw = rawdatatrim[track[0], i-int0, track[1]][matches]   # all baselines for the known pulse
                             raw = raw.mean(axis=0)   # create spectrum for each baseline by averaging over time
-                            if bgwindow > 1:   # same as above, but for bg
-                                matchesbg = n.where( (j - min(self.chans)) == n.array(trackbg[1]) )[0]
+                            if bgwindow > 6:   # same as above, but for bg
+                                matchesbg = n.where( j == n.array(self.chans[trackbg[1]]) )[0]
                                 rawbg = rawdatatrim[trackbg[0], i-int0, trackbg[1]][matchesbg]
                                 rawbg = rawbg.mean(axis=0)
                                 bgarr.append(rawbg)
@@ -386,6 +399,8 @@ class poco:
                                 data[j] = raw
                         else:
                             flags[j] = False
+
+
 #                    print 'BG spectrum std =', (n.abs(bgarr)).std()
 
 #                ants = util.decodeBaseline (preamble[4])
@@ -852,7 +867,7 @@ def process_pickle(filename, pathin, mode='image'):
     peaktrial = n.where(snrarr == max(snrarr))[0][0]
 
     nints=500
-    bgwindow = 15
+    bgwindow = 10
     
     print 'Loaded pickle file for %s' % (name)
     print 'Has peaks at DM = ', dmarr
@@ -866,7 +881,8 @@ def process_pickle(filename, pathin, mode='image'):
         if mode == 'spec':  # just show spectrum
             # plot track and spectrogram
             p.figure(1)
-            p.plot(pv.reltime[track[0]], pv.chans[track[1]], 'w,')
+#            p.plot(pv.reltime[track[0]], pv.chans[track[1]], 'w,')   # doesn't align with data when channels are flagged
+            p.plot(pv.reltime[track[0]], track[1], 'w,')
             pv.spec(save=0)
             # write out bg-subbed track, read back in to fit spectrum
             pv.writetrack(dmbinarr[peaktrial], bgwindow, tshift=0, bgwindow=bgwindow)
@@ -874,7 +890,7 @@ def process_pickle(filename, pathin, mode='image'):
             print 'Loading file', newfile
             pv2 = poco(newfile, nints=1)
             pv2.prep()
-            pv2.fitspec(obsrms=30., save=0)
+            pv2.fitspec(save=0)
             removefile(newfile)
         elif mode == 'dmt0':
             pv.makedmt0()
@@ -882,7 +898,7 @@ def process_pickle(filename, pathin, mode='image'):
 #            p.plot(pv.reltime[bgwindow], pv.dmarr[dmbinarr[peaktrial]], '*' )   # not working?
             pv.plotdmt0(save=1)
         elif mode == 'image':
-            peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = pv.imagedmt0(dmbinarr[peaktrial], bgwindow)
+            peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = pv.imagedmt0(dmbinarr[peaktrial], bgwindow, bgwindow=bgwindow)
             print peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
         elif mode == 'uvfit':
             peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = pv.uvfitdmt0(dmbinarr[peaktrial], bgwindow)
@@ -908,7 +924,7 @@ if __name__ == '__main__':
 
     fileroot = 'poco_crab_201103.mir'
     pathin = 'data/'
-    pathout = 'crab_fixdm_ph2/'
+    pathout = 'crab_fixdm_ph2_flagged/'
     if len(sys.argv) == 1:
         # if no args, search for pulses
         print 'Searching for pulses...'
@@ -917,7 +933,6 @@ if __name__ == '__main__':
     elif len(sys.argv) == 2:
         # if pickle, then plot data or dm search results
         print 'Assuming input file is pickle of candidate...'
-        dedisperse = 1
         process_pickle(sys.argv[1], pathin=pathin, mode='spec')
     elif len(sys.argv) == 6:
         # if full spec of trial, image it
