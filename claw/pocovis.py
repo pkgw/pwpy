@@ -111,15 +111,18 @@ class poco:
             fl = fl[0:i-nskip]
             ti = ti[0:i-nskip]
 
-        self.rawdata = da.reshape((i-nskip)/nbl,nbl,nchan)
-        self.flags = fl.reshape((i-nskip)/nbl,nbl,nchan)
-        self.time = ti[::nbl]
-        self.reltime = 24*3600*(self.time - self.time[0])      # relative time array in seconds
-        print
-        print 'Data read!'
-        print 'Shape of raw data, flags, time:'
-        print self.rawdata.shape, self.flags.shape, self.time.shape
-        print 
+        try:
+            self.rawdata = da.reshape((i-nskip)/nbl,nbl,nchan)
+            self.flags = fl.reshape((i-nskip)/nbl,nbl,nchan)
+            self.time = ti[::nbl]
+            self.reltime = 24*3600*(self.time - self.time[0])      # relative time array in seconds
+            print
+            print 'Data read!'
+            print 'Shape of raw data, flags, time:'
+            print self.rawdata.shape, self.flags.shape, self.time.shape
+            print 
+        except ValueError:
+            print 'Could not reshape data arrays. Incomplete read?'
 
 
     def prep(self):
@@ -135,7 +138,7 @@ class poco:
         tlen = data.shape[0]
         chlen = len(self.chans)
         self.data = n.reshape(data[flags[:,self.noautos][:,:,self.chans]], (tlen, totallen/(tlen*chlen), chlen)) # data is what is typically needed
-        self.dataph = n.abs(self.data.mean(axis=1))  #dataph is summed to form beam at phase center
+        self.dataph = n.abs(self.data.mean(axis=1))  #dataph is summed and detected to form TP beam at phase center
         self.rawdata = (rawdata * flags)
 
         print 'Data flagged, trimmed in channels, and averaged across baselines.'
@@ -150,8 +153,8 @@ class poco:
 # does not account for noise bias.  assumes lots of flux in the field
         mean = self.dataph.mean()
         std = self.dataph.std()
-#        abs = (self.dataph - mean)/std
-        abs = (self.dataph - mean)
+        abs = (self.dataph - mean)/std
+#        abs = self.dataph
         print 'Data mean, std: %f, %f' % (mean, std)
 
         p.figure(1)
@@ -260,8 +263,7 @@ class poco:
         chanbin = []
 
         for ch in range(len(chans)):
-            ontime = n.where(((pulset[ch] + pulsedt[ch]) >= reltime) & ((pulset[ch] - pulsedt[ch]) <= reltime))
-#            ontime = n.where(((pulset[ch] + pulsedt[ch]/2.) >= reltime) & ((pulset[ch] - pulsedt[ch]/2.) <= reltime))
+            ontime = n.where(((pulset[ch] + pulsedt[ch]/2.) >= reltime) & ((pulset[ch] - pulsedt[ch]/2.) <= reltime))
             timebin = n.concatenate((timebin, ontime[0]))
             chanbin = n.concatenate((chanbin, (ch * n.ones(len(ontime[0]), dtype=int))))
 
@@ -287,19 +289,19 @@ class poco:
         chans = self.chans
 
         dmt0arr = n.zeros((len(dmarr),len(reltime)), dtype='float64')
-#        accummask = n.zeros(self.dataph.shape, dtype='bool')
 
         for i in range(len(dmarr)):
             for j in range(len(reltime)):
                 if self.usedmmask:    # slower by factor of 2 than dmtracks
                     dmmask = self.dmmask(dm=dmarr[i], t0=reltime[j])
                     if dmmask.sum() >= minintersect:               # ignore tiny, noise-dominated tracks
-                        dmt0arr[i,j] = n.mean((self.dataph * dmmask)[n.where(dmmask == True)])
-#                   accummask = accummask + dmmask
+#                        dmt0arr[i,j] = n.mean((self.dataph * dmmask)[n.where(dmmask == True)])
+                        dmt0arr[i,j] = n.abs(((self.data * dmmask)[n.where(dmmask == True)]).mean(axis=1))
                 else:
                     dmtrack = self.dmtrack(dm=dmarr[i], t0=reltime[j])
                     if len(dmtrack[0]) >= minintersect:               # ignore tiny, noise-dominated tracks
-                        dmt0arr[i,j] = n.mean(self.dataph[dmtrack[0],dmtrack[1]])
+#                        dmt0arr[i,j] = n.mean(self.dataph[dmtrack[0],dmtrack[1]])
+                        dmt0arr[i,j] = n.abs((((self.data).mean(axis=1))[dmtrack[0],dmtrack[1]]).mean())
             print 'dedispersed for ', dmarr[i]
 
         self.dmt0arr = dmt0arr
@@ -924,7 +926,7 @@ if __name__ == '__main__':
 
     fileroot = 'poco_crab_201103.mir'
     pathin = 'data/'
-    pathout = 'crab_fixdm_ph2_flagged/'
+    pathout = 'crab_fixdm_ph2_flagged_meandet/'
     if len(sys.argv) == 1:
         # if no args, search for pulses
         print 'Searching for pulses...'
@@ -933,7 +935,7 @@ if __name__ == '__main__':
     elif len(sys.argv) == 2:
         # if pickle, then plot data or dm search results
         print 'Assuming input file is pickle of candidate...'
-        process_pickle(sys.argv[1], pathin=pathin, mode='spec')
+        process_pickle(sys.argv[1], pathin=pathin, mode='dmt0')
     elif len(sys.argv) == 6:
         # if full spec of trial, image it
         print 'Imaging DM trial...'
