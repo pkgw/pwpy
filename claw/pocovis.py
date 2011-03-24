@@ -27,7 +27,8 @@ class poco:
         # initialize
         self.nchan = 64
 #        self.chans = n.arange(6,58)
-        li = range(4,23) + range(37,49)
+#        li = range(4,23) + range(37,49)   # must match flagging range; miriad 1-4, 24-38, 50-64
+        li = range(2,10) + range(11,23) + range(37,39) + range(40,41) + range(44,49)   # must match flagging range; miriad 1-2, 11, 24-37, 40, 42-44, 50-64
         self.chans = n.array(li)
         self.nbl = 36
         initsize = nints*self.nbl   # number of integrations to read in a single chunk
@@ -114,12 +115,12 @@ class poco:
         try:
             self.rawdata = da.reshape((i-nskip)/nbl,nbl,nchan)
             self.flags = fl.reshape((i-nskip)/nbl,nbl,nchan)
-            self.time = ti[::nbl]
-            self.reltime = 24*3600*(self.time - self.time[0])      # relative time array in seconds
+            time = ti[::nbl]
+            self.reltime = 24*3600*(time - time[0])      # relative time array in seconds
             print
             print 'Data read!'
             print 'Shape of raw data, flags, time:'
-            print self.rawdata.shape, self.flags.shape, self.time.shape
+            print self.rawdata.shape, self.flags.shape, self.reltime.shape
             print 
         except ValueError:
             print 'Could not reshape data arrays. Incomplete read?'
@@ -186,12 +187,14 @@ class poco:
         print
         print 'obsrms = %.2f' % (obsrms)
 
+        spec = n.abs((((self.data).mean(axis=1))).mean(axis=0))
+
         plaw = lambda a, b, x: a * (x/x[0]) ** b
         fitfunc = lambda p, x, rms:  n.sqrt(plaw(p[0], p[1], x)**2 + rms**2)
         errfunc = lambda p, x, y, rms: y - fitfunc(p, x, rms)
 
         p0 = [50.,0.]
-        p1, success = opt.leastsq(errfunc, p0[:], args = (freq, (self.dataph).mean(axis=0), obsrms))
+        p1, success = opt.leastsq(errfunc, p0[:], args = (freq, spec, obsrms))
         print 'Fit results: ', p1
 
 #        obsrms = n.sqrt((errfunc(p1, freq, self.dataph[0], obsrms)**2).mean())
@@ -201,7 +204,7 @@ class poco:
 #        obsrms = n.sqrt((errfunc(p1, freq, self.dataph[0], obsrms)**2).mean())
 
         p.figure(2)
-        p.plot(freq, self.dataph[0])
+        p.errorbar(freq, spec, yerr=obsrms*n.ones(len(spec)), fmt='.')
         p.plot(freq, fitfunc(p1, freq, obsrms))
         p.xlabel('Frequency'); p.ylabel('Flux Density (Jy)')
         if save == 1:
@@ -728,13 +731,22 @@ def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000):
     """
 
     maxints = 131000
-    edge = 360
+    edge = 360  # ok for Crab DM of 56.8
 
     filelist = []
-    for i in [0,1,4,5,6,7,8,9]:
+# for crab 201103
+#    for i in [0,1,4,5,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+#    for i in range(0,8):
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+
+# for crab 190348
+    for i in [0,1,2,3,4,5,6,7,8,9]:
         filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
-    for i in range(0,8):
+    for i in [1,3,4,5,6,7,8,9]:
         filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+    for i in [0,1,2,3]:
+        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
         
     print 'Looping over filelist: ', filelist
 
@@ -924,18 +936,21 @@ if __name__ == '__main__':
     print 'Greetings, human.'
     print ''
 
-    fileroot = 'poco_crab_201103.mir'
+    fileroot = 'poco_crab_190348.mir'
     pathin = 'data/'
-    pathout = 'crab_fixdm_ph2_flagged_meandet/'
+    pathout = 'crab_fixdm_ph/'
     if len(sys.argv) == 1:
         # if no args, search for pulses
         print 'Searching for pulses...'
-#        pulse_search_image(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, show=0)
-        pulse_search_phasecenter(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000)
+        try:
+#            pulse_search_image(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, show=0)
+            pulse_search_phasecenter(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000)
+        except AttributeError:
+            exit(0)
     elif len(sys.argv) == 2:
         # if pickle, then plot data or dm search results
         print 'Assuming input file is pickle of candidate...'
-        process_pickle(sys.argv[1], pathin=pathin, mode='dmt0')
+        process_pickle(sys.argv[1], pathin=pathin, mode='spec')
     elif len(sys.argv) == 6:
         # if full spec of trial, image it
         print 'Imaging DM trial...'

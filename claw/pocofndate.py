@@ -21,5 +21,5 @@ st = time.strptime("%d_%d_%d_%d_%d" % ( year, doy, h, m, s), "%Y_%j_%H_%M_%S")
 stoff = datetime.datetime(*st[:6]) + dt
 
 
-print 'Segment 1 time:  %s' % (time.strftime("%y%b%d:%H:%M:%S",st))
-print 'Segment %d time:  %s.%.4s' % (int(segment), stoff.strftime("%y%b%d:%H:%M:%S"), stoff.microsecond)
+print 'First segment start time:  %s' % (time.strftime("%y%b%d:%H:%M:%S",st))
+print 'Segment %d start time:  %s.%.4s' % (int(segment), stoff.strftime("%y%b%d:%H:%M:%S"), stoff.microsecond)
