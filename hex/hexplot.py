@@ -72,9 +72,8 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, wherecmd='',
             
     TODO LIST:
         -look into interactive plotting
-        -outlier identification & option to suppress (in database buildup)
-        -color
-        -filtering by uc
+        -outlier identification (by uc?) & automatic flagging
+        -more colors
         -mag vs feed by ant
          
     """
@@ -190,7 +189,7 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, wherecmd='',
             return
             
     # Get number of and list of coloring groups
-    palette = ['b', 'g', 'r', 'c', 'm', 'y', 'k'] * 10
+    palette = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w'] * 10
     colornum = 1
     if colorby != None:
         colorlist = np.unique(data[colorby])
@@ -233,10 +232,10 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, wherecmd='',
         for j in xrange(colornum):
             if colorby != None:
                 cgroup = np.where(data[colorby][igroup] == colorlist[j])
-                clabel = colorby + ' = ' + str(colorlist[j])
+                clabel = str(colorlist[j])
             else:
                 cgroup = np.where(data[xdata][igroup] == data[xdata][igroup])
-                clabel = colorby
+                clabel = ''
                 
             if np.size(cgroup) == 0: continue
             
@@ -259,7 +258,9 @@ def hexplot(xdata, ydata, groupby=None, colorby=None, wherecmd='',
         plt.ylabel(ydata)
         plt.axhline(0, linestyle=':', color='k')
         plt.axvline(0, linestyle=':', color='k')
-        if colorby != None: plt.legend()
+        if colorby != None: 
+            prop = matplotlib.font_manager.FontProperties(size='small')
+            plt.legend(prop=prop, numpoints=1, title=colorby)
         
         # Data limits
         plotlimits = [np.min(ixdata), np.max(ixdata), np.min(iydata),np.max(iydata)]
