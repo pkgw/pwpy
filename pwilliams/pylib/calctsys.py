@@ -291,6 +291,7 @@ from numutils import *
 from miriad import *
 from mirtask import keys, util
 
+__version_info__ = (1, 0)
 SVNID = '$Id$'
 
 # Tables
@@ -821,16 +822,21 @@ def dumpText (solutions, durDays, outfn):
     f.close ()
 
 
+class TextFormatError (StandardError):
+    def __init__ (self, *args):
+        self.text = ' '.join (str (x) for x in args)
+    def __str__ (self):
+        return self.text
+
+
 def loadText (fn):
     """Load solution data from the simple textual file format."""
 
-    f = file (fn, 'r')
-
+    f = open (fn)
     a = f.readline ().strip ().split ()
 
     if a[0] != 'nsol' or len (a) != 2:
-        print >>sys.stderr, 'Error: file', fn, 'does not appear to contain TSys information.'
-        sys.exit (1)
+        raise TextFormatError ('file', fn, 'does not appear to contain TSys information')
 
     nsol_expected = int (a[1])
     in_soln = False
@@ -842,37 +848,44 @@ def loadText (fn):
         if not in_soln:
             if a[0] == 'startsolution':
                 in_soln = True
-                sefds = {}
+                aps = []
+                sefds = []
+                rms = []
+                ncontribs = []
                 tstart = None
                 durDays = None
+                prchisq = None
                 badbps = set ()
             continue
 
         if a[0] == 'endsolution':
             in_soln = False
             if tstart is None:
-                print >>sys.stderr, 'Error: no start time for solution in file', fn
-                sys.exit (1)
+                raise TextFormatError ('no start time for solution in file', fn)
             if durDays is None:
-                print >>sys.stderr, 'Error: no duration for solution in file', fn
-                sys.exit (1)
-            # FIXME update to make sefds a pair of lists instead of a dict and
-            # add dummy RMS, ncontrib, & pseudo-rchisq values
-            solutions.append ((tstart, sefds, badbps, 1.0))
+                raise TextFormatError ('no duration for solution in file', fn)
+            if prchisq is None:
+                raise TextFormatError ('no pseudo-reduced-chi-squared for solution in file', fn)
+
+            solutions.append ((tstart, aps, sefds, badbps, 1.0, rms, ncontribs, prchisq))
             continue
 
         if a[0] == 'tstart':
             tstart = float (a[1])
         elif a[0] == 'duration':
             durDays = float (a[1])
+        elif a[0] == 'prchisq':
+            prchisq = float (a[1])
         elif a[0] == 'sefd':
-            ap = util.parseAP (a[1])
-            sefds[ap] = float (a[2])
+            aps.append (util.parseAP (a[1]))
+            sefds.append (float (a[2]))
+            rms.append (float (a[3]))
+            ncontribs.append (int (float (a[4])))
         elif a[0] == 'badbp':
             badbps.add (util.parseBP (a[1]))
 
     if len (solutions) != nsol_expected:
-        print >>sys.stderr, 'Error: missing soltions in file', fn
+        raise TextFormatError ('missing solutions in file', fn)
 
     solutions.append ((tstart + durDays, None, None, None))
     return solutions
@@ -1063,6 +1076,123 @@ def rewriteData (banner, vis, out, solutions, varyJyPerK, **kwargs):
     
     dOut.closeHistory ()
     dOut.close ()
+
+
+# AWFF/ARF interface
+
+try:
+    import arf
+except:
+    pass
+else:
+    from awff.minimake import SimpleMake
+    from awff.pathref import FileRef
+
+    def _gettsysinfo (context, vis=None, params=None):
+        context.ensureDir ()
+        out = FileRef (context.fullpath ('out'))
+
+        interval = params.get ('interval', 5. / 60 / 24)
+        flux = params.get ('flux')
+        quant = ensureiterable (params.get ('quant', []))
+        hann = params.get ('hann', 1)
+        jyperk = params.get ('jyperk', -1)
+        maxtsys = params.get ('maxtsys', 350)
+        maxresid = params.get ('maxresid', 50)
+
+        if len (quant) == 0:
+            etaQ = 1
+        else:
+            levels = quant[0]
+
+            if len (quant) > 1:
+                beta = quant[1]
+            else:
+                beta = 1
+
+            if (levels, beta) in etaQs:
+                etaQ = etaQs[(levels, beta)]
+            else:
+                raise ValueError ('quant = %r' % quant)
+
+        uvdatargs = {}
+        uvdatargs['select'] = params.get ('select')
+        uvdatargs['line'] = params.get ('line')
+        uvdatargs['stokes'] = params.get ('stokes')
+        uvdatargs['ref'] = params.get ('ref')
+        uvdatargs['nocal'] = params.get ('nocal')
+        uvdatargs['nopass'] = params.get ('nopass')
+        uvdatargs['nopol'] = params.get ('nopol')
+
+        dp = DataProcessor (interval, flux, etaQ, hann, jyperk, maxtsys, maxresid)
+        for tup in vis.readLowlevel ('3', False, **uvdatargs):
+            dp.process (*tup)
+        dp.finish ()
+        dumpText (dp.solutions, interval, str (out))
+
+        return out
+
+    GetTSysInfo = SimpleMake ('vis params', 'out', _gettsysinfo)
+
+    from mirtask.util import mir2aps, aps2ants
+    from arf.vispipe import VisPipeStage
+
+    class AddTSysInfo (VisPipeStage):
+        def __init__ (self, pathobj):
+            self.pathobj = pathobj
+            self.solutions = loadText (str (pathobj))
+
+        def __str__ (self):
+            return '%s(%s)' % (self.__class__.__name__, self.pathobj)
+
+        def updateHash (self, updater):
+            updater (self.__class__.__name__)
+            updater (str (self.pathobj))
+
+        def init (self, state):
+            self.nextsolnidx = 0
+            self.cursoln = None
+            self.badbps = None
+            self.goodaps = None
+            self.curjyperk = None
+            self.tsystrack = None
+            self.systemps = None
+
+        def record (self, state):
+            nextsoldata = self.solutions[self.nextsolnidx]
+            cursoln = self.cursoln
+            badbps = self.badbps
+            goodaps = self.goodaps
+            curjyperk = self.curjyperk
+            tsystrack = self.tsystrack
+            systemps = self.systemps
+
+            if tsystrack is None:
+               tsystrack = self.tsystrack = state.inp.makeVarTracker ().track ('systemp')
+
+            if tsystrack.updated ():
+                nants = state.inp.getVarInt ('nants')
+                systemps = self.systemps = state.inp.getVarFloat ('systemp', nants)
+
+            if state.preamble[3] > nextsoldata[0] or cursoln is None:
+                cursoln = self.cursoln = dict (zip (nextsoldata[1], nextsoldata[2]))
+                badbps = self.badbps = nextsoldata[3]
+                curjyperk = self.curjyperk = nextsoldata[4]
+                goodaps = self.goodaps = set (cursoln.iterkeys ())
+                self.nextsolnidx += 1
+
+            aps = mir2aps (state.inp, state.preamble)
+            ant1, ant2, pol = aps2ants (aps)
+
+            if aps[0] not in goodaps or aps[1] not in goodaps or aps in badbps:
+                state.flags.fill (0)
+                jyperk = 1e-6
+            else:
+                jyperk = N.sqrt ((cursoln[aps[0]] * cursoln[aps[1]]) / 
+                                 (systemps[ant1 - 1] * systemps[ant2 - 1])) * curjyperk
+
+            state.jyperk = jyperk
+
 
 # Task implementation.
 
@@ -1270,7 +1400,12 @@ def taskApply (args):
 
     vis = VisData (args.vis)
     out = VisData (args.out)
-    solutions = loadText (args.textin)
+
+    try:
+        solutions = loadText (args.textin)
+    except TextFormatError, e:
+        return die (str (e))
+
     rewriteData (banner, vis, out, solutions, args.dualpol, **inputArgs)
     return 0
 
