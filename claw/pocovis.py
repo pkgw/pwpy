@@ -28,7 +28,8 @@ class poco:
         self.nchan = 64
 #        self.chans = n.arange(6,58)
 #        li = range(4,23) + range(37,49)   # must match flagging range; miriad 1-4, 24-38, 50-64
-        li = range(2,10) + range(11,23) + range(37,39) + range(40,41) + range(44,49)   # must match flagging range; miriad 1-2, 11, 24-37, 40, 42-44, 50-64
+#        li = range(2,10) + range(11,23) + range(37,39) + range(40,41) + range(44,49)   # must match flagging range; miriad 1-2, 11, 24-37, 40, 42-44, 50-64
+        li = range(3,10) + range(11,23) + range(37,39) + range(40,41) + range(44,49)   # must match flagging range; miriad 1-2, 11, 24-37, 40, 42-44, 50-64
         self.chans = n.array(li)
         self.nbl = 36
         initsize = nints*self.nbl   # number of integrations to read in a single chunk
@@ -180,6 +181,7 @@ class poco:
         Returns fit parameters.
         """
 
+        log = open('spfit.txt','a')
         freq = self.sfreq + self.chans * self.sdf             # freq array in GHz
 
         # estimage of vis rms per channel from spread in imag space at phase center
@@ -213,6 +215,7 @@ class poco:
             savename = string.join(savename,'.')
             print 'Saving file as ', savename
             p.savefig(savename)
+            print >> log, savename, 'Fit results: ', p1
         else:
             p.show()
 
@@ -255,6 +258,7 @@ class poco:
 
         reltime = self.reltime
         chans = self.chans
+        tint = self.reltime[1] - self.reltime[0]
 
         freq = self.sfreq + chans * self.sdf             # freq array in GHz
 
@@ -266,7 +270,8 @@ class poco:
         chanbin = []
 
         for ch in range(len(chans)):
-            ontime = n.where(((pulset[ch] + pulsedt[ch]/2.) >= reltime) & ((pulset[ch] - pulsedt[ch]/2.) <= reltime))
+#            ontime = n.where(((pulset[ch] + pulsedt[ch]/2.) >= reltime) & ((pulset[ch] - pulsedt[ch]/2.) <= reltime))
+            ontime = n.where(((pulset[ch] + pulsedt[ch]/2.) >= reltime - tint/2.) & ((pulset[ch] - pulsedt[ch]/2.) <= reltime + tint/2.))
             timebin = n.concatenate((timebin, ontime[0]))
             chanbin = n.concatenate((chanbin, (ch * n.ones(len(ontime[0]), dtype=int))))
 
@@ -288,7 +293,7 @@ class poco:
         dmarr = self.dmarr
 #        reltime = n.arange(2*len(self.reltime))/2.  # danger!
         reltime = self.reltime
-        minintersect = len(self.chans)
+        minintersect = len(self.chans)/2
         chans = self.chans
 
         dmt0arr = n.zeros((len(dmarr),len(reltime)), dtype='float64')
@@ -316,7 +321,7 @@ class poco:
         Output parameter says whether to 'c'reate a new file or 'a'ppend to existing one. **not tested**
         """
 
-        minintersect = len(self.chans)
+        minintersect = len(self.chans)/2
         rawdatatrim = self.rawdata[:,:,self.chans]
 
         track = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[tbin-tshift], show=0)  # needs to be shifted by -1 bin in reltime?
@@ -325,9 +330,9 @@ class poco:
             print 'Track length, %d, less than number of channels, %d.  Skipping.' % (len(track[1]), minintersect)
             return
 
-        if bgwindow > 6:
+        if bgwindow > 8:
             bgrange = range(int(-bgwindow/2.) + tbin - tshift, int(bgwindow/2.) + tbin - tshift + 1)
-            bgrange.remove(tbin - tshift); bgrange.remove(tbin - tshift + 1); bgrange.remove(tbin - tshift - 1); bgrange.remove(tbin - tshift + 2); bgrange.remove(tbin - tshift - 2)
+            bgrange.remove(tbin - tshift); bgrange.remove(tbin - tshift + 1); bgrange.remove(tbin - tshift - 1); bgrange.remove(tbin - tshift + 2); bgrange.remove(tbin - tshift - 2); bgrange.remove(tbin - tshift + 3); bgrange.remove(tbin - tshift - 3)
             for i in bgrange:     # build up super track for background subtraction
                 if bgrange.index(i) == 0:   # first time through
                     trackbg = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[i], show=0)
@@ -555,6 +560,8 @@ class poco:
         """ Makes and fits an background subtracted image for a given dmbin and t0bin.
         tshift can shift the actual t0bin earlier to allow reading small chunks of data relative to pickle.
         """
+
+        minintersect = len(self.chans)/2
         
         # set up
         outroot = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl) + '-dm' + str(dmbin) + 't' + str(t0bin)
@@ -564,7 +571,7 @@ class poco:
         # make dm trial and image
         dmtrack = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[t0bin-tshift])
 
-        if len(dmtrack[0]) >= len(self.chans):               # ignore tiny, noise-dominated tracks
+        if len(dmtrack[0]) >= minintersect:               # ignore tiny, noise-dominated tracks
             print
             self.writetrack(dmbin, t0bin, 'c', tshift=tshift, bgwindow=bgwindow)   # output file at dmbin, trelbin
 
@@ -613,6 +620,8 @@ class poco:
         tshift can shift the actual t0bin earlier to allow reading small chunks of data relative to pickle.
         """
         
+        minintersect = len(self.chans)/2
+        
         # set up
         outroot = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl) + '-dm' + str(dmbin) + 't' + str(t0bin)
         removefile (outroot+'.map'); removefile (outroot+'.beam'); removefile (outroot+'.clean'); removefile (outroot+'.restor')
@@ -621,7 +630,7 @@ class poco:
         # make dm trial and image
         dmtrack = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[t0bin-tshift])
 
-        if len(dmtrack[0]) >= len(self.chans):               # ignore tiny, noise-dominated tracks
+        if len(dmtrack[0]) >= minintersect:               # ignore tiny, noise-dominated tracks
             print
             self.writetrack(dmbin, t0bin, 'c', tshift=tshift, bgwindow=15)   # output file at dmbin, trelbin
 
@@ -735,18 +744,18 @@ def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000):
 
     filelist = []
 # for crab 201103
-#    for i in [0,1,4,5,6,7,8,9]:
-#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
-#    for i in range(0,8):
-#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+    for i in [0,1,4,5,6,7,8,9]:
+        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+    for i in range(0,8):
+        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
 
 # for crab 190348
-    for i in [0,1,2,3,4,5,6,7,8,9]:
-        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
-    for i in [1,3,4,5,6,7,8,9]:
-        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
-    for i in [0,1,2,3]:
-        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
+#    for i in [0,1,2,3,4,5,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+#    for i in [1,3,4,5,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+#    for i in [0,1,2,3]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
         
     print 'Looping over filelist: ', filelist
 
@@ -895,16 +904,15 @@ def process_pickle(filename, pathin, mode='image'):
         if mode == 'spec':  # just show spectrum
             # plot track and spectrogram
             p.figure(1)
-#            p.plot(pv.reltime[track[0]], pv.chans[track[1]], 'w,')   # doesn't align with data when channels are flagged
-            p.plot(pv.reltime[track[0]], track[1], 'w,')
-            pv.spec(save=0)
+            p.plot(pv.reltime[track[0]], track[1], 'w.')
+            pv.spec(save=1)
             # write out bg-subbed track, read back in to fit spectrum
             pv.writetrack(dmbinarr[peaktrial], bgwindow, tshift=0, bgwindow=bgwindow)
             newfile = string.join(pv.file.split('.')[:-1]) + '.' + str(pv.nskip/pv.nbl) + '-' + 'dm' + str(dmbinarr[peaktrial]) + 't' + str(bgwindow) + '.mir'
             print 'Loading file', newfile
             pv2 = poco(newfile, nints=1)
             pv2.prep()
-            pv2.fitspec(save=0)
+            pv2.fitspec(save=1)
             removefile(newfile)
         elif mode == 'dmt0':
             pv.makedmt0()
@@ -936,7 +944,7 @@ if __name__ == '__main__':
     print 'Greetings, human.'
     print ''
 
-    fileroot = 'poco_crab_190348.mir'
+    fileroot = 'poco_crab_201103.mir'
     pathin = 'data/'
     pathout = 'crab_fixdm_ph/'
     if len(sys.argv) == 1:
