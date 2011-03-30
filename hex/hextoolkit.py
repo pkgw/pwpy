@@ -430,25 +430,30 @@ def buildsql(rootdir):
     os.path.walk (rootdir, load, None)
     
     
-def flagsql(wherecmd='', num=1):
+def flagsql(wherecmd='', add=True, num=1):
     """
     flagsql
     =======
     
     PURPOSE:
         Flags data in squint.db to exlcude from plotting
-        Reset flags using    flagsql(num=0)
+        Reset flags using    flagsql(num=0, add=False)
         
     CALLING SEQUENCE:
-        flagsql(wherecmd='', num=1):
+        flagsql(wherecmd='', add=True, num=1):
         
     INPUTS:
-        wherecmd        :=  SQL WHERE command specifying data to be flagged
+        wherecmd    :=  SQL WHERE command specifying data to be flagged
                             'WHERE ...'
-        num             :=  flag number:
+        add         :=  Boolean, True: add num to current flag, False: set flag to num
+        num         :=  flag number:
   
-                            1   -   Uncertainty magnitude
-                            2   -   Squint magnitude
+                            1   -   Squintaz mag
+                            2   -   Squintaz_uc mag
+                            4   -   Squintel mag
+                            8   -   Squintel_uc mag
+                            16  -   Sumchisq mag
+                            32  -   SEFD mag
         
     """
     
@@ -456,7 +461,11 @@ def flagsql(wherecmd='', num=1):
     connection = sqlite3.connect(getdbpath())
     cursor = connection.cursor()
     
-    sql_cmd = 'UPDATE obs SET flag=%i ' %num + wherecmd
+    if add:
+        sql_cmd = 'UPDATE obs SET flag=flag+%i ' %num + wherecmd
+    else:
+        sql_cmd = 'UPDATE obs SET flag=%i ' %num + wherecmd
+        
     cursor.execute(sql_cmd)
     
     connection.commit()
