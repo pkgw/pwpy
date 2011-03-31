@@ -1085,7 +1085,7 @@ try:
 except:
     pass
 else:
-    from awff.minimake import SimpleMake
+    from awff import SimpleMake
     from awff.pathref import FileRef
 
     def _gettsysinfo (context, vis=None, params=None):

@@ -120,7 +120,7 @@ def dualSelfCal (vis, out, usemself=False, ttol=DEFAULT_TTOL,
 # AWFF/ARF workflow interface
 
 try:
-    from awff.minimake import SimpleMake
+    from awff import SimpleMake
 except:
     pass
 else:
