@@ -3,7 +3,7 @@
 
 set name = $argv[1]
 set cal3c147 = data/poco_3c147_172136.mir
-set calcasa = data/poco_casa_153652.mir
+set calcasa = data/poco_casa_merge.mir
 ## BE SURE TO SET DESTINATION IN GOTO AFTER FLAGGING ##
 
 # standard flagging for poco july 2010 run
@@ -17,7 +17,7 @@ uvflag vis=${name} flagval=f line=ch,3,42
 uvflag vis=${name} flagval=f line=ch,15,50
 
 ## SET DESTINATION ##
-goto b0329
+goto m31
 ## SET DESTINATION ##
 
 # for crab

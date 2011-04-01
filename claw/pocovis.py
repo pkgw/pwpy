@@ -38,8 +38,11 @@ class poco:
         self.baseline_order = n.array([ 257, 258, 514, 261, 517, 1285, 262, 518, 1286, 1542, 259, 515, 773, 774, 771, 516, 1029, 1030, 772, 1028, 1287, 1543, 775, 1031, 1799, 1544, 776, 1032, 1800, 2056, 260, 263, 264, 519, 520, 1288])   # second iteration of bl nums
         self.autos = []
         self.noautos = []
+        self.pulsewidth = 0.0066 * n.ones(len(self.chans)) # pulse width of b0329+54
+#        self.pulsewidth = 0 * n.ones(len(self.chans)) # pulse width of crab
         # set dmarr
-        self.dmarr = [56.8]
+        self.dmarr = [26.8]  # b0329+54
+#        self.dmarr = [56.8]  # crab
 #        self.dmarr = n.arange(52,62,1.6)       # dm trial range in pc/cm3, spacing set for 50% efficiency in PoCo 770 MHz, 1.2 ms integrations
 #        self.dmarr = n.arange(52,62,2.6)       # dm trial range in pc/cm3, spacing set for 50% efficiency in PoCo 1430 MHz, 0.3 ms integrations
 #        self.tshift = 0.2     # not implemented yet
@@ -181,7 +184,7 @@ class poco:
         Returns fit parameters.
         """
 
-        log = open('spfit.txt','a')
+#        log = open('spfit.txt','a')
         freq = self.sfreq + self.chans * self.sdf             # freq array in GHz
 
         # estimage of vis rms per channel from spread in imag space at phase center
@@ -215,7 +218,7 @@ class poco:
             savename = string.join(savename,'.')
             print 'Saving file as ', savename
             p.savefig(savename)
-            print >> log, savename, 'Fit results: ', p1
+#            print >> log, savename, 'Fit results: ', p1
         else:
             p.show()
 
@@ -264,7 +267,7 @@ class poco:
 
         # given freq, dm, dfreq, calculate pulse time and duration
         pulset = 4.2e-3 * dm * freq**(-2) + t0  # time in seconds
-        pulsedt = 8.3e-6 * dm * (1000*self.sdf) * freq**(-3)   # dtime in seconds
+        pulsedt = n.sqrt( (8.3e-6 * dm * (1000*self.sdf) * freq**(-3))**2 + self.pulsewidth**2)   # dtime in seconds
 
         timebin = []
         chanbin = []
@@ -315,9 +318,10 @@ class poco:
         self.dmt0arr = dmt0arr
 
 
-    def writetrack(self, dmbin, tbin, output='c', tshift=0, bgwindow=0):
+    def writetrack(self, dmbin, tbin, output='c', tshift=0, bgwindow=0, show=0):
         """Writes data from track out as miriad visibility file.
-        Optional background subtraction bl-by-bl over bgwindow integrations.
+        Optional background subtraction bl-by-bl over bgwindow integrations. Note that this is bgwindow *dmtracks* so width is bgwindow+track width
+        Optional spectrum plot with source and background dmtracks
         Output parameter says whether to 'c'reate a new file or 'a'ppend to existing one. **not tested**
         """
 
@@ -330,9 +334,14 @@ class poco:
             print 'Track length, %d, less than number of channels, %d.  Skipping.' % (len(track[1]), minintersect)
             return
 
-        if bgwindow > 8:
-            bgrange = range(int(-bgwindow/2.) + tbin - tshift, int(bgwindow/2.) + tbin - tshift + 1)
-            bgrange.remove(tbin - tshift); bgrange.remove(tbin - tshift + 1); bgrange.remove(tbin - tshift - 1); bgrange.remove(tbin - tshift + 2); bgrange.remove(tbin - tshift - 2); bgrange.remove(tbin - tshift + 3); bgrange.remove(tbin - tshift - 3)
+        twidths = []
+        for i in track[1]:
+            twidths.append(len(n.array(track)[0][list(n.where(n.array(track[1]) == i)[0])]))
+
+        if bgwindow > 0:
+            bgrange = range(-bgwindow/2 - max(twidths) + tbin - tshift, -max(twidths) + tbin - tshift) + range(max(twidths) + tbin - tshift, max(twidths) + bgwindow/2 + + tbin - tshift + 1)
+#            bgrange = range(int(-bgwindow/2.) + tbin - tshift, int(bgwindow/2.) + tbin - tshift + 1)
+#            bgrange.remove(tbin - tshift); bgrange.remove(tbin - tshift + 1); bgrange.remove(tbin - tshift - 1); bgrange.remove(tbin - tshift + 2); bgrange.remove(tbin - tshift - 2); bgrange.remove(tbin - tshift + 3); bgrange.remove(tbin - tshift - 3)
             for i in bgrange:     # build up super track for background subtraction
                 if bgrange.index(i) == 0:   # first time through
                     trackbg = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[i], show=0)
@@ -342,6 +351,13 @@ class poco:
                     trackbg[1].extend(tmp[1])
         else:
             print 'Not doing any background subtraction.'
+
+        if show:
+            # show source and background tracks on spectrum
+            p.figure(1)
+            p.plot(self.reltime[track[0]], track[1], 'w.')
+            p.plot(self.reltime[trackbg[0]], trackbg[1], 'r.')
+            self.spec(save=0)
 
 #                print 'trackbg'
 #            print self.rawdata[:,:,self.chans][trackbg[0], 1, trackbg[1]]
@@ -399,7 +415,7 @@ class poco:
                             matches = n.where( j == n.array(self.chans[track[1]]) )[0]   # hack, since chans are from 0-64, but track is in trimmed chan space
                             raw = rawdatatrim[track[0], i-int0, track[1]][matches]   # all baselines for the known pulse
                             raw = raw.mean(axis=0)   # create spectrum for each baseline by averaging over time
-                            if bgwindow > 6:   # same as above, but for bg
+                            if bgwindow > 0:   # same as above, but for bg
                                 matchesbg = n.where( j == n.array(self.chans[trackbg[1]]) )[0]
                                 rawbg = rawdatatrim[trackbg[0], i-int0, trackbg[1]][matchesbg]
                                 rawbg = rawbg.mean(axis=0)
@@ -556,7 +572,7 @@ class poco:
         return self.peaks,arr[self.peaks]
 
 
-    def imagedmt0(self, dmbin, t0bin, tshift=0, bgwindow=15, show=1, clean=1):
+    def imagedmt0(self, dmbin, t0bin, tshift=0, bgwindow=5, show=1, clean=1):
         """ Makes and fits an background subtracted image for a given dmbin and t0bin.
         tshift can shift the actual t0bin earlier to allow reading small chunks of data relative to pickle.
         """
@@ -632,7 +648,7 @@ class poco:
 
         if len(dmtrack[0]) >= minintersect:               # ignore tiny, noise-dominated tracks
             print
-            self.writetrack(dmbin, t0bin, 'c', tshift=tshift, bgwindow=15)   # output file at dmbin, trelbin
+            self.writetrack(dmbin, t0bin, 'c', tshift=tshift, bgwindow=5)   # output file at dmbin, trelbin
 
             # make image, clean, restor, fit point source
             print
@@ -744,10 +760,10 @@ def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000):
 
     filelist = []
 # for crab 201103
-    for i in [0,1,4,5,6,7,8,9]:
-        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
-    for i in range(0,8):
-        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+#    for i in [0,1,4,5,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+#    for i in range(0,8):
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
 
 # for crab 190348
 #    for i in [0,1,2,3,4,5,6,7,8,9]:
@@ -756,8 +772,20 @@ def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000):
 #        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
 #    for i in [0,1,2,3]:
 #        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
-        
-    print 'Looping over filelist: ', filelist
+
+# for b0329 173027
+    for i in [0,1,2,3,4,5,6,7,8,9]:
+        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+    for i in [0,1,2,6,7,8,9]:
+        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+    for i in [0,1,2,3]:
+        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
+
+# for m31 154202
+#    for i in [0,1,2,3,4,5,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+#    for i in [0,1,2,3,4,5,6]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
 
     # loop over miriad data and time chunks
     for file in filelist:
@@ -792,7 +820,7 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=1):
 
     maxints = 131000  # biggest file in integrations
     edge = 360   # number of integrations lost over small Crab DM range
-    bgwindow = 15  # where bg subtraction is made
+    bgwindow = 5  # where bg subtraction is made
 
     filelist = []
     for i in [0,1,4,5,6,7,8,9]:
@@ -890,7 +918,7 @@ def process_pickle(filename, pathin, mode='image'):
     peaktrial = n.where(snrarr == max(snrarr))[0][0]
 
     nints=500
-    bgwindow = 10
+    bgwindow = 5
     
     print 'Loaded pickle file for %s' % (name)
     print 'Has peaks at DM = ', dmarr
@@ -905,14 +933,14 @@ def process_pickle(filename, pathin, mode='image'):
             # plot track and spectrogram
             p.figure(1)
             p.plot(pv.reltime[track[0]], track[1], 'w.')
-            pv.spec(save=1)
+            pv.spec(save=0)
             # write out bg-subbed track, read back in to fit spectrum
             pv.writetrack(dmbinarr[peaktrial], bgwindow, tshift=0, bgwindow=bgwindow)
             newfile = string.join(pv.file.split('.')[:-1]) + '.' + str(pv.nskip/pv.nbl) + '-' + 'dm' + str(dmbinarr[peaktrial]) + 't' + str(bgwindow) + '.mir'
             print 'Loading file', newfile
             pv2 = poco(newfile, nints=1)
             pv2.prep()
-            pv2.fitspec(save=1)
+            pv2.fitspec(save=0)
             removefile(newfile)
         elif mode == 'dmt0':
             pv.makedmt0()
@@ -944,9 +972,9 @@ if __name__ == '__main__':
     print 'Greetings, human.'
     print ''
 
-    fileroot = 'poco_crab_201103.mir'
+    fileroot = 'poco_b0329_173027.mir'
     pathin = 'data/'
-    pathout = 'crab_fixdm_ph/'
+    pathout = 'b0329_fixdm_ph/'
     if len(sys.argv) == 1:
         # if no args, search for pulses
         print 'Searching for pulses...'
