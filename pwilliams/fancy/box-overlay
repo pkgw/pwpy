@@ -14,6 +14,10 @@ This script is probably not useful except for driving cgdisp.
 
 import sys, tempfile, subprocess, os
 
+if len (sys.argv) < 3:
+    print >>sys.stderr, 'Usage: box-overlay <boxfile> <command ...>'
+    sys.exit (1)
+
 boxfn = sys.argv[1]
 command = sys.argv[2:]
 
