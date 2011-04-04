@@ -180,6 +180,7 @@ for dIn, p, d, f in uvdat.read ():
             if vtype == 'a': get = lambda: dIn.getVarString (v)
             elif vtype == 'r': get = lambda: dIn.getVarFloat (v, vlen)
             elif vtype == 'i': get = lambda: dIn.getVarInt (v, vlen)
+            elif vtype == 'j': get = lambda: dIn.getVarShort (v, vlen)
             elif vtype == 'd': get = lambda: dIn.getVarDouble (v, vlen)
             elif vtype == 'c': get = lambda: dIn.getVarComplex (v, vlen)
             else:
