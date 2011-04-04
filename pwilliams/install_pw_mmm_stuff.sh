@@ -45,6 +45,7 @@ fancy/box-overlay
 fancy/box-region
 fancy/byant
 fancy/calctsys
+fancy/chanaver
 fancy/closanal
 fancy/dualscal
 fancy/fxcal.py
@@ -71,6 +72,7 @@ pylib/atabpass.py
 pylib/blflag.py
 pylib/blmapper.glade
 pylib/calctsys.py
+pylib/chanaver.py
 pylib/closanal.py
 pylib/dualscal.py
 pylib/gpmergepols.py
