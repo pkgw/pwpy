@@ -17,7 +17,7 @@ uvflag vis=${name} flagval=f line=ch,3,42
 uvflag vis=${name} flagval=f line=ch,15,50
 
 ## SET DESTINATION ##
-goto m31
+goto b0329
 ## SET DESTINATION ##
 
 # for crab

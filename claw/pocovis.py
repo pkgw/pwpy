@@ -29,7 +29,8 @@ class poco:
 #        self.chans = n.arange(6,58)
 #        li = range(4,23) + range(37,49)   # must match flagging range; miriad 1-4, 24-38, 50-64
 #        li = range(2,10) + range(11,23) + range(37,39) + range(40,41) + range(44,49)   # must match flagging range; miriad 1-2, 11, 24-37, 40, 42-44, 50-64
-        li = range(3,10) + range(11,23) + range(37,39) + range(40,41) + range(44,49)   # must match flagging range; miriad 1-2, 11, 24-37, 40, 42-44, 50-64
+#        li = range(3,10) + range(11,23) + range(37,39) + range(40,41) + range(44,49)   # must match flagging range; miriad 1-2, 11, 24-37, 40, 42-44, 50-64 as in crab data
+        li = range(3,10) + range(11,23) + range(38,39) + range(40,41) + range(44,49)   # as above, but adding channel 38, since b0329 shows problems
         self.chans = n.array(li)
         self.nbl = 36
         initsize = nints*self.nbl   # number of integrations to read in a single chunk
@@ -43,8 +44,7 @@ class poco:
         # set dmarr
         self.dmarr = [26.8]  # b0329+54
 #        self.dmarr = [56.8]  # crab
-#        self.dmarr = n.arange(52,62,1.6)       # dm trial range in pc/cm3, spacing set for 50% efficiency in PoCo 770 MHz, 1.2 ms integrations
-#        self.dmarr = n.arange(52,62,2.6)       # dm trial range in pc/cm3, spacing set for 50% efficiency in PoCo 1430 MHz, 0.3 ms integrations
+#        self.dmarr = n.arange(53,131,3.1)       # dm trials for m31. spacing set for 50% efficiency for band from 722-796 MHz, 1.2 ms integrations
 #        self.tshift = 0.2     # not implemented yet
         self.nskip = nskip*self.nbl    # number of iterations to skip (for reading in different parts of buffer)
         nskip = self.nskip
@@ -178,47 +178,54 @@ class poco:
             p.show()
             
 
-    def fitspec(self, save=0):
+    def fitspec(self, obsrms=0, save=0):
         """
         Fits a powerlaw to the mean spectrum at the phase center.
         Returns fit parameters.
         """
 
-#        log = open('spfit.txt','a')
+        if save:
+            logname = self.file.split('_')[0:2]
+            logname.append('fitsp.txt')
+            logname = string.join(logname,'_')
+            log = open(logname,'a')
+
         freq = self.sfreq + self.chans * self.sdf             # freq array in GHz
 
         # estimage of vis rms per channel from spread in imag space at phase center
-        obsrms = n.std(self.data.mean(axis=1).imag)
-        print
+        if obsrms == 0:
+            print 'estimating obsrms from imaginary part of data...'
+#            obsrms = n.std((((self.data).mean(axis=1)).mean(axis=0)).imag)/n.sqrt(2)  # sqrt(2) scales it to an amplitude error. indep of signal.
+            obsrms = n.std((((self.data).mean(axis=1)).mean(axis=0)).imag)      # std of imag part is std of real part
+#        spec = n.abs((((self.data).mean(axis=1))).mean(axis=0))
+        spec = ((((self.data).mean(axis=1))).mean(axis=0)).real
         print 'obsrms = %.2f' % (obsrms)
 
-        spec = n.abs((((self.data).mean(axis=1))).mean(axis=0))
-
         plaw = lambda a, b, x: a * (x/x[0]) ** b
-        fitfunc = lambda p, x, rms:  n.sqrt(plaw(p[0], p[1], x)**2 + rms**2)
-        errfunc = lambda p, x, y, rms: y - fitfunc(p, x, rms)
+#        fitfunc = lambda p, x, rms:  n.sqrt(plaw(p[0], p[1], x)**2 + rms**2)   # for ricean-biased amplitudes
+#        errfunc = lambda p, x, y, rms: ((y - fitfunc(p, x, rms))/rms)**2
+        fitfunc = lambda p, x:  plaw(p[0], p[1], x)              # for real part of data
+        errfunc = lambda p, x, y, rms: ((y - fitfunc(p, x))/rms)**2
 
         p0 = [50.,0.]
         p1, success = opt.leastsq(errfunc, p0[:], args = (freq, spec, obsrms))
         print 'Fit results: ', p1
-
-#        obsrms = n.sqrt((errfunc(p1, freq, self.dataph[0], obsrms)**2).mean())
-#        print 'RMS per channel =', obsrms
-#        p1, success = opt.leastsq(errfunc, p0[:], args = (freq, self.dataph[0], obsrms))
-#        print 'Second fit results: ', p1
-#        obsrms = n.sqrt((errfunc(p1, freq, self.dataph[0], obsrms)**2).mean())
+        chisq = errfunc(p1, freq, spec, obsrms).sum()/(len(freq) - 2)
+        print 'Reduced chisq: ', chisq
 
         p.figure(2)
         p.errorbar(freq, spec, yerr=obsrms*n.ones(len(spec)), fmt='.')
-        p.plot(freq, fitfunc(p1, freq, obsrms))
-        p.xlabel('Frequency'); p.ylabel('Flux Density (Jy)')
+        p.plot(freq, fitfunc(p1, freq), label='Fit: %.1f, %.2f. Noise: %.1f, $\chi^2$: %.1f' % (p1[0], p1[1], obsrms, chisq))
+        p.xlabel('Frequency')
+        p.ylabel('Flux Density (Jy)')
+        p.legend()
         if save == 1:
             savename = self.file.split('.')[:-1]
             savename.append(str(self.nskip/self.nbl) + '.fitsp.png')
             savename = string.join(savename,'.')
             print 'Saving file as ', savename
             p.savefig(savename)
-#            print >> log, savename, 'Fit results: ', p1
+            print >> log, savename, 'Fit results: ', p1, '. obsrms: ', obsrms
         else:
             p.show()
 
@@ -255,6 +262,7 @@ class poco:
 
     def dmtrack(self, dm = 0., t0 = 0., show=0):
         """Takes dispersion measure in pc/cm3 and time offset from first integration in seconds.
+        t0 defined at first (unflagged) channel. Need to correct by flight time from there to freq=0 for true time.
         Returns an array of (timebin, channel) to select from the data array.
         Faster than dmmask.
         """
@@ -266,7 +274,8 @@ class poco:
         freq = self.sfreq + chans * self.sdf             # freq array in GHz
 
         # given freq, dm, dfreq, calculate pulse time and duration
-        pulset = 4.2e-3 * dm * freq**(-2) + t0  # time in seconds
+        pulset_firstchan = 4.2e-3 * dm * freq[len(freq)-1]**(-2)   # used to start dmtrack at highest-freq unflagged channel
+        pulset = 4.2e-3 * dm * freq**(-2) + t0 - pulset_firstchan  # time in seconds
         pulsedt = n.sqrt( (8.3e-6 * dm * (1000*self.sdf) * freq**(-3))**2 + self.pulsewidth**2)   # dtime in seconds
 
         timebin = []
@@ -296,7 +305,7 @@ class poco:
         dmarr = self.dmarr
 #        reltime = n.arange(2*len(self.reltime))/2.  # danger!
         reltime = self.reltime
-        minintersect = len(self.chans)/2
+#        minintersect = len(self.chans)  # not needed anymore
         chans = self.chans
 
         dmt0arr = n.zeros((len(dmarr),len(reltime)), dtype='float64')
@@ -310,9 +319,9 @@ class poco:
                         dmt0arr[i,j] = n.abs(((self.data * dmmask)[n.where(dmmask == True)]).mean(axis=1))
                 else:
                     dmtrack = self.dmtrack(dm=dmarr[i], t0=reltime[j])
-                    if len(dmtrack[0]) >= minintersect:               # ignore tiny, noise-dominated tracks
-#                        dmt0arr[i,j] = n.mean(self.dataph[dmtrack[0],dmtrack[1]])
-                        dmt0arr[i,j] = n.abs((((self.data).mean(axis=1))[dmtrack[0],dmtrack[1]]).mean())
+                    if ((dmtrack[1][0] == 0) & (dmtrack[1][len(dmtrack[1])-1] == len(self.chans)-1)):   # use only tracks that span whole band
+#                        dmt0arr[i,j] = n.abs((((self.data).mean(axis=1))[dmtrack[0],dmtrack[1]]).mean())
+                        dmt0arr[i,j] = ((((self.data).mean(axis=1))[dmtrack[0],dmtrack[1]]).mean()).real    # use real part to detect on axis, but keep gaussian dis'n
             print 'dedispersed for ', dmarr[i]
 
         self.dmt0arr = dmt0arr
@@ -325,14 +334,15 @@ class poco:
         Output parameter says whether to 'c'reate a new file or 'a'ppend to existing one. **not tested**
         """
 
-        minintersect = len(self.chans)/2
         rawdatatrim = self.rawdata[:,:,self.chans]
 
         track = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[tbin-tshift], show=0)  # needs to be shifted by -1 bin in reltime?
+#        minintersect = len(self.chans)
 
-        if len(track[1]) < minintersect:
-            print 'Track length, %d, less than number of channels, %d.  Skipping.' % (len(track[1]), minintersect)
-            return
+#        if len(track[1]) < minintersect:
+        if ((track[1][0] != 0) | (track[1][len(track[1])-1] != len(self.chans)-1)):
+            print 'Track does not span all channels. Skipping.'
+            return 0
 
         twidths = []
         for i in track[1]:
@@ -356,7 +366,8 @@ class poco:
             # show source and background tracks on spectrum
             p.figure(1)
             p.plot(self.reltime[track[0]], track[1], 'w.')
-            p.plot(self.reltime[trackbg[0]], trackbg[1], 'r.')
+            if bgwindow > 0:
+                p.plot(self.reltime[trackbg[0]], trackbg[1], 'r.')
             self.spec(save=0)
 
 #                print 'trackbg'
@@ -440,6 +451,7 @@ class poco:
 
         dOut.close ()
 
+        return 1
 
     def dmlc(self, dmbin, tbin, nints = 50):
         """Plots lc for DM bin over range of timebins.
@@ -562,10 +574,11 @@ class poco:
         print 'final mean, sig, std:  ', mean, sig, std
 
         # Recast arr as significance array
-        arr = (arr - mean)/std
+#        arr = n.sqrt((arr-mean)**2 - std**2)/std   # PROBABLY WRONG
+        arr = (arr-mean)/std   # for real valued trial output (gaussian dis'n)
 
         # Detect peaks
-        self.peaks = n.where(arr > sig)   # this is probably biased
+        self.peaks = n.where(arr > sig)
         peakmax = n.where(arr == arr.max())
         print 'peaks:  ', self.peaks
 
@@ -577,7 +590,7 @@ class poco:
         tshift can shift the actual t0bin earlier to allow reading small chunks of data relative to pickle.
         """
 
-        minintersect = len(self.chans)/2
+        minintersect = len(self.chans)
         
         # set up
         outroot = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl) + '-dm' + str(dmbin) + 't' + str(t0bin)
@@ -636,7 +649,7 @@ class poco:
         tshift can shift the actual t0bin earlier to allow reading small chunks of data relative to pickle.
         """
         
-        minintersect = len(self.chans)/2
+        minintersect = len(self.chans)
         
         # set up
         outroot = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl) + '-dm' + str(dmbin) + 't' + str(t0bin)
@@ -750,13 +763,12 @@ def removefile (file):
     os.rmdir (file)
 
 
-def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000):
+def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000, edge=0):
     """Blind search for pulses at phase center.
     TO DO:  improve handling of edge times and ignoring data without complete DM track?
     """
 
     maxints = 131000
-    edge = 360  # ok for Crab DM of 56.8
 
     filelist = []
 # for crab 201103
@@ -774,12 +786,12 @@ def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000):
 #        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
 
 # for b0329 173027
-    for i in [0,1,2,3,4,5,6,7,8,9]:
-        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
-    for i in [0,1,2,6,7,8,9]:
-        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
-    for i in [0,1,2,3]:
-        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
+#    for i in [0,1,2,3,4,5,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+#    for i in [0,1,2,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+#    for i in [0,1,2,3]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
 
 # for m31 154202
 #    for i in [0,1,2,3,4,5,6,7,8,9]:
@@ -792,6 +804,7 @@ def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000):
         fileout = open(pathout + string.join(file.split('.')[:-1]) + '.txt', 'a')
 
         for nskip in range(0, maxints-(nints-edge), nints-edge):
+            print
             print 'Starting file %s with nskip %d' % (file, nskip)
 
             # load data
@@ -813,13 +826,12 @@ def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000):
         fileout.close
 
 
-def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=1):
+def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=1, edge=0):
     """
     Searches for pulses by imaging dedispersed trials.
     """
 
     maxints = 131000  # biggest file in integrations
-    edge = 360   # number of integrations lost over small Crab DM range
     bgwindow = 5  # where bg subtraction is made
 
     filelist = []
@@ -857,13 +869,12 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=1):
         fileout.close
 
 
-def pulse_search_uvfit(fileroot, pathin, pathout, nints=12000, sig=5.0, show=1):
+def pulse_search_uvfit(fileroot, pathin, pathout, nints=12000, sig=5.0, show=1, edge=0):
     """
     Searches for pulses by fitting visibilities of dedispersed trials.
     """
 
     maxints = 131000  # biggest file in integrations
-    edge = 360   # number of integrations lost over small Crab DM range
 
     filelist = []
     for i in [0,1,4,5,6,7,8,9]:
@@ -910,6 +921,7 @@ def process_pickle(filename, pathin, mode='image'):
     file = open(filename, 'rb')
     dump = pickle.load(file)
     name = dump[0]
+    nints = dump[2]
     nintskip = dump[1]
     dmbinarr = dump[3]
     dmarr = dump[4]
@@ -917,31 +929,45 @@ def process_pickle(filename, pathin, mode='image'):
     snrarr = dump[6]
     peaktrial = n.where(snrarr == max(snrarr))[0][0]
 
-    nints=500
-    bgwindow = 5
+    bgwindow = 10
     
     print 'Loaded pickle file for %s' % (name)
     print 'Has peaks at DM = ', dmarr
+    print 'Significance of ', snrarr
+#    if len(dmbinarr) >= 1:
     if len(dmbinarr) >= 1:
         print 'Grabbing %d ints at %d' % (nints, nintskip)
-        pv = poco(pathin + name, nints=nints, nskip=nintskip + tbinarr[peaktrial] - bgwindow)    # format defined by pickle dump below
-        pv.nskip=nintskip*pv.nbl    # preserves naming of pickle, but searches over smaller space
+#        pv = poco(pathin + name, nints=nints, nskip=nintskip + tbinarr[peaktrial] - bgwindow)    # to skip a few ints...
+        pv = poco(pathin + name, nints=nints, nskip=nintskip)    # format defined by pickle dump below
+#        pv.nskip=nintskip*pv.nbl    # to skip a few ints...
         pv.prep()
-        track = pv.dmtrack(dm=pv.dmarr[dmbinarr[peaktrial]], t0=pv.reltime[bgwindow], show=0)  # needs to be shifted by -1 bin in reltime?
+#        track = pv.dmtrack(dm=pv.dmarr[dmbinarr[peaktrial]], t0=pv.reltime[bgwindow], show=0)  # to skip a few ints...
+        track = pv.dmtrack(dm=pv.dmarr[dmbinarr[peaktrial]], t0=pv.reltime[tbinarr[peaktrial]], show=0)
 
         if mode == 'spec':  # just show spectrum
-            # plot track and spectrogram
-            p.figure(1)
-            p.plot(pv.reltime[track[0]], track[1], 'w.')
-            pv.spec(save=0)
             # write out bg-subbed track, read back in to fit spectrum
-            pv.writetrack(dmbinarr[peaktrial], bgwindow, tshift=0, bgwindow=bgwindow)
-            newfile = string.join(pv.file.split('.')[:-1]) + '.' + str(pv.nskip/pv.nbl) + '-' + 'dm' + str(dmbinarr[peaktrial]) + 't' + str(bgwindow) + '.mir'
-            print 'Loading file', newfile
-            pv2 = poco(newfile, nints=1)
-            pv2.prep()
-            pv2.fitspec(save=0)
-            removefile(newfile)
+#            pv.writetrack(dmbinarr[peaktrial], bgwindow, tshift=0, bgwindow=bgwindow)  # to skip a few ints...
+            status = pv.writetrack(dmbinarr[peaktrial], tbinarr[peaktrial], tshift=0, bgwindow=bgwindow)
+            if status:
+               # plot track and spectrogram
+                p.figure(1)
+                p.plot(pv.reltime[track[0]], track[1], 'w.')
+                pv.spec(save=0)
+                # now estimate obsrms
+#                status = pv.writetrack(dmbinarr[peaktrial], tbinarr[peaktrial]+bgwindow, tshift=0, bgwindow=0)
+#                bgname = string.join(pv.file.split('.')[:-1]) + '.' + str(pv.nskip/pv.nbl) + '-' + 'dm' + str(dmbinarr[peaktrial]) + 't' + str(tbinarr[peaktrial]+bgwindow) + '.mir'
+#                pvbg = poco(bgname, nints=1)
+#                pvbg.prep()
+#                obsrms = n.abs(pvbg.data.mean(axis=1)[0]).std()
+#                print 'obsrms first try:', obsrms
+#                removefile(bgname)
+#               newfile = string.join(pv.file.split('.')[:-1]) + '.' + str(pv.nskip/pv.nbl) + '-' + 'dm' + str(dmbinarr[peaktrial]) + 't' + str(bgwindow) + '.mir'
+                newfile = string.join(pv.file.split('.')[:-1]) + '.' + str(pv.nskip/pv.nbl) + '-' + 'dm' + str(dmbinarr[peaktrial]) + 't' + str(tbinarr[peaktrial]) + '.mir'
+                print 'Loading file', newfile
+                pv2 = poco(newfile, nints=1)
+                pv2.prep()
+                pv2.fitspec(obsrms=0, save=0)
+                removefile(newfile)
         elif mode == 'dmt0':
             pv.makedmt0()
             peaks, peakssig = pv.peakdmt0()
@@ -975,12 +1001,17 @@ if __name__ == '__main__':
     fileroot = 'poco_b0329_173027.mir'
     pathin = 'data/'
     pathout = 'b0329_fixdm_ph/'
+#    edge = 150 # m31 search up to dm=131 and pulse starting at first unflagged channel
+    edge = 35 # b0329 search at dm=28.6 and pulse starting at first unflagged channel
+#    edge = 70 # Crab search at dm=56.8 and pulse starting at first unflagged channel
+#    edge = 360  # Crab DM of 56.8 and for DM track starting at freq=0
+
     if len(sys.argv) == 1:
         # if no args, search for pulses
         print 'Searching for pulses...'
         try:
 #            pulse_search_image(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, show=0)
-            pulse_search_phasecenter(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000)
+            pulse_search_phasecenter(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)
         except AttributeError:
             exit(0)
     elif len(sys.argv) == 2:
