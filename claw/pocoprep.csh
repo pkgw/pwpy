@@ -17,7 +17,7 @@ uvflag vis=${name} flagval=f line=ch,3,42
 uvflag vis=${name} flagval=f line=ch,15,50
 
 ## SET DESTINATION ##
-goto b0329
+goto casa
 ## SET DESTINATION ##
 
 # for crab
@@ -54,7 +54,7 @@ puthd in=${name}/ra value=6.123452
 puthd in=${name}/dec value=1.026223
 puthd in=${name}/object value=casa
 puthd in=${name}/source value=casa
-mfcal vis=${name} interval=90 refant=1 select='-auto' flux=2417,0.77,-0.77
+mfcal vis=${name} interval=15 refant=1 select='-auto' flux=2417,0.77,-0.77
 goto end
 
 #for m31

@@ -29,8 +29,7 @@ class poco:
 #        self.chans = n.arange(6,58)
 #        li = range(4,23) + range(37,49)   # must match flagging range; miriad 1-4, 24-38, 50-64
 #        li = range(2,10) + range(11,23) + range(37,39) + range(40,41) + range(44,49)   # must match flagging range; miriad 1-2, 11, 24-37, 40, 42-44, 50-64
-#        li = range(3,10) + range(11,23) + range(37,39) + range(40,41) + range(44,49)   # must match flagging range; miriad 1-2, 11, 24-37, 40, 42-44, 50-64 as in crab data
-        li = range(3,10) + range(11,23) + range(38,39) + range(40,41) + range(44,49)   # as above, but adding channel 38, since b0329 shows problems
+        li = range(3,10) + range(11,23) + range(37,39) + range(40,41) + range(44,49)   # must match flagging range; miriad 1-2, 11, 24-37, 40, 42-44, 50-64
         self.chans = n.array(li)
         self.nbl = 36
         initsize = nints*self.nbl   # number of integrations to read in a single chunk
@@ -143,7 +142,7 @@ class poco:
         tlen = data.shape[0]
         chlen = len(self.chans)
         self.data = n.reshape(data[flags[:,self.noautos][:,:,self.chans]], (tlen, totallen/(tlen*chlen), chlen)) # data is what is typically needed
-        self.dataph = n.abs(self.data.mean(axis=1))  #dataph is summed and detected to form TP beam at phase center
+        self.dataph = (self.data.mean(axis=1)).real  #dataph is summed and detected to form TP beam at phase center
         self.rawdata = (rawdata * flags)
 
         print 'Data flagged, trimmed in channels, and averaged across baselines.'
@@ -225,7 +224,7 @@ class poco:
             savename = string.join(savename,'.')
             print 'Saving file as ', savename
             p.savefig(savename)
-            print >> log, savename, 'Fit results: ', p1, '. obsrms: ', obsrms
+            print >> log, savename, 'Fit results: ', p1, '. obsrms: ', obsrms, '. $\Chi^2$: ', chisq
         else:
             p.show()
 
@@ -606,6 +605,7 @@ class poco:
 
             # make image, clean, restor, fit point source
             print
+## this could be made more efficient. image only center? underresolve beam?            
             print 'Making dirty image at dm[%d] = %.1f and trel[%d] = %.3f.' % (dmbin, self.dmarr[dmbin], t0bin-tshift, self.reltime[t0bin-tshift])
             txt = TaskInvert (vis=outroot+'.mir', map=outroot+'.map', beam=outroot+'.beam', mfs=True, double=True, cell=80, rob=0).snarf()
             if show:  txt = TaskCgDisp (in_=outroot+'.map', device='/xs', wedge=True, beambl=True).snarf () 
@@ -786,12 +786,12 @@ def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000, edge=0):
 #        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
 
 # for b0329 173027
-#    for i in [0,1,2,3,4,5,6,7,8,9]:
-#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
-#    for i in [0,1,2,6,7,8,9]:
-#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
-#    for i in [0,1,2,3]:
-#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
+    for i in [0,1,2,3,4,5,6,7,8,9]:
+        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+    for i in [0,1,2,6,7,8,9]:
+        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+    for i in [0,1,2,3]:
+        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
 
 # for m31 154202
 #    for i in [0,1,2,3,4,5,6,7,8,9]:
@@ -935,7 +935,7 @@ def process_pickle(filename, pathin, mode='image'):
     print 'Has peaks at DM = ', dmarr
     print 'Significance of ', snrarr
 #    if len(dmbinarr) >= 1:
-    if len(dmbinarr) >= 1:
+    if (len(dmbinarr) >= 1) & (snrarr[peaktrial] > 8.):
         print 'Grabbing %d ints at %d' % (nints, nintskip)
 #        pv = poco(pathin + name, nints=nints, nskip=nintskip + tbinarr[peaktrial] - bgwindow)    # to skip a few ints...
         pv = poco(pathin + name, nints=nints, nskip=nintskip)    # format defined by pickle dump below
@@ -998,7 +998,7 @@ if __name__ == '__main__':
     print 'Greetings, human.'
     print ''
 
-    fileroot = 'poco_b0329_173027.mir'
+    fileroot = 'poco_b0329_173027.mir'  
     pathin = 'data/'
     pathout = 'b0329_fixdm_ph/'
 #    edge = 150 # m31 search up to dm=131 and pulse starting at first unflagged channel
