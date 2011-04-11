@@ -43,6 +43,7 @@ fancy/atanudgetime
 fancy/box-fitpoint
 fancy/box-overlay
 fancy/box-region
+fancy/box-topointmdl
 fancy/byant
 fancy/calctsys
 fancy/chanaver
@@ -52,6 +53,7 @@ fancy/fxcal.py
 fancy/gpcat
 fancy/gpmergepols
 fancy/gpunity
+fancy/mdl-makeimage
 fancy/multiflag2
 fancy/pwflux
 fancy/pwmodel
