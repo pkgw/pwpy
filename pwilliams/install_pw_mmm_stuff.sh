@@ -12,6 +12,10 @@ fi
 pfx=`cat instpfx`
 pfx=`eval echo $pfx`
 
+if [ x"$1" = x-v ] ; then
+    vee=v
+fi
+
 programs='
 atastdflag
 C
@@ -87,5 +91,5 @@ pylib/pwmodel.py
 '
 
 set -e
-cp -vp $programs $pfx/bin
-cp -vp $modules $pfx/lib/python/site-packages
+cp -p$vee $programs $pfx/bin
+cp -p$vee $modules $pfx/lib/python/site-packages
