@@ -16,6 +16,10 @@ import miriad, mirexec
 
 miriad.basicTrace ()
 
+if len (sys.argv) != 4:
+    print >>sys.stderr, 'Usage: box-fitpoint <boxfile> <image> <boxnum>'
+    sys.exit (1)
+
 boxfn = sys.argv[1]
 img = miriad.ImData (sys.argv[2])
 boxnum = int (sys.argv[3])
