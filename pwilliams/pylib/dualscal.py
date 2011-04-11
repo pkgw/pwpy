@@ -64,7 +64,7 @@ def dualSelfCal (vis, out, usemself=False, ttol=DEFAULT_TTOL,
         task = TaskMSelfCal ()
     else:
         task = TaskSelfCal ()
-        if 'verbose' in kwargs:
+        if 'verbose' in kwargs and kwargs['verbose']:
             util.die ('option "verbose" only supported by mselfcal')
 
     if ttol <= 0:
@@ -205,7 +205,7 @@ def task (args):
 
     for option in ('amplitude', 'phase', 'smooth', 'polarized', 'mfs',
                    'relax', 'apriori', 'noscale', 'mosaic', 'verbose'):
-        rest[option] = getattr (kws, option)
+        rest[option] = bool (getattr (kws, option, False))
 
 
     # Ready to do the real work
