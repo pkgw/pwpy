@@ -73,7 +73,7 @@ except ImportError:
             return curdir
         return join(*rel_list)
 
-from os.path import isabs, join, exists, isdir, basename
+from os.path import isabs, join, exists, isdir, basename, abspath
 
 def jexists (*args):
     return exists (join (*args))
@@ -89,6 +89,8 @@ def doone (src, dest, doapply):
 
     if isabs (src):
         relsrc = src
+    elif isabs (dest):
+        relsrc = abspath (src)
     else:
         relsrc = relpath (src, dest)
 
