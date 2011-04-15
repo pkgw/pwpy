@@ -202,6 +202,9 @@ module Pgplot
     # in the optional +opts+ Hash:
     #
     #   :just => 0
+    #            Supported values are:
+    #              0, false, nil - X and Y scales independent
+    #              anything else - X and Y scales equal
     #   :title => 'Untitled Plot'
     #   :title2 => nil
     #   :xlabel => 'X Axis'
@@ -253,8 +256,10 @@ module Pgplot
         :ypad => 0.1
       }.merge!(opts)
 
-      # Convert true to 1
-      opts[:just] = 1 if opts[:just] == true
+      # Set opts[:just] to 1 if it none of nil, false, or 0
+      # Otherwise, set it to 0
+      opts[:just]  = (opts[:just] && opts[:just] != 0) ? 1 : 0
+
 
       xxmin = opts[:xrange] ? opts[:xrange].first : xx.min
       xxmax = opts[:xrange] ? opts[:xrange].last : xx.max
@@ -412,6 +417,9 @@ module Pgplot
     # in the optional +opts+ Hash:
     #
     #   :just => 0
+    #            Supported values are:
+    #              0, false, nil - X and Y scales independent
+    #              anything else - X and Y scales equal
     #   :title => 'Magnitude/Phase Plot'
     #   :title2 => nil
     #   :xlabel => 'X Axis'
@@ -455,6 +463,10 @@ module Pgplot
         :log_floor => 1e-10,
         :overlay => false,
       }.merge!(opts)
+
+      # Set opts[:just] to 1 if it none of nil, false, or 0
+      # Otherwise, set it to 0
+      opts[:just]  = (opts[:just] && opts[:just] != 0) ? 1 : 0
 
       xxmin = opts[:xrange] ? opts[:xrange].first : xx.min
       xxmax = opts[:xrange] ? opts[:xrange].last : xx.max
