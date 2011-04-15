@@ -385,7 +385,7 @@ class poco:
         dOut.setPreambleType ('uvw', 'time', 'baseline')
 
         i = 0
-        int0 = (track[0][len(track[0])/2] + tshift) * self.nbl   # choose integration at center of dispersed track
+        int0 = self.nskip + (track[0][len(track[0])/2] + tshift) * self.nbl   # choose integration at center of dispersed track
 
         for inp, preamble, data, flags in vis.readLowlevel ('dsl3', False):
             # since template has only one int, this loop gets spectra by iterating over baselines.
@@ -803,7 +803,8 @@ def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000, edge=0):
     for file in filelist:
         fileout = open(pathout + string.join(file.split('.')[:-1]) + '.txt', 'a')
 
-        for nskip in range(0, maxints-(nints-edge), nints-edge):
+        for nskip in range(0, maxints-(nints-edge), 10*(nints)-edge):    ## TEMP
+#        for nskip in range(0, maxints-(nints-edge), nints-edge):
             print
             print 'Starting file %s with nskip %d' % (file, nskip)
 
@@ -930,12 +931,14 @@ def process_pickle(filename, pathin, mode='image'):
     peaktrial = n.where(snrarr == max(snrarr))[0][0]
 
     bgwindow = 10
+
+#    name = 'poco_b0329_173027_16.mir'  # hack to force using certain file
     
     print 'Loaded pickle file for %s' % (name)
     print 'Has peaks at DM = ', dmarr
     print 'Significance of ', snrarr
 #    if len(dmbinarr) >= 1:
-    if (len(dmbinarr) >= 1) & (snrarr[peaktrial] > 8.):
+    if (len(dmbinarr) >= 1) & (snrarr[peaktrial] > 7.):
         print 'Grabbing %d ints at %d' % (nints, nintskip)
 #        pv = poco(pathin + name, nints=nints, nskip=nintskip + tbinarr[peaktrial] - bgwindow)    # to skip a few ints...
         pv = poco(pathin + name, nints=nints, nskip=nintskip)    # format defined by pickle dump below
