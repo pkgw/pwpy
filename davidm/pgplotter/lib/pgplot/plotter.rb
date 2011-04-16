@@ -261,8 +261,13 @@ module Pgplot
       opts[:just]  = (opts[:just] && opts[:just] != 0) ? 1 : 0
 
 
-      xxmin = opts[:xrange] ? opts[:xrange].first : xx.min
-      xxmax = opts[:xrange] ? opts[:xrange].last : xx.max
+      xxmin = xxmax = nil
+      if opts[:xrange]
+        xxmin = opts[:xrange].first
+        xxmax = opts[:xrange].last
+      end
+      xxmin ||= xx.min
+      xxmax ||= xx.max
       # Round to sfloat precision
       xxmin, xxmax = NArray[xxmin, xxmax].to_type(NArray::SFLOAT).to_a
       if xxmin == xxmax
@@ -289,8 +294,13 @@ module Pgplot
         yy.mul!(2) if opts[:yscale].to_s =~ /db2/i
       end
 
-      yymin = opts[:yrange] ? opts[:yrange].first : yy.min
-      yymax = opts[:yrange] ? opts[:yrange].last : yy.max
+      yymin = yymax = nil
+      if opts[:yrange]
+        yymin = opts[:yrange].first
+        yymax = opts[:yrange].last
+      end
+      yymin ||= yy.min
+      yymax ||= yy.max
       # Round to sfloat precision
       yymin, yymax = NArray[yymin, yymax].to_type(NArray::SFLOAT).to_a
       if yymin == yymax
@@ -468,8 +478,13 @@ module Pgplot
       # Otherwise, set it to 0
       opts[:just]  = (opts[:just] && opts[:just] != 0) ? 1 : 0
 
-      xxmin = opts[:xrange] ? opts[:xrange].first : xx.min
-      xxmax = opts[:xrange] ? opts[:xrange].last : xx.max
+      xxmin = xxmax = nil
+      if opts[:xrange]
+        xxmin = opts[:xrange].first
+        xxmax = opts[:xrange].last
+      end
+      xxmin ||= xx.min
+      xxmax ||= xx.max
       # Round to sfloat precision
       xxmin, xxmax = NArray[xxmin, xxmax].to_type(NArray::SFLOAT).to_a
       if xxmin == xxmax
@@ -501,8 +516,13 @@ module Pgplot
         zzabs.mul!(2) if opts[:mag_scale].to_s =~ /db2/i
       end
 
-      zzmin = opts[:mag_range] ? opts[:mag_range].first : zzabs.min
-      zzmax = opts[:mag_range] ? opts[:mag_range].last : zzabs.max
+      zzmin = zzmax = nil
+      if opts[:mag_range]
+        zzmin = opts[:mag_range].first
+        zzmax = opts[:mag_range].last
+      end
+      zzmin ||= zzabs.min
+      zzmax ||= zzabs.max
       # Round to sfloat precision
       zzmin, zzmax = NArray[zzmin, zzmax].to_type(NArray::SFLOAT).to_a
       if zzmin == zzmax
@@ -557,8 +577,13 @@ module Pgplot
       bin(xx, zzabs)
 
       if !opts[:overlay]
-        zzmin = opts[:ph_range] ? opts[:ph_range].first : zzangle.min
-        zzmax = opts[:ph_range] ? opts[:ph_range].last : zzangle.max
+        zzmin = zzmax = nil
+        if opts[:ph_range]
+          zzmin = opts[:ph_range].first
+          zzmax = opts[:ph_range].last
+        end
+        zzmin ||= zzangle.min
+        zzmax ||= zzangle.max
         zzmin = -180 if zzmin < -180
         zzmax =  180 if zzmax >  180
         # Round to sfloat precision
