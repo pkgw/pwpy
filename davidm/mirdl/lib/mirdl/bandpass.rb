@@ -8,9 +8,11 @@ require 'narray'
 
 module Mirdl
 
-  # Returns [bandpass, freqs]
+  # Returns [bandpass, freqs, solution_time]
   # +bandpass+ is NArray that is nants*nfeeds*nchan long
   # +freqs+ is an Array of frequencies corresponding to each channel
+  #
+  # TODO: Handle multiple bandpass solutions
   def get_bandpass(tno, sels=nil)
     return nil unless hdprsnt(tno, :bandpass)
 
@@ -75,6 +77,12 @@ module Mirdl
     bandpass = NArray.scomplex(nchan,nfeeds,nants)
     off = 8
     hreadc(item,bandpass,off,8*nants*nfeeds*nchan)
+    off += 8*nants*nfeeds*nchan
+
+    # Read solution time
+    soltime = NArray.float(1)
+    hreadd(item,soltime,off,8)
+
     hdaccess(item)
 
     # Take reciprocal of gains
@@ -85,7 +93,7 @@ module Mirdl
     # TODO Perform frequency selection, if needed.
     # TODO Blank out the unwanted antennas.
 
-    [bandpass, freqs]
+    [bandpass, freqs, soltime[0]]
   end
   module_function :get_bandpass
 end
