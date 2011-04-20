@@ -63,8 +63,8 @@ exit unless have_library('mir', 'bug_c') || have_library('mir_uvio', 'bug_c')
 # libmir_linpack (old way)
 exit unless have_library('mir', 'sdot_') || have_library('mir_linpack', 'sdot_')
 
-have_library('png','png_init_io') # optional png library
-exit unless have_library('pgplot', 'pgpt_')
+#have_library('png','png_init_io') # optional png library
+#exit unless have_library('pgplot', 'pgpt_')
 
 # Check for new MIRIAD bug handler function
 have_func('bughandler_c', 'miriad.h')
