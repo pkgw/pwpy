@@ -1,7 +1,3 @@
-#
-# $Id$
-#
-
 # Astronomy related extensions for Ruby.
 
 require 'date'
