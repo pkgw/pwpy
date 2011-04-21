@@ -568,6 +568,29 @@ class SysTemps (object):
 
         # Make sure we end with a newline
         print
+        print 'Best dual-pol antennas:'
+
+        jtsyses = {}
+        lastant = None
+        lasttsys = None
+
+        for i in xrange (0, self.nap):
+            ant = util.apAnt (aps[i])
+
+            if ant == lastant:
+                jtsyses[ant] = N.sqrt (lasttsys * soln[i])
+
+            lasttsys = soln[i]
+            lastant = ant
+
+        sjtsys = sorted (jtsyses.iteritems (), key=lambda t: t[1])
+
+        print '   ',
+        for ant, jtsys in sjtsys[:5]:
+            print '%d (%#.4g)' % (ant, jtsys),
+
+        # Make sure we end with a newline
+        print
 
     def _show (self, haveModel):
         import omega
