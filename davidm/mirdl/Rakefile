@@ -67,7 +67,7 @@ spec = Gem::Specification.new do |s|
   s.extensions = %w[ ext/extconf.rb ]
 
   # Documentation TODO
-  s.rdoc_options = ['-m', 'README.rdoc']
+  s.rdoc_options = %w[-m README.rdoc -x ext/Makefile]
   #s.has_rdoc = false
   s.extra_rdoc_files = ['README.rdoc']
 
