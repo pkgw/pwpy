@@ -49,9 +49,9 @@ spec = Gem::Specification.new do |s|
   #s.extensions = %w[ ext/extconf.rb ]
 
   # Documentation
-  s.rdoc_options = ['-m', 'README.rdoc']
+  s.rdoc_options = %w[-m README.rdoc]
   s.has_rdoc = true
-  s.extra_rdoc_files = ['README.rdoc']
+  s.extra_rdoc_files = %w[README.rdoc]
 
   # Testing TODO
   #s.test_files = [test/test.rb]
