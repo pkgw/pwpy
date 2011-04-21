@@ -1,0 +1,9 @@
+= Mirdl
+
+Provides Ruby access to MIRIAD subroutine libraries using custom C extension
+and the Ruby dl extension.  The mirdl gem differs from the miriad gem in that
+Mirdl accesses MIRIAD routines written in both C and Fortran whereas the miriad
+gem only supports the MIRIAD routines in the C based uvio library.  On the
+other hand, the miriad gem does not require a local MIRIAD extension whereas
+the mirdl gem does.  This distinction means that these two gems are not
+redundant.
