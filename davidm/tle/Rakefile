@@ -26,7 +26,7 @@ spec = Gem::Specification.new do |s|
 
   # Files, Libraries, and Extensions
   s.files = FileList[
-    'README',
+    'README.rdoc',
     'Rakefile',
     'lib/tle.rb',
     'ext/debug1.i',
@@ -58,8 +58,8 @@ spec = Gem::Specification.new do |s|
 
   # Documentation
   s.has_rdoc = true
-  s.rdoc_options = %w[-x ext/* -m README]
-  s.extra_rdoc_files = %w[README ext/rb_tle.cpp]
+  s.rdoc_options = %w[-x ext/* -m README.rdoc]
+  s.extra_rdoc_files = %w[README.rdoc ext/rb_tle.cpp]
 
   # Testing TODO
   #s.test_files = []
