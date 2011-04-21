@@ -30,7 +30,7 @@ spec = Gem::Specification.new do |s|
 
   # Files, Libraries, and Extensions
   s.files = FileList[
-    'README',
+    'README.rdoc',
     'Rakefile',
     'lib/novas.rb',
     'ext/*.c',
@@ -49,8 +49,8 @@ spec = Gem::Specification.new do |s|
 
   # Documentation
   s.has_rdoc = true
-  s.rdoc_options = %w[-S -x ext/novas-c201/.* -m README -t NOVAS-Ruby\ Documentation -x ext/Makefile]
-  s.extra_rdoc_files = %w[README ext/rb_novas.c ext/rb_body.c ext/rb_cat_entry.c ext/rb_site_info.c]
+  s.rdoc_options = %w[-S -x ext/novas-c201/.* -m README.rdoc -t NOVAS-Ruby\ Documentation -x ext/Makefile]
+  s.extra_rdoc_files = %w[README.rdoc ext/rb_novas.c ext/rb_body.c ext/rb_cat_entry.c ext/rb_site_info.c]
 
   # Testing TODO
   s.test_files = ['test/checkout-st.rb']
