@@ -1,0 +1,9 @@
+= Ruby/PGPLOT
+
+This is a gemified version of the {Ruby/PGPLOT Rubyforge project
+}[http://pgplot.rubyforge.org/"target="_top].
+
+This version includes fixes for 64-bit platforms.
+
+See {README.en.rdoc}[link:files/README_en_rdoc.html]
+or {README.ja.rdoc}[link:files/README_ja_rdoc.html] for more details.

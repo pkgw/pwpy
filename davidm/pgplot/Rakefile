@@ -23,6 +23,9 @@ spec = Gem::Specification.new do |s|
 
   # Files, Libraries, and Extensions
   s.files = %w[
+    README.en.rdoc
+    README.ja.rdoc
+    README.rdoc
     cogen.rb
     depend
     extconf.rb
@@ -39,9 +42,9 @@ spec = Gem::Specification.new do |s|
   s.extensions = %w[ extconf.rb ]
 
   # Documentation TODO
-  #s.rdoc_options = []
+  s.rdoc_options = %w[-m README.rdoc -x Makefile]
   #s.has_rdoc = false
-  #s.extra_rdoc_files = []
+  s.extra_rdoc_files = %w[README.rdoc README.en.rdoc README.ja.rdoc]
 
   # Testing TODO
   #s.test_files = []
