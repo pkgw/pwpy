@@ -58,7 +58,8 @@ spec = Gem::Specification.new do |s|
 
   # Documentation
   s.has_rdoc = true
-  s.rdoc_options = %w[-x ext/* -m README.rdoc]
+  #s.rdoc_options = %w[-m README.rdoc -E c=cpp]
+  s.rdoc_options = %w[-m README.rdoc]
   s.extra_rdoc_files = %w[README.rdoc ext/rb_tle.cpp]
 
   # Testing TODO
