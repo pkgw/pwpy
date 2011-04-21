@@ -1,0 +1,5 @@
+= EOP
+
+The eop gem provides Ruby classes to manage Earth Orientation Parameters.
+Downloads and parses Earth Orientation Parameter data files from IERS.
+Facilitates management of local EOP data file cache.
