@@ -34,6 +34,7 @@ spec = Gem::Specification.new do |s|
 
   # Files, Libraries, and Extensions
   s.files = FileList[
+    'README.rdoc',
     'Rakefile',
     'lib/astroutil.rb',
     'test/**/*'
@@ -48,9 +49,9 @@ spec = Gem::Specification.new do |s|
   #s.extensions = %w[ ext/extconf.rb ]
 
   # Documentation
-  #s.rdoc_options = []
+  s.rdoc_options = ['-m', 'README.rdoc']
   s.has_rdoc = true
-  #s.extra_rdoc_files = []
+  s.extra_rdoc_files = ['README.rdoc']
 
   # Testing TODO
   #s.test_files = [test/test.rb]

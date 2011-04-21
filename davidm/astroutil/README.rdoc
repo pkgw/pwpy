@@ -1,0 +1,4 @@
+= Astroutil
+
+The astroutil gem adds astronomy related methods and general convenience
+methods to some of Ruby's built in classes.
