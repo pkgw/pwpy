@@ -88,7 +88,7 @@ by this C code; NOVAS-Ruby merely exposes the functionality to Ruby.
 
 The NOVAS-C library was written by John A. Bangert, U. S. Naval Observatory,
 based on Algorithms and FORTRAN code by George H. Kaplan, U. S. Naval
-Observatory.  Their 
+Observatory.
 
 Much of the documentation for the {NOVAS}[link:classes/Novas.html] routines was
 transcribed into Rdoc format from the {NOVAS-C software documentation
