@@ -20,11 +20,13 @@ programs='
 atastdflag
 C
 chbo
+imrms
 iquv
 mirargmerge
 pg2eps
 polsplit
 pwflag
+sfind-to-olay
 show
 sortinplace
 tiam
