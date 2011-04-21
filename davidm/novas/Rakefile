@@ -59,7 +59,6 @@ end
 task "pkg" #=> :swig
 
 Rake::GemPackageTask.new(spec) do |pkg|
-  task pkg.package_dir_path => :swig
   pkg.need_zip = true
   pkg.need_tar = true
 end
