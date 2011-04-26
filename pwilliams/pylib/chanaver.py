@@ -280,8 +280,8 @@ else:
         params = dict (params) # copy so we don't modify:
         naver = params.pop ('naver', 0)
 
-        context.ensureDir ()
-        out = VisData (context.fullpath ('out'))
+        context.ensureParent ()
+        out = VisData (context.fullpath ())
         out.delete ()
 
         channelAverageWithSetup (vis, out, naver, **params)
@@ -310,7 +310,8 @@ else:
 
         return out
 
-    asMake = SimpleMake ('vis params', 'out', _asmake)
+    asMake = SimpleMake ('vis params', 'out', _asmake,
+                         [None, {}])
 
 
 def task (args):

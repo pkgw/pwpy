@@ -1112,8 +1112,8 @@ else:
     from awff.pathref import FileRef
 
     def _gettsysinfo (context, vis=None, params=None):
-        context.ensureDir ()
-        out = FileRef (context.fullpath ('out'))
+        context.ensureParent ()
+        out = FileRef (context.fullpath ())
 
         interval = params.get ('interval', 5. / 60 / 24)
         flux = params.get ('flux')
@@ -1155,7 +1155,8 @@ else:
 
         return out
 
-    GetTSysInfo = SimpleMake ('vis params', 'out', _gettsysinfo)
+    GetTSysInfo = SimpleMake ('vis params', 'out', _gettsysinfo,
+                              [None, {}])
 
     from mirtask.util import mir2aps, aps2ants
     from arf.vispipe import VisPipeStage
