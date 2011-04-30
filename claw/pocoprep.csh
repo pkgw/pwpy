@@ -17,7 +17,7 @@ uvflag vis=${name} flagval=f line=ch,3,42
 uvflag vis=${name} flagval=f line=ch,15,50
 
 ## SET DESTINATION ##
-goto casa
+goto 3c147
 ## SET DESTINATION ##
 
 # for crab
@@ -35,8 +35,9 @@ puthd in=${name}/ra value=0.929314
 puthd in=${name}/dec value=0.95255
 puthd in=${name}/object value=B0329+54
 puthd in=${name}/source value=B0329+54
-gpcopy vis=${cal3c147} out=${name}
-gpedit vis=${name} options=multiply gain=8,0  # need to multiply flux scale by sqrt(1024/16), since integration time affects gain scaling
+#gpcopy vis=${cal3c147} out=${name}
+gpcopy vis=data/poco_crab_cal1.mir out=${name}
+#gpedit vis=${name} options=multiply gain=8,0  # need to multiply flux scale by sqrt(1024/16), since integration time affects gain scaling
 goto end
 
 #for 3c147

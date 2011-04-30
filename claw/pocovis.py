@@ -17,6 +17,7 @@ import miriad, pickle
 import numpy as n
 import pylab as p
 import scipy.optimize as opt
+import scipy.stats.morestats as morestats
 #from threading import Thread
 #from matplotlib.font_manager import fontManager, FontProperties
 #font= FontProperties(size='x-small');
@@ -38,16 +39,15 @@ class poco:
         self.baseline_order = n.array([ 257, 258, 514, 261, 517, 1285, 262, 518, 1286, 1542, 259, 515, 773, 774, 771, 516, 1029, 1030, 772, 1028, 1287, 1543, 775, 1031, 1799, 1544, 776, 1032, 1800, 2056, 260, 263, 264, 519, 520, 1288])   # second iteration of bl nums
         self.autos = []
         self.noautos = []
-        self.pulsewidth = 0.0066 * n.ones(len(self.chans)) # pulse width of b0329+54
-#        self.pulsewidth = 0 * n.ones(len(self.chans)) # pulse width of crab
+#        self.pulsewidth = 0.0066 * n.ones(len(self.chans)) # pulse width of b0329+54
+        self.pulsewidth = 0 * n.ones(len(self.chans)) # pulse width of crab
         # set dmarr
-        self.dmarr = [26.8]  # b0329+54
-#        self.dmarr = [56.8]  # crab
+#        self.dmarr = [26.8]  # b0329+54
+        self.dmarr = [56.8]  # crab
 #        self.dmarr = n.arange(53,131,3.1)       # dm trials for m31. spacing set for 50% efficiency for band from 722-796 MHz, 1.2 ms integrations
 #        self.tshift = 0.2     # not implemented yet
         self.nskip = nskip*self.nbl    # number of iterations to skip (for reading in different parts of buffer)
         nskip = self.nskip
-        self.usedmmask = False    # algorithm for summing over dm track.  'dmmask' is data-shaped array with True/False values, else is 2xn array where track is.
         self.file = file
         for a1 in range(1,9):             # loop to adjust delays
             for a2 in range(a1,9):
@@ -229,41 +229,10 @@ class poco:
             p.show()
 
 
-    def dmmask(self, dm = 0., t0 = 0., show=0,):
-        """Takes dispersion measure in pc/cm3 and time offset from first integration in seconds.
-        Returns a mask to be multiplied by the data array.
-        Not typically used now, since dmtrack is faster.
-        """
-
-        reltime = self.reltime
-        chans = self.chans
-
-        # initialize mask (false=0)
-        mask = n.zeros((self.dataph.shape[0],self.dataph.shape[1]),dtype=bool)   # could get clever here.  use integer code to stack dm masks in unique way
-        freq = self.sfreq + chans * self.sdf             # freq array in GHz
-
-        # given freq, dm, dfreq, calculate pulse time and duration
-        pulset = 4.2e-3 * dm * freq**(-2) + t0  # time in seconds
-        pulsedt = 8.3e-6 * dm * (1000*self.sdf) * freq**(-3)   # dtime in seconds
-
-        for ch in range(mask.shape[1]):
-            ontime = n.where(((pulset[ch] + pulsedt[ch]/2.) >= reltime) & ((pulset[ch] - pulsedt[ch]/2.) <= reltime))
-#            print ontime
-            mask[ontime, ch] = True
-
-        if show:
-            ax = p.imshow(mask, aspect='auto', interpolation='nearest')
-            p.axis([-0.5,len(chans)+0.5,max(reltime),min(reltime)])
-            p.colorbar(ax)
-
-        return mask
-
-
     def dmtrack(self, dm = 0., t0 = 0., show=0):
         """Takes dispersion measure in pc/cm3 and time offset from first integration in seconds.
         t0 defined at first (unflagged) channel. Need to correct by flight time from there to freq=0 for true time.
         Returns an array of (timebin, channel) to select from the data array.
-        Faster than dmmask.
         """
 
         reltime = self.reltime
@@ -295,37 +264,6 @@ class poco:
         return track
 
 
-    def makedmt0(self):
-        """Integrates over data*dmmask or data at dmtrack for each pair of elements in dmarr, time.
-        Not threaded.  Uses dmmask or dmthread directly.
-        Stores mean of detected signal after dmtrack, effectively forming beam at phase center.
-        """
-
-        dmarr = self.dmarr
-#        reltime = n.arange(2*len(self.reltime))/2.  # danger!
-        reltime = self.reltime
-#        minintersect = len(self.chans)  # not needed anymore
-        chans = self.chans
-
-        dmt0arr = n.zeros((len(dmarr),len(reltime)), dtype='float64')
-
-        for i in range(len(dmarr)):
-            for j in range(len(reltime)):
-                if self.usedmmask:    # slower by factor of 2 than dmtracks
-                    dmmask = self.dmmask(dm=dmarr[i], t0=reltime[j])
-                    if dmmask.sum() >= minintersect:               # ignore tiny, noise-dominated tracks
-#                        dmt0arr[i,j] = n.mean((self.dataph * dmmask)[n.where(dmmask == True)])
-                        dmt0arr[i,j] = n.abs(((self.data * dmmask)[n.where(dmmask == True)]).mean(axis=1))
-                else:
-                    dmtrack = self.dmtrack(dm=dmarr[i], t0=reltime[j])
-                    if ((dmtrack[1][0] == 0) & (dmtrack[1][len(dmtrack[1])-1] == len(self.chans)-1)):   # use only tracks that span whole band
-#                        dmt0arr[i,j] = n.abs((((self.data).mean(axis=1))[dmtrack[0],dmtrack[1]]).mean())
-                        dmt0arr[i,j] = ((((self.data).mean(axis=1))[dmtrack[0],dmtrack[1]]).mean()).real    # use real part to detect on axis, but keep gaussian dis'n
-            print 'dedispersed for ', dmarr[i]
-
-        self.dmt0arr = dmt0arr
-
-
     def writetrack(self, dmbin, tbin, output='c', tshift=0, bgwindow=0, show=0):
         """Writes data from track out as miriad visibility file.
         Optional background subtraction bl-by-bl over bgwindow integrations. Note that this is bgwindow *dmtracks* so width is bgwindow+track width
@@ -335,8 +273,7 @@ class poco:
 
         rawdatatrim = self.rawdata[:,:,self.chans]
 
-        track = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[tbin-tshift], show=0)  # needs to be shifted by -1 bin in reltime?
-#        minintersect = len(self.chans)
+        track = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[tbin-tshift], show=0)
 
 #        if len(track[1]) < minintersect:
         if ((track[1][0] != 0) | (track[1][len(track[1])-1] != len(self.chans)-1)):
@@ -348,7 +285,7 @@ class poco:
             twidths.append(len(n.array(track)[0][list(n.where(n.array(track[1]) == i)[0])]))
 
         if bgwindow > 0:
-            bgrange = range(-bgwindow/2 - max(twidths) + tbin - tshift, -max(twidths) + tbin - tshift) + range(max(twidths) + tbin - tshift, max(twidths) + bgwindow/2 + + tbin - tshift + 1)
+            bgrange = range(-bgwindow/2 - max(twidths) + tbin - tshift, -max(twidths) + tbin - tshift) + range(max(twidths) + tbin - tshift, max(twidths) + bgwindow/2 + tbin - tshift + 1)
 #            bgrange = range(int(-bgwindow/2.) + tbin - tshift, int(bgwindow/2.) + tbin - tshift + 1)
 #            bgrange.remove(tbin - tshift); bgrange.remove(tbin - tshift + 1); bgrange.remove(tbin - tshift - 1); bgrange.remove(tbin - tshift + 2); bgrange.remove(tbin - tshift - 2); bgrange.remove(tbin - tshift + 3); bgrange.remove(tbin - tshift - 3)
             for i in bgrange:     # build up super track for background subtraction
@@ -436,7 +373,6 @@ class poco:
                         else:
                             flags[j] = False
 
-
 #                    print 'BG spectrum std =', (n.abs(bgarr)).std()
 
 #                ants = util.decodeBaseline (preamble[4])
@@ -449,8 +385,8 @@ class poco:
                 break
 
         dOut.close ()
-
         return 1
+
 
     def dmlc(self, dmbin, tbin, nints = 50):
         """Plots lc for DM bin over range of timebins.
@@ -501,6 +437,31 @@ class poco:
             lc.append(dataarr.mean())
 
         return n.array(lc)
+
+
+    def makedmt0(self):
+        """Integrates data at dmtrack for each pair of elements in dmarr, time.
+        Not threaded.  Uses dmthread directly.
+        Stores mean of detected signal after dmtrack, effectively forming beam at phase center.
+        """
+
+        dmarr = self.dmarr
+#        reltime = n.arange(2*len(self.reltime))/2.  # danger!
+        reltime = self.reltime
+#        minintersect = len(self.chans)  # not needed anymore
+        chans = self.chans
+
+        dmt0arr = n.zeros((len(dmarr),len(reltime)), dtype='float64')
+
+        for i in range(len(dmarr)):
+            for j in range(len(reltime)):
+                dmtrack = self.dmtrack(dm=dmarr[i], t0=reltime[j])
+                if ((dmtrack[1][0] == 0) & (dmtrack[1][len(dmtrack[1])-1] == len(self.chans)-1)):   # use only tracks that span whole band
+#                    dmt0arr[i,j] = n.abs((((self.data).mean(axis=1))[dmtrack[0],dmtrack[1]]).mean())
+                    dmt0arr[i,j] = ((((self.data).mean(axis=1))[dmtrack[0],dmtrack[1]]).mean()).real    # use real part to detect on axis, but keep gaussian dis'n
+            print 'dedispersed for ', dmarr[i]
+
+        self.dmt0arr = dmt0arr
 
 
     def plotdmt0(self, save=0):
@@ -689,8 +650,140 @@ class poco:
                 removefile (outroot + '.mir')
 
 
+    def normalreim(self, prob=2.3e-4, bgwindow=0):
+        """Calculates p-value of normality for real-imaginary distribution of visibilities. **Does not use both parts of complex values! Only real.**
+        Uses baselines and channels separately. prob is the false positive rate (actually non-normal p-value); default is 230/1e6 => 5sigma.
+        Returns least likely normal trials
+        """
+
+        write = 0  # use writetrack to get bgsub visies? takes long time...
+        tbuffer = 7  # number of extra iterations to trim from edge of dmt0 plot
+
+        dmarr = self.dmarr
+        reltime = self.reltime
+        chans = self.chans
+
+        dmt0arr = n.zeros((len(dmarr),len(reltime)), dtype='float64')
+
+        for i in range(len(dmarr)):
+            for j in range(len(reltime)):
+                if write:
+                    # use writetrack to get bgsub visibilities
+                    status = self.writetrack(i, j, tshift=0, bgwindow=bgwindow)
+                    if status:
+                        newfile = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl) + '-' + 'dm' + str(i) + 't' + str(j) + '.mir'
+                        print 'Loading file', newfile
+                        pv2 = poco(newfile, nints=1)
+                        pv2.prep()
+                        length = pv2.data.shape[1] * pv2.data.shape[2]
+                        da = (pv2.data[0]).reshape((1,length))[0]
+                        removefile(newfile)
+                    
+                        dmt0arr[i,j] = morestats.shapiro(da)[1]
+                else:
+                    datadiff = self.tracksub(i, j, bgwindow=bgwindow)
+                    if len(n.shape(datadiff)) == 3:
+                        length = datadiff.shape[1] * datadiff.shape[2]
+                        datadiff = (datadiff[0]).reshape((1,length))[0]
+                        dmt0arr[i,j] = morestats.shapiro(datadiff)[1]
+                    else:
+                        continue
+            print 'dedispersed for ', dmarr[i]
+
+        # Trim data down to where dmt0 array is nonzero
+        arreq0 = n.where(dmt0arr == 0)
+        trimt = arreq0[1].min()
+        dmt0arr = dmt0arr[:,:trimt - tbuffer]
+        reltime = reltime[:trimt - tbuffer]
+        print 'dmt0arr/time trimmed to new shape:  ',n.shape(dmt0arr), n.shape(reltime)
+
+        # Detect dips
+        self.dmt0arr = dmt0arr
+        self.dips = n.where(dmt0arr < prob)
+        dipmin = n.where(dmt0arr == dmt0arr.min())
+        print 'Least normal re-im distributions: ', self.dips
+        print 'Number of trials: ', len(dmarr) * len(reltime)
+
+        return self.dips,dmt0arr[self.dips]
+
+
+    def tracksub(self, dmbin, tbin, bgwindow = 0):
+        """Reads data along dmtrack and optionally subtracts background like writetrack method.
+        Returns the difference of the data in the on and off tracks as a single integration with all bl and chans.
+        Nominally identical to writetrack, but gives visibilities values off at the 0.01 (absolute) level. Good enough for now.
+        """
+
+        data = self.data
+
+        trackon = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[tbin], show=0)
+        if ((trackon[1][0] != 0) | (trackon[1][len(trackon[1])-1] != len(self.chans)-1)):
+            print 'Track does not span all channels. Skipping.'
+            return [0]
+
+        dataon = data[trackon[0], :, trackon[1]]
+
+        # set up bg track
+        if bgwindow:
+            # measure max width of pulse (to avoid in bgsub)
+            twidths = [] 
+            for k in trackon[1]:
+                twidths.append(len(n.array(trackon)[0][list(n.where(n.array(trackon[1]) == k)[0])]))
+
+            bgrange = range(-bgwindow/2 - max(twidths) + tbin, -max(twidths) + tbin) + range(max(twidths) + tbin, max(twidths) + bgwindow/2 + tbin + 1)
+            for k in bgrange:     # build up super track for background subtraction
+                if bgrange.index(k) == 0:   # first time through
+                    trackoff = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[k], show=0)
+                else:    # then extend arrays by next iterations
+                    tmp = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[k], show=0)
+                    trackoff[0].extend(tmp[0])
+                    trackoff[1].extend(tmp[1])
+
+            dataoff = data[trackoff[0], :, trackoff[1]]
+
+        # compress time axis, then subtract on and off tracks
+        for ch in n.unique(trackon[1]):
+            indon = n.where(trackon[1] == ch)
+
+            if bgwindow:
+                indoff = n.where(trackoff[1] == ch)
+                datadiff = dataon[indon].mean(axis=0) - dataoff[indoff].mean(axis=0)
+            else:
+                datadiff = dataon[indon].mean(axis=0)
+
+            if ch == 0:
+                datadiffarr = [datadiff]
+            else:
+                datadiffarr = n.append(datadiffarr, [datadiff], axis=0)
+
+        datadiffarr = n.array([datadiffarr.transpose()])
+
+        return datadiffarr
+
+
+    def plotreim(self, save=0):
+        """Plots the visibilities in real-imaginary space. Test of pulse detection concept for uncalibrated data...
+        """
+
+        da = self.data.mean(axis=0)
+        length = da.shape[0] * da.shape[1]
+        da = da.reshape((1,length))[0]
+
+        print 'Real center: %.1f +- %.1f ' % (da.real.mean(), da.real.std()/n.sqrt(len(da.real)))
+        print 'Imag center: %.1f +- %.1f ' % (da.imag.mean(), da.imag.std()/n.sqrt(len(da.real)))
+        print 'Normal p-value: ', morestats.shapiro(da)[1]
+
+        if save:
+            savename = self.file.split('.')[:-1]
+            savename.append(str(self.nskip/self.nbl) + '.reim.png')
+            savename = string.join(savename,'.')
+            p.savefig(savename)
+        else:
+            p.plot(da.real,da.imag, '.')
+            p.show()
+
+
     def dedisperse2(self):
-        """Integrates over data*dmmask or data at dmtrack for each pair of elements in dmarr, time.
+        """Integrates over data at dmtrack for each pair of elements in dmarr, time.
         Uses threading.  SLOWER than serial.
         """
 
@@ -713,7 +806,7 @@ class poco:
 
 
     def dedisperse3(self):
-        """Integrates over data*dmmask or data at dmtrack for each pair of elements in dmarr, time.
+        """Integrates over data at dmtrack for each pair of elements in dmarr, time.
         Uses ipython.
         """
         from IPython.kernel import client
@@ -786,12 +879,12 @@ def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000, edge=0):
 #        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
 
 # for b0329 173027
-    for i in [0,1,2,3,4,5,6,7,8,9]:
-        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
-    for i in [0,1,2,6,7,8,9]:
-        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
-    for i in [0,1,2,3]:
-        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
+#    for i in [0,1,2,3,4,5,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+#    for i in [0,1,2,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+#    for i in [0,1,2,3]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
 
 # for m31 154202
 #    for i in [0,1,2,3,4,5,6,7,8,9]:
@@ -799,12 +892,14 @@ def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000, edge=0):
 #    for i in [0,1,2,3,4,5,6]:
 #        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
 
+# hack to search single file for pulses
+    filelist = [fileroot]
+
     # loop over miriad data and time chunks
     for file in filelist:
         fileout = open(pathout + string.join(file.split('.')[:-1]) + '.txt', 'a')
 
-        for nskip in range(0, maxints-(nints-edge), 10*(nints)-edge):    ## TEMP
-#        for nskip in range(0, maxints-(nints-edge), nints-edge):
+        for nskip in range(0, maxints-(nints-edge), nints-edge):
             print
             print 'Starting file %s with nskip %d' % (file, nskip)
 
@@ -822,6 +917,71 @@ def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000, edge=0):
             if len(peaks[0]) > 0:
                 pklout = open(pathout + string.join(file.split('.')[:-1]) + '.' + str(nskip) + '.pkl', 'wb')
                 pickle.dump((file, nskip, nints, peaks[0], pv.dmarr[peaks[0][0]], peaks[1], peakssig), pklout)
+                pklout.close()
+
+        fileout.close
+
+
+def pulse_search_reim(fileroot, pathin, pathout, nints=10000, edge=0):
+    """Blind search for pulses based on real-imaginary distribution of visibilities
+    """
+
+    maxints = 131000
+    bgwindow = 10
+    filelist = []
+
+# for crab 201103
+#    for i in [0,1,4,5,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+#    for i in range(0,8):
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+
+# for crab 190348
+#    for i in [0,1,2,3,4,5,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+#    for i in [1,3,4,5,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+#    for i in [0,1,2,3]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
+
+# for b0329 173027
+#    for i in [0,1,2,3,4,5,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+#    for i in [0,1,2,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+#    for i in [0,1,2,3]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
+
+# for m31 154202
+#    for i in [0,1,2,3,4,5,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+#    for i in [0,1,2,3,4,5,6]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+
+# hack to search single file for pulses
+    filelist = [fileroot]
+
+    # loop over miriad data and time chunks
+    for file in filelist:
+        fileout = open(pathout + string.join(file.split('.')[:-1]) + '.txt', 'a')
+
+        for nskip in range(0, maxints-(nints-edge), nints-edge):
+            print
+            print 'Starting file %s with nskip %d' % (file, nskip)
+
+            # load data
+            pv = poco(pathin + file, nints=nints, nskip=nskip)
+            pv.prep()
+
+            # searches at phase center  ## TO DO:  need to search over position in primary beam
+            dips, dipsprob = pv.normalreim(bgwindow=bgwindow)
+            print >> fileout, file, nskip, nints, dips
+
+            # save all results (v1.0 pickle format)
+            # TO DO:  think of v2.0 of pickle format
+            if len(dips[0]) > 0:
+                pklout = open(pathout + string.join(file.split('.')[:-1]) + '.' + str(nskip) + '.pkl', 'wb')
+                pickle.dump((file, nskip, nints, dips[0], pv.dmarr[dips[0][0]], dips[1], dipsprob), pklout)
                 pklout.close()
 
         fileout.close
@@ -928,17 +1088,20 @@ def process_pickle(filename, pathin, mode='image'):
     dmarr = dump[4]
     tbinarr = dump[5]
     snrarr = dump[6]
-    peaktrial = n.where(snrarr == max(snrarr))[0][0]
+    if mode == 'reim':  # reim mode has p-values for normality, which should be small when there is a pulse
+        peaktrial = n.where(snrarr == min(snrarr))[0][0]
+    else:
+        peaktrial = n.where(snrarr == max(snrarr))[0][0]
 
     bgwindow = 10
 
-#    name = 'poco_b0329_173027_16.mir'  # hack to force using certain file
+#    name = 'poco_crab_201103_tst.mir'  # hack to force using certain file
     
     print 'Loaded pickle file for %s' % (name)
     print 'Has peaks at DM = ', dmarr
     print 'Significance of ', snrarr
-#    if len(dmbinarr) >= 1:
-    if (len(dmbinarr) >= 1) & (snrarr[peaktrial] > 7.):
+    if len(dmbinarr) >= 1:
+#    if (len(dmbinarr) >= 1) & (snrarr[peaktrial] > 7.):
         print 'Grabbing %d ints at %d' % (nints, nintskip)
 #        pv = poco(pathin + name, nints=nints, nskip=nintskip + tbinarr[peaktrial] - bgwindow)    # to skip a few ints...
         pv = poco(pathin + name, nints=nints, nskip=nintskip)    # format defined by pickle dump below
@@ -985,6 +1148,10 @@ def process_pickle(filename, pathin, mode='image'):
         elif mode == 'dump':
             # write dmtrack data out for imaging
             pv.writetrack(track)
+        elif mode == 'reim':
+            datasub = pv.tracksub(dmbinarr[peaktrial], tbinarr[peaktrial], bgwindow=bgwindow)
+            pv.data = datasub
+            pv.plotreim()
         else:
             print 'Mode not recognized'
     else:
@@ -1001,12 +1168,12 @@ if __name__ == '__main__':
     print 'Greetings, human.'
     print ''
 
-    fileroot = 'poco_b0329_173027.mir'  
+    fileroot = 'poco_crab_201103_tst.mir'  
     pathin = 'data/'
-    pathout = 'b0329_fixdm_ph/'
+    pathout = 'crab_tst2/'
 #    edge = 150 # m31 search up to dm=131 and pulse starting at first unflagged channel
-    edge = 35 # b0329 search at dm=28.6 and pulse starting at first unflagged channel
-#    edge = 70 # Crab search at dm=56.8 and pulse starting at first unflagged channel
+#    edge = 35 # b0329 search at dm=28.6 and pulse starting at first unflagged channel
+    edge = 70 # Crab search at dm=56.8 and pulse starting at first unflagged channel
 #    edge = 360  # Crab DM of 56.8 and for DM track starting at freq=0
 
     if len(sys.argv) == 1:
@@ -1014,13 +1181,14 @@ if __name__ == '__main__':
         print 'Searching for pulses...'
         try:
 #            pulse_search_image(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, show=0)
-            pulse_search_phasecenter(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)
+#            pulse_search_phasecenter(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)
+            pulse_search_reim(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=500, edge=edge)
         except AttributeError:
             exit(0)
     elif len(sys.argv) == 2:
         # if pickle, then plot data or dm search results
         print 'Assuming input file is pickle of candidate...'
-        process_pickle(sys.argv[1], pathin=pathin, mode='spec')
+        process_pickle(sys.argv[1], pathin=pathin, mode='reim')
     elif len(sys.argv) == 6:
         # if full spec of trial, image it
         print 'Imaging DM trial...'
