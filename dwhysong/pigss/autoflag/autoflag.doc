@@ -3,26 +3,29 @@
 %P dhw
 %: editing
 %B
-	autoflag is a MIRIAD-compatible program that edits visibility data.
-	calibration of visibility data. Either phase only or amplitude and
-	phase calibration can be performed. The inputs are visibility data
-	files and model images. This program then calculates the visibilities
-	corresponding to the model, searches for redundant visibilities, and
-	solves for the gains.
+        autoflag is a MIRIAD-compatible program that edits visibility data.
+        calibration of visibility data. Either phase only or amplitude and
+        phase calibration can be performed. The inputs are visibility data
+        files and model images. This program then calculates the visibilities
+        corresponding to the model, searches for redundant visibilities, and
+        solves for the gains.
 %A cal
-	Name of input calibrator files. No default. Multiple data files
-	can be entered in a comma-separated list. These should be strong
-	point sources. At least one calibrator file is required.
+        Name of input calibrator files. No default. Multiple data files
+        can be entered in a comma-separated list. These should be strong
+        point sources. At least one calibrator file is required.
 %A vis
-	Name of input visibility data files. No default. Multiple data files
-	can be used in a comma-separated list. These data should be closely
-	associated in time with the calibrator scans.
+        Name of input visibility data files. No default. Multiple data files
+        can be used in a comma-separated list. These data should be closely
+        associated in time with the calibrator scans.
 %A options
-	This gives several processing options. Possible values are:
-	  noflag      Do not write the flag table; useful to see what would be done
-	  noband      Skip the internal bandpass calibration step
-	  nophase     Skip test of phase variance on calibrator data
-	  norfi       Skip the preliminary RFI detection step (not recommended)
-	  nodist      Skip the data distribution test
-	  nonoise     Skip the baseline noise test
-	  ata         Check for spectral corruption (for ATA data only)
+        This gives several processing options. Possible values are:
+          noflag      Do not write the flag table; useful to see what would be done
+          reten       Flag any baseline with less than 50% initial retention
+          time        Flag channels with excessive time-series variability in each scan
+          noband      Skip the internal bandpass calibration step
+          nophase     Skip test of phase variance on calibrator data
+          norfi       Skip the preliminary RFI detection step (not recommended)
+          nodist      Skip the data distribution test
+          nonoise     Skip the baseline noise test
+          nosingle    Skip the individual correlation test
+          ata         Flag spectral corruption (for ATA data only) and broad-band RFI.

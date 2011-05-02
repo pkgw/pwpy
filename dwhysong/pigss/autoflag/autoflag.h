@@ -9,7 +9,6 @@ typedef struct vis_struct {
 	complex float *data;
 	float thermal_sigmasq;
 	struct vis_struct *next;
-	unsigned int baseline;
 	unsigned char *flags;
 	unsigned short int ant[2];
 	char pol;
@@ -22,7 +21,8 @@ typedef struct bin_struct {
 	struct vis_struct *data;
 	unsigned long n_vis;
 	double first_time, last_time;
-	complex float *med_spec, *rms_spec, *gains, *median, *deviation;
+	complex float *med_spec, *rms_spec, *tav_spec, *gains, *median, *deviation, **array;
+	unsigned *n;
 	unsigned char *flags;
 } bin_struct;
 

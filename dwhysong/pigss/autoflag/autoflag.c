@@ -49,9 +49,8 @@
 extern void options_c(char *, char *[], char *, int);
 
 #define MAX_GAIN_ITERS 5
-
 #define N_HEADER_PARAMS 6
-#define N_OPTIONS 7
+#define N_OPTIONS 10
 #define MAXCHAN 1024
 
 /* A sidereal day is 23h 56m 4.09074s = 86164.09074 seconds */
@@ -69,11 +68,12 @@ const char blank=0;
 int one=1;
 int maxsels=1024;
 int n_vis_files=0, n_cal_files=0;
-char noflag,noband,nophase,norfi,ata,nonoise,nodistro;
+char noflag,noband,nophase,norfi,nosingle,ata,nonoise,nodistro,do_reten,tseries;
 dataset_struct *visdata=NULL, *firstvisdata=NULL, *firstcaldata=NULL;
 FILE *fd;
 
 
+// A value of 1 indicates the datum is good.
 inline void set_flag(vis_struct *vis, int channel, int value) {
 	unsigned char mask;
 	unsigned int i;
@@ -142,7 +142,7 @@ void dump_bin(bin_struct *bin) {
 /* Set things up to parse the "options" keyword */
 void getopt_dave() {
 	/* If you want to add a new option, you MUST increase the value of the N_OPTIONS #define. */
-	char *opts[N_OPTIONS]={"noflag","noband","nophase","norfi","ata","nodist","nonoise"};
+	char *opts[N_OPTIONS]={"noflag","noband","nophase","norfi","ata","nodist","nonoise","reten","time","nosingle"};
 	char present[N_OPTIONS];
 
 	options_c("options",opts,present,N_OPTIONS);
@@ -153,21 +153,32 @@ void getopt_dave() {
 	ata=present[4];
 	nodistro=present[5];
 	nonoise=present[6];
+	do_reten=present[7];
+	tseries=present[8];
+	nosingle=present[9];
 }
 
 
 /* Note: pol must be 0 or 1; it is not equal to the MIRIAD polarization value */
-void set_bin_flag(bin_struct *bin, char pol, int bl, unsigned chan, char value) {
+void set_bin_flag(bin_struct *bin, char pol, int bl, unsigned chan) {
 	unsigned char mask;
 	unsigned int i,idx;
-#ifdef DEBUG
-	if (pol > 1) bug_c('f',"Invalid polarization passed to set_bin_flag; must be 0 or 1.");
-#endif
-	i = pol*bin->visdata->n_bl*bin->visdata->n_chan + bl * bin->visdata->n_chan + chan;
-	idx = i / 8;
-	mask = 1 << (i % 8);
-	if (value) bin->flags[idx] |= mask;
-	else bin->flags[idx] &= ~mask;
+
+	idx = pol*bin->visdata->n_bl*bin->visdata->n_chan + bl * bin->visdata->n_chan + chan;
+	i = idx / 8;
+	mask = 1 << (idx % 8);
+	if (mask & bin->flags[i]) {	// already flagged
+		return;
+	}
+	bin->flags[i] |= mask;
+	if (bin->array != NULL) {
+		free(bin->array[idx]);
+		bin->array[idx] = NULL;
+	}
+	if (bin->n != NULL) bin->n[idx] = 0;
+	if (bin->rms_spec != NULL) bin->rms_spec[idx] = NAN + NAN * I;
+	if (bin->med_spec != NULL) bin->med_spec[idx] = NAN + NAN * I;
+	if (bin->tav_spec != NULL) bin->tav_spec[idx] = NAN + NAN * I;
 }
 
 
@@ -261,7 +272,7 @@ complex float median_cmplx(complex float *clist, int n) {
 }
 
 
-// Find the variance in a list of floats, emphasizing clean data. Flagged data
+// Find the scatter in a list of floats, emphasizing clean data. Flagged data
 // should have value NAN. This works the same way as the deviation calculation
 // in meddev_cmplx, but it finds the minimum deviation that encompasses 25% of
 // the data (it's 50% in meddev_cmplx).
@@ -294,7 +305,7 @@ int meddev25_float(float *list, int n, float *med, float *dev) {
 }
 
 
-/* Find the variance of real and imaginary values separately, emphasizing clean data.
+/* Find the scatter of real and imaginary values separately, emphasizing clean data.
  * Inputs: complex float array *clist contains the data. Integer n is the length of the array.
  * Results are returned in *dev.
  */
@@ -314,7 +325,7 @@ void meddev25_cmplx(complex float *clist, int n, complex float *med, complex flo
 }
 
 
-// Find the variance in a list of floats, emphasizing
+// Find the scatter in a list of floats, emphasizing
 // noisy data. Flagged data should have value NAN.
 int dev90_float(float *list, int n, float *dev) {
 	int i, offset, len;
@@ -343,7 +354,39 @@ int dev90_float(float *list, int n, float *dev) {
 }
 
 
-// Find the variance of real and imaginary values separately, emphasizing noisy data.
+// Find the median and scatter in a list of floats, emphasizing
+// noisy data. Flagged data should have value NAN.
+int meddev90_float(float *list, int n, float *med, float *dev) {
+	int i, offset, len;
+
+	qsort(list,n,sizeof(float),cmp_num);
+
+	/* Find how many elements are not NaN */
+	for (i=0; i<n; i++) if (isnan(list[i])) break;
+	n=i;	// Effectively throw out NaN values
+
+	if (n == 0) {	// No good data here. Return error.
+		*med = NAN;
+		*dev = NAN;
+		return(0);
+	}
+	else if (n % 2 == 1) *med = list[n/2];
+	else *med = ((list[n/2-1] + list[n/2]) / 2.0);
+
+	// Find scatter using the sorted list.
+	offset = n*9/10;
+	len = n-offset;
+	float tmp[len];
+	for (i=0; i<len; i++) tmp[i] = list[i+offset] - list[i];
+	*dev = tmp[0];
+	for (i=1; i<len; i++) if (tmp[i] < *dev) *dev=tmp[i];	// Use the smallest value from the list
+	*dev /= 2.0;	// want half-width, not full-width
+
+	return n;	// return the number of good data
+}
+
+
+// Find the scatter of real and imaginary values separately, emphasizing noisy data.
 int dev90_cmplx(complex float *clist, int n, complex float *dev) {
 	float list[n];
 	float redev,imdev;
@@ -450,13 +493,13 @@ void corrupt2(bin_struct *bin, unsigned int n_blocks, unsigned int *count) {
 	}
 	if (width < 4) return;
 
-	// Compute a variance estimate for every quarter of the spectrum; store in blkdev[i]
+	// Compute a scatter estimate for every quarter of the spectrum; store in blkdev[i]
 	for (pol=0; pol<2; pol++)
 	for (ant1=0; ant1 < n_ants; ant1++)
 	for (ant2=ant1+1; ant2 < n_ants; ant2++) {	// doesn't include autocorrelations
 		bl = n_ants*ant1-(ant1*(ant1+1)/2) + ant2;
 
-		// Compute the variance in the spectrum
+		// Compute the scatter in the spectrum
 		idx = pol*n_bl*n_chan + bl*n_chan;	// channel 0
 		meddev25_cmplx(&(bin->med_spec[idx]),n_chan,&med,&dev);
 //		idx = pol * n_bl + bl;
@@ -484,7 +527,9 @@ void corrupt2(bin_struct *bin, unsigned int n_blocks, unsigned int *count) {
 
 /*
  * Check for spectral corruption. The spectrum is divided into blocks, and the
- * variance in each block is compared against the others.
+ * scatter in each block is compared against the others. It returns an array
+ * (dimensions: pol,ant,block) which is a "count" of the number of times the
+ * scatter was high.
  */
 void corrupt(bin_struct *bin, unsigned int n_blocks, unsigned int *count) {
 	unsigned int start, pol, bl, n_bl, n_ants, n_chan, ant1, ant2, idx, i, j, width;
@@ -499,7 +544,7 @@ void corrupt(bin_struct *bin, unsigned int n_blocks, unsigned int *count) {
 	if (n_chan % width > 0) printf("Warning: spectrum does not divide evenly into %u blocks\n",n_blocks);
 	if (width < 4) return;
 
-	// Compute a variance estimate for every quarter of the spectrum; store in dev[i]
+	// Compute a scatter estimate for every quarter of the spectrum; store in dev[i]
 	for (pol=0; pol<2; pol++)
 	for (ant1=0; ant1 < n_ants; ant1++)
 	for (ant2 = ant1+1; ant2 < n_ants; ant2++) {
@@ -508,7 +553,7 @@ void corrupt(bin_struct *bin, unsigned int n_blocks, unsigned int *count) {
 			start = i * n_chan / n_blocks;
 
 			idx = pol*n_bl*n_chan + bl*n_chan + start;
-			// Compute the variance in the window of our spectrum
+			// Compute the scatter in the window of our spectrum
 			n = dev90_cmplx(&(bin->med_spec[idx]),width,&dev[i]);
 
 			if (n<10) {	// Not enough data remaining to get a good deviation
@@ -522,7 +567,7 @@ void corrupt(bin_struct *bin, unsigned int n_blocks, unsigned int *count) {
 			}
 		}
 
-		// Compare variances between quarters of the spectrum, and
+		// Compare scatter between quarters of the spectrum, and
 		// increase the count for each antpol/channel-region that is
 		// high. NaN values do not cause problems here.
 		for (i=0; i<n_blocks; i++)
@@ -671,9 +716,7 @@ complex float *bpcal(bin_struct *bin, complex float *med, complex float *median,
 				if (check[idx] || check[idx2]) {
 					if (cabsf(rms[idx_bl]) > 3 * cabsf(medrms)) {
 						nflag++;
-						set_bin_flag(bin, pol, bl, ch, 1);
-						med[idx_bl] = NAN + NAN * I;
-						rms[idx_bl] = NAN + NAN * I;
+						set_bin_flag(bin, pol, bl, ch);
 						idx_bl = pol*n_bl*n_chan + bl*n_chan;	// channel 0
 						median[pol*n_bl+bl] = median_cmplx(&(med[idx_bl]), n_chan);	// recompute spectral median
 					}
@@ -736,16 +779,62 @@ void getpolstr(dataset_struct *visdata, int p, char *str) {
 	str[2] = '\0';
 }
 
+/*
+ * This computes a mean of the time-series data, and flags channels that show RFI.
+ * Sometimes low-level RFI doesn't average down, i.e. amplitude is low but phase is constant.
+ * So it is more visible in time-averaged data.
+ * Do this per-baseline/pol.
+ */
+void flag_rfi(bin_struct *bin) {
+	unsigned ch, bl, pol, nflag, nchflag;
+	unsigned idx;
+	unsigned int n_chan = bin->visdata->n_chan;
+	unsigned int n_bl = bin->visdata->n_bl;
+	float *amps, med, dev;
+	char flag;
+
+	printf("Scanning averaged data for RFI: ");
+	amps = malloc(sizeof(float) * n_chan);
+	if (!amps) bug_c('f',"Out of memory in function flag_rfi.");
+	nflag = nchflag = 0;
+	for (pol=0; pol<2; pol++) {
+		for (bl=0; bl<n_bl; bl++) {
+			do {
+				flag=0;
+				// Compute the median and deviation of the vector-averaged amplitudes
+				for (ch=0; ch<n_chan; ch++) {
+					idx = pol*n_bl*n_chan + bl * n_chan + ch;
+					amps[ch] = cabsf(bin->tav_spec[idx]);
+				}
+				if (!meddev90_float(amps,n_chan,&med,&dev)) continue;		// Skip this baseline if no good data here
+
+				for (ch=0; ch<n_chan; ch++) {
+					if (get_bin_flag(bin,pol,bl,ch)) continue;		// Skip if the channel is already flagged
+					idx = pol*n_bl*n_chan + bl * n_chan + ch;
+					if (cabsf(bin->tav_spec[idx]) > med + 2 * dev) {	// Don't use amps[ch] since meddev90_float sorts that array.
+						nchflag++;
+						nflag += bin->n[idx];
+						set_bin_flag(bin,pol,bl,ch);
+						flag=1;
+					}
+				}
+			} while (flag);
+		}
+	}
+	printf("flagged %u pol/baseline/channels (%u correlations).\n",nchflag,nflag);
+	free(amps);
+}
+
 
 /*
  * Determine flags from a calibrator scan.
  */
 void calflag(bin_struct *bin) {
 	vis_struct *vis, *tmpvis;
-	complex float *med_spec, *rms_spec, *median, *deviation;
+	complex float *med_spec, *rms_spec, *tav_spec, *median, *deviation;
 	complex float **data;
 	unsigned *n, *n_bad, n_chan, nflag=0, start, end;
-	int i,j,n_bl,bl, ant1, ant2;
+	int pol, i, j, n_bl, bl, ant1, ant2;
 	register unsigned idx, idx2, idx_bl, ch;
 	unsigned int n_ants = bin->visdata->n_ants;
 	unsigned int *nhigh;
@@ -753,18 +842,20 @@ void calflag(bin_struct *bin) {
 	vis = bin->data;
 	n_chan = vis->visdata->n_chan;
 	n_bl = vis->visdata->n_bl;
-	med_spec  = malloc(sizeof(complex float) * 2 * n_bl * n_chan);
-	rms_spec  = malloc(sizeof(complex float) * 2 * n_bl * n_chan);
-	n = malloc(sizeof(unsigned) * 2 * n_bl * n_chan);
+	bin->med_spec = malloc(sizeof(complex float) * 2 * n_bl * n_chan);
+	med_spec = bin->med_spec;
+	bin->rms_spec = malloc(sizeof(complex float) * 2 * n_bl * n_chan);
+	rms_spec = bin->rms_spec;
+	bin->tav_spec = malloc(sizeof(complex float) * 2 * n_bl * n_chan);
+	tav_spec = bin->tav_spec;
+	bin->n = malloc(sizeof(unsigned) * 2 * n_bl * n_chan);
+	n = bin->n;
 	n_bad = malloc(sizeof(unsigned) * 2 * n_bl * n_chan);
-	median = malloc(sizeof(complex float) * 2 * n_bl);
-	deviation = malloc(sizeof(complex float) * 2 * n_bl);
+	bin->median = malloc(sizeof(complex float) * 2 * n_bl);
+	median = bin->median;
+	bin->deviation = malloc(sizeof(complex float) * 2 * n_bl);
+	deviation = bin->deviation;
 	if (!median || !deviation || !n || !med_spec || !rms_spec) bug_c('f',"Out of memory in function calflag.");
-
-	bin->med_spec = med_spec;
-	bin->rms_spec = rms_spec;
-	bin->median = median;
-	bin->deviation = deviation;
 
 
 	// Initialization
@@ -786,22 +877,25 @@ void calflag(bin_struct *bin) {
 			vis = vis->next;
 		}
 	}
-	/* Set the bin flag if less than 50% of the loaded data are good. */
-	for (i=0; i<2; i++)
-	for (bl=0; bl<n_bl; bl++)
-	for (ch=0; ch<n_chan; ch++) {
-		idx = i*n_bl*n_chan + bl * n_chan + ch;
-		if (n[idx] < n_bad[idx]) {
-			set_bin_flag(bin,i,bl,ch,1);
-			nflag++;
+	/* Retention check: flag a channel if less than 50% of the loaded data are good. */
+	if (do_reten) {
+		for (i=0; i<2; i++)
+		for (bl=0; bl<n_bl; bl++)
+		for (ch=0; ch<n_chan; ch++) {
+			idx = i*n_bl*n_chan + bl * n_chan + ch;
+			if (n[idx] < n_bad[idx]) {
+				set_bin_flag(bin,i,bl,ch);
+				nflag++;
+			}
 		}
+		printf("%u pol/baseline/channels are already substantially or completely flagged. Marking these as bad.\n",nflag);
 	}
-	printf("%u pol/baseline/channels are already substantially or completely flagged. Marking these as bad.\n",nflag);
 	free(n_bad);
 
 	/* Make an array of median amplitudes for each pol/bl/chan. */
 	/* Make a temporary array of arrays to hold the data */
-	data = malloc(sizeof(complex float *) * n_bl * n_chan * 2);
+	bin->array = malloc(sizeof(complex float *) * n_bl * n_chan * 2);
+	data = bin->array;
 	if (!data) bug_c('f',"Out of memory in function calflag.");
 	for (i=0; i<2*n_bl*n_chan; i++) {
 		data[i] = malloc(sizeof(complex float) * n[i]);
@@ -811,6 +905,7 @@ void calflag(bin_struct *bin) {
 			data[i][j] = NAN + NAN*I;
 		}
 	}
+
 
 	/*
 	 * Fill the data. First make an array of lists of data values. Then sort, then get the median.
@@ -834,6 +929,7 @@ void calflag(bin_struct *bin) {
 		}
 	}
 
+
 	/* Delete the visibility linked list to save memory. */
 	vis=bin->data;
 	while(vis) {
@@ -845,18 +941,34 @@ void calflag(bin_struct *bin) {
 	}
 	bin->data = NULL;
 
-	// Get median and scatter
-	for (i=0; i<2*n_bl*n_chan; i++) meddev_cmplx(data[i],n[i],&(med_spec[i]),&(rms_spec[i]));
 
-	// Compute a channel median for each baseline.
+	/* Compute the vector average of the time-series data. This MUST be done before the median/deviation stats
+	 * are calculated, as meddev_cmplx and meddevspec sort the real and imaginary data separately and in-place!  */
+	for (pol=0; pol<2; pol++) {
+		for (bl=0; bl<n_bl; bl++) {
+			for (ch=0; ch<n_chan; ch++) {
+				idx = pol * n_bl * n_chan + bl * n_chan + ch;
+				if (n[idx]==0) {
+					tav_spec[idx] = NAN + NAN * I;
+					continue;
+				}
+				i=0;
+				tav_spec[idx] = 0;
+				for (j=0; j<n[idx]; j++) {
+					tav_spec[idx] += data[idx][j];
+					i++;
+				}
+				tav_spec[idx] /= i;
+			}
+		}
+	}
+
+	// Calculate median and scatter, and channel median for each baseline
+	for (i=0; i<2*n_bl*n_chan; i++) meddev_cmplx(data[i],n[i],&(med_spec[i]),&(rms_spec[i]));
 	meddevspec(n_bl, n_chan, med_spec, median, deviation);
 
 
-	// FIXME. This only does time-series analysis, within a single scan. Not much data to work with!
-	// It would be useful to look across the spectrum (i.e. use deviation in addition to rms_spec), BUT
-	// we must avoid flagging spectral corruption here, otherwise the corruption routine won't work.
-	if (!norfi) {
-		// Flag RFI
+	if (tseries) {
 		nhigh=malloc(sizeof(unsigned) * 2*n_bl*n_chan);
 		for (i=0; i<2*n_bl*n_chan; i++) nhigh[i]=0;
 		// Count the number of outlying values for each pol/baseline/channel.
@@ -884,70 +996,40 @@ void calflag(bin_struct *bin) {
 			if (nhigh[idx] > 0.6 * n[idx]) {
 				if (!get_bin_flag(bin,0,bl,i)) {
 					nflag++;
-					set_bin_flag(bin,0,bl,i,1);
-					free(data[idx]);
-					data[idx] = NULL;
-					n[idx] = 0;
-					rms_spec[idx] = NAN + NAN * I;
-					med_spec[idx] = NAN + NAN * I;
+					set_bin_flag(bin,0,bl,i);
 				}
 				// Flag adjacent channels too.
 				j=i-1;
 				if ((j > 0) && !get_bin_flag(bin,0,bl,j))  {
 					idx = indx(bin,bin->visdata->ppol1,bl,j);
 					nflag++;
-					set_bin_flag(bin,0,bl,j,1);
-					free(data[idx]);
-					data[idx] = NULL;
-					n[idx] = 0;
-					rms_spec[idx] = NAN + NAN * I;
-					med_spec[idx] = NAN + NAN * I;
+					set_bin_flag(bin,0,bl,j);
 				}
 				j=i+1;
 				if ((j < n_chan) && !get_bin_flag(bin,0,bl,j)) {
 					idx = indx(bin,bin->visdata->ppol1,bl,j);
 					nflag++;
-					set_bin_flag(bin,0,bl,j,1);
-					free(data[idx]);
-					data[idx] = NULL;
-					n[idx] = 0;
-					rms_spec[idx] = NAN + NAN * I;
-					med_spec[idx] = NAN + NAN * I;
+					set_bin_flag(bin,0,bl,j);
 				}
 			}
 			idx = indx(bin,bin->visdata->ppol2,bl,i);
 			if (nhigh[idx] > 0.6 * n[idx]) {
 				if (!get_bin_flag(bin,1,bl,i)) {
 					nflag++;
-					set_bin_flag(bin,1,bl,i,1);
-					free(data[idx]);
-					data[idx] = NULL;
-					n[idx] = 0;
-					rms_spec[idx] = NAN + NAN * I;
-					med_spec[idx] = NAN + NAN * I;
+					set_bin_flag(bin,1,bl,i);
 				}
 				// Flag adjacent channels too.
 				j=i-1;
 				if ((j > 0) && !get_bin_flag(bin,1,bl,j)) {
 					idx = indx(bin,bin->visdata->ppol2,bl,j);
 					nflag++;
-					set_bin_flag(bin,1,bl,j,1);
-					free(data[idx]);
-					data[idx] = NULL;
-					n[idx] = 0;
-					rms_spec[idx] = NAN + NAN * I;
-					med_spec[idx] = NAN + NAN * I;
+					set_bin_flag(bin,1,bl,j);
 				}
 				j=i+1;
 				if ((j < n_chan) && !get_bin_flag(bin,1,bl,j)) {
 					idx = indx(bin,bin->visdata->ppol2,bl,j);
 					nflag++;
-					set_bin_flag(bin,1,bl,j,1);
-					free(data[idx]);
-					data[idx] = NULL;
-					n[idx] = 0;
-					rms_spec[idx] = NAN + NAN * I;
-					med_spec[idx] = NAN + NAN * I;
+					set_bin_flag(bin,1,bl,j);
 				}
 			}
 		}
@@ -956,9 +1038,9 @@ void calflag(bin_struct *bin) {
 	}
 
 
+	// Do a crude bandpass calibration to flatten the spectrum.
 	if (!noband) {
-//write_spectrum(bin,"med.spec");
-		// Do a bandpass calibration to flatten the spectrum.
+		//write_spectrum(bin,"med.spec");
 		// The gains array has dimensions [2 pols][n_ants][n_chan]
 		bin->gains = bpcal(bin, med_spec, median, rms_spec);
 		// Apply the gains
@@ -973,30 +1055,19 @@ void calflag(bin_struct *bin) {
 				for (j=0; j<n[idx_bl]; j++) data[idx_bl][j] *= bin->gains[idx] * ~ bin->gains[idx2];
 			}
 		}
-		// Apply the flags found in bpcal
-		for (i=0; i<2; i++)
-		for (bl=0; bl<n_bl; bl++)
-		for (ch=0; ch<n_chan; ch++)
-		if (get_bin_flag(bin,i,bl,ch)) {
-			idx = i*n_bl*n_chan + bl * n_chan + ch;
-			free(data[idx]);
-			data[idx] = NULL;
-			n[idx] = 0;
-		}
+		//write_spectrum(bin,"cal-med.spec");
 	}
+
+
 	// Re-calculate median and scatter, and channel median for each baseline
-// FIXME this may cause difficulties for the spectral corruption routine, as the worst of the corruption will
-// probably be flagged by the RFI algorithm. Not a problem until we re-calculate the statistics with medevspec()...
 	for (i=0; i<2*n_bl*n_chan; i++) meddev_cmplx(data[i],n[i],&(med_spec[i]),&(rms_spec[i]));
 	meddevspec(n_bl, n_chan, med_spec, median, deviation);
 
-//write_spectrum(bin,"cal-med.spec");
 
 	if (ata) {
 		// Look for spectral corruption. This can be time dependent.
 		// When flagging spectral corruption, the ENTIRE ANTENNA is affected.
 		printf("Scanning for ATA specral corruption:\n");
-		fflush(stdout);
 		nhigh=malloc(sizeof(unsigned) * 2*n_ants*4);
 		if (!nhigh) bug_c('f',"Out of memory.");
 		nflag=0;
@@ -1015,7 +1086,7 @@ void calflag(bin_struct *bin) {
 			for (j=0; j<4; j++) {
 				idx  = i*n_ants*4 + ant1 * 4 + j;	// antenna-based index to the quarter spectral window
 				getpolstr(bin->visdata,i,str);
-				if (nhigh[idx] >= max) printf("  Spectral corruption found on antpol %d-%s, quarter %d\n",ant1+1,str,j);
+				if (nhigh[idx] >= max) printf("  Spectral corruption found on antpol %d-%s, quarter %d\n",ant1+1,str,j+1);
 			}
 
 			// Flag the worst offender
@@ -1030,14 +1101,8 @@ void calflag(bin_struct *bin) {
 						start = j * n_chan / 4;
 						end = (j+1) * n_chan / 4;
   						for (ch=start; ch<end; ch++) {
-							set_bin_flag(bin,i,bl,ch,1);
-							idx_bl = i*n_bl*n_chan + bl * n_chan + ch;
-							free(data[idx_bl]);
-							data[idx_bl] = NULL;
-							n[idx_bl] = 0;
+							set_bin_flag(bin,i,bl,ch);
 							nflag++;
-							rms_spec[idx_bl] = NAN + NAN * I;
-							med_spec[idx_bl] = NAN + NAN * I;
 						}
 					}
 				}
@@ -1048,6 +1113,15 @@ void calflag(bin_struct *bin) {
 		free(nhigh);
 		printf("  Flagged %u baseline/pol/channels.\n",nflag);
 	}
+
+
+	// Re-calculate median and scatter, and channel median for each baseline
+	for (i=0; i<2*n_bl*n_chan; i++) meddev_cmplx(data[i],n[i],&(med_spec[i]),&(rms_spec[i]));
+	meddevspec(n_bl, n_chan, med_spec, median, deviation);
+
+
+	// Flag RFI
+	if (!norfi) flag_rfi(bin);
 
 
 	if (!nodistro) {
@@ -1069,12 +1143,7 @@ void calflag(bin_struct *bin) {
 				// Flag outliers
 				if (cabsf(med_spec[idx])+cabsf(rms_spec[idx]) > 5.0 * cabsf(deviation[i*n_bl+bl])) {
 					nflag++;
-					set_bin_flag(bin,i,bl,ch,1);
-					free(data[idx]);
-					data[idx] = NULL;
-					n[idx] = 0;
-					rms_spec[idx] = NAN + NAN * I;
-					med_spec[idx] = NAN + NAN * I;
+					set_bin_flag(bin,i,bl,ch);
 				}
 			}
 		}
@@ -1098,12 +1167,7 @@ void calflag(bin_struct *bin) {
 				for (ch=0; ch<n_chan; ch++) {
 					idx = i*n_bl*n_chan + bl*n_chan+ch;
 					if (n[idx]==0) continue;
-					set_bin_flag(bin,i,bl,ch,1);
-					free(data[idx]);
-					data[idx] = NULL;
-					n[idx] = 0;
-					rms_spec[idx] = NAN + NAN * I;
-					med_spec[idx] = NAN + NAN * I;
+					set_bin_flag(bin,i,bl,ch);
 				}
 			}
 		}
@@ -1115,30 +1179,41 @@ void calflag(bin_struct *bin) {
 		free(data[i]);	// it's safe to call free(NULL)
 	}
 	free(data);
+	bin->array = NULL;
 	free(n);
+	bin->n = NULL;
 }
 
 
 void noncal_stats(dataset_struct *visdata) {
 	bin_struct *bin;
 	vis_struct *vis, *tmpvis;
-	complex float *med_spec, *rms_spec, *median, *deviation;
+	complex float *med_spec, *rms_spec, *tav_spec, *median, *deviation;
 	complex float **data;
 	unsigned *n, *n_bad, n_chan, nflag=0;
-	int i,j,n_bl,bl;
+	int pol,i,j,n_bl,bl;
 	register unsigned idx, ch;
 
 	bin = visdata->bin;
 	while (bin) {
-
 		vis = bin->data;
 		n_chan = vis->visdata->n_chan;
 		n_bl = vis->visdata->n_bl;
-		med_spec  = malloc(sizeof(complex float) * 2 * n_bl * n_chan);
-		rms_spec  = malloc(sizeof(complex float) * 2 * n_bl * n_chan);
-		n = malloc(sizeof(unsigned) * 2 * n_bl * n_chan);
+		bin->med_spec = malloc(sizeof(complex float) * 2 * n_bl * n_chan);
+		med_spec = bin->med_spec;
+		bin->rms_spec = malloc(sizeof(complex float) * 2 * n_bl * n_chan);
+		rms_spec = bin->rms_spec;
+		bin->tav_spec = malloc(sizeof(complex float) * 2 * n_bl * n_chan);
+		tav_spec = bin->tav_spec;
+		bin->n = malloc(sizeof(unsigned) * 2 * n_bl * n_chan);
+		n = bin->n;
 		n_bad = malloc(sizeof(unsigned) * 2 * n_bl * n_chan);
-		if ((!n) || (!med_spec) || (!rms_spec)) bug_c('f',"Out of memory in function noncal_stats.");
+		bin->median = malloc(sizeof(complex float) * 2 * n_bl);
+		median = bin->median;
+		bin->deviation = malloc(sizeof(complex float) * 2 * n_bl);
+		deviation = bin->deviation;
+		if (!median || !deviation || !n || !med_spec || !rms_spec) bug_c('f',"Out of memory in function calflag.");
+
 
 		// Initialization
 		for (i=0; i<2*n_bl*n_chan; i++) {
@@ -1160,21 +1235,24 @@ void noncal_stats(dataset_struct *visdata) {
 			}
 		}
 		/* Set the bin flag if less than 50% of the loaded data are good. */
-		for (i=0; i<2; i++)
-		for (bl=0; bl<n_bl; bl++)
-		for (ch=0; ch<n_chan; ch++) {
-			idx = i*n_bl*n_chan + bl * n_chan + ch;
-			if (n[idx] < n_bad[idx]) {
-				set_bin_flag(bin,i,bl,ch,1);
-				nflag++;
+		if (do_reten) {
+			for (i=0; i<2; i++)
+			for (bl=0; bl<n_bl; bl++)
+			for (ch=0; ch<n_chan; ch++) {
+				idx = i*n_bl*n_chan + bl * n_chan + ch;
+				if (n[idx] < n_bad[idx]) {
+					set_bin_flag(bin,i,bl,ch);
+					nflag++;
+				}
 			}
+			printf("%u pol/baseline/channels are already substantially or completely flagged. Marking these as bad.\n",nflag);
 		}
-		printf("%u pol/baseline/channels are already substantially or completely flagged. Marking these as bad.\n",nflag);
 		free(n_bad);
 
 		/* Make an array of median amplitudes for each pol/bl/chan. */
 		/* Make a temporary array of arrays to hold the data */
-		data = malloc(sizeof(complex float *) * n_bl * n_chan * 2);
+		bin->array = malloc(sizeof(complex float *) * n_bl * n_chan * 2);
+		data = bin->array;
 		if (!data) bug_c('f',"Out of memory in function calflag.");
 		for (i=0; i<2*n_bl*n_chan; i++) {
 			data[i] = malloc(sizeof(complex float) * n[i]);
@@ -1214,32 +1292,116 @@ void noncal_stats(dataset_struct *visdata) {
 		}
 		bin->data = NULL;
 
-		// Get median and scatter
-		for (i=0; i<2*n_bl*n_chan; i++) meddev_cmplx(data[i],n[i],&(med_spec[i]),&(rms_spec[i]));
 
-		// Compute a channel median for each baseline.
-		median = malloc(sizeof(complex float) * 2 * n_bl);
-		deviation = malloc(sizeof(complex float) * 2 * n_bl);
-		if (!median || !deviation) bug_c('f',"Out of memory in function noncal_stats.");
+		/* Compute the vector average of the time-series data. This MUST be done before the median/deviation stats
+		 * are calculated, as meddev_cmplx and meddevspec sort the real and imaginary data separately and in-place!  */
+		for (pol=0; pol<2; pol++) {
+			for (bl=0; bl<n_bl; bl++) {
+				for (ch=0; ch<n_chan; ch++) {
+					idx = pol * n_bl * n_chan + bl * n_chan + ch;
+					if (n[idx]==0) {
+						tav_spec[idx] = NAN + NAN * I;
+						continue;
+					}
+					i=0;
+					tav_spec[idx] = 0;
+					for (j=0; j<n[idx]; j++) {
+						tav_spec[idx] += data[idx][j];
+						i++;
+					}
+					tav_spec[idx] /= i;
+				}
+			}
+		}
+
+
+		// Re-calculate median and scatter, and channel median for each baseline
+		for (i=0; i<2*n_bl*n_chan; i++) meddev_cmplx(data[i],n[i],&(med_spec[i]),&(rms_spec[i]));
 		meddevspec(n_bl, n_chan, med_spec, median, deviation);
 
-		bin->med_spec = med_spec;
-		bin->rms_spec = rms_spec;
-		bin->median = median;
-		bin->deviation = deviation;
+		for (pol=0; pol<2; pol++)
+		for (bl=0; bl<n_bl; bl++)
+		for (ch=0; ch<n_chan; ch++) {
+			if (get_bin_flag(bin, pol, bl, ch)) {
+				printf("Error: flag set at bin=%p pol=%u bl=%u ch=%u\n",bin,pol,bl,ch);
+			}
+		}
+
+		if (ata) {
+			#define N_BINS 32
+			unsigned int ant1, ant2, idx2, start, end;
+			unsigned int n_ants = bin->visdata->n_ants;
+			unsigned int *nhigh;
+			// Look for spectral corruption or broad-band RFI.
+			printf("Scanning for ATA specral corruption or broad RFI:\n");
+			nhigh=malloc(sizeof(unsigned) * 2*n_ants*N_BINS);
+			if (!nhigh) bug_c('f',"Out of memory.");
+			nflag=0;
+			char str[3];
+			int max;
+
+			while (1) {
+				for (i=0; i<2*n_ants*N_BINS; i++) nhigh[i]=0;
+				corrupt(bin,N_BINS,nhigh);
+				max=0;
+				for (i=0; i<2*n_ants*N_BINS; i++) if (nhigh[i] > max) max = nhigh[i];
+				if (max == 0) break;
+
+				for (ant1=0; ant1 < n_ants; ant1++)
+				for (i=0; i<2; i++)
+				for (j=0; j<N_BINS; j++) {
+					idx  = i*n_ants*N_BINS + ant1 * N_BINS + j;	// antenna-based index to the quarter spectral window
+					getpolstr(bin->visdata,i,str);
+					if (nhigh[idx] >= max) printf("  Spectral corruption found on antpol %d-%s, section %d\n",ant1+1,str,j+1);
+				}
+
+				// Flag the worst offender
+				for (i=0; i<2; i++)
+				for (ant1=0; ant1 < n_ants; ant1++)
+				for (ant2 = ant1+1; ant2 < n_ants; ant2++) {
+					bl = n_ants*ant1-(ant1*(ant1+1)/2) + ant2;
+					for (j=0; j<N_BINS; j++) {
+						idx  = i*n_ants*N_BINS + ant1 * N_BINS + j;
+						idx2 = i*n_ants*N_BINS + ant2 * N_BINS + j;
+						if (nhigh[idx] >= max || nhigh[idx2] >= max) {	// Found spectral corruption
+							start = j * n_chan / N_BINS;
+							end = (j+1) * n_chan / N_BINS;
+  							for (ch=start; ch<end; ch++) {
+								set_bin_flag(bin,i,bl,ch);
+								nflag++;
+							}
+						}
+					}
+				}
+				// Re-compute the channel-averaged stats after flagging
+				meddevspec(n_bl, n_chan, med_spec, median, deviation);
+			}
+			free(nhigh);
+			printf("  Flagged %u baseline/pol/channels.\n",nflag);
+		}
+
+
+		// Re-calculate median and scatter, and channel median for each baseline
+		for (i=0; i<2*n_bl*n_chan; i++) meddev_cmplx(data[i],n[i],&(med_spec[i]),&(rms_spec[i]));
+		meddevspec(n_bl, n_chan, med_spec, median, deviation);
+
+
+		// Flag RFI
+		if (!norfi) flag_rfi(bin);
 
 		// Clean up
 		for (i=0; i<2*n_bl*n_chan; i++) {
 			free(data[i]);	// it's safe to call free(NULL)
 		}
 		free(data);
+		bin->array = NULL;
 
 		bin = bin->next;
 	}
 }
 
 
-
+/* This is done last, to avoid throwing out entire baselines due to RFI */
 void check_phases(dataset_struct *first) {
 	bin_struct *bin;
 	dataset_struct *visdata;
@@ -1259,8 +1421,8 @@ void check_phases(dataset_struct *first) {
 			for (pol=0; pol<2; pol++)
 			for (bl=0; bl<n_bl; bl++) {
 				idx = pol*n_bl+bl;
-				// Estimate of the variance in phase of this baseline; this is channel-averaged.
-				// Essentially this is a measure of 1/SNR using phase.
+				// Estimate of the scatter in phase of this baseline; this is channel-averaged.
+				// This is a measure of 1/SNR using phase.
 				var = cabsf(bin->deviation[idx]);
 				med = cabsf(bin->median[idx]);
 				phase_var = atan2f(var,med);
@@ -1269,7 +1431,7 @@ void check_phases(dataset_struct *first) {
 					nflag++;
 					for (ch=0; ch<n_chan; ch++) {
 						idx = pol*n_bl*n_chan + bl*n_chan+ch;
-						set_bin_flag(bin,pol,bl,ch,1);
+						set_bin_flag(bin,pol,bl,ch);
 					}
 				}
 			}
@@ -1321,7 +1483,15 @@ void insert_vis(vis_struct *vis, dataset_struct *visdata) {
 	}
 	while (bin->next) { bin = bin->next; }
 	if (vis->time < bin->first_time-bin->visdata->time0) {
-		bug_c('f',"Visibilities do not appear to be in time order.");
+		// If the visibility timestamp is less than 0.1 integrations too early, then adjust the bin time.
+		// Otherwise, abort with an error.
+		if (fabs(bin->first_time - (vis->time + bin->visdata->time0) < visdata->int_time/864000.0)) {
+			bin->first_time=vis->time + bin->visdata->time0;
+		}
+		else {
+			printf("Fatal error: Visibilities are not in time order.");
+			exit(EXIT_FAILURE);
+		}
 	}
 	if (vis->time + vis->visdata->time0 - bin->last_time > 5 * visdata->int_time / 86400) {
 		/* Gap in data; assume a new scan. Make a new bin. */
@@ -1336,9 +1506,9 @@ void insert_vis(vis_struct *vis, dataset_struct *visdata) {
 		if (vis->time > bin->last_time-bin->visdata->time0) {
 			bin->last_time = vis->time+bin->visdata->time0;
 		}
-		if (vis->time < bin->first_time-bin->visdata->time0) {
+		/*if (vis->time < bin->first_time-bin->visdata->time0) {
 			bug_c('f',"Error: putting a vis in the wrong bin. Data not sorted in time order?");
-		}
+		}*/
 	}
 }
 
@@ -1385,7 +1555,6 @@ vis_struct *read_vis(dataset_struct *visdata) {
 		vis->time = 0.0;
 	}
 	else vis->time = (preamble[2] - visdata->time0);
-	vis->baseline = preamble[3];
 	basanta_(&preamble[3], &(vis->ant[0]), &(vis->ant[1]));
 	vis->ant[0]--;		// These are zero-based
 	vis->ant[1]--;
@@ -1393,6 +1562,7 @@ vis_struct *read_vis(dataset_struct *visdata) {
 	vis->data = malloc(sizeof(complex float) * visdata->n_chan);
 	for (j=0; j<visdata->n_chan; j++) {
 		vis->data[j] = data[2*j] + data[2*j+1] * I;
+		if (vis->data[j] == 0.0) set_flag(vis,j,0);
 	}
 
 	/* ATA data are 16-bit integers, scaled by mulitplying by variable "tscale".
@@ -1459,9 +1629,9 @@ void write_flags(dataset_struct *visdata) {
 
 			// Flag RFI for individual data. Do this here instead of with the other flagging routines since
 			// the internal data structures don't have cross-hand pol visibilities.
-			if (!norfi || !nodistro) {
+			if (!nosingle) {
 				// Apply gains if necessary
-				if (!noband && bin->gains && (!norfi || !nodistro)) {
+				if (!noband && bin->gains && (!norfi)) {
 					unsigned int idx1;
 					unsigned int idx2;
 					if (pol < 2) {
@@ -1476,7 +1646,7 @@ void write_flags(dataset_struct *visdata) {
 					if (pol < 2) for (ch=0; ch<visdata->n_chan; ch++) {
 						if (!flags[ch]) continue;	// Don't bother if it is already flagged
 						i = pol * visdata->n_bl + bl;
-						if (cabsf(vis->data[ch] - bin->median[i]) > 10 * cabsf(bin->deviation[i])) {
+						if (cabsf(vis->data[ch]) > cabsf(bin->median[i]) + 10 * cabsf(bin->deviation[i])) {
 							nflag++;
 							flags[ch] = 0;
 						}
@@ -1626,9 +1796,17 @@ void cleanup(dataset_struct *visdata) {
 	bin = visdata->bin;
 	while (bin) {						// FIXME valgrind reports Conditional jump or move depends on uninitialised value(s)
 		free(bin->flags);
+		bin->flags = NULL;
 		free(bin->gains);
+		bin->gains = NULL;
 		free(bin->med_spec);
+		bin->med_spec = NULL;
 		free(bin->rms_spec);
+		bin->rms_spec = NULL;
+		free(bin->median);
+		bin->median = NULL;
+		free(bin->deviation);
+		bin->deviation = NULL;
 
 		vis=bin->data;
 		while(vis) {
@@ -1805,7 +1983,7 @@ int main(int argc, char *argv[]) {
 
 //	if (keyprsnt_c("select") || keyprsnt_c("line")) bug_c('w',"flags may be applied to data that were not selected.");
 //	selinput_("select",sels,&maxsels,strlen("select"));
-//	do keya_c("select",buff,&blank);	// ugly, avoids warning message
+//	keya_len_c("select",buff,80,&blank);
 //	while (buff[0]);
 
 //	keyline_(line_type,&n_chan,&line_start,&line_width,&line_step,32);
@@ -1880,10 +2058,10 @@ int main(int argc, char *argv[]) {
 			printf("# of records rejected due to stokes parameter: %lu\n",visdata->n_bad_stokes);
 			printf("mean # of channels flagged as bad: %1.3f\n",(float) visdata->n_flagged_vischan / visdata->n_vis);
 
+			noncal_stats(visdata);
+
 			// Copy calibrator flags to our flag table
 			interpolate_flags(binlist,visdata);
-
-			noncal_stats(visdata);
 
 			if (!noflag) printf("Writing flag table for %s\n",visdata->fname);
 			write_flags(visdata);
