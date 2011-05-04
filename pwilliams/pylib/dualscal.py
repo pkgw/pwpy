@@ -121,17 +121,30 @@ def dualSelfCal (vis, out, usemself=False, ttol=DEFAULT_TTOL,
 
 try:
     from awff import SimpleMake
+    from arf import calinfo
+    from arf.workflow.vis import getSource, getFreq
 except:
     pass
 else:
-    def _dualscal (context, vis=None, params=None):
-        context.ensureDir ()
-        out = CalData (context.fullpath ('out'))
+    def _dualscal (context, vis=None, params=None, fluxtable=None):
+        context.ensureParent ()
+        out = CalData (context.fullpath ())
+
+        if fluxtable is not '':
+            src = getSource (vis)
+            mhz = int (1000 * getFreq (vis))
+            if src is None or mhz is None:
+                raise Exception ('cannot retrieve source/freq info '
+                                 'for flux table lookup')
+            params = dict (params)
+            params['flux'] = calinfo.getFlux (str (fluxtable), src, mhz, None)
+
         out.delete ()
         dualSelfCal (vis, out, **params)
         return out
 
-    asMake = SimpleMake ('vis params', 'out', _dualscal)
+    asMake = SimpleMake ('vis params fluxtable', 'out', _dualscal,
+                         [None, {}, ''])
     __all__.append ('asMake')
 
 
