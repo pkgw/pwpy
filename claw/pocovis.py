@@ -24,7 +24,7 @@ import scipy.stats.morestats as morestats
 
 
 class poco:
-    def __init__(self,file,nints=1000,nskip=0):
+    def __init__(self, file, nints=1000, nskip=0, nocal=False, nopass=False):
         # initialize
         self.nchan = 64
 #        self.chans = n.arange(6,58)
@@ -39,11 +39,11 @@ class poco:
         self.baseline_order = n.array([ 257, 258, 514, 261, 517, 1285, 262, 518, 1286, 1542, 259, 515, 773, 774, 771, 516, 1029, 1030, 772, 1028, 1287, 1543, 775, 1031, 1799, 1544, 776, 1032, 1800, 2056, 260, 263, 264, 519, 520, 1288])   # second iteration of bl nums
         self.autos = []
         self.noautos = []
-#        self.pulsewidth = 0.0066 * n.ones(len(self.chans)) # pulse width of b0329+54
-        self.pulsewidth = 0 * n.ones(len(self.chans)) # pulse width of crab
+        self.pulsewidth = 0.0066 * n.ones(len(self.chans)) # pulse width of b0329+54
+#        self.pulsewidth = 0 * n.ones(len(self.chans)) # pulse width of crab
         # set dmarr
-#        self.dmarr = [26.8]  # b0329+54
-        self.dmarr = [56.8]  # crab
+        self.dmarr = [26.8]  # b0329+54
+#        self.dmarr = [56.8]  # crab
 #        self.dmarr = n.arange(53,131,3.1)       # dm trials for m31. spacing set for 50% efficiency for band from 722-796 MHz, 1.2 ms integrations
 #        self.tshift = 0.2     # not implemented yet
         self.nskip = nskip*self.nbl    # number of iterations to skip (for reading in different parts of buffer)
@@ -77,7 +77,7 @@ class poco:
 
         # read data
         # You can pass traditional Miriad UV keywords to readLowlevel as keyword arguments
-        for inp, preamble, data, flags in vis.readLowlevel ('dsl3', False):
+        for inp, preamble, data, flags in vis.readLowlevel ('dsl3', False, nocal=nocal, nopass=nopass):
 
             # Loop to skip some data and read shifted data into original data arrays
             if i < nskip:
@@ -154,7 +154,6 @@ class poco:
         chans = self.chans
         reltime = self.reltime
 
-# does not account for noise bias.  assumes lots of flux in the field
         mean = self.dataph.mean()
         std = self.dataph.std()
         abs = (self.dataph - mean)/std
@@ -277,7 +276,7 @@ class poco:
 
 #        if len(track[1]) < minintersect:
         if ((track[1][0] != 0) | (track[1][len(track[1])-1] != len(self.chans)-1)):
-            print 'Track does not span all channels. Skipping.'
+#            print 'Track does not span all channels. Skipping.'
             return 0
 
         twidths = []
@@ -545,7 +544,7 @@ class poco:
         return self.peaks,arr[self.peaks]
 
 
-    def imagedmt0(self, dmbin, t0bin, tshift=0, bgwindow=5, show=1, clean=1):
+    def imagedmt0(self, dmbin, t0bin, tshift=0, bgwindow=5, show=0, clean=1):
         """ Makes and fits an background subtracted image for a given dmbin and t0bin.
         tshift can shift the actual t0bin earlier to allow reading small chunks of data relative to pickle.
         """
@@ -572,7 +571,7 @@ class poco:
             if show:  txt = TaskCgDisp (in_=outroot+'.map', device='/xs', wedge=True, beambl=True).snarf () 
             txt = TaskImStat (in_=outroot+'.map').snarf()
             # get noise level in image
-            thresh = 2*float(txt[0][10][41:47])    # OMG!!
+            thresh = 2*float(txt[0][10][41:47])    # hack! OMG!!
             txt = TaskClean (beam=outroot+'.beam', map=outroot+'.map', out=outroot+'.clean', cutoff=thresh).snarf () 
             print
             print 'Cleaned to %.2f Jy after %d iterations' % (thresh, int(txt[0][-4][19:]))
@@ -651,7 +650,7 @@ class poco:
 
 
     def normalreim(self, prob=2.3e-4, bgwindow=0):
-        """Calculates p-value of normality for real-imaginary distribution of visibilities. **Does not use both parts of complex values! Only real.**
+        """Calculates p-value of normality for real-imaginary distribution of visibilities (uses real/imag separately).
         Uses baselines and channels separately. prob is the false positive rate (actually non-normal p-value); default is 230/1e6 => 5sigma.
         Returns least likely normal trials
         """
@@ -678,14 +677,13 @@ class poco:
                         length = pv2.data.shape[1] * pv2.data.shape[2]
                         da = (pv2.data[0]).reshape((1,length))[0]
                         removefile(newfile)
-                    
-                        dmt0arr[i,j] = morestats.shapiro(da)[1]
+                        dmt0arr[i,j] = min(morestats.shapiro(da.real)[1], morestats.shapiro(da.imag)[1])
                 else:
                     datadiff = self.tracksub(i, j, bgwindow=bgwindow)
                     if len(n.shape(datadiff)) == 3:
                         length = datadiff.shape[1] * datadiff.shape[2]
                         datadiff = (datadiff[0]).reshape((1,length))[0]
-                        dmt0arr[i,j] = morestats.shapiro(datadiff)[1]
+                        dmt0arr[i,j] = min(morestats.shapiro(datadiff.real)[1], morestats.shapiro(datadiff.imag)[1])
                     else:
                         continue
             print 'dedispersed for ', dmarr[i]
@@ -707,6 +705,57 @@ class poco:
         return self.dips,dmt0arr[self.dips]
 
 
+    def stdreim(self, fstd=1.2, bgwindow=0, show=0):
+        """Calculates standard deviation of real-imaginary distribution of visibilities. Uses baselines and channels separately. 
+        fstd is threshold factor of change in std to make detection.
+        Returns trials with large std change.
+        """
+
+        write = 0  # use writetrack to get bgsub visies? takes long time...
+        tbuffer = 7  # number of extra iterations to trim from edge of dmt0 plot
+
+        dmarr = self.dmarr
+        reltime = self.reltime
+        chans = self.chans
+
+        dmt0arr = n.zeros((len(dmarr),len(reltime)), dtype='float64')
+
+        for i in range(len(dmarr)):
+            for j in range(len(reltime)):
+                datadiff = self.tracksub(i, j, bgwindow=bgwindow)
+                if len(n.shape(datadiff)) == 3:
+                    dmt0arr[i,j] = n.std(datadiff)
+                else:
+                    continue
+            print 'dedispersed for ', dmarr[i]
+
+        # Trim data down to where dmt0 array is nonzero
+        arreq0 = n.where(dmt0arr == 0)
+        trimt = arreq0[1].min()
+        dmt0arr = dmt0arr[:,:trimt - tbuffer]
+        reltime = reltime[:trimt - tbuffer]
+        print 'dmt0arr/time trimmed to new shape:  ',n.shape(dmt0arr), n.shape(reltime)
+
+        # Detect peaks
+        self.dmt0arr = dmt0arr
+        self.peaks = n.where(dmt0arr > fstd * dmt0arr.mean())
+        peakmax = n.where(dmt0arr == dmt0arr.max())
+        print 'Least normal re-im distributions: ', self.peaks
+        print 'Number of trials: ', len(dmarr) * len(reltime)
+
+        if show:
+            for i in range(len(self.peaks[1])):
+                ax = p.imshow(dmt0arr, aspect='auto', origin='lower', interpolation='nearest', extent=(min(reltime),max(reltime),min(dmarr),max(dmarr)))
+                p.axis((min(reltime),max(reltime),min(dmarr),max(dmarr)))
+                p.plot([reltime[self.peaks[1][i]]], [dmarr[self.peaks[0][i]]], 'o', markersize=2*dmt0arr[self.peaks[0][i],self.peaks[1][i]], markerfacecolor='white', markeredgecolor='blue', alpha=0.5)
+
+            p.xlabel('Time (s)')
+            p.ylabel('DM (pc/cm3)')
+            p.title('Summed Spectra in DM-t0 space')
+
+        return self.peaks,dmt0arr[self.peaks]
+
+
     def tracksub(self, dmbin, tbin, bgwindow = 0):
         """Reads data along dmtrack and optionally subtracts background like writetrack method.
         Returns the difference of the data in the on and off tracks as a single integration with all bl and chans.
@@ -717,7 +766,7 @@ class poco:
 
         trackon = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[tbin], show=0)
         if ((trackon[1][0] != 0) | (trackon[1][len(trackon[1])-1] != len(self.chans)-1)):
-            print 'Track does not span all channels. Skipping.'
+#            print 'Track does not span all channels. Skipping.'
             return [0]
 
         dataon = data[trackon[0], :, trackon[1]]
@@ -770,7 +819,8 @@ class poco:
 
         print 'Real center: %.1f +- %.1f ' % (da.real.mean(), da.real.std()/n.sqrt(len(da.real)))
         print 'Imag center: %.1f +- %.1f ' % (da.imag.mean(), da.imag.std()/n.sqrt(len(da.real)))
-        print 'Normal p-value: ', morestats.shapiro(da)[1]
+        print 'Normal p-value (real): ', morestats.shapiro(da.real)[1]
+        print 'Normal p-value (imag): ', morestats.shapiro(da.imag)[1]
 
         if save:
             savename = self.file.split('.')[:-1]
@@ -879,12 +929,12 @@ def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000, edge=0):
 #        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
 
 # for b0329 173027
-#    for i in [0,1,2,3,4,5,6,7,8,9]:
-#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
-#    for i in [0,1,2,6,7,8,9]:
-#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
-#    for i in [0,1,2,3]:
-#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
+    for i in [0,1,2,3,4,5,6,7,8,9]:
+        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+    for i in [0,1,2,6,7,8,9]:
+        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+    for i in [0,1,2,3]:
+        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
 
 # for m31 154202
 #    for i in [0,1,2,3,4,5,6,7,8,9]:
@@ -893,7 +943,7 @@ def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000, edge=0):
 #        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
 
 # hack to search single file for pulses
-    filelist = [fileroot]
+#    filelist = [fileroot]
 
     # loop over miriad data and time chunks
     for file in filelist:
@@ -945,12 +995,12 @@ def pulse_search_reim(fileroot, pathin, pathout, nints=10000, edge=0):
 #        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
 
 # for b0329 173027
-#    for i in [0,1,2,3,4,5,6,7,8,9]:
-#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
-#    for i in [0,1,2,6,7,8,9]:
-#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
-#    for i in [0,1,2,3]:
-#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
+    for i in [0,1,2,3,4,5,6,7,8,9]:
+        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+    for i in [0,1,2,6,7,8,9]:
+        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+    for i in [0,1,2,3]:
+        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
 
 # for m31 154202
 #    for i in [0,1,2,3,4,5,6,7,8,9]:
@@ -959,7 +1009,7 @@ def pulse_search_reim(fileroot, pathin, pathout, nints=10000, edge=0):
 #        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
 
 # hack to search single file for pulses
-    filelist = [fileroot]
+#    filelist = [fileroot]
 
     # loop over miriad data and time chunks
     for file in filelist:
@@ -970,11 +1020,12 @@ def pulse_search_reim(fileroot, pathin, pathout, nints=10000, edge=0):
             print 'Starting file %s with nskip %d' % (file, nskip)
 
             # load data
-            pv = poco(pathin + file, nints=nints, nskip=nskip)
+            pv = poco(pathin + file, nints=nints, nskip=nskip, nocal=True, nopass=True)
             pv.prep()
 
             # searches at phase center  ## TO DO:  need to search over position in primary beam
-            dips, dipsprob = pv.normalreim(bgwindow=bgwindow)
+            dips, dipsprob = pv.stdreim(bgwindow=bgwindow)
+#            dips, dipsprob = pv.normalreim(bgwindow=bgwindow, prob=1e-7)
             print >> fileout, file, nskip, nints, dips
 
             # save all results (v1.0 pickle format)
@@ -987,19 +1038,48 @@ def pulse_search_reim(fileroot, pathin, pathout, nints=10000, edge=0):
         fileout.close
 
 
-def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=1, edge=0):
+def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, edge=0):
     """
     Searches for pulses by imaging dedispersed trials.
     """
 
     maxints = 131000  # biggest file in integrations
-    bgwindow = 5  # where bg subtraction is made
+    bgwindow = 10  # where bg subtraction is made
 
     filelist = []
-    for i in [0,1,4,5,6,7,8,9]:
+
+# for crab 201103
+#    for i in [0,1,4,5,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+#    for i in range(0,8):
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+
+# for crab 190348
+#    for i in [0,1,2,3,4,5,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+#    for i in [1,3,4,5,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+#    for i in [0,1,2,3]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
+
+# for b0329 173027
+    for i in [0,1,2,3,4,5,6,7,8,9]:
         filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
-    for i in range(0,8):
+    for i in [0,1,2,6,7,8,9]:
         filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+    for i in [0,1,2,3]:
+        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
+
+    filelist = [string.join(fileroot.split('.')[:-1]) + '_00.mir']   # hack
+
+# for m31 154202
+#    for i in [0,1,2,3,4,5,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+#    for i in [0,1,2,3,4,5,6]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+
+# hack to search single file for pulses
+#    filelist = [fileroot]
         
     print 'Looping over filelist: ', filelist
     for file in filelist:
@@ -1088,24 +1168,26 @@ def process_pickle(filename, pathin, mode='image'):
     dmarr = dump[4]
     tbinarr = dump[5]
     snrarr = dump[6]
-    if mode == 'reim':  # reim mode has p-values for normality, which should be small when there is a pulse
+    if snrarr[0] <= 1:  # reim mode has p-values for normality, which should be small when there is a pulse
         peaktrial = n.where(snrarr == min(snrarr))[0][0]
     else:
         peaktrial = n.where(snrarr == max(snrarr))[0][0]
 
     bgwindow = 10
 
-#    name = 'poco_crab_201103_tst.mir'  # hack to force using certain file
+#    name = 'poco_b0329_173027_16.mir'  # hack to force using certain file
     
-    print 'Loaded pickle file for %s' % (name)
-    print 'Has peaks at DM = ', dmarr
-    print 'Significance of ', snrarr
+    print 'Loaded pickle file for %s plot of %s' % (mode, name)
+    print 'Has peaks at DM = ', dmarr, ' with sig ', snrarr
+    print 'Using ', snrarr[peaktrial]
+
     if len(dmbinarr) >= 1:
 #    if (len(dmbinarr) >= 1) & (snrarr[peaktrial] > 7.):
         print 'Grabbing %d ints at %d' % (nints, nintskip)
 #        pv = poco(pathin + name, nints=nints, nskip=nintskip + tbinarr[peaktrial] - bgwindow)    # to skip a few ints...
-        pv = poco(pathin + name, nints=nints, nskip=nintskip)    # format defined by pickle dump below
 #        pv.nskip=nintskip*pv.nbl    # to skip a few ints...
+        pv = poco(pathin + name, nints=nints, nskip=nintskip)
+#        pv = poco(pathin + name, nints=nints, nskip=nintskip, nocal=True, nopass=True)
         pv.prep()
 #        track = pv.dmtrack(dm=pv.dmarr[dmbinarr[peaktrial]], t0=pv.reltime[bgwindow], show=0)  # to skip a few ints...
         track = pv.dmtrack(dm=pv.dmarr[dmbinarr[peaktrial]], t0=pv.reltime[tbinarr[peaktrial]], show=0)
@@ -1168,27 +1250,27 @@ if __name__ == '__main__':
     print 'Greetings, human.'
     print ''
 
-    fileroot = 'poco_crab_201103_tst.mir'  
+    fileroot = 'poco_b0329_173027.mir'  
     pathin = 'data/'
-    pathout = 'crab_tst2/'
+    pathout = 'b0329_fixdm_im/'
 #    edge = 150 # m31 search up to dm=131 and pulse starting at first unflagged channel
-#    edge = 35 # b0329 search at dm=28.6 and pulse starting at first unflagged channel
-    edge = 70 # Crab search at dm=56.8 and pulse starting at first unflagged channel
+    edge = 35 # b0329 search at dm=28.6 and pulse starting at first unflagged channel
+#    edge = 70 # Crab search at dm=56.8 and pulse starting at first unflagged channel
 #    edge = 360  # Crab DM of 56.8 and for DM track starting at freq=0
 
     if len(sys.argv) == 1:
         # if no args, search for pulses
         print 'Searching for pulses...'
         try:
-#            pulse_search_image(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, show=0)
+            pulse_search_image(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)
 #            pulse_search_phasecenter(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)
-            pulse_search_reim(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=500, edge=edge)
+#            pulse_search_reim(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)
         except AttributeError:
             exit(0)
     elif len(sys.argv) == 2:
         # if pickle, then plot data or dm search results
         print 'Assuming input file is pickle of candidate...'
-        process_pickle(sys.argv[1], pathin=pathin, mode='reim')
+        process_pickle(sys.argv[1], pathin=pathin, mode='spec')
     elif len(sys.argv) == 6:
         # if full spec of trial, image it
         print 'Imaging DM trial...'
