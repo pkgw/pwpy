@@ -71,6 +71,9 @@ class poco:
         nchan = self.nchan
         nbl = self.nbl
         i = 0
+        self.preamble0 = []
+        self.flags0 = []
+        self.inp0 = []
         da = n.zeros((initsize,nchan),dtype='complex64')
         fl = n.zeros((initsize,nchan),dtype='bool')
         ti = n.zeros((initsize),dtype='float64')
@@ -96,6 +99,12 @@ class poco:
     #    pol = uvdat.getPol ()
     
             if (i-nskip) < initsize:
+                if (i-nskip) <= self.nbl:
+                    # store rough uv coords, etc. for quick access later
+                    self.inp.append(inp)
+                    self.preamble0.append(preamble)
+                    self.flags0.append(flags)
+
                 ti[i-nskip] = time
                 da[i-nskip] = data
                 fl[i-nskip] = flags
@@ -832,6 +841,67 @@ class poco:
             p.show()
 
 
+    def writetrack2(self, dmbin, tbin, tshift=0, bgwindow=0, show=0):
+        """Writes data from track out as miriad visibility file.
+        Alternative to writetrack that uses stored, approximate preamble and flags, not one specific to data.
+        Optional background subtraction bl-by-bl over bgwindow integrations. Note that this is bgwindow *dmtracks* so width is bgwindow+track width
+        """
+
+        # create bgsub data
+        datadiffarr = self.tracksub(dmbin, tbin, bgwindow=bgwindow)
+        data = n.zeros(len(datadiffarr[0, 0]))  # default data array. gets overwritten.
+        data0 = n.zeros(len(datadiffarr[0, 0]))  # zero data array for flagged bls
+
+        # define input metadata source and output visibility file names
+        outname = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl) + '-' + 'dm' + str(dmbin) + 't' + str(tbin) + '.mir'
+        out = miriad.VisData(outname)
+        inp = self.inp0[0]
+
+        dOut = out.open ('c')
+        dOut.setPreambleType ('uvw', 'time', 'baseline')
+
+        for i in range(len(self.preamble)):  # iterate over baselines
+            if i == 0:
+                nants = inp.getVarFirstInt ('nants', 0)
+                inttime = inp.getVarFirstFloat ('inttime', 10.0)
+                nspect = inp.getVarFirstInt ('nspect', 0)
+                nwide = inp.getVarFirstInt ('nwide', 0)
+                sdf = inp.getVarDouble ('sdf', nspect)
+                inp.copyHeader (dOut, 'history')
+                inp.initVarsAsInput (' ') # ???
+
+                dOut.writeVarInt ('nants', nants)
+                dOut.writeVarFloat ('inttime', inttime)
+                dOut.writeVarInt ('nspect', nspect)
+                dOut.writeVarDouble ('sdf', sdf)
+                dOut.writeVarInt ('nwide', nwide)
+                dOut.writeVarInt ('nschan', inp.getVarInt ('nschan', nspect))
+                dOut.writeVarInt ('ischan', inp.getVarInt ('ischan', nspect))
+                dOut.writeVarDouble ('sfreq', inp.getVarDouble ('sfreq', nspect))
+                dOut.writeVarDouble ('restfreq', inp.getVarDouble ('restfreq', nspect))
+                dOut.writeVarInt ('pol', inp.getVarInt ('pol'))
+                    
+                inp.copyLineVars (dOut)
+
+            # write out track, if not flagged
+            if n.any(self.flags0[i]):
+                for j in range(self.nchan):
+                    if j in self.chans:
+                        data[j] = datadiffarr[0, i, j]
+                        flags[j] = self.flags0[0, i, j]
+                    else:
+                        data[j] = 0.
+                        flags[j] = False
+            else:
+                data = data0
+                flags = self.flags0[i]
+
+            dOut.write (preamble, data, flags)
+
+        dOut.close ()
+        return 1
+
+
     def dedisperse2(self):
         """Integrates over data at dmtrack for each pair of elements in dmarr, time.
         Uses threading.  SLOWER than serial.
@@ -1094,7 +1164,8 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
 
             # dedisperse
             for i in range(len(pv.dmarr)):
-                for j in range(len(pv.reltime)):
+                for j in range(1240,1270):
+#                for j in range(len(pv.reltime)):
                     try: 
                         peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = pv.imagedmt0(i,j, show=show, bgwindow=bgwindow, clean=1)
                         print >> fileout, file, nskip, nints, (i, j), 'Peak, RA, Dec: ', peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
@@ -1103,7 +1174,7 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
                             print '\tDetection!'
                             # save all results (v1.0 pickle format)
                             pklout = open(pathout + string.join(file.split('.')[:-1]) + '.' + str(nskip) + '-dm' + str(i) + 't' + str(j) + '.pkl', 'wb')
-                            pickle.dump((file, nskip, nints, [i], pv.dmarr[i], [j], peak/epeak), pklout)
+                            pickle.dump((file, nskip, nints, n.array([i]), pv.dmarr[i], n.array([j]), n.array([peak/epeak])), pklout)
                             pklout.close()
                     except:
                         continue
@@ -1145,7 +1216,7 @@ def pulse_search_uvfit(fileroot, pathin, pathout, nints=12000, sig=5.0, show=1, 
                             print '\tDetection!'
                             # save all results (v1.0 pickle format)
                             pklout = open(pathout + string.join(file.split('.')[:-1]) + '.' + str(nskip) + '-dm' + str(i) + 't' + str(j) + '.pkl', 'wb')
-                            pickle.dump((file, nskip, nints, [i], pv.dmarr[i], [j], peak/epeak), pklout)
+                            pickle.dump((file, nskip, nints, n.array([i]), pv.dmarr[i], n.array([j]), n.array([peak/epeak])), pklout)
                             pklout.close()
                     except:
                         continue
@@ -1252,7 +1323,7 @@ if __name__ == '__main__':
 
     fileroot = 'poco_b0329_173027.mir'  
     pathin = 'data/'
-    pathout = 'b0329_fixdm_im/'
+    pathout = 'b0329_fixdm_tst/'
 #    edge = 150 # m31 search up to dm=131 and pulse starting at first unflagged channel
     edge = 35 # b0329 search at dm=28.6 and pulse starting at first unflagged channel
 #    edge = 70 # Crab search at dm=56.8 and pulse starting at first unflagged channel
