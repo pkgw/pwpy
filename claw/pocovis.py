@@ -8,7 +8,7 @@
 --
 """
 
-import sys, string, os
+import sys, string, os, shutil
 from os.path import join
 #import mirtask
 #from mirtask import uvdat, keys, util
@@ -39,6 +39,7 @@ class poco:
         self.baseline_order = n.array([ 257, 258, 514, 261, 517, 1285, 262, 518, 1286, 1542, 259, 515, 773, 774, 771, 516, 1029, 1030, 772, 1028, 1287, 1543, 775, 1031, 1799, 1544, 776, 1032, 1800, 2056, 260, 263, 264, 519, 520, 1288])   # second iteration of bl nums
         self.autos = []
         self.noautos = []
+        self.maketemp = False   # flag to make template visibility file to speed up writing of dm track data
         self.pulsewidth = 0.0066 * n.ones(len(self.chans)) # pulse width of b0329+54
 #        self.pulsewidth = 0 * n.ones(len(self.chans)) # pulse width of crab
         # set dmarr
@@ -57,29 +58,65 @@ class poco:
                 else:
                     self.noautos.append(self.blindex)
 
-# load data
-#
-# slick way, but hard to hack for interactive use
-#        sys.argv.append('vis='+file)
-#        keys.doUvdat ('dsl3', True)
-#        opts = keys.process ()
-
-# poor man's way
+        # load data
         vis = miriad.VisData(file,)
 
-        # initialize parameters
         nchan = self.nchan
         nbl = self.nbl
-        i = 0
-        self.preamble0 = []
-        self.flags0 = []
-        self.inp0 = []
         da = n.zeros((initsize,nchan),dtype='complex64')
         fl = n.zeros((initsize,nchan),dtype='bool')
         ti = n.zeros((initsize),dtype='float64')
 
+        if self.maketemp:  # ?????
+            self.tempname = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl) + '-' + 'temp.mir'
+            out = miriad.VisData(self.tempname)
+            dOut = out.open (output)
+
+        # get few general variables
+        for inp, preamble, data, flags in vis.readLowlevel ('dsl3', False, nocal=True, nopass=True):
+            self.nants0 = inp.getVarFirstInt ('nants', 0)
+            self.inttime0 = inp.getVarFirstFloat ('inttime', 10.0)
+            self.nspect0 = inp.getVarFirstInt ('nspect', 0)
+            self.nwide0 = inp.getVarFirstInt ('nwide', 0)
+            self.sdf0 = inp.getVarDouble ('sdf', self.nspect0)
+            self.nschan0 = inp.getVarInt ('nschan', self.nspect0)
+            self.ischan0 = inp.getVarInt ('ischan', self.nspect0)
+            self.sfreq0 = inp.getVarDouble ('sfreq', self.nspect0)
+            self.restfreq0 = inp.getVarDouble ('restfreq', self.nspect0)
+            self.pol0 = inp.getVarInt ('pol')
+            print 'got variables...'
+            break
+
+        # optionally make the template output visibility file
+        if self.maketemp:
+            i = 0
+            for inp, preamble, data, flags in vis.readLowlevel ('dsl3', False, nocal=True, nopass=True):
+                # set up output file
+                dOut.setPreambleType ('uvw', 'time', 'baseline')
+                dOut.writeVarInt ('nants', self.nants0)
+                dOut.writeVarFloat ('inttime', self.inttime0)
+                dOut.writeVarInt ('nspect', self.nspect0)
+                dOut.writeVarDouble ('sdf', self.sdf0)
+                dOut.writeVarInt ('nwide', self.nwide0)
+                dOut.writeVarInt ('nschan', self.nschan0)
+                dOut.writeVarInt ('ischan', self.ischan0)
+                dOut.writeVarDouble ('sfreq', self.sfreq0)
+                dOut.writeVarDouble ('restfreq', self.restfreq0)
+                dOut.writeVarInt ('pol', self.pol0)
+
+                inp.copyHeader (dOut, 'history')
+                inp.initVarsAsInput (' ') # ???
+                inp.copyLineVars (dOut)
+                dOut.write (preamble, data, flags)
+                i = i+1
+                print i
+                if i >= self.nbl:  # only need to read one integration
+                    break
+
+            dOut.close ()
+
         # read data
-        # You can pass traditional Miriad UV keywords to readLowlevel as keyword arguments
+        i = 0
         for inp, preamble, data, flags in vis.readLowlevel ('dsl3', False, nocal=nocal, nopass=nopass):
 
             # Loop to skip some data and read shifted data into original data arrays
@@ -99,12 +136,6 @@ class poco:
     #    pol = uvdat.getPol ()
     
             if (i-nskip) < initsize:
-                if (i-nskip) <= self.nbl:
-                    # store rough uv coords, etc. for quick access later
-                    self.inp.append(inp)
-                    self.preamble0.append(preamble)
-                    self.flags0.append(flags)
-
                 ti[i-nskip] = time
                 da[i-nskip] = data
                 fl[i-nskip] = flags
@@ -272,6 +303,59 @@ class poco:
         return track
 
 
+    def tracksub(self, dmbin, tbin, bgwindow = 0):
+        """Reads data along dmtrack and optionally subtracts background like writetrack method.
+        Returns the difference of the data in the on and off tracks as a single integration with all bl and chans.
+        Nominally identical to writetrack, but gives visibilities values off at the 0.01 (absolute) level. Good enough for now.
+        """
+
+        data = self.data
+
+        trackon = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[tbin], show=0)
+        if ((trackon[1][0] != 0) | (trackon[1][len(trackon[1])-1] != len(self.chans)-1)):
+#            print 'Track does not span all channels. Skipping.'
+            return [0]
+
+        dataon = data[trackon[0], :, trackon[1]]
+
+        # set up bg track
+        if bgwindow:
+            # measure max width of pulse (to avoid in bgsub)
+            twidths = [] 
+            for k in trackon[1]:
+                twidths.append(len(n.array(trackon)[0][list(n.where(n.array(trackon[1]) == k)[0])]))
+
+            bgrange = range(-bgwindow/2 - max(twidths) + tbin, -max(twidths) + tbin) + range(max(twidths) + tbin, max(twidths) + bgwindow/2 + tbin + 1)
+            for k in bgrange:     # build up super track for background subtraction
+                if bgrange.index(k) == 0:   # first time through
+                    trackoff = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[k], show=0)
+                else:    # then extend arrays by next iterations
+                    tmp = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[k], show=0)
+                    trackoff[0].extend(tmp[0])
+                    trackoff[1].extend(tmp[1])
+
+            dataoff = data[trackoff[0], :, trackoff[1]]
+
+        # compress time axis, then subtract on and off tracks
+        for ch in n.unique(trackon[1]):
+            indon = n.where(trackon[1] == ch)
+
+            if bgwindow:
+                indoff = n.where(trackoff[1] == ch)
+                datadiff = dataon[indon].mean(axis=0) - dataoff[indoff].mean(axis=0)
+            else:
+                datadiff = dataon[indon].mean(axis=0)
+
+            if ch == 0:
+                datadiffarr = [datadiff]
+            else:
+                datadiffarr = n.append(datadiffarr, [datadiff], axis=0)
+
+        datadiffarr = n.array([datadiffarr.transpose()])
+
+        return datadiffarr
+
+
     def writetrack(self, dmbin, tbin, output='c', tshift=0, bgwindow=0, show=0):
         """Writes data from track out as miriad visibility file.
         Optional background subtraction bl-by-bl over bgwindow integrations. Note that this is bgwindow *dmtracks* so width is bgwindow+track width
@@ -279,11 +363,9 @@ class poco:
         Output parameter says whether to 'c'reate a new file or 'a'ppend to existing one. **not tested**
         """
 
+        # prep data and track
         rawdatatrim = self.rawdata[:,:,self.chans]
-
         track = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[tbin-tshift], show=0)
-
-#        if len(track[1]) < minintersect:
         if ((track[1][0] != 0) | (track[1][len(track[1])-1] != len(self.chans)-1)):
 #            print 'Track does not span all channels. Skipping.'
             return 0
@@ -314,25 +396,40 @@ class poco:
                 p.plot(self.reltime[trackbg[0]], trackbg[1], 'r.')
             self.spec(save=0)
 
-#                print 'trackbg'
-#            print self.rawdata[:,:,self.chans][trackbg[0], 1, trackbg[1]]
-#        print 'track'
-#        print self.rawdata[:,:,self.chans][track[0], 1, track[1]]
-
         # define input metadata source and output visibility file names
-        inname = self.file
         outname = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl) + '-' + 'dm' + str(dmbin) + 't' + str(tbin) + '.mir'
 
-        vis = miriad.VisData(inname)
-        out = miriad.VisData(outname)
+        # option to have output vis file made before to save time
+        if self.maketemp:
+            shutil.copytree(self.tempname, outname)
+        else:
+            inname = self.file
+            vis = miriad.VisData(inname)
+            out = miriad.VisData(outname)
 
-        dOut = out.open (output)
-        dOut.setPreambleType ('uvw', 'time', 'baseline')
+            # set up output file
+            dOut = out.open (output)
+            dOut.setPreambleType ('uvw', 'time', 'baseline')
+            dOut.writeVarInt ('nants', self.nants0)
+            dOut.writeVarFloat ('inttime', self.inttime0)
+            dOut.writeVarInt ('nspect', self.nspect0)
+            dOut.writeVarDouble ('sdf', self.sdf0)
+            dOut.writeVarInt ('nwide', self.nwide0)
+            dOut.writeVarInt ('nschan', self.nschan0)
+            dOut.writeVarInt ('ischan', self.ischan0)
+            dOut.writeVarDouble ('sfreq', self.sfreq0)
+            dOut.writeVarDouble ('restfreq', self.restfreq0)
+            dOut.writeVarInt ('pol', self.pol0)
+            for inp, preamble, data, flags in vis.readLowlevel ('dsl3', False, nocal=True, nopass=True):
+                inp.copyHeader (dOut, 'history')
+                inp.initVarsAsInput (' ') # ???
+                inp.copyLineVars (dOut)
+                break
 
         i = 0
         int0 = self.nskip + (track[0][len(track[0])/2] + tshift) * self.nbl   # choose integration at center of dispersed track
 
-        for inp, preamble, data, flags in vis.readLowlevel ('dsl3', False):
+        for inp, preamble, data, flags in vis.readLowlevel ('dsl3', False, nocal=True, nopass=True):
             # since template has only one int, this loop gets spectra by iterating over baselines.
 
             if i < int0:  # need to grab only integration at pulse+intoff
@@ -340,28 +437,6 @@ class poco:
                 continue
 
             elif i < int0 + self.nbl:
-                if i == int0:
-                    nants = inp.getVarFirstInt ('nants', 0)
-                    inttime = inp.getVarFirstFloat ('inttime', 10.0)
-                    nspect = inp.getVarFirstInt ('nspect', 0)
-                    nwide = inp.getVarFirstInt ('nwide', 0)
-                    sdf = inp.getVarDouble ('sdf', nspect)
-                    inp.copyHeader (dOut, 'history')
-                    inp.initVarsAsInput (' ') # ???
-
-                    dOut.writeVarInt ('nants', nants)
-                    dOut.writeVarFloat ('inttime', inttime)
-                    dOut.writeVarInt ('nspect', nspect)
-                    dOut.writeVarDouble ('sdf', sdf)
-                    dOut.writeVarInt ('nwide', nwide)
-                    dOut.writeVarInt ('nschan', inp.getVarInt ('nschan', nspect))
-                    dOut.writeVarInt ('ischan', inp.getVarInt ('ischan', nspect))
-                    dOut.writeVarDouble ('sfreq', inp.getVarDouble ('sfreq', nspect))
-                    dOut.writeVarDouble ('restfreq', inp.getVarDouble ('restfreq', nspect))
-                    dOut.writeVarInt ('pol', inp.getVarInt ('pol'))
-                    
-                    inp.copyLineVars (dOut)
-
                 # write out track, if not flagged
                 if n.any(flags):
                     bgarr = []
@@ -381,16 +456,74 @@ class poco:
                         else:
                             flags[j] = False
 
-#                    print 'BG spectrum std =', (n.abs(bgarr)).std()
-
 #                ants = util.decodeBaseline (preamble[4])
 #                print preamble[3], ants
+
                 dOut.write (preamble, data, flags)
                 i = i+1  # essentially a baseline*int number
 
-
             elif i >= int0 + self.nbl:
                 break
+
+        dOut.close ()
+        return 1
+
+
+    def writetrack2(self, dmbin, tbin, tshift=0, bgwindow=0, show=0):
+        """Writes data from track out as miriad visibility file.
+        Alternative to writetrack that uses stored, approximate preamble and flags, not one specific to data.
+        Optional background subtraction bl-by-bl over bgwindow integrations. Note that this is bgwindow *dmtracks* so width is bgwindow+track width
+        """
+
+        # create bgsub data
+        datadiffarr = self.tracksub(dmbin, tbin, bgwindow=bgwindow)
+        data = n.zeros(len(datadiffarr[0, 0]))  # default data array. gets overwritten.
+        data0 = n.zeros(len(datadiffarr[0, 0]))  # zero data array for flagged bls
+
+        # define input metadata source and output visibility file names
+        outname = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl) + '-' + 'dm' + str(dmbin) + 't' + str(tbin) + '.mir'
+        out = miriad.VisData(outname)
+
+        dOut = out.open ('c')
+        dOut.setPreambleType ('uvw', 'time', 'baseline')
+
+        for i in range(len(self.preamble)):  # iterate over baselines
+            if i == 0:
+                nants = inp.getVarFirstInt ('nants', 0)
+                inttime = inp.getVarFirstFloat ('inttime', 10.0)
+                nspect = inp.getVarFirstInt ('nspect', 0)
+                nwide = inp.getVarFirstInt ('nwide', 0)
+                sdf = inp.getVarDouble ('sdf', nspect)
+                inp.copyHeader (dOut, 'history')
+                inp.initVarsAsInput (' ') # ???
+
+                dOut.writeVarInt ('nants', nants)
+                dOut.writeVarFloat ('inttime', inttime)
+                dOut.writeVarInt ('nspect', nspect)
+                dOut.writeVarDouble ('sdf', sdf)
+                dOut.writeVarInt ('nwide', nwide)
+                dOut.writeVarInt ('nschan', inp.getVarInt ('nschan', nspect))
+                dOut.writeVarInt ('ischan', inp.getVarInt ('ischan', nspect))
+                dOut.writeVarDouble ('sfreq', inp.getVarDouble ('sfreq', nspect))
+                dOut.writeVarDouble ('restfreq', inp.getVarDouble ('restfreq', nspect))
+                dOut.writeVarInt ('pol', inp.getVarInt ('pol'))
+                    
+                inp.copyLineVars (dOut)
+
+            # write out track, if not flagged
+            if n.any(self.flags0[i]):
+                for j in range(self.nchan):
+                    if j in self.chans:
+                        data[j] = datadiffarr[0, i, j]
+                        flags[j] = self.flags0[0, i, j]
+                    else:
+                        data[j] = 0.
+                        flags[j] = False
+            else:
+                data = data0
+                flags = self.flags0[i]
+
+            dOut.write (preamble, data, flags)
 
         dOut.close ()
         return 1
@@ -765,59 +898,6 @@ class poco:
         return self.peaks,dmt0arr[self.peaks]
 
 
-    def tracksub(self, dmbin, tbin, bgwindow = 0):
-        """Reads data along dmtrack and optionally subtracts background like writetrack method.
-        Returns the difference of the data in the on and off tracks as a single integration with all bl and chans.
-        Nominally identical to writetrack, but gives visibilities values off at the 0.01 (absolute) level. Good enough for now.
-        """
-
-        data = self.data
-
-        trackon = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[tbin], show=0)
-        if ((trackon[1][0] != 0) | (trackon[1][len(trackon[1])-1] != len(self.chans)-1)):
-#            print 'Track does not span all channels. Skipping.'
-            return [0]
-
-        dataon = data[trackon[0], :, trackon[1]]
-
-        # set up bg track
-        if bgwindow:
-            # measure max width of pulse (to avoid in bgsub)
-            twidths = [] 
-            for k in trackon[1]:
-                twidths.append(len(n.array(trackon)[0][list(n.where(n.array(trackon[1]) == k)[0])]))
-
-            bgrange = range(-bgwindow/2 - max(twidths) + tbin, -max(twidths) + tbin) + range(max(twidths) + tbin, max(twidths) + bgwindow/2 + tbin + 1)
-            for k in bgrange:     # build up super track for background subtraction
-                if bgrange.index(k) == 0:   # first time through
-                    trackoff = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[k], show=0)
-                else:    # then extend arrays by next iterations
-                    tmp = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[k], show=0)
-                    trackoff[0].extend(tmp[0])
-                    trackoff[1].extend(tmp[1])
-
-            dataoff = data[trackoff[0], :, trackoff[1]]
-
-        # compress time axis, then subtract on and off tracks
-        for ch in n.unique(trackon[1]):
-            indon = n.where(trackon[1] == ch)
-
-            if bgwindow:
-                indoff = n.where(trackoff[1] == ch)
-                datadiff = dataon[indon].mean(axis=0) - dataoff[indoff].mean(axis=0)
-            else:
-                datadiff = dataon[indon].mean(axis=0)
-
-            if ch == 0:
-                datadiffarr = [datadiff]
-            else:
-                datadiffarr = n.append(datadiffarr, [datadiff], axis=0)
-
-        datadiffarr = n.array([datadiffarr.transpose()])
-
-        return datadiffarr
-
-
     def plotreim(self, save=0):
         """Plots the visibilities in real-imaginary space. Test of pulse detection concept for uncalibrated data...
         """
@@ -839,67 +919,6 @@ class poco:
         else:
             p.plot(da.real,da.imag, '.')
             p.show()
-
-
-    def writetrack2(self, dmbin, tbin, tshift=0, bgwindow=0, show=0):
-        """Writes data from track out as miriad visibility file.
-        Alternative to writetrack that uses stored, approximate preamble and flags, not one specific to data.
-        Optional background subtraction bl-by-bl over bgwindow integrations. Note that this is bgwindow *dmtracks* so width is bgwindow+track width
-        """
-
-        # create bgsub data
-        datadiffarr = self.tracksub(dmbin, tbin, bgwindow=bgwindow)
-        data = n.zeros(len(datadiffarr[0, 0]))  # default data array. gets overwritten.
-        data0 = n.zeros(len(datadiffarr[0, 0]))  # zero data array for flagged bls
-
-        # define input metadata source and output visibility file names
-        outname = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl) + '-' + 'dm' + str(dmbin) + 't' + str(tbin) + '.mir'
-        out = miriad.VisData(outname)
-        inp = self.inp0[0]
-
-        dOut = out.open ('c')
-        dOut.setPreambleType ('uvw', 'time', 'baseline')
-
-        for i in range(len(self.preamble)):  # iterate over baselines
-            if i == 0:
-                nants = inp.getVarFirstInt ('nants', 0)
-                inttime = inp.getVarFirstFloat ('inttime', 10.0)
-                nspect = inp.getVarFirstInt ('nspect', 0)
-                nwide = inp.getVarFirstInt ('nwide', 0)
-                sdf = inp.getVarDouble ('sdf', nspect)
-                inp.copyHeader (dOut, 'history')
-                inp.initVarsAsInput (' ') # ???
-
-                dOut.writeVarInt ('nants', nants)
-                dOut.writeVarFloat ('inttime', inttime)
-                dOut.writeVarInt ('nspect', nspect)
-                dOut.writeVarDouble ('sdf', sdf)
-                dOut.writeVarInt ('nwide', nwide)
-                dOut.writeVarInt ('nschan', inp.getVarInt ('nschan', nspect))
-                dOut.writeVarInt ('ischan', inp.getVarInt ('ischan', nspect))
-                dOut.writeVarDouble ('sfreq', inp.getVarDouble ('sfreq', nspect))
-                dOut.writeVarDouble ('restfreq', inp.getVarDouble ('restfreq', nspect))
-                dOut.writeVarInt ('pol', inp.getVarInt ('pol'))
-                    
-                inp.copyLineVars (dOut)
-
-            # write out track, if not flagged
-            if n.any(self.flags0[i]):
-                for j in range(self.nchan):
-                    if j in self.chans:
-                        data[j] = datadiffarr[0, i, j]
-                        flags[j] = self.flags0[0, i, j]
-                    else:
-                        data[j] = 0.
-                        flags[j] = False
-            else:
-                data = data0
-                flags = self.flags0[i]
-
-            dOut.write (preamble, data, flags)
-
-        dOut.close ()
-        return 1
 
 
     def dedisperse2(self):
@@ -1140,8 +1159,6 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
     for i in [0,1,2,3]:
         filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
 
-    filelist = [string.join(fileroot.split('.')[:-1]) + '_00.mir']   # hack
-
 # for m31 154202
 #    for i in [0,1,2,3,4,5,6,7,8,9]:
 #        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
@@ -1149,13 +1166,14 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
 #        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
 
 # hack to search single file for pulses
-#    filelist = [fileroot]
+    filelist = [fileroot]
         
     print 'Looping over filelist: ', filelist
     for file in filelist:
         fileout = open(pathout + string.join(file.split('.')[:-1]) + '.txt', 'a')
 
-        for nskip in range(0, maxints-(nints-edge), nints-edge):
+        for nskip in [0]:
+#        for nskip in range(0, maxints-(nints-edge), nints-edge):
             print 'Starting file %s with nskip %d' % (file, nskip)
 
             # load data
@@ -1164,11 +1182,11 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
 
             # dedisperse
             for i in range(len(pv.dmarr)):
-                for j in range(1240,1270):
+                for j in range(1240,1250):
 #                for j in range(len(pv.reltime)):
                     try: 
                         peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = pv.imagedmt0(i,j, show=show, bgwindow=bgwindow, clean=1)
-                        print >> fileout, file, nskip, nints, (i, j), 'Peak, RA, Dec: ', peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
+#                        print >> fileout, file, nskip, nints, (i, j), 'Peak, RA, Dec: ', peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
 
                         if peak/epeak >= sig:
                             print '\tDetection!'
@@ -1321,8 +1339,8 @@ if __name__ == '__main__':
     print 'Greetings, human.'
     print ''
 
-    fileroot = 'poco_b0329_173027.mir'  
-    pathin = 'data/'
+    fileroot = 'poco_b0329_173027_00.mir'  
+    pathin = ''
     pathout = 'b0329_fixdm_tst/'
 #    edge = 150 # m31 search up to dm=131 and pulse starting at first unflagged channel
     edge = 35 # b0329 search at dm=28.6 and pulse starting at first unflagged channel
