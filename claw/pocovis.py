@@ -9,6 +9,7 @@
 """
 
 import sys, string, os, shutil
+import cProfile
 from os.path import join
 #import mirtask
 #from mirtask import uvdat, keys, util
@@ -27,19 +28,21 @@ class poco:
     def __init__(self, file, nints=1000, nskip=0, nocal=False, nopass=False):
         # initialize
         self.nchan = 64
+        nchan = self.nchan
 #        self.chans = n.arange(6,58)
 #        li = range(4,23) + range(37,49)   # must match flagging range; miriad 1-4, 24-38, 50-64
 #        li = range(2,10) + range(11,23) + range(37,39) + range(40,41) + range(44,49)   # must match flagging range; miriad 1-2, 11, 24-37, 40, 42-44, 50-64
         li = range(3,10) + range(11,23) + range(37,39) + range(40,41) + range(44,49)   # must match flagging range; miriad 1-2, 11, 24-37, 40, 42-44, 50-64
         self.chans = n.array(li)
         self.nbl = 36
+        nbl = self.nbl
         initsize = nints*self.nbl   # number of integrations to read in a single chunk
         self.sfreq = 0.718  # freq for first channel in GHz
         self.sdf = 0.104/self.nchan   # dfreq per channel in GHz
         self.baseline_order = n.array([ 257, 258, 514, 261, 517, 1285, 262, 518, 1286, 1542, 259, 515, 773, 774, 771, 516, 1029, 1030, 772, 1028, 1287, 1543, 775, 1031, 1799, 1544, 776, 1032, 1800, 2056, 260, 263, 264, 519, 520, 1288])   # second iteration of bl nums
         self.autos = []
         self.noautos = []
-        self.maketemp = False   # flag to make template visibility file to speed up writing of dm track data
+        self.maketemp = True     # flag to make template visibility file to speed up writing of dm track data
         self.pulsewidth = 0.0066 * n.ones(len(self.chans)) # pulse width of b0329+54
 #        self.pulsewidth = 0 * n.ones(len(self.chans)) # pulse width of crab
         # set dmarr
@@ -50,6 +53,7 @@ class poco:
         self.nskip = nskip*self.nbl    # number of iterations to skip (for reading in different parts of buffer)
         nskip = self.nskip
         self.file = file
+        self.tempname = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl) + '-' + 'temp.mir'
         for a1 in range(1,9):             # loop to adjust delays
             for a2 in range(a1,9):
                 self.blindex = n.where(self.baseline_order == a1*256 + a2)[0][0]
@@ -60,73 +64,37 @@ class poco:
 
         # load data
         vis = miriad.VisData(file,)
-
-        nchan = self.nchan
-        nbl = self.nbl
         da = n.zeros((initsize,nchan),dtype='complex64')
         fl = n.zeros((initsize,nchan),dtype='bool')
         ti = n.zeros((initsize),dtype='float64')
 
-        if self.maketemp:  # ?????
-            self.tempname = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl) + '-' + 'temp.mir'
-            out = miriad.VisData(self.tempname)
-            dOut = out.open (output)
-
-        # get few general variables
-        for inp, preamble, data, flags in vis.readLowlevel ('dsl3', False, nocal=True, nopass=True):
-            self.nants0 = inp.getVarFirstInt ('nants', 0)
-            self.inttime0 = inp.getVarFirstFloat ('inttime', 10.0)
-            self.nspect0 = inp.getVarFirstInt ('nspect', 0)
-            self.nwide0 = inp.getVarFirstInt ('nwide', 0)
-            self.sdf0 = inp.getVarDouble ('sdf', self.nspect0)
-            self.nschan0 = inp.getVarInt ('nschan', self.nspect0)
-            self.ischan0 = inp.getVarInt ('ischan', self.nspect0)
-            self.sfreq0 = inp.getVarDouble ('sfreq', self.nspect0)
-            self.restfreq0 = inp.getVarDouble ('restfreq', self.nspect0)
-            self.pol0 = inp.getVarInt ('pol')
-            print 'got variables...'
-            break
-
-        # optionally make the template output visibility file
         if self.maketemp:
-            i = 0
-            for inp, preamble, data, flags in vis.readLowlevel ('dsl3', False, nocal=True, nopass=True):
-                # set up output file
-                dOut.setPreambleType ('uvw', 'time', 'baseline')
-                dOut.writeVarInt ('nants', self.nants0)
-                dOut.writeVarFloat ('inttime', self.inttime0)
-                dOut.writeVarInt ('nspect', self.nspect0)
-                dOut.writeVarDouble ('sdf', self.sdf0)
-                dOut.writeVarInt ('nwide', self.nwide0)
-                dOut.writeVarInt ('nschan', self.nschan0)
-                dOut.writeVarInt ('ischan', self.ischan0)
-                dOut.writeVarDouble ('sfreq', self.sfreq0)
-                dOut.writeVarDouble ('restfreq', self.restfreq0)
-                dOut.writeVarInt ('pol', self.pol0)
-
-                inp.copyHeader (dOut, 'history')
-                inp.initVarsAsInput (' ') # ???
-                inp.copyLineVars (dOut)
-                dOut.write (preamble, data, flags)
-                i = i+1
-                print i
-                if i >= self.nbl:  # only need to read one integration
-                    break
-
-            dOut.close ()
+            shutil.rmtree(self.tempname, ignore_errors=True)
+            out = miriad.VisData(self.tempname)
+            dOut = out.open ('c')
+            self.flags0 = []
+            self.preamble0 = []
 
         # read data
         i = 0
         for inp, preamble, data, flags in vis.readLowlevel ('dsl3', False, nocal=nocal, nopass=nopass):
-
             # Loop to skip some data and read shifted data into original data arrays
+            if i == 0:
+                # get few general variables
+                self.nants0 = inp.getVarFirstInt ('nants', 0)
+                self.inttime0 = inp.getVarFirstFloat ('inttime', 10.0)
+                self.nspect0 = inp.getVarFirstInt ('nspect', 0)
+                self.nwide0 = inp.getVarFirstInt ('nwide', 0)
+                self.sdf0 = inp.getVarDouble ('sdf', self.nspect0)
+                self.nschan0 = inp.getVarInt ('nschan', self.nspect0)
+                self.ischan0 = inp.getVarInt ('ischan', self.nspect0)
+                self.sfreq0 = inp.getVarDouble ('sfreq', self.nspect0)
+                self.restfreq0 = inp.getVarDouble ('restfreq', self.nspect0)
+                self.pol0 = inp.getVarInt ('pol')
+
             if i < nskip:
                 i = i+1
                 continue 
-
-            # Reduce these arrays to the correct size
-#            data = data[0:nread]
-#            flags = flags[0:nread]
 
     # Decode the preamble
     #        u, v, w = preamble[0:3]
@@ -154,6 +122,38 @@ class poco:
             da = da[0:i-nskip]
             fl = fl[0:i-nskip]
             ti = ti[0:i-nskip]
+
+        # optionally make the template output visibility file
+        if self.maketemp:
+            k = 0
+            for inp, preamble, data, flags in vis.readLowlevel ('dsl3', False, nocal=True, nopass=True):
+                # set up output file
+                if k == 0:
+                    dOut.setPreambleType ('uvw', 'time', 'baseline')
+                    dOut.writeVarInt ('nants', self.nants0)
+                    dOut.writeVarFloat ('inttime', self.inttime0)
+                    dOut.writeVarInt ('nspect', self.nspect0)
+                    dOut.writeVarDouble ('sdf', self.sdf0)
+                    dOut.writeVarInt ('nwide', self.nwide0)
+                    dOut.writeVarInt ('nschan', self.nschan0)
+                    dOut.writeVarInt ('ischan', self.ischan0)
+                    dOut.writeVarDouble ('sfreq', self.sfreq0)
+                    dOut.writeVarDouble ('restfreq', self.restfreq0)
+                    dOut.writeVarInt ('pol', self.pol0)
+                    inp.copyHeader (dOut, 'history')
+                    inp.initVarsAsInput (' ') # ???
+                    inp.copyLineVars (dOut)
+
+                if k < self.nbl:
+                    (self.flags0).append(flags.copy())
+                    (self.preamble0).append(preamble.copy())
+#                    dOut.write (preamble, data, flags)
+                    print preamble
+                    k = k+1
+                elif k >= self.nbl:  # only need to read one integration
+                    break
+
+            dOut.close ()
 
         try:
             self.rawdata = da.reshape((i-nskip)/nbl,nbl,nchan)
@@ -356,7 +356,7 @@ class poco:
         return datadiffarr
 
 
-    def writetrack(self, dmbin, tbin, output='c', tshift=0, bgwindow=0, show=0):
+    def writetrack(self, dmbin, tbin, tshift=0, bgwindow=0, show=0):
         """Writes data from track out as miriad visibility file.
         Optional background subtraction bl-by-bl over bgwindow integrations. Note that this is bgwindow *dmtracks* so width is bgwindow+track width
         Optional spectrum plot with source and background dmtracks
@@ -398,17 +398,18 @@ class poco:
 
         # define input metadata source and output visibility file names
         outname = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl) + '-' + 'dm' + str(dmbin) + 't' + str(tbin) + '.mir'
+        inname = self.file
+        vis = miriad.VisData(inname)
 
         # option to have output vis file made before to save time
         if self.maketemp:
             shutil.copytree(self.tempname, outname)
-        else:
-            inname = self.file
-            vis = miriad.VisData(inname)
             out = miriad.VisData(outname)
-
+            dOut = out.open ('a')
+        else:
+            out = miriad.VisData(outname)
             # set up output file
-            dOut = out.open (output)
+            dOut = out.open ('c')
             dOut.setPreambleType ('uvw', 'time', 'baseline')
             dOut.writeVarInt ('nants', self.nants0)
             dOut.writeVarFloat ('inttime', self.inttime0)
@@ -459,6 +460,7 @@ class poco:
 #                ants = util.decodeBaseline (preamble[4])
 #                print preamble[3], ants
 
+                print preamble
                 dOut.write (preamble, data, flags)
                 i = i+1  # essentially a baseline*int number
 
@@ -477,53 +479,33 @@ class poco:
 
         # create bgsub data
         datadiffarr = self.tracksub(dmbin, tbin, bgwindow=bgwindow)
-        data = n.zeros(len(datadiffarr[0, 0]))  # default data array. gets overwritten.
-        data0 = n.zeros(len(datadiffarr[0, 0]))  # zero data array for flagged bls
+        data = n.zeros(self.nchan, dtype='complex64')  # default data array. gets overwritten.
+        data0 = n.zeros(self.nchan, dtype='complex64')  # zero data array for flagged bls
+        flags = n.zeros(self.nchan, dtype='bool')
 
-        # define input metadata source and output visibility file names
+        # define output visibility file names. assumes tempname file exists
         outname = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl) + '-' + 'dm' + str(dmbin) + 't' + str(tbin) + '.mir'
+        shutil.rmtree(outname, ignore_errors=True)
+        shutil.copytree(self.tempname, outname)
         out = miriad.VisData(outname)
+        dOut = out.open ('a')
 
-        dOut = out.open ('c')
-        dOut.setPreambleType ('uvw', 'time', 'baseline')
-
-        for i in range(len(self.preamble)):  # iterate over baselines
-            if i == 0:
-                nants = inp.getVarFirstInt ('nants', 0)
-                inttime = inp.getVarFirstFloat ('inttime', 10.0)
-                nspect = inp.getVarFirstInt ('nspect', 0)
-                nwide = inp.getVarFirstInt ('nwide', 0)
-                sdf = inp.getVarDouble ('sdf', nspect)
-                inp.copyHeader (dOut, 'history')
-                inp.initVarsAsInput (' ') # ???
-
-                dOut.writeVarInt ('nants', nants)
-                dOut.writeVarFloat ('inttime', inttime)
-                dOut.writeVarInt ('nspect', nspect)
-                dOut.writeVarDouble ('sdf', sdf)
-                dOut.writeVarInt ('nwide', nwide)
-                dOut.writeVarInt ('nschan', inp.getVarInt ('nschan', nspect))
-                dOut.writeVarInt ('ischan', inp.getVarInt ('ischan', nspect))
-                dOut.writeVarDouble ('sfreq', inp.getVarDouble ('sfreq', nspect))
-                dOut.writeVarDouble ('restfreq', inp.getVarDouble ('restfreq', nspect))
-                dOut.writeVarInt ('pol', inp.getVarInt ('pol'))
-                    
-                inp.copyLineVars (dOut)
-
+        l = 0
+        for i in range(len(self.flags0)):  # iterate over baselines
             # write out track, if not flagged
             if n.any(self.flags0[i]):
+                k = 0
                 for j in range(self.nchan):
                     if j in self.chans:
-                        data[j] = datadiffarr[0, i, j]
-                        flags[j] = self.flags0[0, i, j]
+                        data[j] = datadiffarr[0, l, k]
+                        flags[j] = self.flags0[i][j]
+                        k = k+1
                     else:
-                        data[j] = 0.
+                        data[j] = 0 + 0j
                         flags[j] = False
-            else:
-                data = data0
-                flags = self.flags0[i]
+                l = l+1
 
-            dOut.write (preamble, data, flags)
+            dOut.write (self.preamble0[i], data, self.flags0[i])
 
         dOut.close ()
         return 1
@@ -695,15 +677,19 @@ class poco:
         
         # set up
         outroot = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl) + '-dm' + str(dmbin) + 't' + str(t0bin)
-        removefile (outroot+'.map'); removefile (outroot+'.beam'); removefile (outroot+'.clean'); removefile (outroot+'.restor')
-        removefile (outroot + '.mir')
+        shutil.rmtree (outroot+'.map', ignore_errors=True); shutil.rmtree (outroot+'.beam', ignore_errors=True); shutil.rmtree (outroot+'.clean', ignore_errors=True); shutil.rmtree (outroot+'.restor', ignore_errors=True)
+        shutil.rmtree (outroot + '.mir', ignore_errors=True)
 
         # make dm trial and image
         dmtrack = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[t0bin-tshift])
 
         if len(dmtrack[0]) >= minintersect:               # ignore tiny, noise-dominated tracks
-            print
-            self.writetrack(dmbin, t0bin, 'c', tshift=tshift, bgwindow=bgwindow)   # output file at dmbin, trelbin
+            if self.maketemp:
+                self.writetrack2(dmbin, t0bin, tshift=tshift, bgwindow=bgwindow)   # output file at dmbin, trelbin
+#                self.writetrack(dmbin, t0bin, tshift=tshift, bgwindow=0)   # output file at dmbin, trelbin
+            else:
+                self.writetrack(dmbin, t0bin, tshift=tshift, bgwindow=bgwindow)   # output file at dmbin, trelbin
+#                self.writetrack(dmbin, t0bin, tshift=tshift, bgwindow=0)   # output file at dmbin, trelbin
 
             # make image, clean, restor, fit point source
             print
@@ -735,15 +721,15 @@ class poco:
 
                 print 'Fit peak %.2f +- %.2f' % (peak, epeak)
                 if clean:
-                    removefile (outroot + '.mir')
-                    removefile (outroot+'.map'); removefile (outroot+'.beam'); removefile (outroot+'.clean'); removefile (outroot+'.restor')
+                    shutil.rmtree (outroot + '.mir', ignore_errors=True)
+                    shutil.rmtree (outroot+'.map', ignore_errors=True); shutil.rmtree (outroot+'.beam', ignore_errors=True); shutil.rmtree (outroot+'.clean', ignore_errors=True); shutil.rmtree (outroot+'.restor', ignore_errors=True)
                 return peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
             except:
                 print
                 print 'Something broke in/after imfit!'
                 if clean:
-                    removefile (outroot + '.mir')
-                    removefile (outroot+'.map'); removefile (outroot+'.beam'); removefile (outroot+'.clean'); removefile (outroot+'.restor')
+                    shutil.rmtree (outroot + '.mir', ignore_errors=True)
+                    shutil.rmtree (outroot+'.map', ignore_errors=True); shutil.rmtree (outroot+'.beam', ignore_errors=True); shutil.rmtree (outroot+'.clean', ignore_errors=True); shutil.rmtree (outroot+'.restor', ignore_errors=True); shutil.rmtree(pv.tempname, ignore_errors=True)
 
 
     def uvfitdmt0(self, dmbin, t0bin, tshift=0, show=1):
@@ -755,8 +741,8 @@ class poco:
         
         # set up
         outroot = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl) + '-dm' + str(dmbin) + 't' + str(t0bin)
-        removefile (outroot+'.map'); removefile (outroot+'.beam'); removefile (outroot+'.clean'); removefile (outroot+'.restor')
-        removefile (outroot + '.mir')
+        shutil.rmtree (outroot+'.map', ignore_errors=True); shutil.rmtree (outroot+'.beam', ignore_errors=True); shutil.rmtree (outroot+'.clean', ignore_errors=True); shutil.rmtree (outroot+'.restor', ignore_errors=True)
+        shutil.rmtree (outroot + '.mir', ignore_errors=True)
 
         # make dm trial and image
         dmtrack = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[t0bin-tshift])
@@ -783,12 +769,12 @@ class poco:
                 eoff_dec = float(txt[0][10][42:])
 
                 print 'Fit peak %.2f +- %.2f' % (peak, epeak)
-                removefile (outroot + '.mir')
+                shutil.rmtree (outroot + '.mir', ignore_errors=True)
                 return peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
             except:
                 print
                 print 'Something broke in/after uvfit!'
-                removefile (outroot + '.mir')
+                shutil.rmtree (outroot + '.mir', ignore_errors=True)
 
 
     def normalreim(self, prob=2.3e-4, bgwindow=0):
@@ -818,7 +804,7 @@ class poco:
                         pv2.prep()
                         length = pv2.data.shape[1] * pv2.data.shape[2]
                         da = (pv2.data[0]).reshape((1,length))[0]
-                        removefile(newfile)
+                        shutil.rmtree(newfile, ignore_errors=True)
                         dmt0arr[i,j] = min(morestats.shapiro(da.real)[1], morestats.shapiro(da.imag)[1])
                 else:
                     datadiff = self.tracksub(i, j, bgwindow=bgwindow)
@@ -983,16 +969,6 @@ class poco:
             print 'dedispersed for ', dmarr[i]
 
         self.dmt0arr = dmt0arr
-
-
-def removefile (file):
-    """ Shortcut to remove a miriad file.
-    """
-    if not os.path.exists(file): return
-
-    for e in os.listdir (file):
-        os.remove (join (file, e))
-    os.rmdir (file)
 
 
 def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000, edge=0):
@@ -1182,7 +1158,7 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
 
             # dedisperse
             for i in range(len(pv.dmarr)):
-                for j in range(1240,1250):
+                for j in range(1244,1245):
 #                for j in range(len(pv.reltime)):
                     try: 
                         peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = pv.imagedmt0(i,j, show=show, bgwindow=bgwindow, clean=1)
@@ -1196,6 +1172,9 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
                             pklout.close()
                     except:
                         continue
+            if pv.maketemp:
+                shutil.rmtree(pv.tempname, ignore_errors=True)
+
         fileout.close
 
 
@@ -1238,6 +1217,9 @@ def pulse_search_uvfit(fileroot, pathin, pathout, nints=12000, sig=5.0, show=1, 
                             pklout.close()
                     except:
                         continue
+
+            if pv.maketemp:
+                shutil.rmtree(pv.tempname, ignore_errors=True)
         fileout.close
 
 
@@ -1297,14 +1279,14 @@ def process_pickle(filename, pathin, mode='image'):
 #                pvbg.prep()
 #                obsrms = n.abs(pvbg.data.mean(axis=1)[0]).std()
 #                print 'obsrms first try:', obsrms
-#                removefile(bgname)
+#                shutil.rmtree(bgname, ignore_errors=True)
 #               newfile = string.join(pv.file.split('.')[:-1]) + '.' + str(pv.nskip/pv.nbl) + '-' + 'dm' + str(dmbinarr[peaktrial]) + 't' + str(bgwindow) + '.mir'
                 newfile = string.join(pv.file.split('.')[:-1]) + '.' + str(pv.nskip/pv.nbl) + '-' + 'dm' + str(dmbinarr[peaktrial]) + 't' + str(tbinarr[peaktrial]) + '.mir'
                 print 'Loading file', newfile
                 pv2 = poco(newfile, nints=1)
                 pv2.prep()
                 pv2.fitspec(obsrms=0, save=0)
-                removefile(newfile)
+                shutil.rmtree(newfile, ignore_errors=True)
         elif mode == 'dmt0':
             pv.makedmt0()
             peaks, peakssig = pv.peakdmt0()
@@ -1329,6 +1311,8 @@ def process_pickle(filename, pathin, mode='image'):
         print 'No significant detection.  Moving on...'
 
     file.close()
+    if pv.maketemp:
+        shutil.rmtree(pv.tempname, ignore_errors=True)
 
 
 if __name__ == '__main__':
@@ -1351,6 +1335,7 @@ if __name__ == '__main__':
         # if no args, search for pulses
         print 'Searching for pulses...'
         try:
+#            cProfile.run('pulse_search_image(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)')
             pulse_search_image(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)
 #            pulse_search_phasecenter(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)
 #            pulse_search_reim(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)
