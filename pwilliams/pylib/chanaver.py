@@ -113,6 +113,11 @@ class InputStructureError (Exception):
         return 'Cannot handle input dataset %s: %s' % (self.vis, self.why)
 
 
+class _CreateFailedError (Exception):
+    def __init__ (self, subexc):
+        self.subexc = subexc
+
+
 def channelAverage (out, naver, slop=DEFAULT_SLOP, banner=DEFAULT_BANNER):
     if naver < 1:
         raise ValueError ('must average at least one channel (got naver=%d)' % naver)
@@ -121,7 +126,10 @@ def channelAverage (out, naver, slop=DEFAULT_SLOP, banner=DEFAULT_BANNER):
 
     try:
         _channelAverage (uvdat.read (), out, naver, slop, banner)
-    except:
+    except _CreateFailedError, e:
+        # Don't delete the existing dataset!
+        raise e.subexc
+    except Exception:
         out.delete ()
         raise
 
@@ -136,7 +144,10 @@ def channelAverageWithSetup (toread, out, naver, slop=DEFAULT_SLOP,
     try:
         gen = uvdat.setupAndRead (toread, UVDAT_OPTIONS, False, **uvdargs)
         _channelAverage (gen, out, naver, slop, banner)
-    except:
+    except _CreateFailedError, e:
+        # Don't delete the existing dataset!
+        raise e.subexc
+    except Exception:
         out.delete ()
         raise
 
@@ -151,7 +162,10 @@ def _channelAverage (gen, out, naver, slop, banner):
     prevnpol = 0
     npolvaried = False
 
-    outhnd = out.open ('c')
+    try:
+        outhnd = out.open ('c')
+    except Exception, e:
+        raise _CreateFailedError (e)
     outhnd.setPreambleType ('uvw', 'time', 'baseline')
 
     for vishnd, preamble, data, flags in gen:
