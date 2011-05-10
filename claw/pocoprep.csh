@@ -13,6 +13,7 @@ if ( ${doflag} == 1) then
     # standard flagging for poco july 2010 run
     uvflag vis=${name} flagval=f select='ant(4,7,8)'
     uvflag vis=${name} flagval=f select='ant(3)(5)'
+    uvflag vis=${name} flagval=f select='auto'
     uvflag vis=${name} flagval=f line=ch,3,1
     uvflag vis=${name} flagval=f line=ch,1,11
     uvflag vis=${name} flagval=f line=ch,14,24
