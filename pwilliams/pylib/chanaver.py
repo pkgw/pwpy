@@ -283,12 +283,11 @@ def _channelAverage (gen, out, naver, slop, banner):
 
 try:
     from awff import SimpleMake
+    from arf.visutil import propagateHeaders
 except ImportError:
     pass
 else:
     __all__ += ['asMake']
-
-    # FIXME: make the propagation a library routine
 
     def _asmake (context, vis=None, params=None):
         params = dict (params) # copy so we don't modify:
@@ -299,29 +298,7 @@ else:
         out.delete ()
 
         channelAverageWithSetup (vis, out, naver, **params)
-
-        ihandle = vis.open ('rw')
-        ohandle = out.open ('rw')
-
-        if ihandle.hasItem ('arfinstr'):
-            instr = ihandle.getHeaderString ('arfinstr', 'uhoh')
-            ohandle.writeHeaderString ('arfinstr', instr)
-
-        if ihandle.hasItem ('arfvbds'):
-            a = ihandle.getArrayHeader ('arfvbds')
-            ohandle.writeArrayHeaderDouble ('arfvbds', a)
-
-        if ihandle.hasItem ('source'):
-            source = ihandle.getHeaderString ('source', 'uhoh')
-            ohandle.writeHeaderString ('source', source)
-
-        if ihandle.hasItem ('freq'):
-            freq = ihandle.getHeaderDouble ('freq', 0.)
-            ohandle.writeHeaderDouble ('freq', freq)
-
-        ihandle.close ()
-        ohandle.close ()
-
+        propagateHeaders (vis, out)
         return out
 
     asMake = SimpleMake ('vis params', 'out', _asmake,
