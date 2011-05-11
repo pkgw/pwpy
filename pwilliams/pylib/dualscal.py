@@ -49,7 +49,7 @@ __version_info__ = (1, 0)
 __all__ = 'dualSelfCal task'.split ()
 
 
-def dualSelfCal (vis, out, usemself=False, ttol=DEFAULT_TTOL, 
+def dualSelfCal (vis, out, usemself=False, ttol=DEFAULT_TTOL, outexists=False,
                  serial=False, select='', banner='PYTHON dualSelfCal', **kwargs):
     vis = ensureiterable (vis)
 
@@ -76,7 +76,10 @@ def dualSelfCal (vis, out, usemself=False, ttol=DEFAULT_TTOL,
                       'one visibility input specified')
         dest = vis[0].open ('rw')
     else:
-        dest = out.open ('c')
+        if outexists:
+            dest = out.open ('rw')
+        else:
+            dest = out.open ('c')
         src1 = vis[0].open ('rw')
         src1.copyHeader (dest, 'history')
         src1.close ()
@@ -121,26 +124,28 @@ def dualSelfCal (vis, out, usemself=False, ttol=DEFAULT_TTOL,
 
 try:
     from awff import SimpleMake
-    from arf import calinfo
+    from arf import calinfo, visutil
     from arf.workflow.vis import getSource, getFreq
 except:
     pass
 else:
     def _dualscal (context, vis=None, params=None, fluxtable=None):
         context.ensureParent ()
-        out = CalData (context.fullpath ())
+        out = VisData (context.fullpath ())
 
         if fluxtable is not '':
-            src = getSource (vis)
-            mhz = int (1000 * getFreq (vis))
-            if src is None or mhz is None:
-                raise Exception ('cannot retrieve source/freq info '
-                                 'for flux table lookup')
             params = dict (params)
-            params['flux'] = calinfo.getFlux (str (fluxtable), src, mhz, None)
+            params['flux'] = visutil.lookupFlux (str (fluxtable), vis)
 
         out.delete ()
-        dualSelfCal (vis, out, **params)
+        vis.lwcpTo (out)
+
+        try:
+            dualSelfCal (vis, out, outexists=True, **params)
+        except Exception:
+            out.delete ()
+            raise
+
         return out
 
     asMake = SimpleMake ('vis params fluxtable', 'out', _dualscal,
