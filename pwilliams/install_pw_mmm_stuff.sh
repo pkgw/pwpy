@@ -58,6 +58,7 @@ fancy/dualscal
 fancy/fxcal.py
 fancy/gpcat
 fancy/gpmergepols
+fancy/gptext
 fancy/gpunity
 fancy/mdl-makeimage
 fancy/multiflag2
@@ -84,6 +85,7 @@ pylib/chanaver.py
 pylib/closanal.py
 pylib/dualscal.py
 pylib/gpmergepols.py
+pylib/gptext.py
 pylib/hhaa.dat
 pylib/multiflag.py
 pylib/multiflag2.py
