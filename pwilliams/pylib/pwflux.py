@@ -54,6 +54,11 @@
 @ textapp
  Flux information is appended to the specified textual file in a
  tabular format. FIXME specify it.
+
+@ options
+ Minimum-match is used.
+
+ 'plot' Make a quick plot of the flux values (requires "omega")
 --
 
 FIXME: assuming a single source per UV data file!
@@ -62,7 +67,7 @@ FIXME: compute weighted center times / time bounds via inttime, etc
 """
 
 import sys, numpy as N, miriad
-from mirtask import keys, uvdat, util
+from mirtask import keys, uvdat, util, cliutil
 
 SVNID = '$Id$'
 __all__ = ['Fluxer']
@@ -111,7 +116,6 @@ class Fluxer (object):
         sdf = inp.getVarDouble ('sdf')
         sfreq = inp.getVarDouble ('sfreq')
         self.phscale = 1 + N.arange (nchan) * sdf / sfreq
-
 
     def process (self):
         byPol = {}
@@ -194,12 +198,14 @@ class Fluxer (object):
 
 
 class TabularAppender (object):
-    def __init__ (self, f):
+    def __init__ (self, f, prevonflush):
         assert f is not None
         self.f = f
+        self.prevonflush = prevonflush
 
+    def onFlush (self, tMin, tMax, poldata):
+        self.prevonflush (tMin, tMax, poldata)
 
-    def append (self, tMin, tMax, poldata):
         tCenter = 0.5 * (tMin + tMax)
         dur = tMax - tMin
 
@@ -217,11 +223,41 @@ class TabularAppender (object):
         uncert = 1 / N.sqrt (tweight)
 
         print >>self.f, '%.8f\t%.8f\t%.8f\t%.8f' % (tCenter, dur, real, uncert)
-            
 
-    def appendAndPrint (self, tmin, tmax, poldata):
-        flushPrint (tmin, tmax, poldata)
-        self.append (tmin, tmax, poldata)
+
+class PlotAccumulator (object):
+    def __init__ (self, prevonflush):
+        self.prevonflush = prevonflush
+        self.times = []
+        self.amps = {}
+        self.ampus = {}
+
+    def onFlush (self, tMin, tMax, poldata):
+        self.prevonflush (tMin, tMax, poldata)
+
+        tCenter = 0.5 * (tMin + tMax)
+        self.times.append (tCenter)
+
+        for pol, data in poldata.iteritems ():
+            mreal, mimag, amp, u, phdeg, uphdeg, count = data
+            self.amps.setdefault (pol, []).append (amp)
+            self.ampus.setdefault (pol, []).append (u)
+
+
+    def plot (self):
+        import omega as O
+
+        p = O.RectPlot ()
+        dt = (N.asarray (self.times) - self.times[0]) * 24.
+        print 'Base time is', util.jdToFull (self.times[0])
+
+        for pol, amps in self.amps.iteritems ():
+            us = self.ampus[pol]
+            p.addXYErr (dt, amps, us, util.polarizationName (pol), lines=False)
+
+        #p.setBounds (ymin=0)
+        p.setLabels ('Relative Time (hr)', 'Flux Density (Jy)')
+        return p
 
 
 # Task
@@ -248,6 +284,7 @@ def task (args=None):
     ks.keyword ('interval', 'd', 1)
     ks.mkeyword ('offset', 'd', 2)
     ks.keyword ('textapp', 'f', ' ')
+    ks.option ('plot')
     ks.uvdat ('dsl3w', True)
     opts = ks.process (args)
 
@@ -265,16 +302,30 @@ def task (args=None):
         print >>sys.stderr, ('Error: zero or two values must be specified for source offset;'
                              ' got'), opts.offset
         return 1
-    
+
+    if opts.plot:
+        try:
+            import omega
+        except ImportError:
+            util.die ('cannot import Python module "omega" for plotting')
+
     f = Fluxer (interval, offset)
+    onflush = flushPrint
 
-    if opts.textapp == ' ':
-        f.onFlush (flushPrint)
-    else:
-        appobj = TabularAppender (file (opts.textapp, 'a'))
-        f.onFlush (appobj.appendAndPrint )
+    if opts.textapp != ' ':
+        appobj = TabularAppender (file (opts.textapp, 'a'), onflush)
+        onflush = appobj.onFlush
 
+    if opts.plot:
+        plotacc = PlotAccumulator (onflush)
+        onflush = plotacc.onFlush
+
+    f.onFlush (onflush)
     f.process ()
+
+    if opts.plot:
+        plotacc.plot ().show ()
+
     return 0
 
 
