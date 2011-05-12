@@ -91,7 +91,7 @@
 """
 
 import numpy as N
-from miriad import VisData
+from miriad import VisData, ensureiterable
 from mirtask import keys, util, uvdat
 
 
@@ -102,7 +102,7 @@ __version_info__ = (1, 0)
 SVNID = '$Id$'
 DEFAULT_SLOP = 0.5
 DEFAULT_BANNER = 'PYTHON chanaver - channel average after applying bandpass'
-UVDAT_OPTIONS = 'dslr3'
+UVDAT_OPTIONS = '3'
 
 
 class InputStructureError (Exception):
@@ -118,14 +118,15 @@ class _CreateFailedError (Exception):
         self.subexc = subexc
 
 
-def channelAverage (out, naver, slop=DEFAULT_SLOP, banner=DEFAULT_BANNER):
+def channelAverage (out, naver, slop=DEFAULT_SLOP, banner=DEFAULT_BANNER,
+                    args=['undefined']):
     if naver < 1:
         raise ValueError ('must average at least one channel (got naver=%d)' % naver)
     if slop < 0 or slop > 1:
         raise ValueError ('slop must be between 0 and 1 (got slop=%f)' % slop)
 
     try:
-        _channelAverage (uvdat.read (), out, naver, slop, banner)
+        _channelAverage (uvdat.read (), out, naver, slop, banner, args)
     except _CreateFailedError, e:
         # Don't delete the existing dataset!
         raise e.subexc
@@ -143,7 +144,9 @@ def channelAverageWithSetup (toread, out, naver, slop=DEFAULT_SLOP,
 
     try:
         gen = uvdat.setupAndRead (toread, UVDAT_OPTIONS, False, **uvdargs)
-        _channelAverage (gen, out, naver, slop, banner)
+        args = ['vis=' + ','.join (str (x) for x in ensureiterable (toread))]
+        args += ['%s=%s' % (k, uvdargs[k]) for k in sorted (uvdargs.iterkeys ())]
+        _channelAverage (gen, out, naver, slop, banner, args)
     except _CreateFailedError, e:
         # Don't delete the existing dataset!
         raise e.subexc
@@ -152,7 +155,7 @@ def channelAverageWithSetup (toread, out, naver, slop=DEFAULT_SLOP,
         raise
 
 
-def _channelAverage (gen, out, naver, slop, banner):
+def _channelAverage (gen, out, naver, slop, banner, args):
     from numpy import sum, greater_equal, maximum
 
     nmin = max (int (round (slop * naver)), 1)
@@ -181,7 +184,7 @@ def _channelAverage (gen, out, naver, slop, banner):
             vishnd.copyHeader (outhnd, 'history')
             outhnd.openHistory ()
             outhnd.writeHistory (banner)
-            outhnd.logInvocation ('PYTHON chanaver')
+            outhnd.logInvocation ('PYTHON chanaver', ['chanaver'] + args)
             outhnd.writeHistory ('PYTHON chanaver: naver=%d slop=%f' % (naver, slop))
             outhnd.closeHistory ()
 
@@ -315,7 +318,7 @@ def task (args):
     ks.keyword ('out', 'f', ' ')
     ks.keyword ('naver', 'i', -1)
     ks.keyword ('slop', 'd', DEFAULT_SLOP)
-    ks.uvdat (UVDAT_OPTIONS)
+    ks.uvdat (UVDAT_OPTIONS + 'dslr')
     opts = ks.process (args)
 
     if opts.out == ' ':
@@ -326,7 +329,7 @@ def task (args):
         util.die ('must specify the number of channels to average (naver=...)')
 
     try:
-        channelAverage (out, opts.naver, opts.slop, banner)
+        channelAverage (out, opts.naver, opts.slop, banner, args)
     except (InputStructureError, ValueError), e:
         util.die (str (e))
 
