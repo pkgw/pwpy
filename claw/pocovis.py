@@ -689,9 +689,10 @@ class poco:
             shutil.rmtree (outroot + '.mir', ignore_errors=True)
 
 
-    def uvfitdmt02 (self, dmbin, t0bin, bgwindow=10, tshift=0, show=1):
+    def uvfitdmt02 (self, dmbin, t0bin, bgwindow=10, tshift=0, show=1, mode='default'):
         """Alternative function to do uvfitting of visibilities.
         Reads in data from dispersion track, then fits uv model of point source in python.
+        mode defines the optimization approach.
         """
 
         datadiffarr = self.tracksub(dmbin, t0bin, bgwindow=bgwindow)
@@ -722,16 +723,78 @@ class poco:
         print
         print 'UVfit2 for nskip=%d, dm[%d] = %.1f, and trel[%d] = %.3f.' % (self.nskip/self.nbl, dmbin, self.dmarr[dmbin], t0bin-tshift, self.reltime[t0bin-tshift])
 
-        vi = lambda a, l, m, u, v, w: a * n.exp(-2j * n.pi * (u*l + v*m ))   # + w*(1 - l**2 - m**2)))  # ignoring w term
+        vi = lambda a, l, m, u, v, w: a * n.exp(-2j * n.pi * (u*l + v*m)) # + w*n.sqrt(1 - l**2 - m**2)))  # ignoring w term
         def errfunc (p, u, v, w, y):
             a, l, m = p
             err = y - vi(a, l, m, u, v, w)
             return err.real + err.imag
 
-        p0 = [100.,0.,0.]
-        p1, success = opt.leastsq(errfunc, p0, args = (u, v, w, data))
-        print 'Fit results (Jy, arcsec, arcsec):', p1[0], n.arcsin(p1[1]) * 180/n.pi * 3600, n.arcsin(p1[2]) * 180/n.pi * 3600
-        print 'Change in sumsq: %.2f to %.2f' % (n.sum(errfunc(p0, u, v, w, data)**2), n.sum(errfunc(p1, u, v, w, data)**2))
+        def ltoa (l):
+            a = n.arcsin(l) * 180 / n.pi * 3600
+            return a
+
+        if mode == 'default':
+            p0 = [100.,0.,0.]
+            out = opt.leastsq(errfunc, p0, args = (u, v, w, data), full_output=1)
+            p1 = out[0]
+            covar = out[1]
+            print 'Fit results (Jy, arcsec, arcsec):', p1[0], ltoa(p1[1]), ltoa(p1[2])
+            print 'Change in sumsq: %.2f to %.2f' % (n.sum(errfunc(p0, u, v, w, data)**2), n.sum(errfunc(p1, u, v, w, data)**2))
+
+            print 'here\'s some stuff...'
+            print covar
+            print n.sqrt(covar[0][0])
+            print n.sqrt(covar[1][1])
+        elif mode == 'map':
+            p0 = [100.,0.,0.]
+            out = opt.leastsq(errfunc, p0, args = (u, v, w, data), full_output=1)
+            p1 = out[0]
+            covar = out[1]
+
+            llen = 150
+            mlen = 150
+            sumsq = n.zeros((llen, mlen))
+            linspl = n.linspace(-0.01,0.01,llen)   # dl=0.026 => 1.5 deg (half ra width of andromeda)
+            linspm = n.linspace(-0.01,0.01,mlen)   # dl=0.01 => 0.57 deg (half dec width of andromeda)
+            for i in range(llen):
+                for j in range(mlen):
+                    sumsq[i, j] = n.sum(errfunc([p1[0], linspl[i], linspm[j]], u, v, w, data)**2)
+
+            mins = n.where(sumsq < 1.01 * sumsq.min())
+            print mins, sumsq[mins]
+            print ltoa(linspl[mins[0]])
+            print ltoa(linspm[mins[1]])
+            p.plot(mins[1], mins[0],'w.')
+            p.imshow(sumsq)
+            p.colorbar()
+        elif mode == 'grid':
+            llen = 10
+            mlen = 100
+            sumsq = n.zeros((llen, mlen))
+            linspl = n.linspace(-0.01,0.01,llen)   # dl=0.026 => 1.5 deg (half ra width of andromeda)
+            linspm = n.linspace(0.026,0.026,mlen)   # dl=0.01 => 0.57 deg (half dec width of andromeda)
+            p0 = [100.,0.,0.]
+            
+            sumsq = n.sum(errfunc(p0, u, v, w, data)**2)
+            for i in range(llen):
+                
+                for j in range(mlen):
+                    out = opt.leastsq(errfunc, [p0[0], linspl[i], linspm[j]], args = (u, v, w, data), full_output=1)
+                    sumsqnew = n.sum(errfunc(out[0], u, v, w, data)**2)
+                    if sumsqnew < sumsq:
+                        print 'for (%d, %d), sumsq went from %.1f to %.1f' % (i, j, sumsq, sumsqnew)
+                        sumsq = sumsqnew.copy()
+                        p1 = out[0]
+                        covar = out[1]
+
+            print 'Fit results (Jy, arcsec, arcsec):', p1[0], ltoa(p1[1]), ltoa(p1[2])
+            print 'Change in sumsq: %.2f to %.2f' % (n.sum(errfunc(p0, u, v, w, data)**2), n.sum(errfunc(p1, u, v, w, data)**2))
+
+            print 'here\'s some stuff...'
+            print covar
+            print n.sqrt(covar[0][0])
+            print n.sqrt(covar[1][1])
+
 
 #        return peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
 
@@ -1190,7 +1253,7 @@ def pulse_search_uvfit(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
         fileout = open(pathout + string.join(file.split('.')[:-1]) + '.txt', 'a')
 
         for nskip in [0]:
-#        for nskip in range(0, maxints-(nints-edge), nints-edge):
+#        for nskip in range(1965, maxints-(nints-edge), nints-edge):
             print 'Starting file %s with nskip %d' % (file, nskip)
 
             # load data

@@ -3,7 +3,7 @@
 ## BE SURE TO SET DESTINATION IN GOTO AFTER FLAGGING ##
 
 set name = $argv[1]
-set doflag = 0
+set doflag = 1
 
 # calibrators prepared with delay correction
 set cal3c147 = data/poco_3c147b0329_171818_del.mir   # one solution
@@ -23,7 +23,7 @@ if ( ${doflag} == 1) then
 endif
 
 ## SET DESTINATION ##
-goto m31
+goto end
 ## SET DESTINATION ##
 
 # for crab
