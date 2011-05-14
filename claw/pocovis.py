@@ -41,11 +41,11 @@ class poco:
         self.sdf = 0.104/self.nchan   # dfreq per channel in GHz
         self.approxuvw = True      # flag to make template visibility file to speed up writing of dm track data
         self.baseline_order = n.array([ 257, 258, 514, 261, 517, 1285, 262, 518, 1286, 1542, 259, 515, 773, 774, 771, 516, 1029, 1030, 772, 1028, 1287, 1543, 775, 1031, 1799, 1544, 776, 1032, 1800, 2056, 260, 263, 264, 519, 520, 1288])   # second iteration of bl nums
-        self.pulsewidth = 0.0066 * n.ones(len(self.chans)) # pulse width of b0329+54
-#        self.pulsewidth = 0 * n.ones(len(self.chans)) # pulse width of crab
+#        self.pulsewidth = 0.0066 * n.ones(len(self.chans)) # pulse width of b0329+54
+        self.pulsewidth = 0 * n.ones(len(self.chans)) # pulse width of crab
         # set dmarr
-        self.dmarr = [26.8]  # b0329+54
-#        self.dmarr = [56.8]  # crab
+#        self.dmarr = [26.8]  # b0329+54
+        self.dmarr = [56.8]  # crab
 #        self.dmarr = n.arange(53,131,3.1)       # dm trials for m31. spacing set for 50% efficiency for band from 722-796 MHz, 1.2 ms integrations
 #        self.tshift = 0.2     # not implemented yet
         self.nskip = int(nskip*self.nbl)    # number of iterations to skip (for reading in different parts of buffer)
@@ -146,15 +146,16 @@ class poco:
         reltime = self.reltime
 
         mean = self.dataph.mean()
-        std = self.dataph.std()
+#        std = self.dataph.std()
         abs = (self.dataph - mean)/std
-#        abs = self.dataph
+        abs = self.dataph
         print 'Data mean, std: %f, %f' % (mean, std)
 
         p.figure(1)
         ax = p.imshow(n.rot90(abs), aspect='auto', origin='upper', interpolation='nearest', extent=(min(reltime),max(reltime),0,len(chans)))
 #        ax = p.imshow(n.rot90(abs), aspect='auto', origin='upper', interpolation='nearest', extent=(min(reltime),max(reltime),min(chans),max(chans)))
         p.colorbar(ax)
+        p.yticks(n.arange(0,len(self.chans),4), (self.chans[(n.arange(0,len(self.chans), 4))]))
         p.xlabel('Relative time (s)')
         p.ylabel('Channel (flagged data removed)')
         if save:
@@ -312,7 +313,6 @@ class poco:
         """Writes data from track out as miriad visibility file.
         Optional background subtraction bl-by-bl over bgwindow integrations. Note that this is bgwindow *dmtracks* so width is bgwindow+track width
         Optional spectrum plot with source and background dmtracks
-        Output parameter says whether to 'c'reate a new file or 'a'ppend to existing one. **not tested**
         """
 
         # prep data and track
@@ -407,7 +407,8 @@ class poco:
 #                ants = util.decodeBaseline (preamble[4])
 #                print preamble[3], ants
 
-                dOut.write (self.preamble[i], data, flags)
+#                dOut.write (self.preamble[i], data, flags)   # not working right here...?
+                dOut.write (preamble, data, flags)
                 i = i+1  # essentially a baseline*int number
 
             elif i >= int0 + self.nbl:
@@ -596,7 +597,7 @@ class poco:
         return self.peaks,arr[self.peaks]
 
 
-    def imagedmt0(self, dmbin, t0bin, tshift=0, bgwindow=10, show=0, clean=1):
+    def imagedmt0(self, dmbin, t0bin, tshift=0, bgwindow=10, show=0, clean=1, mode='dirty'):
         """ Makes and fits an background subtracted image for a given dmbin and t0bin.
         tshift can shift the actual t0bin earlier to allow reading small chunks of data relative to pickle.
         """
@@ -620,33 +621,40 @@ class poco:
             print 'Making dirty image for nskip=%d, dm[%d]=%.1f, and trel[%d] = %.3f.' % (self.nskip/self.nbl, dmbin, self.dmarr[dmbin], t0bin-tshift, self.reltime[t0bin-tshift])
             txt = TaskInvert (vis=outroot+'.mir', map=outroot+'.map', beam=outroot+'.beam', mfs=True, double=True, cell=80, imsize=250).snarf()  # sensitivity drops for larger vals...
             if show:  txt = TaskCgDisp (in_=outroot+'.map', device='/xs', wedge=True, beambl=True).snarf () 
-            txt = TaskImStat (in_=outroot+'.map').snarf()
-            # get noise level in image
-            thresh = 2*float(txt[0][10][41:47])    # hack! OMG!!
-            txt = TaskClean (beam=outroot+'.beam', map=outroot+'.map', out=outroot+'.clean', cutoff=thresh).snarf () 
-            print 'Cleaned to %.2f Jy after %d iterations' % (thresh, int(txt[0][-4][19:]))
-            txt = TaskRestore (beam=outroot+'.beam', map=outroot+'.map', model=outroot+'.clean', out=outroot+'.restor').snarf () 
-            if show:  txt = TaskCgDisp (in_=outroot+'.restor', device='/xs', wedge=True, beambl=True).snarf () 
-            txt = TaskImFit (in_=outroot+'.restor', object='point').snarf () 
+            txt = TaskImStat (in_=outroot+'.map').snarf()   # get dirty image stats
 
-            # parse output of imfit
-            # print '012345678901234567890123456789012345678901234567890123456789'
-            peak = float(txt[0][14][30:36])
-            epeak = float(txt[0][14][44:])
-            off_ra = float(txt[0][15][28:39])
-            eoff_ra = float(txt[0][16][30:39])
-            off_dec = float(txt[0][15][40:])
-            eoff_dec = float(txt[0][16][40:])
-            print 'Fit peak %.2f +- %.2f' % (peak, epeak)
+            if mode == 'clean':
+#                print 'cleaning image'
+                thresh = 2*float(txt[0][10][41:47])       # set thresh to 2*noise level in dirty image. hack! OMG!!
+                txt = TaskClean (beam=outroot+'.beam', map=outroot+'.map', out=outroot+'.clean', cutoff=thresh).snarf () 
+                print 'Cleaned to %.2f Jy after %d iterations' % (thresh, int(txt[0][-4][19:]))
+                txt = TaskRestore (beam=outroot+'.beam', map=outroot+'.map', model=outroot+'.clean', out=outroot+'.restor').snarf () 
+                if show:  txt = TaskCgDisp (in_=outroot+'.restor', device='/xs', wedge=True, beambl=True).snarf () 
+                txt = TaskImFit (in_=outroot+'.restor', object='point').snarf () 
+
+                # parse output of imfit
+                # print '012345678901234567890123456789012345678901234567890123456789'
+                peak = float(txt[0][14][30:36])
+                epeak = float(txt[0][14][44:])
+                off_ra = float(txt[0][15][28:39])
+                eoff_ra = float(txt[0][16][30:39])
+                off_dec = float(txt[0][15][40:])
+                eoff_dec = float(txt[0][16][40:])
+                print 'Fit cleaned image peak %.2f +- %.2f' % (peak, epeak)
+                return peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
+            elif mode == 'dirty':
+#                print 'stats of dirty image'
+                peak = float(txt[0][10][50:57])       # get peak of dirty image
+                epeak = float(txt[0][10][41:47])       # note that epeak is biased by any true flux
+                print 'Individual dirty image peak %.2f +- %.2f' % (peak, epeak)
+                return peak, epeak
         except:
-            print 'Something broke in/after imfit!'
+            print 'Something broke with imaging!'
             return 0
         finally:
             if clean:
                 shutil.rmtree (outroot + '.mir', ignore_errors=True)
                 shutil.rmtree (outroot+'.map', ignore_errors=True); shutil.rmtree (outroot+'.beam', ignore_errors=True); shutil.rmtree (outroot+'.clean', ignore_errors=True); shutil.rmtree (outroot+'.restor', ignore_errors=True)
-
-        return peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
 
 
     def uvfitdmt0(self, dmbin, t0bin, bgwindow=10, tshift=0, show=1):
@@ -690,7 +698,7 @@ class poco:
 
 
     def uvfitdmt02 (self, dmbin, t0bin, bgwindow=10, tshift=0, show=1, mode='default'):
-        """Alternative function to do uvfitting of visibilities.
+        """Experimental alternative function to do uvfitting of visibilities.
         Reads in data from dispersion track, then fits uv model of point source in python.
         mode defines the optimization approach.
         """
@@ -767,7 +775,7 @@ class poco:
             p.plot(mins[1], mins[0],'w.')
             p.imshow(sumsq)
             p.colorbar()
-        elif mode == 'grid':
+        elif mode == 'lsgrid':
             llen = 10
             mlen = 100
             sumsq = n.zeros((llen, mlen))
@@ -794,7 +802,9 @@ class poco:
             print covar
             print n.sqrt(covar[0][0])
             print n.sqrt(covar[1][1])
-
+        elif mode == 'anneal':
+            # ?
+            pass
 
 #        return peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
 
@@ -1133,7 +1143,7 @@ def pulse_search_reim(fileroot, pathin, pathout, nints=10000, edge=0):
         fileout.close
 
 
-def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, edge=0):
+def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, edge=0, mode='dirty'):
     """
     Searches for pulses by imaging dedispersed trials.
     """
@@ -1173,13 +1183,13 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
 
 # hack to search single file for pulses
     filelist = [fileroot]
-        
+
     print 'Looping over filelist: ', filelist
     for file in filelist:
         fileout = open(pathout + string.join(file.split('.')[:-1]) + '.txt', 'a')
 
-        for nskip in [0]:
-#        for nskip in range(0, maxints-(nints-edge), nints-edge):
+#        for nskip in [0]:
+        for nskip in range(0, maxints-(nints-edge), nints-edge):
             print 'Starting file %s with nskip %d' % (file, nskip)
 
             # load data
@@ -1188,15 +1198,41 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
 
             # dedisperse
             for i in range(len(pv.dmarr)):
-                for j in range(1240,1300):
-#                for j in range(len(pv.reltime)):
-                    try: 
-                        peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = pv.imagedmt0(i,j, show=show, bgwindow=bgwindow, clean=1)
-#                        print >> fileout, file, nskip, nints, (i, j), 'Peak, RA, Dec: ', peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
 
+                if mode == 'dirty':
+                # define typical dirty image noise level for this dm
+                    print 'For DM = %.1f, measuring median image noise level' % (pv.dmarr[i])
+                    bgpeak = []; bgepeak = []
+                    for bgi in range(bgwindow, nints-bgwindow, nints/7):
+                        print 'Measuring noise in integration %d' % (bgi)
+                        outname = string.join(pv.file.split('.')[:-1]) + '.' + str(pv.nskip/pv.nbl) + '-' + 'dm' + str(i) + 't' + str(bgi) + '.mir'
+                        shutil.rmtree (outname, ignore_errors=True); shutil.rmtree (outname+'.map', ignore_errors=True); shutil.rmtree (outname+'.beam', ignore_errors=True)
+                        status = pv.writetrack2(i, bgi, bgwindow=bgwindow)   # output file at dmbin, trelbin
+                        try:
+                            txt = TaskInvert (vis=outname, map=outname+'.map', beam=outname+'.beam', mfs=True, double=True, cell=80, imsize=250).snarf()
+                            txt = TaskImStat (in_=outname+'.map').snarf()   # get dirty image stats
+                            bgpeak.append(float(txt[0][10][50:57]))       # get peak of dirty image
+                            bgepeak.append(float(txt[0][10][41:47]))       # note that epeak is biased by any true flux
+                        finally:
+                            shutil.rmtree (outname, ignore_errors=True); shutil.rmtree (outname+'.map', ignore_errors=True); shutil.rmtree (outname+'.beam', ignore_errors=True)
+                    print 'Dirty image noises and their median', bgepeak, n.median(bgepeak)
+
+                # now iterate over integrations
+#                for j in range(1240,1300):
+                for j in range(len(pv.reltime)):
+                    try: 
+                        results = pv.imagedmt0(i, j, show=show, bgwindow=bgwindow, clean=1, mode=mode)
+                        if mode == 'clean':
+                            peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = results
+                        elif mode == 'dirty':  # need to develop more... needs to be ~10ms processing per int!
+                            peak, epeak = results
+                            epeak = n.median(bgepeak)
                         if peak/epeak >= sig:
                             print '\tDetection!'
-                            print >> fileout, file, nskip, nints, (i, j), 'Peak, (sig),  RA, Dec: ', peak, epeak, '(', peak/epeak, ')  ', off_ra, eoff_ra, off_dec, eoff_dec
+                            if mode == 'clean':
+                                print >> fileout, file, nskip, nints, (i, j), 'Peak, (sig),  RA, Dec: ', peak, epeak, '(', peak/epeak, ')  ', off_ra, eoff_ra, off_dec, eoff_dec
+                            elif mode == 'dirty':
+                                print >> fileout, file, nskip, nints, (i, j), 'Peak, (sig): ', peak, epeak, '(', peak/epeak, ')'
                             # save all results (v1.0 pickle format)
                             pklout = open(pathout + string.join(file.split('.')[:-1]) + '.' + str(nskip) + '-dm' + str(i) + 't' + str(j) + '.pkl', 'wb')
                             pickle.dump((file, nskip, nints, n.array([i]), pv.dmarr[i], n.array([j]), n.array([peak/epeak])), pklout)
@@ -1253,7 +1289,6 @@ def pulse_search_uvfit(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
         fileout = open(pathout + string.join(file.split('.')[:-1]) + '.txt', 'a')
 
         for nskip in [0]:
-#        for nskip in range(1965, maxints-(nints-edge), nints-edge):
             print 'Starting file %s with nskip %d' % (file, nskip)
 
             # load data
@@ -1262,10 +1297,10 @@ def pulse_search_uvfit(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
 
             # dedisperse
             for i in range(len(pv.dmarr)):
-                for j in range(1240,1300):
-#                for j in range(len(pv.reltime)):
+#                for j in range(1200,1300):
+                for j in range(len(pv.reltime)):
                     try: 
-                        peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = pv.uvfitdmt02(i,j, show=show, bgwindow=bgwindow)
+                        peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = pv.uvfitdmt0(i,j, show=show, bgwindow=bgwindow)
 #                        print >> fileout, file, nskip, nints, (i, j), 'Peak, RA, Dec: ', peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
 
                         if peak/epeak >= sig:
@@ -1304,7 +1339,7 @@ def process_pickle(filename, pathin, mode='image'):
 
     bgwindow = 10
 
-    name = 'poco_b0329_173027_00.mir'  # hack to force using certain file
+#    name = 'poco_b0329_173027_00.mir'  # hack to force using certain file
     
     print 'Loaded pickle file for %s plot of %s' % (mode, name)
     print 'Has peaks at DM = ', dmarr, ' with sig ', snrarr
@@ -1328,7 +1363,7 @@ def process_pickle(filename, pathin, mode='image'):
             if status:
                # plot track and spectrogram
                 p.figure(1)
-                p.plot(pv.reltime[track[0]], track[1], 'w.')
+                p.plot(pv.reltime[track[0]], track[1], 'w*')
                 pv.spec(save=0)
                 # now estimate obsrms
 #                status = pv.writetrack(dmbinarr[peaktrial], tbinarr[peaktrial]+bgwindow, tshift=0, bgwindow=0)
@@ -1351,8 +1386,14 @@ def process_pickle(filename, pathin, mode='image'):
 #            p.plot(pv.reltime[bgwindow], pv.dmarr[dmbinarr[peaktrial]], '*' )   # not working?
             pv.plotdmt0(save=1)
         elif mode == 'image':
-            peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = pv.imagedmt0(dmbinarr[peaktrial], bgwindow, bgwindow=bgwindow)
-            print peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
+            mode = 'dirty'
+            results = pv.imagedmt0(dmbinarr[peaktrial], bgwindow, bgwindow=bgwindow, clean=1, mode=mode)
+            if mode == 'clean':
+                peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = results
+                print peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
+            elif mode == 'dirty':
+                peak, std = results
+                print peak, std
         elif mode == 'uvfit':
             peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = pv.uvfitdmt0(dmbinarr[peaktrial], bgwindow)
             print peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
@@ -1391,8 +1432,8 @@ if __name__ == '__main__':
         # if no args, search for pulses
         print 'Searching for pulses...'
         try:
-            cProfile.run('pulse_search_uvfit(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)')
-#            pulse_search_uvfit(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)
+#            cProfile.run('pulse_search_uvfit(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)')
+            pulse_search_image(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge, mode='dirty')
 #            pulse_search_phasecenter(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)
 #            pulse_search_reim(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)
         except AttributeError:
@@ -1400,7 +1441,7 @@ if __name__ == '__main__':
     elif len(sys.argv) == 2:
         # if pickle, then plot data or dm search results
         print 'Assuming input file is pickle of candidate...'
-        process_pickle(sys.argv[1], pathin=pathin, mode='reim')
+        process_pickle(sys.argv[1], pathin=pathin, mode='spec')
     elif len(sys.argv) == 6:
         # if full spec of trial, image it
         print 'Imaging DM trial...'
