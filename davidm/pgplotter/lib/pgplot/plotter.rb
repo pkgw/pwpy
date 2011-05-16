@@ -1,5 +1,6 @@
 # $Id$
 
+require 'monitor'
 require 'narray'
 require 'pgplot'
 
@@ -55,8 +56,9 @@ module Pgplot
   class Plotter
     include Pgplot
 
-    VERSION = '0.0.9'
+    VERSION = '0.1.0'
 
+    @@monitor = Monitor.new
     @@instances = {}
     @@last_selected = nil
 
@@ -112,51 +114,56 @@ module Pgplot
 
     # Selects the Plotter instance corresponding to the PGPLOT ID given by
     # +pgid+ (defaulting to this Plotter's ID).
-    def select(pgid=@pgid)
+    def select(pgid=@pgid, &block)
       raise 'pgid #{pgid} not opened by Pgplot::Plotter' unless @@instances[pgid]
 
-      pgin, pgout = IO.pipe
-      begin
-        pgout.sync = true
-        dupout = STDOUT.dup
+      @@monitor.synchronize do
+        pgin, pgout = IO.pipe
         begin
-          STDOUT.reopen(pgout)
+          pgout.sync = true
+          dupout = STDOUT.dup
           begin
-            pgslct(pgid)
+            STDOUT.reopen(pgout)
+            begin
+              pgslct(pgid)
+            ensure
+              STDOUT.reopen(dupout)
+            end
           ensure
-            STDOUT.reopen(dupout)
+            dupout.close
           end
         ensure
-          dupout.close
+          pgout.close
+          begin
+            msg = pgin.read.chomp!
+            raise msg if msg =~ /%PGPLOT/
+            @@last_selected = @@instances[pgid]
+          ensure
+            pgin.close
+          end
         end
-      ensure
-        pgout.close
-        begin
-          msg = pgin.read.chomp!
-          raise msg if msg =~ /%PGPLOT/
-          @@last_selected = @@instances[pgid]
-        ensure
-          pgin.close
-        end
+        yield if block_given?
+        @@last_selected
       end
-      @@last_selected
     end
 
     # Closes this Plotter.
     def close
-      select
-      Pgplot.pgclos
-      @@instances.delete(@pgid)
+      select do
+        Pgplot.pgclos
+        @@instances.delete(@pgid)
+      end
     end
     alias :clos   :close
     alias :pgclos :close
 
     # Shortcut way to call Pgplot functions (without the +pg+ prefix).
     def method_missing(sym, *args)
-      select
-      m = sym.to_s
-      m = 'pg' + m unless m =~ /^pg/
-      Pgplot.send(m, *args)
+      select do
+        m = sym.to_s
+        m = 'pg' + m unless m =~ /^pg/
+        Pgplot.send(m, *args)
+      end
     end
 
     # Attempts to convert +a+ to a class that is plotable (e.g. NArray, Array).
@@ -314,66 +321,66 @@ module Pgplot
       end
 
       # Make sure this Plotter's device is pgplot's current selection
-      select
-      pgbbuf
+      select do
+        pgbbuf
 
-      if !opts[:overlay]
-        ls = pgqls
-        pgsls(Line::SOLID)
-        pgsci(opts[:border_color]) if opts[:use_color]
-        pgenv(xxmin, xxmax, yymin, yymax, opts[:just], -1)
-        pglab(opts[:xlabel], opts[:ylabel], opts[:title])
-        pgmtxt('T',0.5,0.5,0.5,opts[:title2].to_s) if opts[:title2]
-        # Draw bottom and top axes
-        pgaxis(xxmin,yymin,xxmax,yymin,xxmin,xxmax,:opt=>'N',:step=>0,
-               :tickl=>0.5,:tickr=>0,:frac=>0.5,
-               :disp=>0.5,:orient=>0)
-        pgaxis(xxmin,yymax,xxmax,yymax,xxmin,xxmax,:step=>0,
-               :tickl=>0,:tickr=>0.5,:frac=>0.5,
-               :disp=>0.5,:orient=>0)
-        # Draw y axis on left and right
-        pgaxis(xxmin,yymin,xxmin,yymax,yymin,yymax,:opt=>'N',:step=>0,
-               :tickl=>0,:tickr=>0.5,:frac=>0.5,
-               :disp=>-0.5,:orient=>0)
-        pgaxis(xxmax,yymin,xxmax,yymax,yymin,yymax,:step=>0,
-               :tickl=>0.5,:tickr=>0,:frac=>0.5,
-               :disp=>0.5,:orient=>0)
-        pgsls(ls)
-      end
-
-      # Optionally change color
-      pgsci(opts[:line_color]) if opts[:use_color]
-      # Plot line
-      case opts[:line]
-      when :none, :nil, nil: nil
-      when :bin, :stairs, :steps: pgbin(xx, yy, true)
-      when :impulse
-        base = if (yymin..yymax) === 0
-                 old_ci = pgqci
-                 old_ls = pgqls
-                 pgsci(Color::WHITE)
-                 pgsls(Line::DASHED)
-                 pgmove(xxmin,0)
-                 pgdraw(xxmax,0)
-                 pgsls(old_ls)
-                 pgsci(old_ci)
-                 0
-               elsif yymax < 0
-                 yymax
-               else
-                 yymin
-               end
-        xx.length.times do |i|
-          pgmove(xx[i],base)
-          pgdraw(xx[i],yy[i])
+        if !opts[:overlay]
+          ls = pgqls
+          pgsls(Line::SOLID)
+          pgsci(opts[:border_color]) if opts[:use_color]
+          pgenv(xxmin, xxmax, yymin, yymax, opts[:just], -1)
+          pglab(opts[:xlabel], opts[:ylabel], opts[:title])
+          pgmtxt('T',0.5,0.5,0.5,opts[:title2].to_s) if opts[:title2]
+          # Draw bottom and top axes
+          pgaxis(xxmin,yymin,xxmax,yymin,xxmin,xxmax,:opt=>'N',:step=>0,
+                 :tickl=>0.5,:tickr=>0,:frac=>0.5,
+                 :disp=>0.5,:orient=>0)
+          pgaxis(xxmin,yymax,xxmax,yymax,xxmin,xxmax,:step=>0,
+                 :tickl=>0,:tickr=>0.5,:frac=>0.5,
+                 :disp=>0.5,:orient=>0)
+          # Draw y axis on left and right
+          pgaxis(xxmin,yymin,xxmin,yymax,yymin,yymax,:opt=>'N',:step=>0,
+                 :tickl=>0,:tickr=>0.5,:frac=>0.5,
+                 :disp=>-0.5,:orient=>0)
+          pgaxis(xxmax,yymin,xxmax,yymax,yymin,yymax,:step=>0,
+                 :tickl=>0.5,:tickr=>0,:frac=>0.5,
+                 :disp=>0.5,:orient=>0)
+          pgsls(ls)
         end
-      else pgline(xx, yy)
+
+        # Optionally change color
+        pgsci(opts[:line_color]) if opts[:use_color]
+        # Plot line
+        case opts[:line]
+        when :none, :nil, nil: nil
+        when :bin, :stairs, :steps: pgbin(xx, yy, true)
+        when :impulse
+          base = if (yymin..yymax) === 0
+                   old_ci = pgqci
+                   old_ls = pgqls
+                   pgsci(Color::WHITE)
+                   pgsls(Line::DASHED)
+                   pgmove(xxmin,0)
+                   pgdraw(xxmax,0)
+                   pgsls(old_ls)
+                   pgsci(old_ci)
+                   0
+                 elsif yymax < 0
+                   yymax
+                 else
+                   yymin
+                 end
+          xx.length.times do |i|
+            pgmove(xx[i],base)
+            pgdraw(xx[i],yy[i])
+          end
+        else pgline(xx, yy)
+        end
+        # Plot points
+        pgpt(xx, yy, opts[:marker]) if opts[:marker]
+
+        pgebuf
       end
-      # Plot points
-      pgpt(xx, yy, opts[:marker]) if opts[:marker]
-
-      pgebuf
-
       nil
     end
 
@@ -537,114 +544,116 @@ module Pgplot
 
 
       # Make sure this Plotter's device is pgplot's current selection
-      select
-      pgbbuf
-      #pgvstd # This might be useful?
+      select do
+        pgbbuf
+        #pgvstd # This might be useful?
 
-      if !opts[:overlay]
-        pgsci(opts[:border_color]) if opts[:use_color]
-        pgenv(xxmin, xxmax, zzmin, zzmax, opts[:just], -1)
-        # Save world coordinates for magnitude axes
-        @state[:wc_mag] = [xxmin, xxmax, zzmin, zzmax]
-        pglab(opts[:xlabel], '', opts[:title])
-        pgmtxt('T',0.5,0.5,0.5,opts[:title2].to_s) if opts[:title2]
-        # Draw bottom and top axes
-        pgaxis(xxmin,zzmin,xxmax,zzmin,xxmin,xxmax,:opt=>'N', :step=>0,
-               :tickl=>0.5,:tickr=>0,:frac=>0.5,
-               :disp=>0.5,:orient=>0)
-        pgaxis(xxmin,zzmax,xxmax,zzmax,xxmin,xxmax, :step=>0,
-               :tickl=>0,:tickr=>0.5,:frac=>0.5,
-               :disp=>0.5,:orient=>0)
+        if !opts[:overlay]
+          pgsci(opts[:border_color]) if opts[:use_color]
+          pgenv(xxmin, xxmax, zzmin, zzmax, opts[:just], -1)
+          # Save world coordinates for magnitude axes
+          @state[:wc_mag] = [xxmin, xxmax, zzmin, zzmax]
+          pglab(opts[:xlabel], '', opts[:title])
+          pgmtxt('T',0.5,0.5,0.5,opts[:title2].to_s) if opts[:title2]
+          # Draw bottom and top axes
+          pgaxis(xxmin,zzmin,xxmax,zzmin,xxmin,xxmax,:opt=>'N', :step=>0,
+                 :tickl=>0.5,:tickr=>0,:frac=>0.5,
+                 :disp=>0.5,:orient=>0)
+          pgaxis(xxmin,zzmax,xxmax,zzmax,xxmin,xxmax, :step=>0,
+                 :tickl=>0,:tickr=>0.5,:frac=>0.5,
+                 :disp=>0.5,:orient=>0)
 
-        # Plot magnitude
-        # Draw y axis on left for magnitudes
-        pgaxis(xxmin,zzmin,xxmin,zzmax,zzmin,zzmax,:opt=>'N',:step=>0,
-               :tickl=>0,:tickr=>0.5,:frac=>0.5,
-               :disp=>-0.5,:orient=>0)
-        # Optionally change color
-        pgsci(opts[:mag_color]) if opts[:use_color]
-        # Label magnitude axis
-        pgmtxt('L',2.2,0.5,0.5,opts[:mag_label])
-      else # overlay mode
-        # Optionally change color
-        pgsci(opts[:mag_color]) if opts[:use_color]
-        # TODO Set line style (etc?)
-        # Restore world coords for magnitude
-        pgswin(*@state[:wc_mag])
-      end
-      # Plot magnitude data
-      #pgbin(xx, zzabs, true)
-      bin(xx, zzabs)
-
-      if !opts[:overlay]
-        zzmin = zzmax = nil
-        if opts[:ph_range]
-          zzmin = opts[:ph_range].first
-          zzmax = opts[:ph_range].last
+          # Plot magnitude
+          # Draw y axis on left for magnitudes
+          pgaxis(xxmin,zzmin,xxmin,zzmax,zzmin,zzmax,:opt=>'N',:step=>0,
+                 :tickl=>0,:tickr=>0.5,:frac=>0.5,
+                 :disp=>-0.5,:orient=>0)
+          # Optionally change color
+          pgsci(opts[:mag_color]) if opts[:use_color]
+          # Label magnitude axis
+          pgmtxt('L',2.2,0.5,0.5,opts[:mag_label])
+        else # overlay mode
+          # Optionally change color
+          pgsci(opts[:mag_color]) if opts[:use_color]
+          # TODO Set line style (etc?)
+          # Restore world coords for magnitude
+          pgswin(*@state[:wc_mag])
         end
-        zzmin ||= zzangle.min
-        zzmax ||= zzangle.max
-        zzmin = -180 if zzmin < -180
-        zzmax =  180 if zzmax >  180
-        # Round to sfloat precision
-        zzmin, zzmax = NArray[zzmin, zzmax].to_type(NArray::SFLOAT).to_a
-        if zzmin == zzmax
-          zzmin -= 1
-          zzmax += 1
+        # Plot magnitude data
+        #pgbin(xx, zzabs, true)
+        bin(xx, zzabs)
+
+        if !opts[:overlay]
+          zzmin = zzmax = nil
+          if opts[:ph_range]
+            zzmin = opts[:ph_range].first
+            zzmax = opts[:ph_range].last
+          end
+          zzmin ||= zzangle.min
+          zzmax ||= zzangle.max
+          zzmin = -180 if zzmin < -180
+          zzmax =  180 if zzmax >  180
+          # Round to sfloat precision
+          zzmin, zzmax = NArray[zzmin, zzmax].to_type(NArray::SFLOAT).to_a
+          if zzmin == zzmax
+            zzmin -= 1
+            zzmax += 1
+          else
+            zzmin, zzmax = zzmax, zzmin if zzmin > zzmax
+            #zzavg = (zzmin + zzmax)/2.0
+            #zzdev = (zzmax - zzmin)/2.0
+            #zzmin = zzavg - 1.1*zzdev
+            #zzmax = zzavg + 1.1*zzdev
+          end
+          step, nsub = case (zzmax-zzmin)
+                       when (135..360): [45, 3]
+                       when (45...135): [15, 3]
+                       else [0, 0]
+                       end
+
+          # Save world coordinates for phase axes
+          @state[:wc_phase] = [xxmin, xxmax, zzmin, zzmax]
+          pgswin(*@state[:wc_phase])
+          pgsci(opts[:border_color]) if opts[:use_color]
+          # Draw y axis on right for phase
+          pgaxis(xxmax,zzmin,xxmax,zzmax,zzmin,zzmax,:opt=>'N',
+                 :step=>step,:nsub=>nsub,
+                 :tickl=>0.5,:tickr=>0,:frac=>0.5,
+                 :disp=>0.3,:orient=>0)
+          # Optionally change color
+          pgsci(opts[:phase_color]) if opts[:use_color]
+          # Label phase axis
+          pgmtxt('R',2.7,0.5,0.5,opts[:phase_label])
         else
-          zzmin, zzmax = zzmax, zzmin if zzmin > zzmax
-          #zzavg = (zzmin + zzmax)/2.0
-          #zzdev = (zzmax - zzmin)/2.0
-          #zzmin = zzavg - 1.1*zzdev
-          #zzmax = zzavg + 1.1*zzdev
+          # Optionally change color
+          pgsci(opts[:phase_color]) if opts[:use_color]
+          # Change window's world coordinates
+          pgswin(*@state[:wc_phase])
         end
-        step, nsub = case (zzmax-zzmin)
-                     when (135..360): [45, 3]
-                     when (45...135): [15, 3]
-                     else [0, 0]
-                     end
+        # Plot phase points
+        marker = xx.length > 100 ? Marker::DOT : opts[:phase_marker]
+        npts = [xx.length, zzangle.length].min
+        npts.times do |i|
+          pgpt1(xx[i], zzangle[i], marker)
+        end
 
-        # Save world coordinates for phase axes
-        @state[:wc_phase] = [xxmin, xxmax, zzmin, zzmax]
-        pgswin(*@state[:wc_phase])
-        pgsci(opts[:border_color]) if opts[:use_color]
-        # Draw y axis on right for phase
-        pgaxis(xxmax,zzmin,xxmax,zzmax,zzmin,zzmax,:opt=>'N',
-               :step=>step,:nsub=>nsub,
-               :tickl=>0.5,:tickr=>0,:frac=>0.5,
-               :disp=>0.3,:orient=>0)
-        # Optionally change color
-        pgsci(opts[:phase_color]) if opts[:use_color]
-        # Label phase axis
-        pgmtxt('R',2.7,0.5,0.5,opts[:phase_label])
-      else
-        # Optionally change color
-        pgsci(opts[:phase_color]) if opts[:use_color]
-        # Change window's world coordinates
-        pgswin(*@state[:wc_phase])
+        pgebuf
       end
-      # Plot phase points
-      marker = xx.length > 100 ? Marker::DOT : opts[:phase_marker]
-      npts = [xx.length, zzangle.length].min
-      npts.times do |i|
-        pgpt1(xx[i], zzangle[i], marker)
-      end
-
-      pgebuf
-
       nil
     end
 
     # Used to select between magnitude coordinates or phase coordinates on
     # peviously created magphase plots to enable overlay etc.
     def axis(*args)
-      case args[0]
-      when :mag
-        pgswin(*@state[:wc_mag]) if @state[:wc_mag]
-      when :phase
-        pgswin(*@state[:wc_phase]) if @state[:wc_phase]
-      else
-        warn("Unsupported axis type #{type.inspect}")
+      select do
+        case args[0]
+        when :mag
+          pgswin(*@state[:wc_mag]) if @state[:wc_mag]
+        when :phase
+          pgswin(*@state[:wc_phase]) if @state[:wc_phase]
+        else
+          warn("Unsupported axis type #{type.inspect}")
+        end
       end
     end
 
