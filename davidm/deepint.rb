@@ -154,6 +154,7 @@ baselines.each do |bl|
   else
     # Doesn't make much sense to do dB if not a ratio
     mag_scale = 'log' if yax =~ /db/i
+    warn "autos not present/selected; plotting magnitude"
     mag_label = "Magnitude"
   end
 
@@ -193,6 +194,7 @@ baselines.each do |bl|
            :title => title,
            :title2 => title2,
            :xlabel => xax[0,1] == 'f' ? 'Frequency (GHz)' : 'Channel',
+           :mag_scale => mag_scale,
            :mag_label => mag_label,
            :mag_scale => mag_scale,
            :mag_range => [ymin, ymax]
