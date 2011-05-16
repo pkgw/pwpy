@@ -172,7 +172,7 @@ baselines.each do |bl|
 
   title = "Ants #{a1}-#{a2} #{p1}#{p2} / Inputs #{a1-1}-#{a2-1} #{p1}#{p2}"
   # TODO Fix format for linear and/or channel-based plots
-  title2 = sprintf('tau = %s, mean=%.1f, max=%.1f @ %.3f MHz',
+  title2 = sprintf('tau = %s, mean=%.3f, max=%.3f @ %.3f MHz',
                    (tau_fudge*tau12/3600).to_hmsstr(3), mean, max, 1000*maxx[0]
                   )
 
