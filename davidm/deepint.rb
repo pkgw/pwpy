@@ -29,6 +29,10 @@ keyini
   xax = keya(:axis, 'freq')
   yax = keya(:axis, 'linear')
 
+  # Get yrange
+  ymin = keyr(:yrange, -1.0/0); ymin = nil if ymin == -1.0/0
+  ymax = keyr(:yrange, +1.0/0); ymax = nil if ymax == +1.0/0
+
   # Get tau fudge factor
   tau_fudge = keyr(:taufudge, 1)
 keyfin
@@ -190,7 +194,8 @@ baselines.each do |bl|
            :title2 => title2,
            :xlabel => xax[0,1] == 'f' ? 'Frequency (GHz)' : 'Channel',
            :mag_label => mag_label,
-           :mag_scale => mag_scale
+           :mag_scale => mag_scale,
+           :mag_range => [ymin, ymax]
           )
 
   axis(:mag)
