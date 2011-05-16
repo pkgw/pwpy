@@ -120,7 +120,7 @@ baselines.each do |bl|
 
   a1 = ap1[0..-2].to_i
   p1 = ap1[-1,1]
-  a2 = ap1[0..-2].to_i
+  a2 = ap2[0..-2].to_i
   p2 = ap2[-1,1]
 
 
@@ -170,7 +170,7 @@ baselines.each do |bl|
   # maxy is Array with same length as maxx, all elements are max
   maxy = [max] * maxx.length
 
-  title = "Ants #{a1}-#{a2} #{p1}#{p2};  Inputs #{a1-1}-#{a2-1} #{p1}#{p2}"
+  title = "Ants #{a1}-#{a2} #{p1}#{p2} / Inputs #{a1-1}-#{a2-1} #{p1}#{p2}"
   # TODO Fix format for linear and/or channel-based plots
   title2 = sprintf('tau = %s, mean=%.1f, max=%.1f @ %.3f MHz',
                    (tau_fudge*tau12/3600).to_hmsstr(3), mean, max, 1000*maxx[0]
