@@ -59,21 +59,23 @@ while tno = uvDatOpn
 
     # Get keys
     time = v.time
-    a1a2 = v.basant
+    a1, a2 = v.basant
+    p1, p2 = POLMAP[uvrdvri(tno, :pol, 1)].split('')
+    ap1ap2 = [a1.to_s+p1, a2.to_s+p2]
 
     # Build value
     tau = uvrdvrf(tno, :inttime)
-    warn "tau == 0 for #{a1a2[0]}-#{a1a2[1]} at #{time}" if tau == 0
+    warn "tau == 0 for #{ap1ap2[0]}-#{ap1ap2[1]} at #{time}" if tau == 0
     next if tau == 0
 
     # Store into data Hash
     data[time] ||= {}
-    if data.has_key?(a1a2)
-      d = data[a1a2]
+    if data.has_key?(ap1ap2)
+      d = data[ap1ap2]
       d[0] += tau
       d[1].add!(v.data)
     else
-      data[a1a2] = [tau, v.data.dup]
+      data[ap1ap2] = [tau, v.data.dup]
     end
   end
 
@@ -113,17 +115,27 @@ Plotter.new(:device=>device, :nx=>nx, :ny=>ny, :ask=>true)
 pgsch(1.5) if nx > 1 || ny > 1
 
 baselines.each do |bl|
-  a1, a2 = bl
-  next if a1 == a2
+  ap1, ap2 = bl
+  next if ap1 == ap2 # Skip autos
 
-  tau12, vis12 = data[bl]
+  a1 = ap1[0..-2].to_i
+  p1 = ap1[-1,1]
+  a2 = ap1[0..-2].to_i
+  p2 = ap2[-1,1]
+
+
+  ap1ap1 = [ap1, ap1]
+  ap1ap2 = [ap1, ap2]
+  ap2ap2 = [ap2, ap2]
+
+  tau12, vis12 = data[ap1ap2]
   mag_scale = yax
 
   # Normalize by geometric mean of the autos if present
-  have_autos = data.has_key?([a1,a1]) && data.has_key?([a2,a2])
+  have_autos = data.has_key?(ap1ap1) && data.has_key?(ap2ap2)
   if have_autos
-    tau11, vis11 = data[[a1,a1]]
-    tau22, vis22 = data[[a2,a2]]
+    tau11, vis11 = data[ap1ap1]
+    tau22, vis22 = data[ap2ap2]
     if tau12 == tau11 && tau12 == tau22
       mag_label = "Correlation Coefficient"
       geomean = (vis11.real*vis22.real)**0.5
@@ -132,7 +144,7 @@ baselines.each do |bl|
       #vis12[geomean0_idx] = 0.0
       vis12.div!(geomean)
     else
-      warn "baseline #{a1}-#{a2} has different inttime than #{a1}-#{a1} or #{a2}-#{a2}"
+      warn "baseline #{ap1}-#{ap2} has different inttime than #{ap1}-#{ap1} or #{ap2}-#{ap2}"
       have_autos = false
     end
   else
@@ -158,7 +170,7 @@ baselines.each do |bl|
   # maxy is Array with same length as maxx, all elements are max
   maxy = [max] * maxx.length
 
-  title = "Ants #{a1}-#{a2};  Inputs #{a1-1}-#{a2-1}"
+  title = "Ants #{a1}-#{a2} #{p1}#{p2};  Inputs #{a1-1}-#{a2-1} #{p1}#{p2}"
   # TODO Fix format for linear and/or channel-based plots
   title2 = sprintf('tau = %s, mean=%.1f, max=%.1f @ %.3f MHz',
                    (tau_fudge*tau12/3600).to_hmsstr(3), mean, max, 1000*maxx[0]
