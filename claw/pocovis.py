@@ -146,9 +146,9 @@ class poco:
         reltime = self.reltime
 
         mean = self.dataph.mean()
-#        std = self.dataph.std()
+        std = self.dataph.std()
         abs = (self.dataph - mean)/std
-        abs = self.dataph
+#        abs = self.dataph
         print 'Data mean, std: %f, %f' % (mean, std)
 
         p.figure(1)
@@ -174,11 +174,10 @@ class poco:
         Returns fit parameters.
         """
 
-        if save:
-            logname = self.file.split('_')[0:2]
-            logname.append('fitsp.txt')
-            logname = string.join(logname,'_')
-            log = open(logname,'a')
+        logname = self.file.split('_')[0:3]
+        logname.append('fitsp.txt')
+        logname = string.join(logname,'_')
+        log = open(logname,'a')
 
         freq = self.sfreq + self.chans * self.sdf             # freq array in GHz
 
@@ -197,7 +196,7 @@ class poco:
         fitfunc = lambda p, x:  plaw(p[0], p[1], x)              # for real part of data
         errfunc = lambda p, x, y, rms: ((y - fitfunc(p, x))/rms)**2
 
-        p0 = [50.,0.]
+        p0 = [100.,-5.]
         p1, success = opt.leastsq(errfunc, p0[:], args = (freq, spec, obsrms))
         print 'Fit results: ', p1
         chisq = errfunc(p1, freq, spec, obsrms).sum()/(len(freq) - 2)
@@ -217,7 +216,7 @@ class poco:
             p.savefig(savename)
             print >> log, savename, 'Fit results: ', p1, '. obsrms: ', obsrms, '. $\Chi^2$: ', chisq
         else:
-            p.show()
+            print >> log, self.file, 'Fit results: ', p1, '. obsrms: ', obsrms, '. $\Chi^2$: ', chisq
 
 
     def dmtrack(self, dm = 0., t0 = 0., show=0):
@@ -1202,7 +1201,7 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
                 # define typical dirty image noise level for this dm
                     print 'For DM = %.1f, measuring median image noise level' % (pv.dmarr[i])
                     bgpeak = []; bgepeak = []
-                    for bgi in range(bgwindow, nints-bgwindow, nints/11):
+                    for bgi in range(bgwindow, nints-bgwindow, nints/15):
                         print 'Measuring noise in integration %d' % (bgi)
                         outname = string.join(pv.file.split('.')[:-1]) + '.' + str(pv.nskip/pv.nbl) + '-' + 'dm' + str(i) + 't' + str(bgi) + '.mir'
                         shutil.rmtree (outname, ignore_errors=True); shutil.rmtree (outname+'.map', ignore_errors=True); shutil.rmtree (outname+'.beam', ignore_errors=True)
@@ -1419,7 +1418,7 @@ if __name__ == '__main__':
 
     fileroot = 'poco_b0329_173027.mir'
     pathin = 'data/'
-    pathout = 'b0329_fixdm_im/'
+    pathout = 'b0329_fixdm_im2/'
 #    edge = 150 # m31 search up to dm=131 and pulse starting at first unflagged channel
     edge = 35 # b0329 search at dm=28.6 and pulse starting at first unflagged channel
 #    edge = 70 # Crab search at dm=56.8 and pulse starting at first unflagged channel
@@ -1430,7 +1429,7 @@ if __name__ == '__main__':
         print 'Searching for pulses...'
         try:
 #            cProfile.run('pulse_search_uvfit(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)')
-            pulse_search_image(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge, mode='dirty')
+            pulse_search_image(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge, mode='dirty', sig=6.0)
 #            pulse_search_phasecenter(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)
 #            pulse_search_reim(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)
         except AttributeError:
@@ -1438,7 +1437,7 @@ if __name__ == '__main__':
     elif len(sys.argv) == 2:
         # if pickle, then plot data or dm search results
         print 'Assuming input file is pickle of candidate...'
-        process_pickle(sys.argv[1], pathin=pathin, mode='image')
+        process_pickle(sys.argv[1], pathin=pathin, mode='spec')
     elif len(sys.argv) == 6:
         # if full spec of trial, image it
         print 'Imaging DM trial...'
