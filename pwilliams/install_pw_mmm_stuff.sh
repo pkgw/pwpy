@@ -65,6 +65,7 @@ fancy/multiflag2
 fancy/pwflux
 fancy/pwmodel
 fancy/qimage
+fancy/showgains
 fancy/uvasimg
 fancy/varcat
 '
