@@ -42,11 +42,11 @@ class poco:
         self.approxuvw = True      # flag to make template visibility file to speed up writing of dm track data
         self.baseline_order = n.array([ 257, 258, 514, 261, 517, 1285, 262, 518, 1286, 1542, 259, 515, 773, 774, 771, 516, 1029, 1030, 772, 1028, 1287, 1543, 775, 1031, 1799, 1544, 776, 1032, 1800, 2056, 260, 263, 264, 519, 520, 1288])   # second iteration of bl nums
         self.pulsewidth = 0.0066 * n.ones(len(self.chans)) # pulse width of b0329+54
-#        self.pulsewidth = 0 * n.ones(len(self.chans)) # pulse width of crab
+        self.pulsewidth = 0 * n.ones(len(self.chans)) # pulse width of crab
         # set dmarr
-        self.dmarr = [26.8]  # b0329+54
+#        self.dmarr = [26.8]  # b0329+54
 #        self.dmarr = [56.8]  # crab
-#        self.dmarr = n.arange(53,131,3.1)       # dm trials for m31. spacing set for 50% efficiency for band from 722-796 MHz, 1.2 ms integrations
+        self.dmarr = n.arange(50,126,2.7)       # dm trials for m31. spacing set for 50% efficiency for band from 722-796 MHz, 1.2 ms integrations
 #        self.tshift = 0.2     # not implemented yet
         self.nskip = int(nskip*self.nbl)    # number of iterations to skip (for reading in different parts of buffer)
         nskip = int(self.nskip)
@@ -1033,21 +1033,21 @@ def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000, edge=0):
 #        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
 
 # for b0329 173027
-    for i in [0,1,2,3,4,5,6,7,8,9]:
-        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
-    for i in [0,1,2,6,7,8,9]:
-        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
-    for i in [0,1,2,3]:
-        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
-
-# for m31 154202
 #    for i in [0,1,2,3,4,5,6,7,8,9]:
 #        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
-#    for i in [0,1,2,3,4,5,6]:
+#    for i in [0,1,2,6,7,8,9]:
 #        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+#    for i in [0,1,2,3]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
+
+# for m31 154202
+    for i in [0,1,2,3,4,5,6,7,8,9]:
+        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+    for i in [0,1,2,3,4,5,6]:
+        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
 
 # hack to search single file for pulses
-#    filelist = [fileroot]
+    filelist = [fileroot]
 
     # loop over miriad data and time chunks
     for file in filelist:
@@ -1147,7 +1147,8 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
     Searches for pulses by imaging dedispersed trials.
     """
 
-    maxints = 131000  # biggest file in integrations
+    maxints = 3000  # biggest file in integrations
+#    maxints = 131000  # biggest file in integrations
     bgwindow = 10  # where bg subtraction is made
 
     filelist = []
@@ -1167,18 +1168,18 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
 #        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
 
 # for b0329 173027
-    for i in [0,1,2,3,4,5,6,7,8,9]:
-        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
-    for i in [0,1,2,6,7,8,9]:
-        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
-    for i in [0,1,2,3]:
-        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
-
-# for m31 154202
 #    for i in [0,1,2,3,4,5,6,7,8,9]:
 #        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
-#    for i in [0,1,2,3,4,5,6]:
+#    for i in [0,1,2,6,7,8,9]:
 #        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+#    for i in [0,1,2,3]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
+
+# for m31 154202
+    for i in [0,1,2,3,4,5,6,7,8,9]:
+        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+    for i in [0,1,2,3,4,5,6]:
+        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
 
 # hack to search single file for pulses
 #    filelist = [fileroot]
@@ -1209,8 +1210,8 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
                         try:
                             txt = TaskInvert (vis=outname, map=outname+'.map', beam=outname+'.beam', mfs=True, double=True, cell=80, imsize=250).snarf()
                             txt = TaskImStat (in_=outname+'.map').snarf()   # get dirty image stats
-                            bgpeak.append(float(txt[0][10][50:57]))       # get peak of dirty image
-                            bgepeak.append(float(txt[0][10][41:47]))       # note that epeak is biased by any true flux
+                            bgpeak.append(float(txt[0][10][51:61]))       # get peak of dirty image
+                            bgepeak.append(float(txt[0][10][41:51]))       # note that epeak is biased by any true flux
                         finally:
                             shutil.rmtree (outname, ignore_errors=True); shutil.rmtree (outname+'.map', ignore_errors=True); shutil.rmtree (outname+'.beam', ignore_errors=True)
                     print 'Dirty image noises and their median', bgepeak, n.median(bgepeak)
@@ -1235,6 +1236,8 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
                             pklout.close()
                     except:
                         continue
+                if mode == 'dirty':
+                    print >> fileout, '   Finished ', file, nskip, nints, (i, j), '. Noise = ', n.median(bgepeak)
 
         fileout.close
 
@@ -1416,11 +1419,11 @@ if __name__ == '__main__':
     print 'Greetings, human.'
     print ''
 
-    fileroot = 'poco_b0329_173027.mir'
+    fileroot = 'poco_m31_154202.mir'
     pathin = 'data/'
-    pathout = 'b0329_fixdm_im2/'
-#    edge = 150 # m31 search up to dm=131 and pulse starting at first unflagged channel
-    edge = 35 # b0329 search at dm=28.6 and pulse starting at first unflagged channel
+    pathout = 'm31_im/'
+    edge = 150 # m31 search up to dm=131 and pulse starting at first unflagged channel
+#    edge = 35 # b0329 search at dm=28.6 and pulse starting at first unflagged channel
 #    edge = 70 # Crab search at dm=56.8 and pulse starting at first unflagged channel
 #    edge = 360  # Crab DM of 56.8 and for DM track starting at freq=0
 
