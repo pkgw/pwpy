@@ -9,7 +9,7 @@
 """
 
 import sys, string, os, shutil
-import cProfile
+#import cProfile
 from os.path import join
 #import mirtask
 #from mirtask import uvdat, keys, util
@@ -646,14 +646,13 @@ class poco:
                 peak = float(txt[0][10][50:57])       # get peak of dirty image
                 epeak = float(txt[0][10][41:47])       # note that epeak is biased by any true flux
                 print 'Individual dirty image peak %.2f +- %.2f' % (peak, epeak)
+                if clean:
+                    shutil.rmtree (outroot + '.mir', ignore_errors=True)
+                    shutil.rmtree (outroot+'.map', ignore_errors=True); shutil.rmtree (outroot+'.beam', ignore_errors=True); shutil.rmtree (outroot+'.clean', ignore_errors=True); shutil.rmtree (outroot+'.restor', ignore_errors=True)
                 return peak, epeak
         except:
             print 'Something broke with imaging!'
             return 0
-        finally:
-            if clean:
-                shutil.rmtree (outroot + '.mir', ignore_errors=True)
-                shutil.rmtree (outroot+'.map', ignore_errors=True); shutil.rmtree (outroot+'.beam', ignore_errors=True); shutil.rmtree (outroot+'.clean', ignore_errors=True); shutil.rmtree (outroot+'.restor', ignore_errors=True)
 
 
     def uvfitdmt0(self, dmbin, t0bin, bgwindow=10, tshift=0, show=1):
@@ -688,12 +687,12 @@ class poco:
             off_dec = float(txt[0][9][40:])
             eoff_dec = float(txt[0][10][42:])
             print 'Fit peak %.2f +- %.2f' % (peak, epeak)
+            shutil.rmtree (outroot + '.mir', ignore_errors=True)
             return peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
         except:
             print 'Something broke in/after uvfit!'
-            return 0
-        finally:
             shutil.rmtree (outroot + '.mir', ignore_errors=True)
+            return 0
 
 
     def uvfitdmt02 (self, dmbin, t0bin, bgwindow=10, tshift=0, show=1, mode='default'):
@@ -1212,8 +1211,8 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
                             txt = TaskImStat (in_=outname+'.map').snarf()   # get dirty image stats
                             bgpeak.append(float(txt[0][10][51:61]))       # get peak of dirty image
                             bgepeak.append(float(txt[0][10][41:51]))       # note that epeak is biased by any true flux
-                        finally:
                             shutil.rmtree (outname, ignore_errors=True); shutil.rmtree (outname+'.map', ignore_errors=True); shutil.rmtree (outname+'.beam', ignore_errors=True)
+
                     print 'Dirty image noises and their median', bgepeak, n.median(bgepeak)
                 # now iterate over integrations
                 for j in range(len(pv.reltime)):
