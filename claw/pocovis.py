@@ -1211,8 +1211,11 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
                             txt = TaskImStat (in_=outname+'.map').snarf()   # get dirty image stats
                             bgpeak.append(float(txt[0][10][51:61]))       # get peak of dirty image
                             bgepeak.append(float(txt[0][10][41:51]))       # note that epeak is biased by any true flux
-                            shutil.rmtree (outname, ignore_errors=True); shutil.rmtree (outname+'.map', ignore_errors=True); shutil.rmtree (outname+'.beam', ignore_errors=True)
-
+                            shutil.rmtree (outname, ignore_errors=True)
+                            shutil.rmtree (outname+'.map', ignore_errors=True)
+                            shutil.rmtree (outname+'.beam', ignore_errors=True)
+                        except:
+                            pass
                     print 'Dirty image noises and their median', bgepeak, n.median(bgepeak)
                 # now iterate over integrations
                 for j in range(len(pv.reltime)):
