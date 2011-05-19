@@ -1141,9 +1141,10 @@ def pulse_search_reim(fileroot, pathin, pathout, nints=10000, edge=0):
         fileout.close
 
 
-def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, edge=0, mode='dirty'):
+def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, edge=0, mode='dirty', dmrange=None):
     """
     Searches for pulses by imaging dedispersed trials.
+    dmrange lets outside call limit range of dms to search (good to spread jobs out in parallel).
     """
 
     maxints = 131000  # biggest file in integrations
@@ -1174,15 +1175,18 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
 #        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
 
 # for m31 154202
-    for i in [0,1,2,3,4,5,6,7,8,9]:
-        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
-    for i in [0,1,2,3,4,5,6]:
-        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+#    for i in [0,1,2,3,4,5,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+#    for i in [0,1,2,3,4,5,6]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
 
 # hack to search single file for pulses
     filelist = [fileroot]
 
-    print 'Looping over filelist: ', filelist
+    if dmrange == None:
+        dmrange = range(len(pv.dmarr))
+
+    print 'Looping over filelist ', filelist, ' with dmrange, ', dmrange
     for file in filelist:
         fileout = open(pathout + string.join(file.split('.')[:-1]) + '.txt', 'a')
 
@@ -1194,7 +1198,7 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
             pv.prep()
 
             # dedisperse
-            for i in range(len(pv.dmarr)):
+            for i in dmrange:
 
                 if mode == 'dirty':
                 # define typical dirty image noise level for this dm
@@ -1442,12 +1446,12 @@ if __name__ == '__main__':
         # if pickle, then plot data or dm search results
         print 'Assuming input file is pickle of candidate...'
         process_pickle(sys.argv[1], pathin=pathin, mode='spec')
-    elif len(sys.argv) == 4:
+    elif len(sys.argv) == 5:
         # if pickle, then plot data or dm search results
         print 'Searching for pulses... with %s, %s, %s' % (fileroot, pathin, pathout)
         try:
-#            cProfile.run('pulse_search_uvfit(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)')
-            pulse_search_image(fileroot=sys.argv[1], pathin=sys.argv[2], pathout=sys.argv[3], nints=10000, edge=edge, mode='dirty', sig=6.0)
+            dmrange = [int(sys.argv[4])]    # only works for single dm
+            pulse_search_image(fileroot=sys.argv[1], pathin=sys.argv[2], pathout=sys.argv[3], nints=10000, edge=edge, mode='dirty', sig=6.0, dmrange=dmrange)
         except AttributeError:
             exit(0)
     elif len(sys.argv) == 6:
