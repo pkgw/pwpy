@@ -1146,8 +1146,7 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
     Searches for pulses by imaging dedispersed trials.
     """
 
-    maxints = 3000  # biggest file in integrations
-#    maxints = 131000  # biggest file in integrations
+    maxints = 131000  # biggest file in integrations
     bgwindow = 10  # where bg subtraction is made
 
     filelist = []
@@ -1181,7 +1180,7 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
         filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
 
 # hack to search single file for pulses
-#    filelist = [fileroot]
+    filelist = [fileroot]
 
     print 'Looping over filelist: ', filelist
     for file in filelist:
@@ -1443,6 +1442,14 @@ if __name__ == '__main__':
         # if pickle, then plot data or dm search results
         print 'Assuming input file is pickle of candidate...'
         process_pickle(sys.argv[1], pathin=pathin, mode='spec')
+    elif len(sys.argv) == 4:
+        # if pickle, then plot data or dm search results
+        print 'Searching for pulses... with %s, %s, %s' % (fileroot, pathin, pathout)
+        try:
+#            cProfile.run('pulse_search_uvfit(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)')
+            pulse_search_image(fileroot=sys.argv[1], pathin=sys.argv[2], pathout=sys.argv[3], nints=2000, edge=edge, mode='dirty', sig=6.0)
+        except AttributeError:
+            exit(0)
     elif len(sys.argv) == 6:
         # if full spec of trial, image it
         print 'Imaging DM trial...'
