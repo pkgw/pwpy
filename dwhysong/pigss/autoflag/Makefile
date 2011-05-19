@@ -20,14 +20,14 @@ dep:
 	makedepend $(SRCS)
 
 clean:
-	rm -f $(OBJS) a.out core .depend
+	rm -f $(OBJS) a.out core
 
 distclean: clean
 	rm -f *.a autoflag
 
 tar:
 	rm -f autoflag.tar.bz2
-	tar cjf autoflag.tar.bz2 autoflag.c  autoflag.h  Makefile  mirclib.h  mirflib.h  options.c  list.h
+	tar cjf autoflag.tar.bz2 autoflag.c  autoflag.h  Makefile  mirclib.h  mirflib.h  options.c  list.h autoflag.doc
 
 install: autoflag
 	strip autoflag
