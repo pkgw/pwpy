@@ -10,10 +10,6 @@
  *	Threading for SMP machines
  *
  *	TODO:
- *
- *	-- do basic RFI flagging on non-calibrator files
- *
- *		Option to flag all data from a baseline/pol/chan if a certain percentage is flagged
  */
 
 
@@ -50,7 +46,7 @@ extern void options_c(char *, char *[], char *, int);
 
 #define MAX_GAIN_ITERS 5
 #define N_HEADER_PARAMS 6
-#define N_OPTIONS 10
+#define N_OPTIONS 11
 #define MAXCHAN 1024
 
 /* A sidereal day is 23h 56m 4.09074s = 86164.09074 seconds */
@@ -68,9 +64,10 @@ const char blank=0;
 int one=1;
 int maxsels=1024;
 int n_vis_files=0, n_cal_files=0;
-char noflag,noband,nophase,norfi,nosingle,ata,nonoise,nodistro,do_reten,tseries;
+char noflag,noband,nophase,norfi,nosingle,ata,donoise,dodistro,do_reten,tseries,interpolate;
 dataset_struct *visdata=NULL, *firstvisdata=NULL, *firstcaldata=NULL;
 FILE *fd;
+plist calbinlist = NULL;
 
 
 // A value of 1 indicates the datum is good.
@@ -142,7 +139,7 @@ void dump_bin(bin_struct *bin) {
 /* Set things up to parse the "options" keyword */
 void getopt_dave() {
 	/* If you want to add a new option, you MUST increase the value of the N_OPTIONS #define. */
-	char *opts[N_OPTIONS]={"noflag","noband","nophase","norfi","ata","nodist","nonoise","reten","time","nosingle"};
+	char *opts[N_OPTIONS]={"noflag","noband","nophase","norfi","ata","dist","noise","reten","time","nosingle","interpolate"};
 	char present[N_OPTIONS];
 
 	options_c("options",opts,present,N_OPTIONS);
@@ -151,11 +148,12 @@ void getopt_dave() {
 	nophase=present[2];
 	norfi=present[3];
 	ata=present[4];
-	nodistro=present[5];
-	nonoise=present[6];
+	dodistro=present[5];
+	donoise=present[6];
 	do_reten=present[7];
 	tseries=present[8];
 	nosingle=present[9];
+	interpolate=present[10];
 }
 
 
@@ -471,6 +469,23 @@ void meddevspec(unsigned int n_bl, unsigned int n_chan, complex float *med_spec,
 }
 
 
+/* Given source scan in bin, find the previous and next calibrator scans/bins */
+void find_adjacent_cal_bins(plist binlist, bin_struct *bin, bin_struct **prev, bin_struct **next) {
+	plist l;
+
+	*prev = NULL;
+	l = binlist;
+	*next = (bin_struct *) l->data;
+	while (l->next != NULL && bin->first_time > (*next)->last_time) {
+		l = l->next;
+		*next = (bin_struct *) l->data;
+	}
+	if ((*next)->last_time < bin->first_time) return;
+	l = l->prev;
+	*prev = (bin_struct *) l->data;
+}
+
+
 /*
  * Check for spectral corruption.
  * Alternate algorithm: we compute a deviation for the entire spectrum using
@@ -583,6 +598,79 @@ void corrupt(bin_struct *bin, unsigned int n_blocks, unsigned int *count) {
 }
 
 
+/* Heuristic to find the number of bins if we bin the spectrum */
+unsigned n_chav(unsigned nch) {
+
+	if (nch < 16) return 0;
+	else {
+		unsigned n = 1;
+		while (n < sqrt(nch) && (nch % 2 == 0)) {
+			n *= 2;
+			nch /= 2;
+		}
+		return n;
+	}
+}
+
+
+/* For a binned spectrum, return the center channel of spectrum-bin n */
+unsigned inline center_ch(bin_struct *bin, unsigned n) {
+	unsigned width = bin->visdata->n_chan / bin->n_gain_ch;
+	return (n*width + width/2);
+}
+
+
+// Return the first channel that falls into spectrum-bin n
+unsigned start_ch(bin_struct *bin, unsigned n) {
+	return n * bin->visdata->n_chan / bin->n_gain_ch;
+}
+
+
+// Return the first channel that falls into spectrum-bin n
+unsigned end_ch(bin_struct *bin, unsigned n) {
+	return (n+1) * bin->visdata->n_chan / bin->n_gain_ch - 1;
+}
+
+
+unsigned which_gain(bin_struct *bin, unsigned ch) {
+	unsigned width = bin->visdata->n_chan / bin->n_gain_ch;
+	return (ch / width);
+}
+
+
+// Simple linear interpolation
+complex float interpolate_gain(bin_struct *bin, char pol, unsigned ant, unsigned ch) {
+	unsigned bina, binb, cha, chb, idxa, idxb;
+
+	bina = which_gain(bin,ch);
+	cha = center_ch(bin,bina);
+
+	if (ch == cha) {					// Exact, no interpolation necessary
+		idxa = pol * bin->visdata->n_ants * bin->n_gain_ch + ant * bin->n_gain_ch + bina;
+		return bin->gains[idxa];
+	}
+
+        else if ((bina == bin->n_gain_ch-1) && (ch >= cha)) {	// At the top end
+		idxa = pol * bin->visdata->n_ants * bin->n_gain_ch + ant * bin->n_gain_ch + bina;
+		return bin->gains[idxa];
+	}
+	else if ((bina == 0) && (ch <= cha)) {			// At the bottom end
+        	idxa = pol * bin->visdata->n_ants * bin->n_gain_ch + ant * bin->n_gain_ch + bina;
+		return bin->gains[idxa];
+	}
+	else {							// In the middle; interpolate
+		if (ch > cha) binb = bina+1;
+		else binb = bina-1;
+		chb = center_ch(bin,binb);
+
+        	idxa = pol * bin->visdata->n_ants * bin->n_gain_ch + ant * bin->n_gain_ch + bina;
+        	idxb = pol * bin->visdata->n_ants * bin->n_gain_ch + ant * bin->n_gain_ch + binb;
+
+		return (bin->gains[idxa] * fabs((long int)ch-(long int)chb) + bin->gains[idxb] * fabs((long int)ch-(long int)cha)) / fabs((long int)cha-(long int)chb);
+	}
+}
+
+
 
 
 /*
@@ -597,61 +685,83 @@ void corrupt(bin_struct *bin, unsigned int n_blocks, unsigned int *count) {
  *
  * Minimum is at: gain[pol][ant1][ch] = csqrtf(median[bl] / median[bl][ch]) / conjf(gain[pol][ant2][ch])
  */
-complex float *bpcal(bin_struct *bin, complex float *med, complex float *median, complex float *rms) {
-	complex float *gainlist; // [2][n_ants][n_ants-1][n_chan];	// List of all possible gain solutions; every antenna vs. every other antenna
+complex float *bpcal(bin_struct *bin, complex float *med1, complex float *median1, complex float *rms1) {
+	complex float *gainlist; // [2][n_ants][n_ants-1][n_gain];	// List of all possible gain solutions; every antenna vs. every other antenna
 	unsigned int n_bl = bin->visdata->n_bl;
 	unsigned int n_ants = bin->visdata->n_ants;
 	unsigned int n_chan = bin->visdata->n_chan;
+	unsigned int n_gain = bin->n_gain_ch;
 	complex float glist[2][n_ants-1];
 	complex float *gain, tmpgain;
 	complex float medrms;
-	unsigned int ch, bl, idx, idx2, idx_bl, niter=1, n, nbad;
-	unsigned int ant, ant1, ant2, nflag=0;
+	unsigned int ch, bl, idx, idx_bl, niter=1, n, nbad;
+	unsigned int ant, ant1, ant2;
 	int i, pol;
 	float maxdev, meddev;			// Greatest change in any gain in the most recent iteration
-	float dev[2*n_ants*n_chan];		// Change in gain in the most recent iteration
+	float dev[2*n_ants*n_gain];		// Change in gain in the most recent iteration
 	char done=0;
-	char check[2*n_ants*n_chan];		// Antpol/channels which are converging slowly
 
 	inline unsigned int gainidx(int pol, int ant1, int ant2, unsigned int ch) {
-		return pol * n_ants * (n_ants-1) * n_chan + ant1 * (n_ants-1) * n_chan + ant2 * n_chan + ch;
+		return pol * n_ants * (n_ants-1) * n_gain + ant1 * (n_ants-1) * n_gain + ant2 * n_gain + ch;
 	}
 
-	gain = malloc(sizeof(complex float) * 2 * n_ants * n_chan);
-	gainlist = malloc(sizeof(complex float) * 2 * n_ants * (n_ants-1) * n_chan);
+
+	// Make arrays to hold the spectrally-binned statistics
+	complex float *med = malloc(sizeof(complex float) * 2 * n_bl * n_gain);
+	complex float *median = malloc(sizeof(complex float) * 2 * n_bl * n_gain);
+	complex float *rms = malloc(sizeof(complex float) * 2 * n_bl * n_gain);
+
+	// Bin the spectral statistics
+	for (pol=0; pol<2; pol++)
+	for (bl=0; bl<n_bl; bl++)
+	for (i=0; i<n_gain; i++) {
+		unsigned start = start_ch(bin,i);
+		unsigned end = end_ch(bin,i);
+		unsigned width = end - start + 1;
+
+		idx = pol * n_bl * n_gain + bl * n_gain + i;
+		unsigned idx_start = pol * n_bl * n_chan + bl * n_chan + start;
+
+		med[idx] = median_cmplx(&med1[idx_start],width);
+		median[idx] = median_cmplx(&median1[idx_start],width);
+		rms[idx] = median_cmplx(&rms1[idx_start],width);
+	}
+
+	gain = malloc(sizeof(complex float) * 2 * n_ants * n_gain);
+	gainlist = malloc(sizeof(complex float) * 2 * n_ants * (n_ants-1) * n_gain);
 	if (!gain || !gainlist) bug_c('f',"Out of memory in function bpcal.");
-	for (i=0; i<2*n_ants*n_chan; i++) gain[i] = 1.0 + 0.0 * I;
+	for (i=0; i<2*n_ants*n_gain; i++) gain[i] = 1.0 + 0.0 * I;
 	for (pol=0; pol<2; pol++)
 	  for (ant1=0; ant1<n_ants; ant1++)
 	  for (ant2=0; ant2<n_ants-1; ant2++)
-	  for (ch=0; ch<n_chan; ch++) {
+	  for (ch=0; ch<n_gain; ch++) {
 		gainlist[gainidx(pol,ant1,ant2,ch)] = NAN + NAN * I;
 	}
 
-	printf("Starting bandpass calibration loop\n");
+	printf("Bandpass calibration solving for %u gains per antpol.\n",n_gain);
 	printf("    MedDev\tMaxDev\t#outliers\n");
 	while (!done) {
-		medrms = median_cmplx(rms,2*n_bl*n_chan);
+		medrms = median_cmplx(rms,2*n_bl*n_gain);
 		/* For each antpol, make a list of all contributing baselines, stored in "gainlist" */
 		for (pol=0; pol<2; pol++)
 		for (ant=0; ant<n_ants; ant++) {
 			i=0;
 			ant2 = ant;
 			for (ant1 = 0; ant1 < ant2; ant1++)
-		  	for (ch=0; ch<n_chan; ch++) {
+		  	for (ch=0; ch<n_gain; ch++) {
 					bl = n_ants*ant1-(ant1*(ant1+1)/2) + ant2;
-					idx_bl = pol*n_bl*n_chan + bl * n_chan + ch;
-					idx = pol*n_ants*n_chan + ant1 * n_chan + ch;
+					idx_bl = pol*n_bl*n_gain + bl * n_gain + ch;
+					idx = pol*n_ants*n_gain + ant1 * n_gain + ch;
 					// Conjugate, since we're getting solutions for ant == ant2
 					gainlist[gainidx(pol,ant,ant1,ch)] = conjf(csqrtf(median[pol*n_bl+bl] / med[idx_bl]) / gain[idx]);
 					i++;
 			}
 			ant1 = ant;
 			for (ant2 = ant1+1; ant2 < n_ants; ant2++)
-		  	for (ch=0; ch<n_chan; ch++) {
+		  	for (ch=0; ch<n_gain; ch++) {
 					bl = n_ants*ant1-(ant1*(ant1+1)/2) + ant2;
-					idx_bl = pol*n_bl*n_chan + bl * n_chan + ch;
-					idx = pol*n_ants*n_chan + ant2 * n_chan + ch;
+					idx_bl = pol*n_bl*n_gain + bl * n_gain + ch;
+					idx = pol*n_ants*n_gain + ant2 * n_gain + ch;
 					gainlist[gainidx(pol,ant,ant2,ch)] = csqrtf(median[pol*n_bl+bl] / med[idx_bl]) / conjf(gain[idx]);
 					i++;
 			}
@@ -663,11 +773,11 @@ complex float *bpcal(bin_struct *bin, complex float *med, complex float *median,
 	 	*/
 		nbad = 0;
 		n=0;
-		for (i=0; i<2*n_ants*n_chan; i++) dev[i] = NAN;
+		for (i=0; i<2*n_ants*n_gain; i++) dev[i] = NAN;
 		printf("  %d ",niter);
 		for (pol=0; pol<2; pol++)
 	  	for (ant=0; ant<n_ants; ant++)
-	  	for (ch=0; ch<n_chan; ch++) {
+	  	for (ch=0; ch<n_gain; ch++) {
 			// Find median value for the new gain; use it.
 			i=0;
 			for (ant1=0; ant1<n_ants; ant1++) {
@@ -675,7 +785,7 @@ complex float *bpcal(bin_struct *bin, complex float *med, complex float *median,
 				glist[pol][i] = gainlist[gainidx(pol,ant,ant1,ch)];
 				i++;
 			}
-			idx = pol*n_ants*n_chan + ant*n_chan + ch;
+			idx = pol*n_ants*n_gain + ant*n_gain + ch;
 			tmpgain = (median_cmplx(glist[pol], n_ants-1) + gain[idx]) / 2.0;
 			dev[idx] = cabsf(tmpgain - gain[idx]);
 			if (isnan(tmpgain)) continue;
@@ -684,48 +794,14 @@ complex float *bpcal(bin_struct *bin, complex float *med, complex float *median,
 		}
 
 		maxdev = 0.0;
-		meddev = median_float(dev,2*n_ants*n_chan);
+		meddev = median_float(dev,2*n_ants*n_gain);
 		printf("%.4f\t",meddev);
-		for (i=0; i<2*n_ants*n_chan; i++) {
+		for (i=0; i<2*n_ants*n_gain; i++) {
 			if (dev[i] > maxdev) maxdev = dev[i];
 			if (dev[i] > 5*meddev) nbad++;
 		}
 		printf(" %.2f",maxdev);
-		printf("  %u of %u\t",nbad,n);
-
-		nbad=0;
-		/* Start looking for things to flag if we're getting close to convergence */
-		if (meddev < 0.01) {
-			for (i=0; i<2*n_ants*n_chan; i++) {
-				if (dev[i] > 5*meddev) {
-					nbad++;
-					check[i]=1;
-				}
-				else check[i]=0;
-			}
-			printf("Looking carefully at %d antpol/chans\t",nbad);
-
-			for (pol=0; pol<2; pol++)
-			for (ant1=0; ant1 < n_ants; ant1++)
-			for (ant2 = ant1+1; ant2 < n_ants; ant2++)
-		  	for (ch=0; ch<n_chan; ch++) {
-				bl = n_ants*ant1-(ant1*(ant1+1)/2) + ant2;
-				idx_bl = pol*n_bl*n_chan + bl * n_chan + ch;
-				idx = pol*n_ants*n_chan + ant1 * n_chan + ch;	// antenna-based index for ant1
-				idx2 = pol*n_ants*n_chan + ant2 * n_chan + ch;	// antenna-based index for ant2
-				if (check[idx] || check[idx2]) {
-					if (cabsf(rms[idx_bl]) > 3 * cabsf(medrms)) {
-						nflag++;
-						set_bin_flag(bin, pol, bl, ch);
-						idx_bl = pol*n_bl*n_chan + bl*n_chan;	// channel 0
-						median[pol*n_bl+bl] = median_cmplx(&(med[idx_bl]), n_chan);	// recompute spectral median
-					}
-				}
-			}
-			if (nflag) printf("  %u bl/pol/chan marked bad",nflag);
-			printf("\n");
-		}
-		else printf("\n");
+		printf("  %u of %u\n",nbad,n);
 
 		niter++;
 		if (maxdev < 0.01) done=1;
@@ -737,24 +813,10 @@ complex float *bpcal(bin_struct *bin, complex float *med, complex float *median,
 		//printf("\n");
 	}
 	free(gainlist);
-
-	return gain;
-}
-
-
-void write_spectrum(bin_struct *bin, char *name) {
-	FILE *fd;
-	int i,bl,ch,idx;
-	fd = fopen(name,"a");
-
-	for (i=0; i<2; i++)
-	for (bl=0; bl<bin->visdata->n_bl; bl++)
-	for (ch=0; ch<bin->visdata->n_chan; ch++) {
-		idx = i*bin->visdata->n_bl*bin->visdata->n_chan + bl * bin->visdata->n_chan + ch;
-		fprintf(fd,"%d %d %d %f %f\n",i,bl,ch,crealf(bin->med_spec[idx]),cimagf(bin->med_spec[idx]));
-	}
-	fprintf(fd,"\n");
-	fclose(fd);
+	free(med);
+	free(median);
+	free(rms);
+	return gain;	// Do not free
 }
 
 
@@ -779,19 +841,57 @@ void getpolstr(dataset_struct *visdata, int p, char *str) {
 	str[2] = '\0';
 }
 
+
+void write_spectrum(bin_struct *bin, char *name) {
+	FILE *fd;
+	int i,bl,ch,idx;
+	fd = fopen(name,"a");
+
+	for (i=0; i<2; i++)
+	for (bl=0; bl<bin->visdata->n_bl; bl++)
+	for (ch=0; ch<bin->visdata->n_chan; ch++) {
+		idx = i*bin->visdata->n_bl*bin->visdata->n_chan + bl * bin->visdata->n_chan + ch;
+		fprintf(fd,"%d %d %d %f %f\n",i,bl,ch,crealf(bin->med_spec[idx]),cimagf(bin->med_spec[idx]));
+	}
+	fprintf(fd,"\n");
+	fclose(fd);
+}
+
+
+void write_gains(bin_struct *bin, char *name) {
+	FILE *fd;
+	int pol,ant,ch,idx;
+	fd = fopen(name,"a");
+	char str[3];
+
+	fprintf(fd,"Pol Ant sBin\tRe(g)\tIm(g)\n");
+	for (pol=0; pol<2; pol++) {
+		getpolstr(bin->visdata, pol, str);
+		for (ant=0; ant<bin->visdata->n_ants; ant++)
+		for (ch=0; ch<bin->n_gain_ch; ch++) {
+			idx = pol*bin->visdata->n_ants*bin->visdata->n_chan + ant * bin->visdata->n_chan + ch;
+			fprintf(fd,"%s %d %d %f %f\n",str,ant,ch,crealf(bin->gains[idx]),cimagf(bin->gains[idx]));
+		}
+	}
+	fprintf(fd,"\n");
+	fclose(fd);
+}
+
+
 /*
  * This computes a mean of the time-series data, and flags channels that show RFI.
  * Sometimes low-level RFI doesn't average down, i.e. amplitude is low but phase is constant.
  * So it is more visible in time-averaged data.
  * Do this per-baseline/pol.
  */
-void flag_rfi(bin_struct *bin) {
+void flag_rfi(bin_struct *bin, float nsigma) {
 	unsigned ch, bl, pol, nflag, nchflag;
 	unsigned idx;
 	unsigned int n_chan = bin->visdata->n_chan;
 	unsigned int n_bl = bin->visdata->n_bl;
 	float *amps, med, dev;
 	char flag;
+	int j;
 
 	printf("Scanning averaged data for RFI: ");
 	amps = malloc(sizeof(float) * n_chan);
@@ -811,11 +911,25 @@ void flag_rfi(bin_struct *bin) {
 				for (ch=0; ch<n_chan; ch++) {
 					if (get_bin_flag(bin,pol,bl,ch)) continue;		// Skip if the channel is already flagged
 					idx = pol*n_bl*n_chan + bl * n_chan + ch;
-					if (cabsf(bin->tav_spec[idx]) > med + 2 * dev) {	// Don't use amps[ch] since meddev90_float sorts that array.
+					if (cabsf(bin->tav_spec[idx]) > med + nsigma * dev) {	// Don't use amps[ch] since meddev90_float sorts that array.
 						nchflag++;
 						nflag += bin->n[idx];
 						set_bin_flag(bin,pol,bl,ch);
 						flag=1;
+
+						// Flag adjacent channels too.
+						j = ch - 1;
+						if ((j > 0) && !get_bin_flag(bin,pol,bl,j)) {
+							idx = pol*n_bl*n_chan + bl * n_chan + j;
+							nchflag++;
+							set_bin_flag(bin,pol,bl,j);
+						}
+						j = ch + 1;
+						if ((j < n_chan) && !get_bin_flag(bin,pol,bl,j)) {
+							idx = pol*n_bl*n_chan + bl * n_chan + j;
+							nchflag++;
+							set_bin_flag(bin,pol,bl,j);
+						}
 					}
 				}
 			} while (flag);
@@ -829,15 +943,16 @@ void flag_rfi(bin_struct *bin) {
 /*
  * Determine flags from a calibrator scan.
  */
-void calflag(bin_struct *bin) {
+void flag(bin_struct *bin, char cal) {
 	vis_struct *vis, *tmpvis;
 	complex float *med_spec, *rms_spec, *tav_spec, *median, *deviation;
 	complex float **data;
-	unsigned *n, *n_bad, n_chan, nflag=0, start, end;
+	unsigned *n, *n_bad, n_chan, nflag=0;
 	int pol, i, j, n_bl, bl, ant1, ant2;
-	register unsigned idx, idx2, idx_bl, ch;
+	register unsigned idx, idx_bl, ch;
 	unsigned int n_ants = bin->visdata->n_ants;
 	unsigned int *nhigh;
+	complex float g1, g2;
 
 	vis = bin->data;
 	n_chan = vis->visdata->n_chan;
@@ -855,7 +970,7 @@ void calflag(bin_struct *bin) {
 	median = bin->median;
 	bin->deviation = malloc(sizeof(complex float) * 2 * n_bl);
 	deviation = bin->deviation;
-	if (!median || !deviation || !n || !med_spec || !rms_spec) bug_c('f',"Out of memory in function calflag.");
+	if (!median || !deviation || !n || !med_spec || !rms_spec) bug_c('f',"Out of memory in function flag.");
 
 
 	// Initialization
@@ -864,6 +979,7 @@ void calflag(bin_struct *bin) {
 		n_bad[i]=0;
 		med_spec[i]=NAN + NAN*I;
 		rms_spec[i]=NAN + NAN*I;
+		tav_spec[i]=NAN + NAN*I;
 	}
 
 	/* Compute the number of data elements in each pol/baseline/channel */
@@ -892,14 +1008,15 @@ void calflag(bin_struct *bin) {
 	}
 	free(n_bad);
 
+
 	/* Make an array of median amplitudes for each pol/bl/chan. */
 	/* Make a temporary array of arrays to hold the data */
 	bin->array = malloc(sizeof(complex float *) * n_bl * n_chan * 2);
 	data = bin->array;
-	if (!data) bug_c('f',"Out of memory in function calflag.");
+	if (!data) bug_c('f',"Out of memory in function flag.");
 	for (i=0; i<2*n_bl*n_chan; i++) {
 		data[i] = malloc(sizeof(complex float) * n[i]);
-		if (!data[i]) bug_c('f',"Out of memory in function calflag.");
+		if (!data[i]) bug_c('f',"Out of memory in function flag.");
 		/* Initialize each array to an invalid number */
 		for (j=0; j<n[i]; j++) {
 			data[i][j] = NAN + NAN*I;
@@ -1040,53 +1157,92 @@ void calflag(bin_struct *bin) {
 
 	// Do a crude bandpass calibration to flatten the spectrum.
 	if (!noband) {
-		//write_spectrum(bin,"med.spec");
-		// The gains array has dimensions [2 pols][n_ants][n_chan]
-		bin->gains = bpcal(bin, med_spec, median, rms_spec);
+		if (cal) {
+			//write_spectrum(bin,"med.spec");
+			// The gains array has dimensions [2 pols][n_ants][n_chan]
+			bin->gains = bpcal(bin, med_spec, median, rms_spec);
+			//write_gains(bin,"gains.txt");
+		}
+		else {
+			// FIXME copy gains from calibrator scan
+			printf("Copying gains from the calibrator\n");
+			bin_struct *prev=NULL, *next=NULL;
+			find_adjacent_cal_bins(calbinlist,bin,&prev,&next);
+
+			if (prev != NULL) bin->gains = prev->gains;
+			else if (next != NULL) bin->gains = next->gains;
+			else printf("Error: unable to copy gain table.\n");
+		}
+
 		// Apply the gains
+		if (bin->gains != NULL)
 		for (i=0; i<2; i++)
 		for (ant1=0; ant1 < n_ants; ant1++)
 		for (ant2 = ant1+1; ant2 < n_ants; ant2++) {
 			bl = n_ants*ant1-(ant1*(ant1+1)/2) + ant2;
   			for (ch=0; ch<n_chan; ch++) {
 				idx_bl = i*n_bl*n_chan + bl * n_chan + ch;
-				idx = i*n_ants*n_chan + ant1 * n_chan + ch;	// antenna-based index for ant1
-				idx2 = i*n_ants*n_chan + ant2 * n_chan + ch;	// antenna-based index for ant2
-				for (j=0; j<n[idx_bl]; j++) data[idx_bl][j] *= bin->gains[idx] * ~ bin->gains[idx2];
+				g1 = interpolate_gain(bin,i,ant1,ch);
+				g2 = interpolate_gain(bin,i,ant2,ch);
+				for (j=0; j<n[idx_bl]; j++) data[idx_bl][j] *= g1 * ~ g2;
 			}
 		}
-		//write_spectrum(bin,"cal-med.spec");
+
+		// Need to apply the gains to tav_spec
+		if (bin->gains != NULL)
+		for (pol=0; pol<2; pol++)
+		for (ant1=0; ant1 < n_ants; ant1++)
+		for (ant2 = ant1+1; ant2 < n_ants; ant2++) {
+			bl = n_ants*ant1-(ant1*(ant1+1)/2) + ant2;
+			for (ch=0; ch<n_chan; ch++) {
+				idx = pol * n_bl * n_chan + bl * n_chan + ch;
+				g1 = interpolate_gain(bin,pol,ant1,ch);
+				g2 = interpolate_gain(bin,pol,ant2,ch);
+				tav_spec[idx] *= g1 * ~g2;
+			}
+		}
 	}
 
 
 	// Re-calculate median and scatter, and channel median for each baseline
 	for (i=0; i<2*n_bl*n_chan; i++) meddev_cmplx(data[i],n[i],&(med_spec[i]),&(rms_spec[i]));
 	meddevspec(n_bl, n_chan, med_spec, median, deviation);
+	//write_spectrum(bin,"cal-med.spec");
 
 
 	if (ata) {
-		// Look for spectral corruption. This can be time dependent.
-		// When flagging spectral corruption, the ENTIRE ANTENNA is affected.
-		printf("Scanning for ATA specral corruption:\n");
-		nhigh=malloc(sizeof(unsigned) * 2*n_ants*4);
-		if (!nhigh) bug_c('f',"Out of memory.");
+		unsigned int ant1, ant2, idx2, start, end;
+		unsigned int n_ants = bin->visdata->n_ants;
+		unsigned int *nhigh;
+		// Look for spectral corruption or broad-band RFI.
+		printf("Scanning for ATA specral corruption or broad RFI:\n");
 		nflag=0;
 		char str[3];
 		int max;
+		unsigned int nbins;
+
+		if (cal) nbins=4;
+		else nbins=32;
+
+		nhigh=malloc(sizeof(unsigned) * 2*n_ants*nbins);
+		if (!nhigh) bug_c('f',"Out of memory.");
 
 		while (1) {
-			for (i=0; i<2*n_ants*4; i++) nhigh[i]=0;
-			corrupt(bin,4,nhigh);
+			for (i=0; i<2*n_ants*nbins; i++) nhigh[i]=0;
+			corrupt(bin,nbins,nhigh);
 			max=0;
-			for (i=0; i<2*n_ants*4; i++) if (nhigh[i] > max) max = nhigh[i];
+			for (i=0; i<2*n_ants*nbins; i++) if (nhigh[i] > max) max = nhigh[i];
 			if (max == 0) break;
 
 			for (ant1=0; ant1 < n_ants; ant1++)
 			for (i=0; i<2; i++)
-			for (j=0; j<4; j++) {
-				idx  = i*n_ants*4 + ant1 * 4 + j;	// antenna-based index to the quarter spectral window
+			for (j=0; j<nbins; j++) {
+				idx  = i*n_ants*nbins + ant1 * nbins + j;	// antenna-based index to the quarter spectral window
 				getpolstr(bin->visdata,i,str);
-				if (nhigh[idx] >= max) printf("  Spectral corruption found on antpol %d-%s, quarter %d\n",ant1+1,str,j+1);
+				if (nhigh[idx] >= max) {
+					printf("  Spectral corruption found on antpol %d-%s, section %d\n",ant1+1,str,j+1);
+					fflush(stdout);
+				}
 			}
 
 			// Flag the worst offender
@@ -1094,12 +1250,12 @@ void calflag(bin_struct *bin) {
 			for (ant1=0; ant1 < n_ants; ant1++)
 			for (ant2 = ant1+1; ant2 < n_ants; ant2++) {
 				bl = n_ants*ant1-(ant1*(ant1+1)/2) + ant2;
-				for (j=0; j<4; j++) {
-					idx  = i*n_ants*4 + ant1 * 4 + j;
-					idx2 = i*n_ants*4 + ant2 * 4 + j;
+				for (j=0; j<nbins; j++) {
+					idx  = i*n_ants*nbins + ant1 * nbins + j;
+					idx2 = i*n_ants*nbins + ant2 * nbins + j;
 					if (nhigh[idx] >= max || nhigh[idx2] >= max) {	// Found spectral corruption
-						start = j * n_chan / 4;
-						end = (j+1) * n_chan / 4;
+						start = j * n_chan / nbins;
+						end = (j+1) * n_chan / nbins;
   						for (ch=start; ch<end; ch++) {
 							set_bin_flag(bin,i,bl,ch);
 							nflag++;
@@ -1112,19 +1268,19 @@ void calflag(bin_struct *bin) {
 		}
 		free(nhigh);
 		printf("  Flagged %u baseline/pol/channels.\n",nflag);
+		fflush(stdout);
+
+		// Re-calculate median and scatter, and channel median for each baseline
+		for (i=0; i<2*n_bl*n_chan; i++) meddev_cmplx(data[i],n[i],&(med_spec[i]),&(rms_spec[i]));
+		meddevspec(n_bl, n_chan, med_spec, median, deviation);
 	}
 
 
-	// Re-calculate median and scatter, and channel median for each baseline
-	for (i=0; i<2*n_bl*n_chan; i++) meddev_cmplx(data[i],n[i],&(med_spec[i]),&(rms_spec[i]));
-	meddevspec(n_bl, n_chan, med_spec, median, deviation);
-
-
 	// Flag RFI
-	if (!norfi) flag_rfi(bin);
+	if (!norfi) flag_rfi(bin, 2.0);
 
 
-	if (!nodistro) {
+	if (dodistro && cal) {
 		printf("Looking at distribution of data in real/imag space:");
 		// Flag discrepant data by looking at scatter in real/imag space.
 		nflag=0;
@@ -1148,10 +1304,14 @@ void calflag(bin_struct *bin) {
 			}
 		}
 		printf(" flagged %u discrepant baseline/pol/channels.\n",nflag);
+
+		// Re-calculate median and scatter, and channel median for each baseline
+		for (i=0; i<2*n_bl*n_chan; i++) meddev_cmplx(data[i],n[i],&(med_spec[i]),&(rms_spec[i]));
+		meddevspec(n_bl, n_chan, med_spec, median, deviation);
 	}
 
 
-	if (!nonoise) {
+	if (donoise && cal) {
 		// Re-calculate median and scatter, and channel median for each baseline
 		printf("Looking for excessively noisy baselines:");
 		for (i=0; i<2*n_bl*n_chan; i++) meddev_cmplx(data[i],n[i],&(med_spec[i]),&(rms_spec[i]));
@@ -1212,7 +1372,7 @@ void noncal_stats(dataset_struct *visdata) {
 		median = bin->median;
 		bin->deviation = malloc(sizeof(complex float) * 2 * n_bl);
 		deviation = bin->deviation;
-		if (!median || !deviation || !n || !med_spec || !rms_spec) bug_c('f',"Out of memory in function calflag.");
+		if (!median || !deviation || !n || !med_spec || !rms_spec) bug_c('f',"Out of memory in function noncal_stats.");
 
 
 		// Initialization
@@ -1221,6 +1381,7 @@ void noncal_stats(dataset_struct *visdata) {
 			n_bad[i]=0;
 			med_spec[i]=NAN + NAN*I;
 			rms_spec[i]=NAN + NAN*I;
+			tav_spec[i]=NAN + NAN*I;
 		}
 
 		/* Compute the number of data elements in each pol/baseline/channel */
@@ -1253,10 +1414,10 @@ void noncal_stats(dataset_struct *visdata) {
 		/* Make a temporary array of arrays to hold the data */
 		bin->array = malloc(sizeof(complex float *) * n_bl * n_chan * 2);
 		data = bin->array;
-		if (!data) bug_c('f',"Out of memory in function calflag.");
+		if (!data) bug_c('f',"Out of memory in function noncal_stats.");
 		for (i=0; i<2*n_bl*n_chan; i++) {
 			data[i] = malloc(sizeof(complex float) * n[i]);
-			if (!data[i]) bug_c('f',"Out of memory in function calflag.");
+			if (!data[i]) bug_c('f',"Out of memory in function noncal_stats.");
 			/* Initialize each array to an invalid number */
 			for (j=0; j<n[i]; j++) {
 				data[i][j] = NAN + NAN*I;
@@ -1319,13 +1480,6 @@ void noncal_stats(dataset_struct *visdata) {
 		for (i=0; i<2*n_bl*n_chan; i++) meddev_cmplx(data[i],n[i],&(med_spec[i]),&(rms_spec[i]));
 		meddevspec(n_bl, n_chan, med_spec, median, deviation);
 
-		for (pol=0; pol<2; pol++)
-		for (bl=0; bl<n_bl; bl++)
-		for (ch=0; ch<n_chan; ch++) {
-			if (get_bin_flag(bin, pol, bl, ch)) {
-				printf("Error: flag set at bin=%p pol=%u bl=%u ch=%u\n",bin,pol,bl,ch);
-			}
-		}
 
 		if (ata) {
 			#define N_BINS 32
@@ -1387,7 +1541,7 @@ void noncal_stats(dataset_struct *visdata) {
 
 
 		// Flag RFI
-		if (!norfi) flag_rfi(bin);
+		if (!norfi) flag_rfi(bin, 2.0);
 
 		// Clean up
 		for (i=0; i<2*n_bl*n_chan; i++) {
@@ -1446,7 +1600,6 @@ void check_phases(dataset_struct *first) {
 
 
 
-
 bin_struct *make_bin(vis_struct *vis) {
 	bin_struct *bin;
 	unsigned i;
@@ -1464,6 +1617,7 @@ bin_struct *make_bin(vis_struct *vis) {
 	bin->median = NULL;
 	bin->deviation = NULL;
 	bin->n_vis=1;
+	bin->n_gain_ch = n_chav(bin->visdata->n_chan);
 	bin->flags = malloc(sizeof(char)*(1+bin->visdata->n_chan*bin->visdata->n_bl/4));
 	if (!bin->flags) bug_c('f',"Out of memory in function 'make_bin'");
 	for (i=0; i<1+bin->visdata->n_chan*bin->visdata->n_bl/4; i++) bin->flags[i]=0;
@@ -1632,13 +1786,12 @@ void write_flags(dataset_struct *visdata) {
 			if (!nosingle) {
 				// Apply gains if necessary
 				if (!noband && bin->gains && (!norfi)) {
-					unsigned int idx1;
-					unsigned int idx2;
+					complex float g1, g2;
 					if (pol < 2) {
 					    for (ch=0; ch<visdata->n_chan; ch++) {
-						idx1 = pol*visdata->n_ants*visdata->n_chan + vis->ant[0] * visdata->n_chan + ch;
-						idx2 = pol*visdata->n_ants*visdata->n_chan + vis->ant[1] * visdata->n_chan + ch;
-						vis->data[ch] *= bin->gains[idx1] * ~ bin->gains[idx2];
+						g1 = interpolate_gain(bin,pol,vis->ant[0],ch);
+						g2 = interpolate_gain(bin,pol,vis->ant[1],ch);
+						vis->data[ch] *= g1 * ~ g2;
 					    }
 					}
 				}
@@ -1862,6 +2015,7 @@ plist sorted_list_insert(plist list, bin_struct *bin) {
 }
 
 
+
 void interpolate_flags(plist binlist, dataset_struct *visdata) {
 	bin_struct *bin, *calbin;
 	plist l;
@@ -1870,10 +2024,9 @@ void interpolate_flags(plist binlist, dataset_struct *visdata) {
 	bin = visdata->bin;
 
 	while (bin != NULL) {
+		// Find the first calibrator scan that occurs after our last time
 		l = binlist;
 		calbin = (bin_struct *) l->data;
-
-		// Find the first calibrator scan that occurs after our last time
 		while (l->next != NULL && bin->first_time > calbin->last_time) {
 			l = l->next;
 			calbin = (bin_struct *) l->data;
@@ -1927,7 +2080,6 @@ int main(int argc, char *argv[]) {
 //	float line_start, line_width, line_step;
 //	float sels[maxsels];
 	bin_struct *bin;
-	plist binlist = NULL;
 
 	f_setarg(argc,argv);
 	f_setsig();
@@ -2015,7 +2167,7 @@ int main(int argc, char *argv[]) {
 		while (bin) {
 			i++;
 			printf("\nProcessing scan %d\n",i);
-			calflag(bin);
+			flag(bin,1);
 			bin = bin->next;
 		}
 
@@ -2036,7 +2188,7 @@ int main(int argc, char *argv[]) {
 	while (visdata != NULL) {
 		bin = visdata->bin;
 		while (bin != NULL) {
-			binlist = sorted_list_insert(binlist, bin);
+			calbinlist = sorted_list_insert(calbinlist, bin);
 			bin = bin->next;
 		}
 		visdata = visdata->next;
@@ -2058,10 +2210,18 @@ int main(int argc, char *argv[]) {
 			printf("# of records rejected due to stokes parameter: %lu\n",visdata->n_bad_stokes);
 			printf("mean # of channels flagged as bad: %1.3f\n",(float) visdata->n_flagged_vischan / visdata->n_vis);
 
-			noncal_stats(visdata);
+
+			bin = visdata->bin;
+			i=0;
+			while (bin) {
+				i++;
+				printf("\nProcessing scan %d\n",i);
+				flag(bin,0);
+				bin = bin->next;
+			}
 
 			// Copy calibrator flags to our flag table
-			interpolate_flags(binlist,visdata);
+			if (interpolate) interpolate_flags(calbinlist,visdata);
 
 			if (!noflag) printf("Writing flag table for %s\n",visdata->fname);
 			write_flags(visdata);
@@ -2070,7 +2230,7 @@ int main(int argc, char *argv[]) {
 			visdata = visdata->next;
 		}
 	}
-/*
+	/*
 	// Write some history 
 	if (!noflag) {
 		snprintf(buff,80,"%s/history",visdata->fname);
@@ -2082,9 +2242,9 @@ int main(int argc, char *argv[]) {
 
 		if (fclose(fd)) fprintf(stderr,"Error closing history file %s\n",buff);
 		uvclose_c(visdata->tvis);
+	}
 
-*/
-/*
+
 	// Clean everything up
 	visdata=firstcaldata;
 	while (visdata) {

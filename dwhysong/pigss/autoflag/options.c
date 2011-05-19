@@ -5,16 +5,17 @@
 #include <stdlib.h>
 #include "mirclib.h"
 
+#define STRLENGTH 16
 void options_c(char *key, char *opts[], char *present, int nopt) {
 	const char blank=0;
-	char string[16], *errmsg, found=FALSE;
+	char string[STRLENGTH], *errmsg, found=FALSE;
 	int len, i, optlen[nopt];
 
 	for (i=0; i<nopt; i++) {
 		present[i]=FALSE;
 		optlen[i]=strlen(opts[i]);
 	}
-	keya_c(key,string,&blank);
+	keya_len_c(key,string,STRLENGTH,&blank);
 	while (string[0]) {
 		len=strlen(string);
 
@@ -43,7 +44,7 @@ void options_c(char *key, char *opts[], char *present, int nopt) {
 			snprintf(errmsg,30+strlen(string),"Unrecognized option %s",string);
 			bug_c('f',errmsg);
 		}
-		keya_c(key,string,&blank);
+		keya_len_c(key,string,STRLENGTH,&blank);
 		found=FALSE;
 	}
 

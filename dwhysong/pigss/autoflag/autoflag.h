@@ -22,6 +22,7 @@ typedef struct bin_struct {
 	unsigned long n_vis;
 	double first_time, last_time;
 	complex float *med_spec, *rms_spec, *tav_spec, *gains, *median, *deviation, **array;
+	unsigned n_gain_ch;
 	unsigned *n;
 	unsigned char *flags;
 } bin_struct;
