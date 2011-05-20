@@ -258,7 +258,9 @@ def task (args):
             p.addXY (x, y, keytext, lines=False, rebound=False)
 
         p.rebound (False, False)
-        p.setBounds (ymin=ymin * 0.96, ymax=ymax * 1.05)
+        dx = N.abs (xmax - xmin) * 0.05
+        dy = N.abs (ymax - ymin) * 0.05
+        p.setBounds (xmin - dx, xmax + dx, ymin - dy, ymax + dy)
         p.setLabels (xlabel, ylabel)
         pg.send (p)
 
