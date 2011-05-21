@@ -86,14 +86,13 @@
 
 import numpy as N
 from mirtask import keys, util, uvdat
-from mirtask.util import fmtBP
 from numutils import *
 import sys
 
 SVNID = '$Id$'
 SECOND = 1.0 / 3600. / 24.
 
-p2p = lambda ap1, ap2: util.aps2bp ((ap1, ap2))
+p2p = lambda ap1, ap2: util.apsToPBP32 ((ap1, ap2))
 
 
 def _format (aps):
@@ -224,7 +223,7 @@ class ClosureComputer (object):
         self.seenpols = set ()
 
     def integrate (self, bp, data, flags, var, inttime):
-        for ap in util.bp2aps (bp):
+        for ap in util.pbp32ToAps (bp):
             fpol = util.apFPol (ap)
             self.seenpols.add (fpol)
 
@@ -550,14 +549,14 @@ class ClosureProcessor (object):
             flags = flags.copy ()
 
             time = preamble[3]
-            bp = util.mir2bp (inp, preamble)
+            bp = util.mir2pbp32 (inp, preamble)
     
             var = uvdat.getVariance ()
             inttime = inp.getVarFloat ('inttime')
     
             # Some first checks.
     
-            if not util.bpIsInten (bp): continue
+            if not util.pbp32IsInten (bp): continue
             if not flags.any (): continue
     
             if first:
@@ -584,7 +583,7 @@ class ClosureProcessor (object):
             for integ in integs: integ (bp, data, flags, var, inttime)
 
             if self.uvdPlot:
-                self.uvdists.accum (util.bp2aps (bp),
+                self.uvdists.accum (util.pbp32ToAps (bp),
                                     N.sqrt ((preamble[0:3]**2).sum ()))
 
         # Clean up last interval

@@ -905,7 +905,7 @@ def loadText (fn):
             rms.append (float (a[3]))
             ncontribs.append (int (float (a[4])))
         elif a[0] == 'badbp':
-            badbps.add (util.parseBP (a[1]))
+            badbps.add (util.pbp32ToAps (util.parsePBP32 (a[1])))
 
     if len (solutions) != nsol_expected:
         raise TextFormatError ('missing solutions in file', fn)
