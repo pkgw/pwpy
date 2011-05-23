@@ -1390,12 +1390,12 @@ def process_pickle(filename, pathin, mode='image'):
 #            p.plot(pv.reltime[bgwindow], pv.dmarr[dmbinarr[peaktrial]], '*' )   # not working?
             pv.plotdmt0(save=1)
         elif mode == 'image':
-            mode = 'clean'
-            results = pv.imagedmt0(dmbinarr[peaktrial], tbinarr[peaktrial], bgwindow=bgwindow, clean=1, mode=mode, show=1)
-            if mode == 'clean':
+            immode = 'dirty'
+            results = pv.imagedmt0(dmbinarr[peaktrial], tbinarr[peaktrial], bgwindow=bgwindow, clean=0, mode=immode, show=1)
+            if immode == 'clean':
                 peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = results
                 print peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
-            elif mode == 'dirty':
+            elif immode == 'dirty':
                 peak, std = results
                 print peak, std
         elif mode == 'uvfit':
@@ -1445,7 +1445,7 @@ if __name__ == '__main__':
     elif len(sys.argv) == 2:
         # if pickle, then plot data or dm search results
         print 'Assuming input file is pickle of candidate...'
-        process_pickle(sys.argv[1], pathin=pathin, mode='spec')
+        process_pickle(sys.argv[1], pathin=pathin, mode='image')
     elif len(sys.argv) == 5:
         # if pickle, then plot data or dm search results
         print 'Searching for pulses... with %s, %s, %s' % (fileroot, pathin, pathout)
