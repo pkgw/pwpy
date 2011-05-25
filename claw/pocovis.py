@@ -1383,6 +1383,7 @@ def process_pickle(filename, pathin, mode='image'):
                 pv2 = poco(newfile, nints=1)
                 pv2.prep()
                 pv2.fitspec(obsrms=0, save=0)
+#                p.show()
                 shutil.rmtree(newfile, ignore_errors=True)
         elif mode == 'dmt0':
             pv.makedmt0()
@@ -1427,8 +1428,8 @@ if __name__ == '__main__':
     fileroot = 'poco_m31_154202.mir'
     pathin = 'data/'
     pathout = 'm31_im/'
-    edge = 150 # m31 search up to dm=131 and pulse starting at first unflagged channel
-#    edge = 35 # b0329 search at dm=28.6 and pulse starting at first unflagged channel
+#    edge = 150 # m31 search up to dm=131 and pulse starting at first unflagged channel
+    edge = 35 # b0329 search at dm=28.6 and pulse starting at first unflagged channel
 #    edge = 70 # Crab search at dm=56.8 and pulse starting at first unflagged channel
 #    edge = 360  # Crab DM of 56.8 and for DM track starting at freq=0
 
@@ -1445,7 +1446,7 @@ if __name__ == '__main__':
     elif len(sys.argv) == 2:
         # if pickle, then plot data or dm search results
         print 'Assuming input file is pickle of candidate...'
-        process_pickle(sys.argv[1], pathin=pathin, mode='image')
+        process_pickle(sys.argv[1], pathin=pathin, mode='uvfit')
     elif len(sys.argv) == 5:
         # if pickle, then plot data or dm search results
         print 'Searching for pulses... with %s, %s, %s' % (fileroot, pathin, pathout)
