@@ -10,8 +10,8 @@ import numpy as n
 import scipy.optimize as opt
 
 
-#filename = 'crab_fixdm_ph/poco_crab_fitsp.txt'
-filename = 'b0329_fixdm_ph/poco_b0329_173027_fitsp.txt'
+filename = 'crab_fixdm_ph/poco_crab_fitsp.txt'
+#filename = 'b0329_fixdm_ph/poco_b0329_173027_fitsp.txt'
 filename2 = 'b0329_fixdm_uv/poco_b0329_173027_fitsp.txt'
 filename3 = 'b0329_fixdm_im2/poco_b0329_173027_fitsp.txt'
 mode='flux'
@@ -52,7 +52,8 @@ nint3 = []; nskip3 = []; chunk3 = []; pnn3 = []; detsig3 = []
 for nn in name:
     nskip.append(int((nn.split('.'))[1].split('-')[0]))
     nint.append(int((nn.split('-dm0t'))[1].split('.')[0]))
-    chunk.append(int((nn.split('_173027_'))[1].split('.')[0]))
+#    chunk.append(int((nn.split('_173027_'))[1].split('.')[0]))
+    chunk.append(int((nn.split('_'))[3].split('.')[0]))
 for nn in name2:
     nskip2.append(int((nn.split('.'))[1].split('-')[0]))
     nint2.append(int((nn.split('-dm0t'))[1].split('.')[0]))
@@ -97,47 +98,51 @@ for i in range(len(newsortar2)-1):
     ntotdiff2.append(newsortar2[i+1][0] - newsortar2[i][0])
 for i in range(len(newsortar3)-1):
     ntotdiff3.append(newsortar3[i+1][0] - newsortar3[i][0])
+ntotdiff.append(0)
 ntotdiff3.append(0)
 ntotdiff = n.array(ntotdiff) ; ntotdiff2 = n.array(ntotdiff2); ntotdiff3 = n.array(ntotdiff3)
 
-# need to add function to grab brightest pulse in fixed box
-
-
-good1 = n.where(ntotdiff > 0)[0]
+good1 = n.where(ntotdiff > -1)[0]
 good2 = n.where(ntotdiff2 > 0)[0]
-#good3 = n.where(ntotdiff3 > 0)[0]
-good3 = n.where( (n.array(newsortar3.tolist())[:,2] > 7.) & (ntotdiff3 > 0))[0]
+good3 = n.where( (n.array(newsortar3.tolist())[:,2] > 7.) & (n.array(newsortar3.tolist())[:,1] > 0.) & (ntotdiff3 > 0))[0]
 print 'lengths (orig, new): ', len(ntotdiff), len(good1), len(ntotdiff2), len(good2), len(ntotdiff3), len(good3)
+print len(n.where( (n.array(newsortar3.tolist())[:,1] < 0.))[0])
 
 meanflux = (n.array( newsortar.tolist())[:,1] )[good1]
 meanflux2 = (n.array( newsortar2.tolist())[:,1] )[good2]
 meanflux3 = (n.array( newsortar3.tolist())[:,1] )[good3]
 
-p.figure(1)
-p.hist(ntotdiff, bins=[-1,0,1,2,5,10,20,30,40,50,60,70,80,90,100,110])
-p.figure(2)
-p.hist(ntotdiff2, bins=[-1,0,1,2,5,10,20,30,40,50,60,70,80,90,100,110])
-p.figure(3)
-p.hist(ntotdiff3, bins=[-1,0,1,2,5,10,20,30,40,50,60,70,80,90,100,110])
-p.show()
+#p.figure(1)
+#p.hist(ntotdiff, bins=[-1,0,1,2,5,10,20,30,40,50,60,70,80,90,100,110])
+#p.figure(2)
+#p.hist(ntotdiff2, bins=[-1,0,1,2,5,10,20,30,40,50,60,70,80,90,100,110])
+#p.figure(3)
+#p.hist(ntotdiff3, bins=[-1,0,1,2,5,10,20,30,40,50,60,70,80,90,100,110])
+#p.show()
 
 if mode == 'flux':
     plaw = lambda a, b, x: a * (x/100.)**b
     fitfunc = lambda p, x:  plaw(p[0], p[1], x)
     errfunc = lambda p, x, y, rms: ((y - fitfunc(p, x))/rms)**2
-    p0 = [1000,-4.5]
+    p0 = [100,-4.5]
 
-    hist = p.hist(meanflux, align='mid', bins=n.arange(-200,450,10))
-    p.clf()
+    hist = p.hist(meanflux, align='mid', bins=n.arange(40,760,15), label='Observed', color='b')
     centers = n.array([(hist[1][i+1] + hist[1][i])/2 for i in range(len(hist[1])-1)])
     errs = 1+(n.sqrt(hist[0] + 0.75))
     p.errorbar(centers,hist[0],yerr=errs,fmt=None,ecolor='b', capsize=0)
-    fitignore = n.where(hist[1] >= 40)[0].min()
+    fitignore = n.where(hist[1] >= 80)[0].min()
     print 'ignore, ', fitignore
     p1,success = opt.leastsq(errfunc, p0[:], args = (centers[fitignore:], hist[0][fitignore:], errs[fitignore:]))
+    print p1
+    p.plot(centers,fitfunc(p1[:],centers), 'y', label='Fit powerlaw slope=%.1f' % p1[1])
+    p.xlabel('Flux (Jy)')
+    p.ylabel('Number of pulses')
+    p.legend()
+    p.axis([-170,430,0,500])
+    p.show()
 
-    hist2 = p.hist(meanflux2, align='mid', histtype='step', bins=hist[1], label='UV fit', color='g')
     hist = p.hist(meanflux, align='mid', histtype='bar', bins=hist[1], label='Beamforming', color='b')
+    hist2 = p.hist(meanflux2, align='mid', histtype='step', bins=hist[1], label='UV fit', color='g')
     centers2 = n.array([(hist2[1][i+1] + hist2[1][i])/2 for i in range(len(hist2[1])-1)])
     errs2 = 1+(n.sqrt(hist2[0] + 0.75))
     p.errorbar(centers2,hist2[0],yerr=errs2,fmt=None,ecolor='g', capsize=0)
@@ -153,7 +158,7 @@ if mode == 'flux':
     for i in range(len(centers)):
         print centers[i], hist[0][i]/fitfunc(p1[:],centers)[i], hist2[0][i]/fitfunc(p1[:],centers)[i], hist3[0][i]/fitfunc(p1[:],centers)[i]
 
-    p.plot(centers,fitfunc(p1[:],centers), 'y', label='Fit powerlaw slope=%.1f' % p1[1])
+#    p.plot(centers,fitfunc(p1[:],centers), 'y', label='Fit powerlaw slope=%.1f' % p1[1])
 #    p.plot(centers2,fitfunc(p12[:],centers2), 'g', label='Best fit slope2=%.1f' % p12[1])
 #    p.plot(centers3,fitfunc(p13[:],centers3), 'g', label='Best fit slope3=%.1f' % p13[1])
     p.xlabel('Flux (Jy)')
@@ -166,17 +171,19 @@ elif mode == 'index':
     gauss = lambda amp, x, x0, sigma: amp * n.exp(-1./(2.*sigma**2)*(x-x0)**2)
     fitfunc = lambda p, x:  gauss(p[0], x, p[1], p[2])
     errfunc = lambda p, x, y, rms: ((y - fitfunc(p, x))/rms)**2
-    p0 = [100,0,1]
+    p0 = [10,0,10]
 
-    hist = p.hist(ind, align='mid',bins=20, label='Observed')
+    hist = p.hist(ind, align='mid',bins=n.arange(-50,50,2))
+    p.clf()
     centers = n.array([(hist[1][i+1] + hist[1][i])/2 for i in range(len(hist[1])-1)])
     errs = 1+(n.sqrt(hist[0] + 0.75))
 
     p1,success = opt.leastsq(errfunc, p0[:], args = (centers, hist[0], errs))
     print 'model', p1
 
-    p.errorbar(centers,hist[0],yerr=errs,fmt=None,ecolor='b')
-    p.plot(centers,fitfunc(p1[:],centers), label='Best fit')
+    hist = p.hist(ind, align='mid',bins=hist[1], label='Observed')
+    p.errorbar(centers,hist[0],yerr=errs,fmt=None,ecolor='b', capsize=0)
+    p.plot(centers,fitfunc(p1[:],centers), 'y', label='Best-fit Gaussian')
     p.legend()
     p.xlabel('Spectral index')
     p.ylabel('Number of pulses')

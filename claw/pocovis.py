@@ -41,12 +41,12 @@ class poco:
         self.sdf = 0.104/self.nchan   # dfreq per channel in GHz
         self.approxuvw = True      # flag to make template visibility file to speed up writing of dm track data
         self.baseline_order = n.array([ 257, 258, 514, 261, 517, 1285, 262, 518, 1286, 1542, 259, 515, 773, 774, 771, 516, 1029, 1030, 772, 1028, 1287, 1543, 775, 1031, 1799, 1544, 776, 1032, 1800, 2056, 260, 263, 264, 519, 520, 1288])   # second iteration of bl nums
-#        self.pulsewidth = 0.0066 * n.ones(len(self.chans)) # pulse width of b0329+54
-        self.pulsewidth = 0 * n.ones(len(self.chans)) # pulse width of crab
+        self.pulsewidth = 0.0066 * n.ones(len(self.chans)) # pulse width of b0329+54
+#        self.pulsewidth = 0 * n.ones(len(self.chans)) # pulse width of crab
         # set dmarr
-#        self.dmarr = [26.8]  # b0329+54
+        self.dmarr = [26.8]  # b0329+54
 #        self.dmarr = [56.8]  # crab
-        self.dmarr = n.arange(50,126,2.7)       # dm trials for m31. spacing set for 50% efficiency for band from 722-796 MHz, 1.2 ms integrations
+#        self.dmarr = n.arange(50,126,2.7)       # dm trials for m31. spacing set for 50% efficiency for band from 722-796 MHz, 1.2 ms integrations
 #        self.tshift = 0.2     # not implemented yet
         self.nskip = int(nskip*self.nbl)    # number of iterations to skip (for reading in different parts of buffer)
         nskip = int(self.nskip)
@@ -617,7 +617,7 @@ class poco:
         # make image, clean, restor, fit point source
             print
             print 'Making dirty image for nskip=%d, dm[%d]=%.1f, and trel[%d] = %.3f.' % (self.nskip/self.nbl, dmbin, self.dmarr[dmbin], t0bin-tshift, self.reltime[t0bin-tshift])
-            txt = TaskInvert (vis=outroot+'.mir', map=outroot+'.map', beam=outroot+'.beam', mfs=True, double=True, cell=80, imsize=250).snarf()  # sensitivity drops for larger vals...
+            txt = TaskInvert (vis=outroot+'.mir', map=outroot+'.map', beam=outroot+'.beam', mfs=True, double=True, cell=70, imsize=160).snarf()  # good for m31 search
             if show:  txt = TaskCgDisp (in_=outroot+'.map', device='/xs', wedge=True, beambl=True).snarf () 
             txt = TaskImStat (in_=outroot+'.map').snarf()   # get dirty image stats
 
@@ -1446,7 +1446,7 @@ if __name__ == '__main__':
     elif len(sys.argv) == 2:
         # if pickle, then plot data or dm search results
         print 'Assuming input file is pickle of candidate...'
-        process_pickle(sys.argv[1], pathin=pathin, mode='uvfit')
+        process_pickle(sys.argv[1], pathin=pathin, mode='spec')
     elif len(sys.argv) == 5:
         # if pickle, then plot data or dm search results
         print 'Searching for pulses... with %s, %s, %s' % (fileroot, pathin, pathout)
