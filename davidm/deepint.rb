@@ -3,6 +3,7 @@ $-w = true if $0 == __FILE__ # Turn on warnings
 
 # Do deep integrations
 
+require 'rubygems'
 require 'pgplot/plotter'
 include Pgplot
 
