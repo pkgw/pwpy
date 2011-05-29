@@ -3,6 +3,7 @@ $-w = true if $0 == __FILE__ # Turn on warnings
 
 # Plot UV spectra in lag space
 
+require 'rubygems'
 require 'pgplot/plotter'
 include Pgplot
 
