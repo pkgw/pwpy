@@ -86,7 +86,7 @@ for dIn, p, d, f in uvdat.read ():
     
     # Collect data
     
-    bp = util.mir2aps (dIn, p)
+    bp = util.mir2bp (dIn, p)
 
     if not xantdep: x = xfunc (dIn, p, d)
     if not yantdep: y = yfunc (dIn, p, d)

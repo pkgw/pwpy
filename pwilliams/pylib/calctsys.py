@@ -423,7 +423,7 @@ class SysTemps (object):
             tsys = gain * s * etaQ * N.sqrt (2 * sdf * 1e9 * meantime) / jyperk
 
             #if tsys > 300: 
-                #    print '  Crappy %s: TSys = %g' % (util.fmtAPs (bp), tsys)
+                #    print '  Crappy %s: TSys = %g' % (util.fmtBP (bp), tsys)
                 #    print '    real: s, D, p:', sreal, Dr, pr
                 #    print '    imag: s, D, p:', simag, Di, pi
                 #    continue
@@ -556,7 +556,7 @@ class SysTemps (object):
         for i in xrange (lb, 0):
             idx = idxs[i]
             a1, a2 = ants[idx]
-            bp = util.fmtAPs ((aps[a1], aps[a2])).rjust (8)
+            bp = util.fmtBP ((aps[a1], aps[a2])).rjust (8)
             
             if col == 0: print ' ',
             if col < 4:
@@ -680,7 +680,7 @@ class SysTemps (object):
             
             for bp, resid in badBps:
                 print '      Flagging basepol %s: resid |%#4g| > %#4g' % \
-                      (util.fmtAPs (bp), resid, self.maxresid)
+                      (util.fmtBP (bp), resid, self.maxresid)
             for ap, soln in badAps:
                 print '      Flagging antpol %s: TSys %#4g > %#4g' % \
                       (util.fmtAP (ap), soln, self.maxtsys)
@@ -786,9 +786,9 @@ class DataProcessor (object):
             if nspect > 0:
                 sdf = inp.getVarDouble ('sdf', nspect)
         
-        bp = util.mir2aps (inp, preamble)
+        bp = util.mir2bp (inp, preamble)
         ants = util.decodeBaseline (preamble[4])
-        fcpdiscard = (self.flux is not None) and (not util.apsAreInten (bp))
+        fcpdiscard = (self.flux is not None) and (not util.bpIsInten (bp))
 
         if fcpdiscard and not self.warnedFluxAndCrossPols:
             print >>sys.stderr, 'Warning: flux keyword not compatible with ' \
@@ -838,7 +838,7 @@ def dumpText (solutions, durDays, outfn):
                 '%.3f' % (rms[idx] * jyperk), ncontrib[idx]
 
         for bp in badbps:
-            print >>f, 'badbp', util.fmtAPs (bp)
+            print >>f, 'badbp', util.fmtBP (bp)
 
         print >>f, 'endsolution'
 
@@ -905,7 +905,7 @@ def loadText (fn):
             rms.append (float (a[3]))
             ncontribs.append (int (float (a[4])))
         elif a[0] == 'badbp':
-            badbps.add (util.pbp32ToAps (util.parsePBP32 (a[1])))
+            badbps.add (util.parseBP (a[1]))
 
     if len (solutions) != nsol_expected:
         raise TextFormatError ('missing solutions in file', fn)
@@ -1015,8 +1015,8 @@ def rewriteData (banner, vis, out, solutions, varyJyPerK, **kwargs):
                 dOut.writeVarFloat ('xyphase', inp.getVarFloat ('xyphase', tup[1]))
 
         time = preamble[3]
-        bp = util.mir2aps (inp, preamble)
-        pol = util.aps2ants (bp)[2]
+        bp = util.mir2bp (inp, preamble)
+        pol = util.bp2aap (bp)[2]
 
         if thePol is None:
             thePol = pol
@@ -1053,7 +1053,7 @@ def rewriteData (banner, vis, out, solutions, varyJyPerK, **kwargs):
             dOut.writeHistory ('CALCTSYS: soln %s: flagging %d basepols' % (jd, len (badBps)))
 
             for bp in sorted (badBps):
-                dOut.writeHistory ('CALCTSYS:   flagging %s' % util.fmtAPs (bp))
+                dOut.writeHistory ('CALCTSYS:   flagging %s' % util.fmtBP (bp))
 
             if not varyJyPerK:
                 dOut.writeVarFloat ('systemp', systemps)
@@ -1158,7 +1158,7 @@ else:
     GetTSysInfo = SimpleMake ('vis params', 'out', _gettsysinfo,
                               [None, {}])
 
-    from mirtask.util import mir2aps, aps2ants
+    from mirtask.util import mir2bp, bp2aap
     from arf.vispipe import VisPipeStage
 
     class AddTSysInfo (VisPipeStage):
@@ -1205,14 +1205,14 @@ else:
                 goodaps = self.goodaps = set (cursoln.iterkeys ())
                 self.nextsolnidx += 1
 
-            aps = mir2aps (state.inp, state.preamble)
-            ant1, ant2, pol = aps2ants (aps)
+            bp = mir2bp (state.inp, state.preamble)
+            ant1, ant2, pol = bp2aap (bp)
 
-            if aps[0] not in goodaps or aps[1] not in goodaps or aps in badbps:
+            if bp[0] not in goodaps or bp[1] not in goodaps or bp in badbps:
                 state.flags.fill (0)
                 jyperk = 1e-6
             else:
-                jyperk = N.sqrt ((cursoln[aps[0]] * cursoln[aps[1]]) / 
+                jyperk = N.sqrt ((cursoln[bp[0]] * cursoln[bp[1]]) / 
                                  (systemps[ant1 - 1] * systemps[ant2 - 1])) * curjyperk
 
             state.jyperk = jyperk

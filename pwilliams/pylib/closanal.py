@@ -92,7 +92,7 @@ import sys
 SVNID = '$Id$'
 SECOND = 1.0 / 3600. / 24.
 
-p2p = lambda ap1, ap2: util.apsToPBP32 ((ap1, ap2))
+p2p = lambda ap1, ap2: util.bpToPBP32 ((ap1, ap2))
 
 
 def _format (aps):
@@ -222,8 +222,8 @@ class ClosureComputer (object):
         self.seenaps = {}
         self.seenpols = set ()
 
-    def integrate (self, bp, data, flags, var, inttime):
-        for ap in util.pbp32ToAps (bp):
+    def integrate (self, pbp, data, flags, var, inttime):
+        for ap in util.pbp32ToBP (pbp):
             fpol = util.apFPol (ap)
             self.seenpols.add (fpol)
 
@@ -583,7 +583,7 @@ class ClosureProcessor (object):
             for integ in integs: integ (bp, data, flags, var, inttime)
 
             if self.uvdPlot:
-                self.uvdists.accum (util.pbp32ToAps (bp),
+                self.uvdists.accum (util.pbp32ToBP (bp),
                                     N.sqrt ((preamble[0:3]**2).sum ()))
 
         # Clean up last interval
