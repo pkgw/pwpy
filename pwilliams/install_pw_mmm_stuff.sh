@@ -53,6 +53,7 @@ fancy/box-topointmdl
 fancy/byant
 fancy/calctsys
 fancy/chanaver
+fancy/cloplot
 fancy/closanal
 fancy/dualscal
 fancy/fxcal.py
