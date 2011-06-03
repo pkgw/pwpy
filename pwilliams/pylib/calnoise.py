@@ -1,0 +1,509 @@
+#! /usr/bin/env python
+# -*- mode: python; coding: utf-8 -*-
+
+"""\
+Use a bandpass calibrator observation to information calibrating the
+system noise levels to the autocorrelation amplitudes of raw data.
+An ARF preprocessing stage can then use this calibration information
+to insert appropriate TSys and Jy/K information.
+
+"""
+
+import sys, os.path
+import cPickle
+import numpy as N
+import numutils
+from miriad import *
+from mirtask import util, uvdat
+
+__version_info__ = (1, 0)
+__all__ = ('NoiseCal loadNoiseCalExport').split ()
+
+TTOL = 1./1440 # 1 minute
+
+
+class NoiseCal (object):
+    instr = None # the ARF instrument used to take the data
+
+    saps = None # sorted list of seen (autocorr) antpols
+
+    raras = None # raw autocorrelation rms amplitudes: {apidx:
+    # (3,n)-ndarray} with n sets of: JD timestamp, raw autocorrelation
+    # RMS amplitudes, RARA msmt weight; apidx is an index into saps
+
+    sqbps = None # squashed sample basepols: (n,2)-ndarray with two
+    # indexes into saps 
+
+    bpdata = None # basepol sample data: (n,5)-ndarray where n is the
+    # same as in sqbps. items are JD timestamp, spectrum variance,
+    # variance measurement weight, rara product, rara product weight
+
+    solution = None # noise coefficient solutions: n-element vector
+    # where n is the number of seen antpols, such that
+    # (solution1 * rara1 * solution2 * rara2) gives the expected
+    # visibility variance for a set of correlations
+
+    svals = None # solution values for samples: n-element vector
+    # with n the same as in sqbps, with svals[i] = solution1 *
+    # solution2 for the i'th good sample.
+
+
+    def load (self, path, partial=False):
+        f = open (path)
+        self.instr = cPickle.load (f)
+        self.saps = cPickle.load (f)
+        self.solution = N.load (f)
+        if not partial:
+            self.raras = cPickle.load (f)
+            self.sqbps = N.load (f)
+            self.bpdata = N.load (f)
+            self.svals = N.load (f)
+        f.close ()
+        
+
+    def printsefdinfo (self):
+        raras = self.raras
+        solution = self.solution
+        saps = self.saps
+
+        print 'instrument:', self.instr
+
+        for i in xrange (len (saps)):
+            info = raras[i]
+            # sqrt (2 * 102.4 khz * 10 s)
+            sefd = 1431 * solution[i] * info[1]
+            # TODO later: we're ignoring the RARA weighting
+            pstd = 100. * sefd.std () / sefd.mean ()
+            print util.fmtAP (saps[i]), '%7.0f' % sefd.mean (), 'var. %.1f%%' % pstd
+
+
+    def export (self, stream):
+        solution = self.solution
+        saps = self.saps
+
+        for i in xrange (len (saps)):
+            print >>stream, self.instr, util.fmtAP (saps[i]), '%.5e' % solution[i]
+
+
+    def compute (self, toread, **uvdatoptions):
+        for vis in toread:
+            if not os.path.exists (vis.path ('gains')):
+                util.die ('input "%s" has no gain calibration tables', vis)
+
+        self._compute_getraras (toread, uvdatoptions)
+        self._compute_getbpvs (toread, uvdatoptions)
+        self._compute_solve ()
+
+
+    def save (self, outpath):
+        f = open (outpath, 'w')
+        # Start with just the info needed to apply to noise calibration:
+        cPickle.dump (self.instr, f)
+        cPickle.dump (self.saps, f)
+        self.solution.dump (f)
+        # Then (potentially large) extra data for checking the quality
+        # of the noise calibration:
+        cPickle.dump (self.raras, f)
+        self.sqbps.dump (f)
+        self.bpdata.dump (f)
+        self.svals.dump (f)
+        f.close ()
+
+
+    # The bits that actually do the calibration:
+
+    def _compute_getraras (self, toread, uvdatoptions):
+        seenaps = set ()
+        rarawork = {}
+
+        previnp = None
+        gen = uvdat.setupAndRead (toread, 'a3', False,
+                                  nopass=True, nocal=True, nopol=True,
+                                  **uvdatoptions)
+
+        for inp, preamble, data, flags in gen:
+            if previnp is None or inp is not previnp:
+                instr = inp.getHeaderString ('arfinstr', 'UNDEF')
+                if instr != 'UNDEF':
+                    if self.instr is None:
+                        self.instr = instr
+                    elif instr != self.instr:
+                        util.die ('input instrument changed from "%s" to '
+                                  '"%s" in "%s"', self.instr, instr,
+                                  uvdat.getCurrentName ())
+                previnp = inp
+
+            # the 'a' uvdat options limits us to autocorrelations,
+            # but includes 1X-1Y-type autocorrelations
+            bp = util.mir2bp (inp, preamble)
+            if not util.bpIsInten (bp):
+                continue
+            ap = bp[0]
+            t = preamble[3]
+
+            w = N.where (flags)[0]
+            if not w.size:
+                continue
+
+            data = data[w]
+            rara = N.sqrt ((data.real**2).mean ())
+
+            seenaps.add (ap)
+            ag = rarawork.get (ap)
+            if ag is None:
+                ag = rarawork[ap] = numutils.ArrayGrower (3)
+            ag.add (t, rara, w.size)
+
+        self.saps = sorted (seenaps)
+        raras = self.raras = {}
+        apidxs = dict ((t[1], t[0]) for t in enumerate (self.saps))
+
+        for ap in rarawork.keys ():
+            raradata = rarawork[ap].finish ().T
+            apidx = apidxs[ap]
+            sidx = N.argsort (raradata[0])
+            raras[apidx] = raradata[:,sidx]
+
+
+    def _compute_getbpvs (self, toread, uvdatoptions):
+        raras = self.raras
+        apidxs = dict ((t[1], t[0]) for t in enumerate (self.saps))
+
+        sqbps = numutils.ArrayGrower (2, dtype=N.int)
+        bpdata = numutils.ArrayGrower (5)
+        
+        nnorara = 0
+        gen = uvdat.setupAndRead (toread, 'x3', False,
+                                  nopass=False, nocal=False, nopol=False,
+                                  **uvdatoptions)
+
+        for inp, preamble, data, flags in gen:
+            bp = util.mir2bp (inp, preamble)
+            t = preamble[3]
+
+            w = N.where (flags)[0]
+            if not w.size:
+                continue
+
+            idx1, idx2 = apidxs[bp[0]], apidxs[bp[1]]
+            rdata1, rdata2 = raras[idx1], raras[idx2]
+
+            tidx1 = rdata1[0].searchsorted (t)
+            tidx2 = rdata2[0].searchsorted (t)
+
+            if (tidx1 < 0 or tidx1 >= rdata1.shape[1] or
+                tidx2 < 0 or tidx2 >= rdata2.shape[1]):
+                nnorara += 1
+                continue
+
+            tr1, rara1, rwt1 = rdata1[:,tidx1]
+            tr2, rara2, rwt2 = rdata2[:,tidx2]
+            dt1 = N.abs (tr1 - t)
+            dt2 = N.abs (tr2 - t)
+
+            if max (dt1, dt2) > TTOL:
+                nnorara += 1
+                continue
+
+            crara = rara1 * rara2
+            cwt = 1. / (rara2**2 / rwt1 + rara1**2 / rwt2)
+
+            data = data[w]
+            rvar = data.real.var (ddof=1)
+            ivar = data.imag.var (ddof=1)
+            var = 0.5 * (rvar + ivar)
+
+            sqbps.add (idx1, idx2)
+            bpdata.add (t, var, w.size, crara, cwt)
+
+        self.sqbps = sqbps.finish ()
+        self.bpdata = bpdata.finish ()
+        nsamp = self.sqbps.shape[0]
+
+        if nnorara > nsamp * 0.02:
+            print >>sys.stderr, ('Warning: no autocorr data for %d/%d '
+                                 '(%.0f%%) of samples' % (nnorara, nsamp,
+                                                          100. * nnorara / nsamp))
+
+
+    def _compute_solve (self):
+        nap = len (self.saps)
+        sqbps = self.sqbps
+        bpdata = self.bpdata
+        nsamp = bpdata.shape[0]
+
+        coeffs = N.zeros ((nap, nsamp))
+        values = N.empty (nsamp)
+
+        # FIXME: weighting -- can't seem to find a canned linear least
+        # squares solver that will use weights.  Can always transition
+        # to a nonlinear one.
+
+        for i in xrange (nsamp):
+            idx1, idx2 = sqbps[i]
+            var = bpdata[i,1]
+            crara = bpdata[i,3]
+
+            coeffs[idx1,i] = coeffs[idx2,i] = 1
+            values[i] = N.log (var / crara)
+
+        soln = util.linLeastSquares (coeffs, values)
+        self.solution = N.exp (soln)
+        self.svals = N.exp (N.dot (coeffs.T, soln))
+
+
+def loadNoiseCalExport (path):
+    byinstr = {}
+
+    for line in open (path):
+        a = line.split ('#', 1)[0].strip ().split ()
+        if len (a) == 0:
+            continue
+
+        instr = a[0]
+        ap = util.parseAP (a[1])
+        value = float (a[2])
+
+        byap = byinstr.setdefault (instr, {})
+        byap[ap] = value
+
+    for instr, byap in byinstr.items ():
+        default = N.median (byap.values ())
+        byinstr[instr] = (byap, default)
+
+    return byinstr
+
+
+# AWFF/ARF interface
+
+try:
+    import arf
+except:
+    pass
+else:
+    from mirtask.util import mir2bp, apAnt
+    from arf.vispipe import VisPipeStage
+
+    class InsertNoiseInfo (VisPipeStage):
+        def __init__ (self, pathobj):
+            self.pathobj = pathobj
+            self.byinstr = loadNoiseCalExport (str (pathobj))
+
+
+        def __str__ (self):
+            return '%s(%s)' % (self.__class__.__name__, self.pathobj)
+
+
+        def updateHash (self, updater):
+            updater (self.__class__.__name__)
+            from awff.stdhash import updatefile
+            updatefile (updater, str (self.pathobj))
+
+
+        def init (self, state):
+            if not hasattr (state, 'nbp'):
+                raise ValueError ('this stage only works in arf.ata.vispipe')
+
+            self.track = None
+            self.systemps = None
+            self.prefactor = None
+            self.raras = {}
+            self.bps = None
+            self.bpfactors = None
+
+
+        def record (self, state):
+            inp = state.inp
+            track = self.track
+            systemps = self.systemps
+            prefactor = self.prefactor
+            bps = self.bps
+            bpfactors = self.bpfactors
+
+            if track is None:
+               track = inp.makeVarTracker ().track ('systemp', 'sdf', 'inttime')
+               self.track = track
+
+            if track.updated ():
+                nants = inp.getVarInt ('nants')
+                systemps = self.systemps = inp.getVarFloat ('systemp', nants)
+                nspect = inp.getVarInt ('nspect')
+                sdf = inp.getVarDouble ('sdf', nspect)
+                if nspect > 1:
+                    sdf = sdf[0]
+                inttime = inp.getVarFloat ('inttime')
+                prefactor = self.prefactor = 2 * inttime * sdf * 1e9
+
+            if bpfactors is None or bpfactors.size != state.nbp:
+                bpfactors = self.bpfactors = N.empty (state.nbp)
+                bps = self.bps = N.empty ((state.nbp, 2), dtype=N.int)
+
+            ap1, ap2 = mir2bp (inp, state.preamble)
+
+            if ap1 == ap2:
+                # Autocorrelation! Get the RARA (raw autocorrelation
+                # RMS amplitude)
+                w = N.where (state.flags)[0]
+                if w.size == 0:
+                    self.raras[ap1] = 0
+                else:
+                    self.raras[ap1] = N.sqrt ((state.data.real[w]**2).mean ())
+
+            # Get the factor that will go in front of the RARAs for
+            # jyperk computations. Do this for autocorrs too because
+            # there's no reason not to.
+
+            byap, default = self.byinstr[state.instr]
+            cal1 = byap.get (ap1, default)
+            cal2 = byap.get (ap2, default)
+            ant1, ant2 = apAnt (ap1), apAnt (ap2)
+            tsys1, tsys2 = systemps[ant1 - 1], systemps[ant2 - 1]
+
+            bpindex = state.bpindex
+            bps[bpindex,0] = ap1
+            bps[bpindex,1] = ap2
+            bpfactors[bpindex] = prefactor * cal1 * cal2 / (tsys1 * tsys2)
+
+
+        def dumpdone (self, state):
+            seen = state.dump_seen
+            jyperks = state.dump_jyperks
+            bps = self.bps
+            bpfactors = self.bpfactors
+            raras = self.raras
+
+            defaultrara = N.median (raras.values ())
+            get = lambda ap: raras.get (ap, defaultrara)
+
+            for i in xrange (state.nbp):
+                if seen[i]:
+                    ap1, ap2 = bps[i]
+                    jyperks[i] = bpfactors[i] * get (ap1) * get (ap2)
+
+            N.sqrt (jyperks, jyperks)
+            raras.clear ()
+
+    __all__ += ['InsertNoiseInfo']
+
+
+# Command-line interface
+
+def tui_compute (args):
+    toread = []
+    uvdatoptions = {}
+
+    for arg in args:
+        if '=' in arg:
+            key, value = arg.split ('=', 1)
+            uvdatoptions[key] = value
+        else:
+            toread.append (arg)
+
+    if len (toread) < 2:
+        util.die ('usage: <vis1> [... visn] [uvdat options] <output name>')
+
+    toread = [VisData (x) for x in toread[:-1]]
+    outpath = toread[-1]
+
+    try:
+        tmp = open (outpath, 'w')
+        tmp.close ()
+    except Exception, e:
+        util.die ('cannot open output path "%s" for writing: %s',
+                  outpath, e)
+
+    nc = NoiseCal ()
+    nc.compute (toread, **uvdatoptions)
+    nc.save (outpath)
+    return 0
+
+
+def tui_checkcal (args):
+    import omega as O, scipy.stats as SS
+    toread = []
+    uvdatoptions = {}
+
+    for arg in args:
+        if '=' in arg:
+            key, value = arg.split ('=', 1)
+            uvdatoptions[key] = value
+        else:
+            toread.append (VisData (arg))
+
+    if len (toread) < 1:
+        util.die ('usage: <vis1> [... visn] [uvdat options]')
+
+    samples = numutils.VectorGrower ()
+    gen = uvdat.setupAndRead (toread, 'x3', False, **uvdatoptions)
+
+    for inp, pream, data, flags in gen:
+        w = N.where (flags)[0]
+        if w.size == 0:
+            continue
+
+        data = data[w]
+        var = 0.5 * (data.real.var (ddof=1) + data.imag.var (ddof=1))
+        uvar = N.sqrt (2. / (w.size - 1)) * var # uncert in our derived variance
+        thy = uvdat.getVariance ()
+        samples.add ((var - thy) / uvar)
+
+    samples = samples.finish ()
+    n = samples.size
+    m = samples.mean ()
+    s = samples.std ()
+    med = N.median (samples)
+    smadm = 1.4826 * N.median (N.abs (samples - med)) # see comment below
+
+    print 'Number of samples:', n
+    print 'Mean normalized error (should be 0):', m
+    print '                             Median:', med
+    print 'Normalized std. dev. (should be 1):', s
+    print '                             SMADM:', smadm
+    print 'Probability that samples are normal:', SS.normaltest (samples)[1]
+
+    bins = 50
+    rng = (m - 5 * s, m + 5 * s)
+    p = O.quickHist (samples, keyText='Samples', bins=bins, range=rng)
+    x = N.linspace (m - 5 * s, m + 5 * s, 200)
+    area = 10 * s / bins * n
+    y = area / N.sqrt (2 * N.pi * s**2) * N.exp (-0.5 * (x - m)**2 / s**2)
+    p.addXY (x, y, 'Normal fit')
+    p.rebound (False, False)
+    p.show ()
+    return 0
+
+# A footnote on the SMADM: this is the Scaled Median Absolute
+# Difference from the Median. Unsurprisingly this is supposed to be an
+# outlier-resistant version of the standard deviation.
+#
+# But what is the exact relationship between this and an actual
+# standard deviation? Consider a true normal distribution. Its median
+# is its mean, so if we subtract the median, we center on zero. Taking
+# the absolute value then mirrors the negative axis to the positive
+# axis. The median of *this* distribution is the median of the top half
+# of the normal distribution, that is, the 75th percentile of the normal
+# distribution. We should divide the (unscaled) MADM by that number to
+# get a psuedo standard deviation. It works out to sqrt(2) erfinv (1/2),
+# the inverse of which is the value used above.
+
+
+def tui_export (args):
+    if len (args) < 1:
+        util.die ('usage: <dat1> [... datn]')
+
+    nc = NoiseCal ()
+
+    for path in args:
+        nc.load (path, partial=True)
+        nc.export (sys.stdout)
+
+
+if __name__ == '__main__':
+    if len (sys.argv) == 1:
+        util.die ('add a subcommand: one of "checkcal compute export"')
+
+    subcommand = sys.argv[1]
+    if 'tui_' + subcommand not in globals ():
+        util.die ('unknown subcommand "%s"', subcommand)
+
+    sys.exit (globals ()['tui_' + subcommand] (sys.argv[2:]))

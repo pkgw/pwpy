@@ -52,6 +52,7 @@ fancy/box-region
 fancy/box-topointmdl
 fancy/byant
 fancy/calctsys
+fancy/calnoise
 fancy/chanaver
 fancy/cloplot
 fancy/closanal
@@ -83,6 +84,7 @@ pylib/atabpass.py
 pylib/blflag.py
 pylib/blmapper.glade
 pylib/calctsys.py
+pylib/calnoise.py
 pylib/chanaver.py
 pylib/closanal.py
 pylib/dualscal.py
