@@ -65,16 +65,60 @@ class NoiseCal (object):
         raras = self.raras
         solution = self.solution
         saps = self.saps
+        n = len (saps)
 
-        print 'instrument:', self.instr
+        msefds = N.empty (n)
+        pstds = N.empty (n)
+        antcounts = N.zeros (n)
+        antprods = N.ones (n)
 
-        for i in xrange (len (saps)):
+        for i in xrange (n):
             info = raras[i]
+            # TODO later: we're ignoring the RARA weighting
             # sqrt (2 * 102.4 khz * 10 s)
             sefd = 1431 * solution[i] * info[1]
-            # TODO later: we're ignoring the RARA weighting
-            pstd = 100. * sefd.std () / sefd.mean ()
-            print util.fmtAP (saps[i]), '%7.0f' % sefd.mean (), 'var. %.1f%%' % pstd
+            msefds[i] = sefd.mean ()
+            pstds[i] = 100. * sefd.std () / msefds[i]
+
+            ant = util.apAnt (saps[i])
+            antcounts[ant] += 1
+            antprods[ant] *= msefds[i]
+
+        w = N.where (antcounts == 2)[0]
+        if w.size == 0:
+            bestant = -1
+        else:
+            bestant = w[N.argmin (antprods[w])]
+
+        mmarks = ['     |     '] * n
+        smarks = ['     |     '] * n
+
+        sm = N.argsort (msefds)
+        ss = N.argsort (pstds)
+
+        for i in xrange (5):
+            mmarks[sm[i]] = ' ' * i + '*' + ' ' * (4 - i) + '|     '
+            mmarks[sm[-1 - i]] = '     |' + ' ' * (4 - i) + '*' + ' ' * i
+            smarks[ss[i]] = ' ' * i + '*' + ' ' * (4 - i) + '|     '
+            smarks[ss[-1 - i]] = '     |' + ' ' * (4 - i) + '*' + ' ' * i
+
+        print 'instrument:', self.instr
+        print
+        print '%4s %7s %5s %13s %13s' % ('AP', 'SEFD', 'Var.', 'SEFD Rank',
+                                         'Var. Rank')
+
+        for i in xrange (n):
+            print '%4s %7.0f %4.1f%% [%s] [%s]' % \
+                (util.fmtAP (saps[i]), msefds[i], pstds[i], mmarks[i], smarks[i])
+
+        print
+        print 'Median (mean SEFD):', N.median (msefds)
+        print '       Equiv. TSys:', N.median (msefds) / 153.
+
+        if bestant < 0:
+            print 'No dual-pol antennas'
+        else:
+            print 'Best dual-pol antenna:', bestant
 
 
     def export (self, stream):
@@ -282,7 +326,20 @@ except:
     pass
 else:
     from mirtask.util import mir2bp, apAnt
+    from awff import SimpleMake
+    from awff.pathref import FileRef
     from arf.vispipe import VisPipeStage
+
+    def _calnoise (context, vis=None, params=None):
+        context.ensureParent ()
+        out = FileRef (context.fullpath ())
+
+        nc = NoiseCal ()
+        nc.compute (ensureiterable (vis), **params)
+        nc.save (str (out))
+        return out
+
+    CalNoise = SimpleMake ('vis params', 'out', _calnoise, [None, {}])
 
     class InsertNoiseInfo (VisPipeStage):
         def __init__ (self, pathobj):
@@ -345,7 +402,7 @@ else:
                 # RMS amplitude)
                 w = N.where (state.flags)[0]
                 if w.size == 0:
-                    self.raras[ap1] = 0
+                    self.raras.pop (ap1, 0)
                 else:
                     self.raras[ap1] = N.sqrt ((state.data.real[w]**2).mean ())
 
@@ -383,7 +440,7 @@ else:
             N.sqrt (jyperks, jyperks)
             raras.clear ()
 
-    __all__ += ['InsertNoiseInfo']
+    __all__ += ['CalNoise', 'InsertNoiseInfo']
 
 
 # Command-line interface
@@ -492,15 +549,25 @@ def tui_export (args):
         util.die ('usage: <dat1> [... datn]')
 
     nc = NoiseCal ()
-
     for path in args:
         nc.load (path, partial=True)
         nc.export (sys.stdout)
+    return 0
+
+
+def tui_sefds (args):
+    if len (args) != 1:
+        util.die ('usage: <datfile>')
+
+    nc = NoiseCal ()
+    nc.load (args[0])
+    nc.printsefdinfo ()
+    return 0
 
 
 if __name__ == '__main__':
     if len (sys.argv) == 1:
-        util.die ('add a subcommand: one of "checkcal compute export"')
+        util.die ('add a subcommand: one of "checkcal compute export sefds"')
 
     subcommand = sys.argv[1]
     if 'tui_' + subcommand not in globals ():
