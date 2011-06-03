@@ -10,8 +10,8 @@ import numpy as n
 import scipy.optimize as opt
 
 
-filename = 'crab_fixdm_ph/poco_crab_fitsp.txt'
-#filename = 'b0329_fixdm_ph/poco_b0329_173027_fitsp.txt'
+#filename = 'crab_fixdm_ph/poco_crab_fitsp.txt'
+filename = 'b0329_fixdm_ph/poco_b0329_173027_fitsp.txt'
 filename2 = 'b0329_fixdm_uv/poco_b0329_173027_fitsp.txt'
 filename3 = 'b0329_fixdm_im2/poco_b0329_173027_fitsp.txt'
 mode='flux'
@@ -47,7 +47,7 @@ meanflux = n.array(meanflux); meanflux2 = n.array(meanflux2); meanflux3 = n.arra
 sig = meanflux/(n.sqrt(len(freqs)) * n.array(rms)); sig2 = meanflux2/(n.sqrt(len(freqs)) * n.array(rms2)); sig3 = meanflux3/(n.sqrt(len(freqs)) * n.array(rms3))
 
 nint = []; nskip = []; chunk = []
-nint2 = []; nskip2 = []; chunk2 = []
+nint2 = []; nskip2 = []; chunk2 = []; pnn2 = []; detsig2 = []
 nint3 = []; nskip3 = []; chunk3 = []; pnn3 = []; detsig3 = []
 for nn in name:
     nskip.append(int((nn.split('.'))[1].split('-')[0]))
@@ -58,6 +58,13 @@ for nn in name2:
     nskip2.append(int((nn.split('.'))[1].split('-')[0]))
     nint2.append(int((nn.split('-dm0t'))[1].split('.')[0]))
     chunk2.append(int((nn.split('_173027_'))[1].split('.')[0]))
+    tmp = (nn.split('/')[1].split('.')[0:2])
+    tmp.append('pkl')
+    tmp[0] = 'b0329_fixdm_uv/' + tmp[0]
+    pklname = string.join(tmp, '.')
+    pnn2.append(pklname)
+    pkl = pickle.load(open(pklname))
+    detsig2.append(pkl[6][0])
 for nn in name3:
     nskip3.append(int((nn.split('.'))[1].split('-')[0]))
     nint3.append(int((nn.split('-dm0t'))[1].split('.')[0]))
@@ -80,12 +87,12 @@ sortar = []; sortar2 = []; sortar3 = []
 for i in range(len(ntot)):
     sortar.append( (ntot[i], meanflux[i]) )
 for i in range(len(ntot2)):
-    sortar2.append( (ntot2[i], meanflux2[i]) )
+    sortar2.append( (ntot2[i], meanflux2[i], detsig2[i]) )
 for i in range(len(ntot3)):
     sortar3.append( (ntot3[i], meanflux3[i], detsig3[i]) )
 
 sortar = n.array(sortar, dtype=dtype1)
-sortar2 = n.array(sortar2, dtype=dtype1)
+sortar2 = n.array(sortar2, dtype=dtype2)
 sortar3 = n.array(sortar3, dtype=dtype2)
 newsortar = n.sort(sortar, order=['ntot'])
 newsortar2 = n.sort(sortar2, order=['ntot'])
@@ -99,14 +106,14 @@ for i in range(len(newsortar2)-1):
 for i in range(len(newsortar3)-1):
     ntotdiff3.append(newsortar3[i+1][0] - newsortar3[i][0])
 ntotdiff.append(0)
+ntotdiff2.append(0)
 ntotdiff3.append(0)
 ntotdiff = n.array(ntotdiff) ; ntotdiff2 = n.array(ntotdiff2); ntotdiff3 = n.array(ntotdiff3)
 
-good1 = n.where(ntotdiff > -1)[0]
-good2 = n.where(ntotdiff2 > 0)[0]
-good3 = n.where( (n.array(newsortar3.tolist())[:,2] > 7.) & (n.array(newsortar3.tolist())[:,1] > 0.) & (ntotdiff3 > 0))[0]
+good1 = n.where(ntotdiff > 0)[0]
+good2 = n.where( (ntotdiff2 > 0) & (n.array(newsortar2.tolist())[:,2] > 5.6) )[0]
+good3 = n.where( (n.array(newsortar3.tolist())[:,2] > 7.0) & (n.array(newsortar3.tolist())[:,1] > 0.) & (ntotdiff3 > 0))[0]
 print 'lengths (orig, new): ', len(ntotdiff), len(good1), len(ntotdiff2), len(good2), len(ntotdiff3), len(good3)
-print len(n.where( (n.array(newsortar3.tolist())[:,1] < 0.))[0])
 
 meanflux = (n.array( newsortar.tolist())[:,1] )[good1]
 meanflux2 = (n.array( newsortar2.tolist())[:,1] )[good2]
@@ -126,20 +133,21 @@ if mode == 'flux':
     errfunc = lambda p, x, y, rms: ((y - fitfunc(p, x))/rms)**2
     p0 = [100,-4.5]
 
-    hist = p.hist(meanflux, align='mid', bins=n.arange(40,760,15), label='Observed', color='b')
+    hist = p.hist(meanflux, align='mid', bins=n.arange(-200,1000,10), label='Observed', color='b')
     centers = n.array([(hist[1][i+1] + hist[1][i])/2 for i in range(len(hist[1])-1)])
     errs = 1+(n.sqrt(hist[0] + 0.75))
     p.errorbar(centers,hist[0],yerr=errs,fmt=None,ecolor='b', capsize=0)
-    fitignore = n.where(hist[1] >= 80)[0].min()
+    fitignore = n.where(hist[1] >= 40)[0].min()
     print 'ignore, ', fitignore
     p1,success = opt.leastsq(errfunc, p0[:], args = (centers[fitignore:], hist[0][fitignore:], errs[fitignore:]))
     print p1
-    p.plot(centers,fitfunc(p1[:],centers), 'y', label='Fit powerlaw slope=%.1f' % p1[1])
-    p.xlabel('Flux (Jy)')
-    p.ylabel('Number of pulses')
-    p.legend()
-    p.axis([-170,430,0,500])
-    p.show()
+    p.clf()
+#    p.plot(centers,fitfunc(p1[:],centers), 'y', label='Fit powerlaw slope=%.1f' % p1[1])
+#    p.xlabel('Flux (Jy)')
+#    p.ylabel('Number of pulses')
+#    p.legend()
+#    p.axis([-170,430,0,500])
+#    p.show()
 
     hist = p.hist(meanflux, align='mid', histtype='bar', bins=hist[1], label='Beamforming', color='b')
     hist2 = p.hist(meanflux2, align='mid', histtype='step', bins=hist[1], label='UV fit', color='g')
