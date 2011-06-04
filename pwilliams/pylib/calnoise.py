@@ -12,6 +12,7 @@ to insert appropriate TSys and Jy/K information.
 import sys, os.path
 import cPickle
 import numpy as N
+import scipy.optimize
 import numutils
 from miriad import *
 from mirtask import util, uvdat
@@ -43,21 +44,28 @@ class NoiseCal (object):
     # (solution1 * rara1 * solution2 * rara2) gives the expected
     # visibility variance for a set of correlations
 
+    covar = None # Covariance matrix of derived solutions: (n,n)-
+    # element ndarray, where n is len(saps).
+
     svals = None # solution values for samples: n-element vector
     # with n the same as in sqbps, with svals[i] = solution1 *
     # solution2 for the i'th good sample.
 
+    suncerts = None # formal uncertainties in the per-sample
+    # solutions: n-element vector, n as in sqbps
 
     def load (self, path, partial=False):
         f = open (path)
         self.instr = cPickle.load (f)
         self.saps = cPickle.load (f)
         self.solution = N.load (f)
+        self.covar = N.load (f)
         if not partial:
             self.raras = cPickle.load (f)
             self.sqbps = N.load (f)
             self.bpdata = N.load (f)
             self.svals = N.load (f)
+            self.suncerts = N.load (f)
         f.close ()
         
 
@@ -145,12 +153,14 @@ class NoiseCal (object):
         cPickle.dump (self.instr, f)
         cPickle.dump (self.saps, f)
         self.solution.dump (f)
+        self.covar.dump (f)
         # Then (potentially large) extra data for checking the quality
         # of the noise calibration:
         cPickle.dump (self.raras, f)
         self.sqbps.dump (f)
         self.bpdata.dump (f)
         self.svals.dump (f)
+        self.suncerts.dump (f)
         f.close ()
 
 
@@ -196,6 +206,9 @@ class NoiseCal (object):
             ag = rarawork.get (ap)
             if ag is None:
                 ag = rarawork[ap] = numutils.ArrayGrower (3)
+
+            # We record w.size as a weight for the RARA measurement,
+            # but it's essentially noise-free.
             ag.add (t, rara, w.size)
 
         self.saps = sorted (seenaps)
@@ -249,6 +262,8 @@ class NoiseCal (object):
                 nnorara += 1
                 continue
 
+            # We propagate the weight for crara but once again,
+            # it's basically noiseless.
             crara = rara1 * rara2
             cwt = 1. / (rara2**2 / rwt1 + rara1**2 / rwt2)
 
@@ -256,9 +271,14 @@ class NoiseCal (object):
             rvar = data.real.var (ddof=1)
             ivar = data.imag.var (ddof=1)
             var = 0.5 * (rvar + ivar)
+            # The weight of the computed variance (i.e., the
+            # inverse square of the maximum-likelihood variance
+            # in the variance measurement) is 0.5 * (nsamp - ndof) / var**2.
+            # We have 2*w.size samples and 2 degrees of freedom, so:
+            wtvar = (w.size - 1) / var**2
 
             sqbps.add (idx1, idx2)
-            bpdata.add (t, var, w.size, crara, cwt)
+            bpdata.add (t, var, wtvar, crara, cwt)
 
         self.sqbps = sqbps.finish ()
         self.bpdata = bpdata.finish ()
@@ -276,24 +296,52 @@ class NoiseCal (object):
         bpdata = self.bpdata
         nsamp = bpdata.shape[0]
 
+        # Get approvimate solution by using a linear least squares
+        # solver on the log of our equation.
+
         coeffs = N.zeros ((nap, nsamp))
         values = N.empty (nsamp)
-
-        # FIXME: weighting -- can't seem to find a canned linear least
-        # squares solver that will use weights.  Can always transition
-        # to a nonlinear one.
+        invsigmas = N.empty (nsamp)
 
         for i in xrange (nsamp):
             idx1, idx2 = sqbps[i]
-            var = bpdata[i,1]
-            crara = bpdata[i,3]
+            var, wtvar, crara = bpdata[i,1:4]
 
             coeffs[idx1,i] = coeffs[idx2,i] = 1
             values[i] = N.log (var / crara)
+            # Here we ignore the noise in crara.
+            invsigmas[i] = crara * N.sqrt (wtvar)
 
         soln = util.linLeastSquares (coeffs, values)
-        self.solution = N.exp (soln)
-        self.svals = N.exp (N.dot (coeffs.T, soln))
+
+        # Now refine and get uncertainties with a nonlinear solver.
+
+        soln = N.exp (soln)
+        values = N.exp (values)
+        modelvals = N.empty (nsamp)
+
+        def nonlin (params):
+            for i in xrange (nsamp):
+                idx1, idx2 = sqbps[i]
+                modelvals[i] = params[idx1] * params[idx2]
+            return (values - modelvals) * invsigmas
+
+        from scipy.optimize import leastsq
+        soln, cov, misc, mesg, flag = leastsq (nonlin, soln, full_output=True)
+        rchisq = (((values - modelvals) * invsigmas)**2).sum () / (nsamp - nap)
+        print 'reduced chi squared: %.3f for %d DOF' % (rchisq, nsamp - nap)
+        cov *= rchisq # copying scipy.optimize.curve_fit
+        suncerts = N.empty (nsamp)
+
+        for i in xrange (nsamp):
+            idx1, idx2 = sqbps[i]
+            suncerts[i] = N.sqrt ((soln[idx1]**2 * cov[idx2,idx2] +
+                                   soln[idx2]**2 * cov[idx1,idx1]))
+
+        self.solution = soln
+        self.covar = cov
+        self.svals = modelvals
+        self.suncerts = suncerts
 
 
 def loadNoiseCalExport (path):
@@ -459,8 +507,8 @@ def tui_compute (args):
     if len (toread) < 2:
         util.die ('usage: <vis1> [... visn] [uvdat options] <output name>')
 
-    toread = [VisData (x) for x in toread[:-1]]
     outpath = toread[-1]
+    toread = [VisData (x) for x in toread[:-1]]
 
     try:
         tmp = open (outpath, 'w')
@@ -472,6 +520,156 @@ def tui_compute (args):
     nc = NoiseCal ()
     nc.compute (toread, **uvdatoptions)
     nc.save (outpath)
+    return 0
+
+
+def tui_checkfit (args):
+    import omega as O
+
+    if len (args) != 1:
+        util.die ('usage: <datfile>')
+
+    nc = NoiseCal ()
+    nc.load (args[0])
+
+    vals = nc.bpdata[:,1]
+    modelvals = nc.bpdata[:,3] * nc.svals
+    resids = vals - modelvals
+    runcerts = N.sqrt (1./nc.bpdata[:,2] + (nc.suncerts * nc.bpdata[:,3])**2)
+    normresids = resids / runcerts
+
+    n = normresids.size
+    mn = normresids.mean ()
+    s = normresids.std ()
+    md = N.median (normresids)
+    smadm = 1.4826 * N.median (N.abs (normresids - md)) # see comment below
+
+    print '                 Number of samples:', n
+    print '           Normalized mean residal:', mn
+    print '                            Median:', md
+    print 'Normalized std. dev. (should be 1):', s
+    print '                             SMADM:', smadm
+
+    # Check for problematic antpols and basepols
+
+    saps = nc.saps
+    sqbps = nc.sqbps
+    nap = len (saps)
+    dumbnbp = nap**2
+    apcounts = N.zeros (nap, dtype=N.int)
+    apsumsqresids = N.zeros (nap)
+    bpcounts = N.zeros (dumbnbp, dtype=N.int)
+    bpsumsqresids = N.zeros (dumbnbp)
+
+    for i in xrange (n):
+        idx1, idx2 = sqbps[i]
+
+        apcounts[idx1] += 1
+        apsumsqresids[idx1] += normresids[i]**2
+        apcounts[idx2] += 1
+        apsumsqresids[idx2] += normresids[i]**2
+
+        bpidx = idx1 * nap + idx2
+        bpcounts[bpidx] += 1
+        bpsumsqresids[bpidx] += normresids[i]**2
+
+    aprmsresids = N.sqrt (apsumsqresids / apcounts)
+    sapresids = N.argsort (aprmsresids)
+
+    print
+    print 'Extreme residual RMS by antpol:'
+    for i in xrange (5):
+        idx = sapresids[i]
+        print ' %10s %8.2f' % (util.fmtAP (saps[idx]), aprmsresids[idx])
+    print '       ....'
+    for i in xrange (5):
+        idx = sapresids[i - 5]
+        print ' %10s %8.2f' % (util.fmtAP (saps[idx]), aprmsresids[idx])
+
+    wbpgood = N.where (bpcounts)[0]
+    wbpbad = N.where (bpcounts == 0)[0]
+    bpcounts[wbpbad] = 1
+    bprmsresids = bpsumsqresids / bpcounts
+    sbpresids = N.argsort (bprmsresids[wbpgood])
+
+    print
+    print 'Extreme residual RMS by basepol:'
+    for i in xrange (3):
+        idx = wbpgood[sbpresids[i]]
+        ap2 = saps[idx % nap]
+        ap1 = saps[idx // nap]
+        print ' %10s %8.2f' % (util.fmtBP ((ap1, ap2)), bprmsresids[idx])
+    print '       ....'
+    for i in xrange (7):
+        idx = wbpgood[sbpresids[i - 7]]
+        ap2 = saps[idx % nap]
+        ap1 = saps[idx // nap]
+        print ' %10s %8.2f' % (util.fmtBP ((ap1, ap2)), bprmsresids[idx])
+
+    # Plot the distribution of residuals
+
+    bins = 50
+    rng = -5, 5
+    p = O.quickHist (normresids, keyText='Residuals', bins=bins, range=rng)
+    x = N.linspace (-5, 5, 200)
+    area = 10. / bins * n
+    y = area / N.sqrt (2 * N.pi) * N.exp (-0.5 * x**2)
+    p.addXY (x, y, 'Ideal')
+    p.rebound (False, False)
+    p.show ()
+
+    return 0
+
+
+def tui_checkap (args):
+    import omega as O
+
+    if len (args) != 2:
+        util.die ('usage: <datfile> <antpol>')
+
+    nc = NoiseCal ()
+    nc.load (args[0])
+
+    ap = util.parseAP (args[1])
+    apidx = nc.saps.index (ap)
+    if apidx < 0:
+        util.die ('no antpol %s in data file!', util.fmtAP (ap))
+
+    sqbps = nc.sqbps
+    vals = nc.bpdata[:,1]
+    modelvals = nc.bpdata[:,3] * nc.svals
+    resids = vals - modelvals
+
+    runcerts = N.sqrt (1./nc.bpdata[:,2] + (nc.suncerts * nc.bpdata[:,3])**2)
+    resids /= runcerts
+
+    w = N.where ((sqbps[:,0] == apidx) | (sqbps[:,1] == apidx))
+    resids = resids[w]
+
+    n = resids.size
+    mn = resids.mean ()
+    s = resids.std ()
+    md = N.median (resids)
+    smadm = 1.4826 * N.median (N.abs (resids - md)) # see comment below
+
+    print '       Number of samples:', n
+    print '      Norm. mean residal:', mn
+    print '                  Median:', md
+    print 'Norm. residual std. dev.:', s
+    print '                   SMADM:', smadm
+
+
+    bins = 50
+    rng = -5, 5
+    p = O.quickHist (resids, keyText='%s Residuals' % util.fmtAP (ap),
+                     bins=bins, range=rng)
+    x = N.linspace (-5, 5, 200)
+    area = 10. / bins * n
+    y = area / N.sqrt (2 * N.pi) * N.exp (-0.5 * x**2)
+    p.addXY (x, y, 'Ideal')
+    p.rebound (False, False)
+    p.show ()
+
     return 0
 
 
@@ -500,7 +698,7 @@ def tui_checkcal (args):
 
         data = data[w]
         var = 0.5 * (data.real.var (ddof=1) + data.imag.var (ddof=1))
-        uvar = N.sqrt (2. / (w.size - 1)) * var # uncert in our derived variance
+        uvar = N.sqrt (1. / (w.size - 1)) * var # uncert in variance msmt
         thy = uvdat.getVariance ()
         samples.add ((var - thy) / uvar)
 
@@ -511,20 +709,20 @@ def tui_checkcal (args):
     med = N.median (samples)
     smadm = 1.4826 * N.median (N.abs (samples - med)) # see comment below
 
-    print 'Number of samples:', n
+    print '                  Number of samples:', n
     print 'Mean normalized error (should be 0):', m
     print '                             Median:', med
-    print 'Normalized std. dev. (should be 1):', s
-    print '                             SMADM:', smadm
+    print ' Normalized std. dev. (should be 1):', s
+    print '                              SMADM:', smadm
     print 'Probability that samples are normal:', SS.normaltest (samples)[1]
 
     bins = 50
-    rng = (m - 5 * s, m + 5 * s)
+    rng = -5, 5
     p = O.quickHist (samples, keyText='Samples', bins=bins, range=rng)
-    x = N.linspace (m - 5 * s, m + 5 * s, 200)
-    area = 10 * s / bins * n
-    y = area / N.sqrt (2 * N.pi * s**2) * N.exp (-0.5 * (x - m)**2 / s**2)
-    p.addXY (x, y, 'Normal fit')
+    x = N.linspace (-5, 5, 200)
+    area = 10. / bins * n
+    y = area / N.sqrt (2 * N.pi) * N.exp (-0.5 * x**2)
+    p.addXY (x, y, 'Ideal')
     p.rebound (False, False)
     p.show ()
     return 0
@@ -567,7 +765,8 @@ def tui_sefds (args):
 
 if __name__ == '__main__':
     if len (sys.argv) == 1:
-        util.die ('add a subcommand: one of "checkcal compute export sefds"')
+        util.die ('add a subcommand: one of "checkap checkcal checkfit '
+                  'compute export sefds"')
 
     subcommand = sys.argv[1]
     if 'tui_' + subcommand not in globals ():
