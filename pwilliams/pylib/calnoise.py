@@ -230,6 +230,7 @@ class NoiseCal (object):
         bpdata = numutils.ArrayGrower (5)
         
         nnorara = 0
+        seenidxs = set ()
         gen = uvdat.setupAndRead (toread, 'x3', False,
                                   nopass=False, nocal=False, nopol=False,
                                   **uvdatoptions)
@@ -277,17 +278,46 @@ class NoiseCal (object):
             # We have 2*w.size samples and 2 degrees of freedom, so:
             wtvar = (w.size - 1) / var**2
 
+            seenidxs.add (idx1)
+            seenidxs.add (idx2)
             sqbps.add (idx1, idx2)
             bpdata.add (t, var, wtvar, crara, cwt)
 
-        self.sqbps = sqbps.finish ()
+        sqbps = self.sqbps = sqbps.finish ()
         self.bpdata = bpdata.finish ()
-        nsamp = self.sqbps.shape[0]
+        nsamp = sqbps.shape[0]
 
         if nnorara > nsamp * 0.02:
             print >>sys.stderr, ('Warning: no autocorr data for %d/%d '
                                  '(%.0f%%) of samples' % (nnorara, nsamp,
                                                           100. * nnorara / nsamp))
+
+        if len (seenidxs) == len (apidxs):
+            return
+
+        # There exist antpols that we got autocorrelations for but
+        # have no contributing baselines. This can happen if there are
+        # no gains for the given antpol. To avoid running into a
+        # singular matrix in the solve step, we have to eliminate
+        # them. To avoid a bunch of baggage in the analysis code, we
+        # rewrite our data structures, which actually isn't so bad.
+
+        mapping = {}
+        newsaps = []
+        newraras = {}
+
+        for idx in xrange (len (apidxs)):
+            if idx in seenidxs:
+                mapping[idx] = len (mapping)
+                newsaps.append (self.saps[idx])
+                newraras[mapping[idx]] = raras[idx]
+
+        self.saps = newsaps
+        self.raras = newraras
+
+        for i in xrange (nsamp):
+            sqbps[i,0] = mapping[sqbps[i,0]]
+            sqbps[i,1] = mapping[sqbps[i,1]]
 
 
     def _compute_solve (self):
@@ -296,7 +326,7 @@ class NoiseCal (object):
         bpdata = self.bpdata
         nsamp = bpdata.shape[0]
 
-        # Get approvimate solution by using a linear least squares
+        # Get approximate solution by using a linear least squares
         # solver on the log of our equation.
 
         coeffs = N.zeros ((nap, nsamp))
@@ -328,15 +358,33 @@ class NoiseCal (object):
 
         from scipy.optimize import leastsq
         soln, cov, misc, mesg, flag = leastsq (nonlin, soln, full_output=True)
+        if flag < 1 or flag > 4 or cov is None:
+            if cov is None:
+                expln = 'encountered singular matrix'
+            else:
+                expln = 'return flag was %d' % flag
+
+            if 'CALNOISE_DEBUG' in os.environ:
+                print >>sys.stderr, 'Nonlinear fit failed! Saving anyway!'
+                print >>sys.stderr, 'expln:', expln
+                print >>sys.stderr, 'mesg:', mesg
+                cov = None
+            else:
+                util.die ('nonlinear fit failed: %s; mesg: %s', expln, mesg)
+
         rchisq = (((values - modelvals) * invsigmas)**2).sum () / (nsamp - nap)
         print 'reduced chi squared: %.3f for %d DOF' % (rchisq, nsamp - nap)
-        cov *= rchisq # copying scipy.optimize.curve_fit
-        suncerts = N.empty (nsamp)
 
-        for i in xrange (nsamp):
-            idx1, idx2 = sqbps[i]
-            suncerts[i] = N.sqrt ((soln[idx1]**2 * cov[idx2,idx2] +
-                                   soln[idx2]**2 * cov[idx1,idx1]))
+        if cov is None:
+            cov = suncerts = N.empty (0)
+        else:
+            cov *= rchisq # copying scipy.optimize.curve_fit
+            suncerts = N.empty (nsamp)
+
+            for i in xrange (nsamp):
+                idx1, idx2 = sqbps[i]
+                suncerts[i] = N.sqrt ((soln[idx1]**2 * cov[idx2,idx2] +
+                                       soln[idx2]**2 * cov[idx1,idx1]))
 
         self.solution = soln
         self.covar = cov
