@@ -259,7 +259,17 @@ def task (args):
 
         p.rebound (False, False)
         dx = N.abs (xmax - xmin) * 0.05
+        if dx == 0:
+            if xmax == 0:
+                dx = 1
+            else:
+                dx = 0.05 * xmax
         dy = N.abs (ymax - ymin) * 0.05
+        if dy == 0:
+            if ymax == 0:
+                dy = 1
+            else:
+                dy = 0.05 * ymax
         p.setBounds (xmin - dx, xmax + dx, ymin - dy, ymax + dy)
         p.setLabels (xlabel, ylabel)
         pg.send (p)
