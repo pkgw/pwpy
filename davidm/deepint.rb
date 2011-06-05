@@ -143,11 +143,20 @@ baselines.each do |bl|
     tau22, vis22 = data[ap2ap2]
     if tau12 == tau11 && tau12 == tau22
       mag_label = "Correlation Coefficient"
+      # Handle case where integration wrapped into negative values
+      vis12[vis11.real.lt(0)] = 0
+      vis11[vis11.real.lt(0)] = 1
+      vis12[vis22.real.lt(0)] = 0
+      vis22[vis22.real.lt(0)] = 1
+
       geomean = (vis11.real*vis22.real)**0.5
       geomean0_idx = geomean.eq(0).where
       geomean[geomean0_idx] = 1.0
       #vis12[geomean0_idx] = 0.0
       vis12.div!(geomean)
+      # Handle case where instrument errors give correlation coefficient
+      # greater than 1
+      vis12[vis12.abs.gt(1)] = 1e-100
     else
       warn "baseline #{ap1}-#{ap2} has different inttime than #{ap1}-#{ap1} or #{ap2}-#{ap2}"
       have_autos = false
