@@ -33,11 +33,26 @@ require 'pgplot/plotter'
 include Pgplot
 
 keyini
+  # Get options
+  optkeys = [:nocal, :nopass, :nopol]
+  optvals = options(optkeys)
+  # Convert optkeys and optvals into a Hash
+  OPTS = Hash[*optkeys.zip(optvals).flatten!]
+
+  # Build flags to send to uvDatInp
+  # 3 = do w (i.e. u,v,w)
   # d = use select keyword
   # s = use stokes keyword (needed?)
   # l = use line keyword
-  # 3 = return w in preamble
-  uvDatInp('dsl3')
+  # c = apply gains
+  # f = apply passband
+  # e = apply polarization leakage
+  uvflags = '3dsl'
+  uvflags += 'c' unless OPTS[:nocal]
+  uvflags += 'f' unless OPTS[:nopass]
+  uvflags += 'e' unless OPTS[:nopol]
+
+  uvDatInp(uvflags)
 
   # Get pgplot device
   device = keya(:device, ENV['PGPLOT_DEV']||'/xs')
@@ -56,12 +71,6 @@ keyini
   rgbmax << keyr(:rgbmax, 1.0)
   rgbmax << keyr(:rgbmax, 0.0)
   rgbmax << keyr(:rgbmax, 0.0)
-
-  ## Get options
-  #optkeys = [:percent]
-  #optvals = options(optkeys)
-  ## Convert optkeys and optvals into a Hash
-  #opts = Hash[*optkeys.zip(optvals).flatten!]
 keyfin
 
 # Iniitalize plot device
