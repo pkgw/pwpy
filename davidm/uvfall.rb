@@ -85,6 +85,33 @@ AMP_RAMP = [
   [1.0000, rgbmax[0], rgbmax[1], rgbmax[2]], # Never used?
 ]
 
+# Color ramp for amplutides
+PHASE_RAMP = [
+  # Min color
+  #  pos    R    G    B
+  [0.0/7.0, 0.0, 0.0, 0.0], # Black (flagged = -240 degrees)
+  [1.0/7.0, 1.0, 0.0, 1.0], # Magenta
+  [2.0/7.0, 1.0, 0.0, 0.0], # Red
+  [3.0/7.0, 1.0, 1.0, 0.0], # Yellow
+  [4.0/7.0, 0.0, 1.0, 0.0], # Green
+  [5.0/7.0, 0.0, 1.0, 1.0], # Cyan
+  [6.0/7.0, 0.0, 0.0, 1.0], # Blue
+  [7.0/7.0, 1.0, 0.0, 1.0]  # Magenta
+]
+
+# Color ramp for amplutides
+PHASE_WEDGE_RAMP = [
+  # Min color
+  #  pos    R    G    B
+  [0/6.0, 1.0, 0.0, 1.0], # Magenta
+  [1/6.0, 1.0, 0.0, 0.0], # Red
+  [2/6.0, 1.0, 1.0, 0.0], # Yellow
+  [3/6.0, 0.0, 1.0, 0.0], # Green
+  [4/6.0, 0.0, 1.0, 1.0], # Cyan
+  [5/6.0, 0.0, 0.0, 1.0], # Blue
+  [6/6.0, 1.0, 0.0, 1.0]  # Magenta
+]
+
 pgscir(16, 16+100)
 
 # Loop through all datasets
@@ -179,10 +206,10 @@ while tno = uvDatOpn
 
     # Setup phase data
     z=image.angle.mul!(180/Math::PI)
-    zmin = -180
+    zmin = -240
     zmax =  180
     # Make sure flagged data gets lowest color bin
-    z[flag2<1] = zmin - (zmax-zmin)/100
+    z[flag2<1] = -240
 
     # Setup phase plot
     zlabel = 'Phase'
@@ -195,11 +222,11 @@ while tno = uvDatOpn
          :line_color => Color::WHITE
         )
 
-    # TODO Make phase ramp that "wraps" the color
-    pgctab(*AMP_RAMP.transpose)
-
+    pgctab(*PHASE_RAMP.transpose)
     pgimag(z, zmin..zmax)
-    pgwedg('RI', 0.5, 3, zmin, zmax, zlabel)
+
+    pgctab(*PHASE_WEDGE_RAMP.transpose)
+    pgwedg('RI', 0.5, 3, -180, zmax, zlabel)
   end
 
 end # uvDatOpn
