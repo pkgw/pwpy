@@ -1213,6 +1213,7 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
                     for bgi in range(bgwindow, nints-bgwindow, nints/15):
                         print 'Measuring noise in integration %d' % (bgi)
                         outname = string.join(file.split('.')[:-1]) + '.' + str(pv.nskip/pv.nbl) + '-' + 'dm' + str(i) + 't' + str(bgi) + '.mir'
+                        print outname
                         shutil.rmtree (outname, ignore_errors=True); shutil.rmtree (outname+'.map', ignore_errors=True); shutil.rmtree (outname+'.beam', ignore_errors=True)
                         status = pv.writetrack2(i, bgi, bgwindow=bgwindow)   # output file at dmbin, trelbin
                         try:
