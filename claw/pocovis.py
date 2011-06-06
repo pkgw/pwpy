@@ -433,7 +433,7 @@ class poco:
         flags = n.zeros(self.nchan, dtype='bool')
 
         # define output visibility file names
-        outname = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl) + '-' + 'dm' + str(dmbin) + 't' + str(tbin) + '.mir'
+        outname = './' + string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl) + '-' + 'dm' + str(dmbin) + 't' + str(tbin) + '.mir'
         vis = miriad.VisData(self.file,)
 
         int0 = int((tbin + tshift) * self.nbl)
