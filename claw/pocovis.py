@@ -1141,11 +1141,17 @@ def pulse_search_reim(fileroot, pathin, pathout, nints=10000, edge=0):
         fileout.close
 
 
-def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, edge=0, mode='dirty', dmrange=None):
+def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, edge=0, mode='dirty', dmrange=None, nstart=0, tstop=0):
     """
     Searches for pulses by imaging dedispersed trials.
     dmrange lets outside call limit range of dms to search (good to spread jobs out in parallel).
+    nstart and tstop control start integration and duration of run. useful for running on cluster.
     """
+
+    if tstop != 0:
+        import time
+        t0 = time.time()
+        print 'Time limited search starting at ', time.ctime()
 
     maxints = 131000  # biggest file in integrations
     bgwindow = 10  # where bg subtraction is made
@@ -1190,7 +1196,7 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
     for file in filelist:
         fileout = open(pathout + string.join(file.split('.')[:-1]) + '.txt', 'a')
 
-        for nskip in range(0, maxints-(nints-edge), nints-edge):
+        for nskip in range(nstart, maxints-(nints-edge), nints-edge):
             print 'Starting file %s with nskip %d' % (file, nskip)
 
             # load data
@@ -1222,6 +1228,9 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
                     print 'Dirty image noises and their median', bgepeak, n.median(bgepeak)
                 # now iterate over integrations
                 for j in range(len(pv.reltime)):
+                    if (tstop != 0) & (j % 100):     # check if time limit exceeded
+                        if (time.time() - t0) / 3600 > tstop:
+                            return 0
                     try: 
                         results = pv.imagedmt0(i, j, show=show, bgwindow=bgwindow, clean=1, mode=mode)
                         if mode == 'clean':
@@ -1447,12 +1456,14 @@ if __name__ == '__main__':
         # if pickle, then plot data or dm search results
         print 'Assuming input file is pickle of candidate...'
         process_pickle(sys.argv[1], pathin=pathin, mode='spec')
-    elif len(sys.argv) == 5:
+    elif len(sys.argv) == 7:
         # if pickle, then plot data or dm search results
-        print 'Searching for pulses... with %s, %s, %s' % (fileroot, pathin, pathout)
+        print 'Time limited searching for pulses... with %s, %s, %s' % (fileroot, pathin, pathout)
         try:
             dmrange = [int(sys.argv[4])]    # only works for single dm
-            pulse_search_image(fileroot=sys.argv[1], pathin=sys.argv[2], pathout=sys.argv[3], nints=10000, edge=edge, mode='dirty', sig=6.0, dmrange=dmrange)
+            nstart = int(sys.argv[5])  # start integration
+            tstop = int(sys.argv[6])  # run time in hours
+            pulse_search_image(fileroot=sys.argv[1], pathin=sys.argv[2], pathout=sys.argv[3], nints=10000, edge=edge, mode='dirty', sig=6.0, dmrange=dmrange, nstart=nstart, tstop=tstop)
         except AttributeError:
             exit(0)
     elif len(sys.argv) == 6:
