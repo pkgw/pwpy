@@ -1194,7 +1194,7 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
 
     print 'Looping over filelist ', filelist, ' with dmrange, ', dmrange
     for file in filelist:
-        fileout = open(pathout + string.join(file.split('.')[:-1]) + '.txt', 'a')
+        fileout = open(pathout + string.join(file.split('.')[:-1]) + '_dm' + str(dmrange[0]) + '.txt', 'a')
 
         for nskip in range(nstart, maxints-(nints-edge), nints-edge):
             print 'Starting file %s with nskip %d' % (file, nskip)
@@ -1212,7 +1212,7 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
                     bgpeak = []; bgepeak = []
                     for bgi in range(bgwindow, nints-bgwindow, nints/15):
                         print 'Measuring noise in integration %d' % (bgi)
-                        outname = string.join(pv.file.split('.')[:-1]) + '.' + str(pv.nskip/pv.nbl) + '-' + 'dm' + str(i) + 't' + str(bgi) + '.mir'
+                        outname = string.join(file.split('.')[:-1]) + '.' + str(pv.nskip/pv.nbl) + '-' + 'dm' + str(i) + 't' + str(bgi) + '.mir'
                         shutil.rmtree (outname, ignore_errors=True); shutil.rmtree (outname+'.map', ignore_errors=True); shutil.rmtree (outname+'.beam', ignore_errors=True)
                         status = pv.writetrack2(i, bgi, bgwindow=bgwindow)   # output file at dmbin, trelbin
                         try:
