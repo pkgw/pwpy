@@ -348,7 +348,7 @@ class poco:
             self.spec(save=0)
 
         # define input metadata source and output visibility file names
-        outname = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl) + '-' + 'dm' + str(dmbin) + 't' + str(tbin) + '.mir'
+        outname = string.join(self.file.split('.')[:-1], '.') + '.' + str(self.nskip/self.nbl) + '-' + 'dm' + str(dmbin) + 't' + str(tbin) + '.mir'
         shutil.rmtree(outname, ignore_errors=True)
         vis = miriad.VisData(self.file,)
 
@@ -603,7 +603,7 @@ class poco:
         """
 
         # set up
-        outroot = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl) + '-dm' + str(dmbin) + 't' + str(t0bin)
+        outroot = string.join(self.file.split('.')[:-1], '.') + '.' + str(self.nskip/self.nbl) + '-dm' + str(dmbin) + 't' + str(t0bin)
         shutil.rmtree (outroot+'.map', ignore_errors=True); shutil.rmtree (outroot+'.beam', ignore_errors=True); shutil.rmtree (outroot+'.clean', ignore_errors=True); shutil.rmtree (outroot+'.restor', ignore_errors=True)
 
         if self.approxuvw:
@@ -662,7 +662,7 @@ class poco:
         """
         
         # set up
-        outroot = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl) + '-dm' + str(dmbin) + 't' + str(t0bin)
+        outroot = string.join(self.file.split('.')[:-1], '.') + '.' + str(self.nskip/self.nbl) + '-dm' + str(dmbin) + 't' + str(t0bin)
         shutil.rmtree (outroot + '.mir', ignore_errors=True)
 
         if self.approxuvw:
@@ -837,7 +837,7 @@ class poco:
                     # use writetrack to get bgsub visibilities
                     status = self.writetrack(i, j, tshift=0, bgwindow=bgwindow)
                     if status:
-                        newfile = string.join(self.file.split('.')[:-1]) + '.' + str(self.nskip/self.nbl) + '-' + 'dm' + str(i) + 't' + str(j) + '.mir'
+                        newfile = string.join(self.file.split('.')[:-1], '.') + '.' + str(self.nskip/self.nbl) + '-' + 'dm' + str(i) + 't' + str(j) + '.mir'
                         print 'Loading file', newfile
                         pv2 = poco(newfile, nints=1)
                         pv2.prep()
@@ -1051,7 +1051,7 @@ def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000, edge=0):
 
     # loop over miriad data and time chunks
     for file in filelist:
-        fileout = open(pathout + string.join(file.split('.')[:-1]) + '.txt', 'a')
+        fileout = open(pathout + string.join(file.split('.')[:-1], '.') + '.txt', 'a')
 
         for nskip in range(0, maxints-(nints-edge), nints-edge):
             print
@@ -1069,7 +1069,7 @@ def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000, edge=0):
             # save all results (v1.0 pickle format)
             # TO DO:  think of v2.0 of pickle format
             if len(peaks[0]) > 0:
-                pklout = open(pathout + string.join(file.split('.')[:-1]) + '.' + str(nskip) + '.pkl', 'wb')
+                pklout = open(pathout + string.join(file.split('.')[:-1], '.') + '.' + str(nskip) + '.pkl', 'wb')
                 pickle.dump((file, nskip, nints, peaks[0], pv.dmarr[peaks[0][0]], peaks[1], peakssig), pklout)
                 pklout.close()
 
@@ -1117,7 +1117,7 @@ def pulse_search_reim(fileroot, pathin, pathout, nints=10000, edge=0):
 
     # loop over miriad data and time chunks
     for file in filelist:
-        fileout = open(pathout + string.join(file.split('.')[:-1]) + '.txt', 'a')
+        fileout = open(pathout + string.join(file.split('.')[:-1], '.') + '.txt', 'a')
 
         for nskip in range(0, maxints-(nints-edge), nints-edge):
             print
@@ -1135,7 +1135,7 @@ def pulse_search_reim(fileroot, pathin, pathout, nints=10000, edge=0):
             # save all results (v1.0 pickle format)
             # TO DO:  think of v2.0 of pickle format
             if len(dips[0]) > 0:
-                pklout = open(pathout + string.join(file.split('.')[:-1]) + '.' + str(nskip) + '.pkl', 'wb')
+                pklout = open(pathout + string.join(file.split('.')[:-1], '.') + '.' + str(nskip) + '.pkl', 'wb')
                 pickle.dump((file, nskip, nints, dips[0], pv.dmarr[dips[0][0]], dips[1], dipsprob), pklout)
                 pklout.close()
 
@@ -1195,7 +1195,7 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
 
     print 'Looping over filelist ', filelist, ' with dmrange, ', dmrange
     for file in filelist:
-        fileout = open(pathout + string.join(file.split('.')[:-1]) + '_dm' + str(dmrange[0]) + '.txt', 'a')
+        fileout = open(pathout + string.join(file.split('.')[:-1], '.') + '_dm' + str(dmrange[0]) + '.txt', 'a')
 
         for nskip in range(nstart, maxints-(nints-edge), nints-edge):
             print 'Starting file %s with nskip %d' % (file, nskip)
@@ -1246,7 +1246,7 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
                             elif mode == 'dirty':
                                 print >> fileout, file, nskip, nints, (i, j), 'Peak, (sig): ', peak, epeak, '(', peak/epeak, ')'
                             # save all results (v1.0 pickle format)
-                            pklout = open(pathout + string.join(file.split('.')[:-1]) + '.' + str(nskip) + '-dm' + str(i) + 't' + str(j) + '.pkl', 'wb')
+                            pklout = open(pathout + string.join(file.split('.')[:-1], '.') + '.' + str(nskip) + '-dm' + str(i) + 't' + str(j) + '.pkl', 'wb')
                             pickle.dump((file, nskip, nints, n.array([i]), pv.dmarr[i], n.array([j]), n.array([peak/epeak])), pklout)
                             pklout.close()
                     except:
@@ -1300,7 +1300,7 @@ def pulse_search_uvfit(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
         
     print 'Looping over filelist: ', filelist
     for file in filelist:
-        fileout = open(pathout + string.join(file.split('.')[:-1]) + '.txt', 'a')
+        fileout = open(pathout + string.join(file.split('.')[:-1], '.') + '.txt', 'a')
 
         for nskip in [0]:
             print 'Starting file %s with nskip %d' % (file, nskip)
@@ -1321,7 +1321,7 @@ def pulse_search_uvfit(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
                             print '\tDetection!'
                             print >> fileout, file, nskip, nints, (i, j), 'Peak, (sig),  RA, Dec: ', peak, epeak, '(', peak/epeak, ')  ', off_ra, eoff_ra, off_dec, eoff_dec
                             # save all results (v1.0 pickle format)
-                            pklout = open(pathout + string.join(file.split('.')[:-1]) + '.' + str(nskip) + '-dm' + str(i) + 't' + str(j) + '.pkl', 'wb')
+                            pklout = open(pathout + string.join(file.split('.')[:-1], '.') + '.' + str(nskip) + '-dm' + str(i) + 't' + str(j) + '.pkl', 'wb')
                             pickle.dump((file, nskip, nints, n.array([i]), pv.dmarr[i], n.array([j]), n.array([peak/epeak])), pklout)
                             pklout.close()
                     except:
@@ -1388,7 +1388,7 @@ def process_pickle(filename, pathin, mode='image'):
 #                print 'obsrms first try:', obsrms
 #                shutil.rmtree(bgname, ignore_errors=True)
 #               newfile = string.join(pv.file.split('.')[:-1]) + '.' + str(pv.nskip/pv.nbl) + '-' + 'dm' + str(dmbinarr[peaktrial]) + 't' + str(bgwindow) + '.mir'
-                newfile = string.join(pv.file.split('.')[:-1]) + '.' + str(pv.nskip/pv.nbl) + '-' + 'dm' + str(dmbinarr[peaktrial]) + 't' + str(tbinarr[peaktrial]) + '.mir'
+                newfile = string.join(pv.file.split('.')[:-1], '.') + '.' + str(pv.nskip/pv.nbl) + '-' + 'dm' + str(dmbinarr[peaktrial]) + 't' + str(tbinarr[peaktrial]) + '.mir'
                 print 'Loading file', newfile
                 pv2 = poco(newfile, nints=1)
                 pv2.prep()
