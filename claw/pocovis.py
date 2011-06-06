@@ -1229,8 +1229,9 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
                     print 'Dirty image noises and their median', bgepeak, n.median(bgepeak)
                 # now iterate over integrations
                 for j in range(len(pv.reltime)):
-                    if (tstop != 0) & (j % 100):     # check if time limit exceeded
+                    if (tstop != 0) & (j % 10):     # check if time limit exceeded
                         if (time.time() - t0) / 3600 > tstop:
+                            print 'Time limit exceeded...'
                             return 0
                     try: 
                         results = pv.imagedmt0(i, j, show=show, bgwindow=bgwindow, clean=1, mode=mode)
