@@ -1462,7 +1462,7 @@ if __name__ == '__main__':
         try:
             dmrange = [int(sys.argv[4])]    # only works for single dm
             nstart = int(sys.argv[5])  # start integration
-            tstop = int(sys.argv[6])  # run time in hours
+            tstop = float(sys.argv[6])  # run time in hours
             pulse_search_image(fileroot=sys.argv[1], pathin=sys.argv[2], pathout=sys.argv[3], nints=10000, edge=edge, mode='dirty', sig=6.0, dmrange=dmrange, nstart=nstart, tstop=tstop)
         except AttributeError:
             exit(0)
