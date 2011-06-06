@@ -257,6 +257,9 @@ def task (args):
 
             p.addXY (x, y, keytext, lines=False, rebound=False)
 
+        p.magicAxisPainters ('ltrb')
+        p.rpainter.paintLabels = False
+        p.tpainter.paintLabels = False
         p.rebound (False, False)
         dx = N.abs (xmax - xmin) * 0.05
         if dx == 0:
