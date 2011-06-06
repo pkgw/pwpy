@@ -243,7 +243,11 @@ class NoiseCal (object):
             if not w.size:
                 continue
 
-            idx1, idx2 = apidxs[bp[0]], apidxs[bp[1]]
+            idx1, idx2 = apidxs.get (bp[0]), apidxs.get (bp[1])
+            if idx1 is None or idx2 is None:
+                nnorara += 1
+                continue
+
             rdata1, rdata2 = raras[idx1], raras[idx2]
 
             tidx1 = rdata1[0].searchsorted (t)
