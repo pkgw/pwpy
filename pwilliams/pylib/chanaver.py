@@ -285,7 +285,7 @@ def _channelAverage (gen, out, naver, slop, banner, args):
 
 
 try:
-    from awff import SimpleMake
+    from awff import MultiprocessMake
     from arf.visutil import propagateHeaders
 except ImportError:
     pass
@@ -304,8 +304,8 @@ else:
         propagateHeaders (vis, out)
         return out
 
-    asMake = SimpleMake ('vis params', 'out', _asmake,
-                         [None, {}])
+    asMake = MultiprocessMake ('vis params', 'out', _asmake,
+                               [None, {}])
 
 
 def task (args):

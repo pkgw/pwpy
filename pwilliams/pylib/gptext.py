@@ -201,10 +201,10 @@ class GainsInfo (object):
         return self
 
 
-# AWFF SimpleMake implementation
+# AWFF make implementation
 
 try:
-    from awff import SimpleMake
+    from awff import MultiprocessMake
 except ImportError:
     pass
 else:
@@ -226,8 +226,8 @@ else:
 
         return out
 
-    applyText = SimpleMake ('vis gaintext', 'out', _applytext,
-                            [None, None])
+    applyText = MultiprocessMake ('vis gaintext', 'out', _applytext,
+                                  [None, None])
 
     def _genfromtext (context, gaintext=None):
         from miriad import CalData
@@ -244,8 +244,8 @@ else:
 
         return out
 
-    genFromText = SimpleMake ('gaintext', 'out', _genfromtext,
-                              [None])
+    genFromText = MultiprocessMake ('gaintext', 'out', _genfromtext,
+                                    [None])
 
 
 # Task functionality

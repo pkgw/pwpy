@@ -1108,7 +1108,7 @@ try:
 except:
     pass
 else:
-    from awff import SimpleMake
+    from awff import MultiprocessMake
     from awff.pathref import FileRef
 
     def _gettsysinfo (context, vis=None, params=None):
@@ -1155,8 +1155,8 @@ else:
 
         return out
 
-    GetTSysInfo = SimpleMake ('vis params', 'out', _gettsysinfo,
-                              [None, {}])
+    GetTSysInfo = MultiprocessMake ('vis params', 'out', _gettsysinfo,
+                                    [None, {}])
 
     from mirtask.util import mir2bp, bp2aap
     from arf.vispipe import VisPipeStage
