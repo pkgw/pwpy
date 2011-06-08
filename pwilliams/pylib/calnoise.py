@@ -426,7 +426,7 @@ except:
     pass
 else:
     from mirtask.util import mir2bp, apAnt
-    from awff import SimpleMake
+    from awff import MultiprocessMake
     from awff.pathref import FileRef
     from arf.vispipe import VisPipeStage
 
@@ -439,7 +439,7 @@ else:
         nc.save (str (out))
         return out
 
-    CalNoise = SimpleMake ('vis params', 'out', _calnoise, [None, {}])
+    CalNoise = MultiprocessMake ('vis params', 'out', _calnoise, [None, {}])
 
     class InsertNoiseInfo (VisPipeStage):
         def __init__ (self, pathobj):
@@ -528,6 +528,8 @@ else:
             bps = self.bps
             bpfactors = self.bpfactors
             raras = self.raras
+
+            jyperks.fill (0)
 
             defaultrara = N.median (raras.values ())
             get = lambda ap: raras.get (ap, defaultrara)
@@ -725,6 +727,36 @@ def tui_checkap (args):
     return 0
 
 
+def tui_checkabs (args):
+    import omega as O
+
+    if len (args) != 1:
+        util.die ('usage: <datfile>')
+
+    nc = NoiseCal ()
+    nc.load (args[0])
+
+    saps = nc.saps
+    sqbps = nc.sqbps
+    vals = nc.bpdata[:,1]
+    uncerts = nc.bpdata[:,2]**-0.5
+    modelvals = nc.bpdata[:,3] * nc.svals
+    muncerts = nc.suncerts * nc.bpdata[:,3]
+
+    pg = O.quickPager ([])
+
+    for idx in xrange (len (saps)):
+        w = N.where ((sqbps[:,0] == idx) | (sqbps[:,1] == idx))
+
+        p = O.quickXYErr (vals[w], modelvals[w], muncerts[w], 
+                          util.fmtAP (saps[idx]), lines=False)
+        p.setLabels ('Measured variance (Jy²)', 'Modeled variance (Jy²)')
+        pg.send (p)
+
+    pg.done ()
+    return 0
+
+
 def tui_checkcal (args):
     import omega as O, scipy.stats as SS
     toread = []
@@ -817,7 +849,7 @@ def tui_sefds (args):
 
 if __name__ == '__main__':
     if len (sys.argv) == 1:
-        util.die ('add a subcommand: one of "checkap checkcal checkfit '
+        util.die ('add a subcommand: one of "checkabs checkap checkcal checkfit '
                   'compute export sefds"')
 
     subcommand = sys.argv[1]
