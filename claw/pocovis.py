@@ -656,6 +656,50 @@ class poco:
             return 0
 
 
+    def imsearch(self, dmind, tind, nints, sig=5., show=0, edge=0, mode='dirty'):
+        """
+        Reproduce search result of pulse_search_image.
+        """
+
+        bgwindow = 10  # where bg subtraction is made
+
+        if mode == 'dirty':
+            # define typical dirty image noise level for this dm
+            print 'For DM = %.1f, measuring median image noise level' % (self.dmarr[dmind])
+            bgpeak = []; bgepeak = []
+            for bgi in range(bgwindow, nints-bgwindow, nints/15):
+                print 'Measuring noise in integration %d' % (bgi)
+                outname = string.join(self.file.split('.')[:-1], '.') + '.' + str(self.nskip/self.nbl) + '-' + 'dm' + str(dmind) + 't' + str(bgi) + '.mir'
+                shutil.rmtree (outname, ignore_errors=True); shutil.rmtree (outname+'.map', ignore_errors=True); shutil.rmtree (outname+'.beam', ignore_errors=True)
+                status = self.writetrack2(dmind, bgi, bgwindow=bgwindow)   # output file at dmbin, trelbin
+                try:
+                    txt = TaskInvert (vis=outname, map=outname+'.map', beam=outname+'.beam', mfs=True, double=True, cell=80, imsize=250).snarf()
+                    txt = TaskImStat (in_=outname+'.map').snarf()   # get dirty image stats
+                    bgpeak.append(float(txt[0][10][51:61]))       # get peak of dirty image
+                    bgepeak.append(float(txt[0][10][41:51]))       # note that epeak is biased by any true flux
+                    shutil.rmtree (outname, ignore_errors=True)
+                    shutil.rmtree (outname+'.map', ignore_errors=True)
+                    shutil.rmtree (outname+'.beam', ignore_errors=True)
+                except:
+                    pass
+                
+            print 'Dirty image noises and their median', bgepeak, n.median(bgepeak)
+
+            # now make dirty image
+            results = self.imagedmt0(dmind, tind, show=show, bgwindow=bgwindow, clean=1, mode=mode)
+            if mode == 'clean':
+                peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = results
+            elif mode == 'dirty':  # need to develop more... needs to be ~10ms processing per int!
+                peak, epeak = results
+                epeak = n.median(bgepeak)
+            if peak/epeak >= sig:
+                print '\tDetection!'
+            if mode == 'clean':
+                print self.nskip/self.nbl, nints, (dmind, tind), 'Peak, (sig),  RA, Dec: ', peak, epeak, '(', peak/epeak, ')  ', off_ra, eoff_ra, off_dec, eoff_dec
+            elif mode == 'dirty':
+                print self.nskip/self.nbl, nints, (dmind, tind), 'Peak, (sig): ', peak, epeak, '(', peak/epeak, ')'
+
+
     def uvfitdmt0(self, dmbin, t0bin, bgwindow=10, tshift=0, show=1):
         """ Makes and fits a point source to background subtracted visibilities for a given dmbin and t0bin.
         tshift can shift the actual t0bin earlier to allow reading small chunks of data relative to pickle.
@@ -1404,7 +1448,7 @@ def process_pickle(filename, pathin, mode='image'):
             pv.plotdmt0(save=1)
         elif mode == 'image':
             immode = 'dirty'
-            results = pv.imagedmt0(dmbinarr[peaktrial], tbinarr[peaktrial], bgwindow=bgwindow, clean=0, mode=immode, show=1)
+            results = pv.imagedmt0(dmbinarr[peaktrial], tbinarr[peaktrial], bgwindow=bgwindow, clean=1, mode=immode, show=1)
             if immode == 'clean':
                 peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = results
                 print peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
@@ -1421,6 +1465,8 @@ def process_pickle(filename, pathin, mode='image'):
             datasub = pv.tracksub(dmbinarr[peaktrial], tbinarr[peaktrial], bgwindow=bgwindow)
             pv.data = datasub
             pv.plotreim()
+        elif mode == 'imsearch':
+            pv.imsearch(dmbinarr[peaktrial], tbinarr[peaktrial], nints, sig=7.0)
         else:
             print 'Mode not recognized'
     else:
@@ -1458,7 +1504,7 @@ if __name__ == '__main__':
     elif len(sys.argv) == 2:
         # if pickle, then plot data or dm search results
         print 'Assuming input file is pickle of candidate...'
-        process_pickle(sys.argv[1], pathin=pathin, mode='spec')
+        process_pickle(sys.argv[1], pathin=pathin, mode='imsearch')
     elif len(sys.argv) == 7:
         # if pickle, then plot data or dm search results
         print 'Time limited searching for pulses... with %s, %s, %s' % (fileroot, pathin, pathout)
@@ -1466,7 +1512,7 @@ if __name__ == '__main__':
             dmrange = [int(sys.argv[4])]    # only works for single dm
             nstart = int(sys.argv[5])  # start integration
             tstop = float(sys.argv[6])  # run time in hours
-            pulse_search_image(fileroot=sys.argv[1], pathin=sys.argv[2], pathout=sys.argv[3], nints=10000, edge=edge, mode='dirty', sig=6.0, dmrange=dmrange, nstart=nstart, tstop=tstop)
+            pulse_search_image(fileroot=sys.argv[1], pathin=sys.argv[2], pathout=sys.argv[3], nints=20000, edge=edge, mode='dirty', sig=7.0, dmrange=dmrange, nstart=nstart, tstop=tstop)
         except AttributeError:
             exit(0)
     elif len(sys.argv) == 6:
