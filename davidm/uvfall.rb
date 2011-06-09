@@ -201,7 +201,7 @@ while tno = uvDatOpn
          :title=> title,
          :xlabel => xlabel,
          :ylabel => 'Dump',
-         :yrange=>[ymin, ymax],
+         :yrange=>[ymax, ymin],
          :line_color => Color::WHITE
         )
 
@@ -227,7 +227,7 @@ while tno = uvDatOpn
          :title=> title,
          :xlabel => xlabel,
          :ylabel => 'Dump',
-         :yrange=>[ymin, ymax],
+         :yrange=>[ymax, ymin],
          :line_color => Color::WHITE
         )
 
