@@ -45,8 +45,8 @@ class poco:
         self.pulsewidth = 0 * n.ones(len(self.chans)) # pulse width of crab
         # set dmarr
 #        self.dmarr = [26.8]  # b0329+54
-#        self.dmarr = [56.8]  # crab
-        self.dmarr = n.arange(50,126,2.7)       # dm trials for m31. spacing set for 50% efficiency for band from 722-796 MHz, 1.2 ms integrations
+        self.dmarr = [56.8]  # crab
+#        self.dmarr = n.arange(50,126,2.7)       # dm trials for m31. spacing set for 50% efficiency for band from 722-796 MHz, 1.2 ms integrations
 #        self.tshift = 0.2     # not implemented yet
         self.nskip = int(nskip*self.nbl)    # number of iterations to skip (for reading in different parts of buffer)
         nskip = int(self.nskip)
@@ -649,7 +649,8 @@ class poco:
                 print 'Individual dirty image peak %.2f +- %.2f' % (peak, epeak)
                 if clean:
                     shutil.rmtree (outroot + '.mir', ignore_errors=True)
-                    shutil.rmtree (outroot+'.map', ignore_errors=True); shutil.rmtree (outroot+'.beam', ignore_errors=True); shutil.rmtree (outroot+'.clean', ignore_errors=True); shutil.rmtree (outroot+'.restor', ignore_errors=True)
+#                    shutil.rmtree (outroot+'.map', ignore_errors=True) 
+                    shutil.rmtree (outroot+'.beam', ignore_errors=True); shutil.rmtree (outroot+'.clean', ignore_errors=True); shutil.rmtree (outroot+'.restor', ignore_errors=True)
                 return peak, epeak
         except:
             print 'Something broke with imaging!'
@@ -1234,19 +1235,19 @@ def pulse_search_image(fileroot, pathin, pathout, nints=12000, sig=5.0, show=0, 
 # hack to search single file for pulses
     filelist = [fileroot]
 
-    if dmrange == None:
-        dmrange = range(len(pv.dmarr))
-
     print 'Looping over filelist ', filelist, ' with dmrange, ', dmrange
     for file in filelist:
-        fileout = open(pathout + string.join(file.split('.')[:-1], '.') + '_dm' + str(dmrange[0]) + '.txt', 'a')
-
         for nskip in range(nstart, maxints-(nints-edge), nints-edge):
             print 'Starting file %s with nskip %d' % (file, nskip)
 
             # load data
             pv = poco(pathin + file, nints=nints, nskip=nskip)
             pv.prep()
+
+            if dmrange == None:
+                dmrange = range(len(pv.dmarr))
+
+            fileout = open(pathout + string.join(file.split('.')[:-1], '.') + '_dm' + str(dmrange[0]) + '.txt', 'a')
 
             # dedisperse
             for i in dmrange:
@@ -1483,12 +1484,12 @@ if __name__ == '__main__':
     print 'Greetings, human.'
     print ''
 
-    fileroot = 'poco_m31_154202.mir'
+    fileroot = 'poco_crab_201103_16.mir'
     pathin = 'data/'
-    pathout = 'm31_im/'
-    edge = 150 # m31 search up to dm=131 and pulse starting at first unflagged channel
+    pathout = 'tst/'
+#    edge = 150 # m31 search up to dm=131 and pulse starting at first unflagged channel
 #    edge = 35 # b0329 search at dm=28.6 and pulse starting at first unflagged channel
-#    edge = 70 # Crab search at dm=56.8 and pulse starting at first unflagged channel
+    edge = 70 # Crab search at dm=56.8 and pulse starting at first unflagged channel
 #    edge = 360  # Crab DM of 56.8 and for DM track starting at freq=0
 
     if len(sys.argv) == 1:
@@ -1496,7 +1497,7 @@ if __name__ == '__main__':
         print 'Searching for pulses...'
         try:
 #            cProfile.run('pulse_search_uvfit(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)')
-            pulse_search_image(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge, mode='dirty', sig=6.0)
+            pulse_search_image(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge, mode='dirty', sig=7.0)
 #            pulse_search_phasecenter(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)
 #            pulse_search_reim(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)
         except AttributeError:
