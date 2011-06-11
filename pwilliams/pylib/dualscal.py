@@ -228,7 +228,7 @@ def task (args):
 
     # Ready to do the real work
 
-    dualSelfCal (vises, out, kws.usemself, kws.ttol, kws.serial,
+    dualSelfCal (vises, out, kws.usemself, kws.ttol, False, kws.serial,
                  kws.select, banner, **rest)
     return 0
 
