@@ -1,407 +1,269 @@
-"""Utility class for rendering 2-D numpy arrays
-graphically as images."""
+"""
+UI features of the viewport:
 
-# TODO: zooming, slices, histogram
+click-drag to pan
+scrollwheel to zoom in/out
+double-click to recenter
+
+Added by the toplevel window viewer:
+
+Ctrl-A to autoscale data to fit window
+Ctrl-E to center the data in the window
+Ctrl-W to close the window
+Ctrl-1 to set scale to unity
+
+"""
 
 import numpy as N
-import Numeric # ugh.
-
-class ArrayTransformer (object):
-    CLAMPING_MYMEDIAN = 0
-    CLAMPING_MINMAX = 1
-    CLAMPING_NONE = 2
-
-    SCALING_LINEAR = 0
-    SCALING_LOG = 1
-    SCALING_SQRT = 2
-    SCALING_HISTEQ = 3
-    
-    COLORING_BLACKTOWHITE = 0
-    COLORING_BLUETORED = 1
-    COLORING_GREENTOMAGENTA = 2
-
-    clamped = None
-    scaled = None
-    
-    def __init__ (self, array, clamping=None, scaling=None, coloring=None):
-        if array.ndim != 2:
-            raise Exception ('Can only show 2-dimensional arrays as images.')
-
-        self.orig_data = array
-        self.orig_nrow, self.orig_ncol = array.shape
-        self.orig_min, self.orig_max = N.min (array), N.max (array)
-        self.orig_med = N.median (array.ravel ())
-
-        # Initial rendering settings
-        
-        if clamping is None: clamping = self.CLAMPING_MYMEDIAN
-        if scaling is None: scaling = self.SCALING_LINEAR
-        if coloring is None: coloring = self.COLORING_BLACKTOWHITE
-        
-        self.clamping = clamping
-        self.scaling = scaling
-        self.invertScale = False
-        self.coloring = coloring
-
-        self._initColors ()
-
-    def setClamping (self, clamping):
-        if clamping == self.clamping:
-            return
-
-        if self.orig_min < 0. and clamping == self.CLAMPING_NONE:
-            raise Exception ('Must have some sort of clamping when minimum value less than 0')
-        
-        self.clamping = clamping
-        
-        self.clamped = None
-        self.scaled = None
-
-    def setScaling (self, scaling):
-        if scaling == self.scaling:
-            return
-
-        self.scaling = scaling
-        
-        self.scaled = None
-
-    def setInvertScale (self, invertScale):
-        if invertScale == self.invertScale:
-            return
-
-        self.invertScale = invertScale
-
-        self.scaled = None
-        
-    def setColoring (self, coloring):
-        if coloring == self.coloring:
-            return
-
-        self.coloring = coloring
-
-    def getClamped (self):
-        if self.clamped is None:
-            self.doClamping ()
-
-        return self.clamped
-
-    def getScaled (self):
-        if self.clamped is None:
-            self.doClamping ()
-        if self.scaled is None:
-            self.doScaling ()
-
-        return self.scaled
-
-    def getPixbufArray (self, enlargement):
-        if self.clamped is None:
-            self.doClamping ()
-        if self.scaled is None:
-            self.doScaling ()
-
-        return self.makePixbufArray (self.scaled, enlargement)
-
-    # Implementations.
-        
-    def doClamping (self):
-        omin, omax = self.orig_min, self.orig_max
-        
-        if self.clamping == self.CLAMPING_NONE:
-            clamped = self.orig_data
-            cmax = omax
-
-            if omin < 0:
-                raise Exception ('Data minimum less than 0, must have some clamping')
-        elif self.clamping == self.CLAMPING_MINMAX:
-            clamped = self.orig_data - omin
-            cmax = omax - omin
-        elif self.clamping == self.CLAMPING_MYMEDIAN:
-            clamped = self.orig_data * 1.0
-
-            for i in range (0, 5):
-                med = N.median (clamped.ravel ())
-                quasistd = N.sqrt (((clamped - med)**2).mean ())
-                ciel = N.min (med + 5 * quasistd, omax)
-                floor = N.max (med - 5 * quasistd, omin)
-                
-                #nabove = len (N.where (self.orig_data > ciel)[0])
-                #nbelow = len (N.where (self.orig_data < floor)[0])
-                #
-                #print 'med %f, qs %f, ci %f, fl %f, nab %f, nbe %f' \
-                #      % (med, quasistd, ciel, floor, nabove, nbelow)
-
-                clamped = N.minimum (self.orig_data, ciel)
-                clamped = N.maximum (clamped, floor)
-                
-            clamped -= floor
-            # for some reason this fails for the very highest values
-            #cmax = ciel - floor
-            cmax = clamped.max ()
-        else:
-            raise Exception ('Unknown clamping mode %d' % self.clamping)
-
-        self.clamped = clamped
-        self.clamped_max = cmax
-
-    def doScaling (self):
-        """Map our clamped data, ranging from 0 to clamped_max, into a 24-bit
-        space of integers, in preparation for colorization into a 24-bit RGB
-        space."""
-        
-        ncol, nrow = self.orig_ncol, self.orig_nrow
-        scaled = N.ndarray ((nrow, ncol), N.uint32)
-        smax = 2**24 - 1 # 8 bits of R,G,B = 24 bit color
-        
-        cmax = self.clamped_max
-
-        # These are all slicewise assignments to set the array contents,
-        # not just the array variable. Otherwise we lose the uint32 datatype,
-        # and the arrayness altogether when cmax = 0.
-        
-        if cmax == 0:
-            scaled[:,:] = 0
-        elif self.scaling == self.SCALING_LINEAR:
-            scale = smax / cmax
-            scaled[:,:] = self.clamped * scale
-        elif self.scaling == self.SCALING_LOG:
-            scale = smax / N.log (cmax + 1.0)
-            scaled[:,:] = N.log (self.clamped + 1.0) * scale
-        elif self.scaling == self.SCALING_SQRT:
-            scale = smax / N.sqrt (cmax + 1.0)
-            scaled[:,:] = N.sqrt (self.clamped + 1.0) * scale
-        elif self.scaling == self.SCALING_HISTEQ:
-            # Scale by area under the image histogram -- equivalently, rank
-            # by percentile
-            # FIXME: we lose precision by taking only a subset of the sorted array,
-            # but digitize () gets very slow when its second argument is large.
-            # Even a ~512 element maximum is pushing it.
-            
-            raveled = self.clamped.ravel ()
-            
-            sorted = raveled * 1.0
-            sorted.sort ()
-
-            if sorted.size > 512:
-                step = sorted.size / 512
-                sorted = sorted[::step]
-            
-            indexed = N.digitize (raveled, sorted) - 1
-            v = 1.0 * smax / len (sorted)
-            scaled[:,:] = indexed.reshape (nrow, ncol) * v
-        else:
-            raise Exception ('Unknown image scale %d' % self.scaling)
-
-        if self.invertScale:
-            scaled = -scaled + smax
-        
-        self.scaled = scaled
-
-    # See http://geography.uoregon.edu/datagraphics/ for some information
-    # on good color schemes.
-    
-    def _colorMakeGauss (self, peak, ctr, width):
-        # sqrt (2pi) = 2.50662827463
-
-        def f (work, scaled):
-            work[:,:] = N.exp (-(scaled - ctr)**2/(2*width**2)) * \
-                        peak / 2.50662827463
-
-        return f
-    
-    def _colorTruncate (self, work, scaled):
-        work[:,:] = scaled // 2**16
-
-    def _initColors (self):
-        self._colorschemes = cs = {}
-
-        r = g = b = self._colorTruncate
-        cs[self.COLORING_BLACKTOWHITE] = (r, g, b)
-
-        #  These could all use some work.
-        
-        r = self._colorMakeGauss (255., 2**24 * 0.8, 2**24 * 0.333)
-        g = self._colorMakeGauss (255., 2**24 * 0.5, 2**24 * 0.333)
-        b = self._colorMakeGauss (255., 2**24 * 0.2, 2**24 * 0.5)
-        cs[self.COLORING_BLUETORED] = (r, g, b)
-        
-        r = self._colorMakeGauss (255., 2**24 * 0.8, 2**24 * 0.25)
-        g = self._colorMakeGauss (255., 2**24 * 0.4, 2**24 * 0.3)
-        b = self._colorMakeGauss (255., 2**24 * 0.8, 2**24 * 0.25)
-        cs[self.COLORING_GREENTOMAGENTA] = (r, g, b)
-        
-    def makePixbufArray (self, scaled, e):
-        nrow, ncol = scaled.shape
-
-        a2 = Numeric.zeros ((nrow, ncol, 3), 'b')
-        work = N.ndarray ((nrow, ncol), N.uint8)
-
-        if not self.coloring in self._colorschemes:
-            raise Exception ('Unknown image colorization %d' % self.coloring)
-            
-        (r, g, b) = self._colorschemes[self.coloring]
-
-        r (work, scaled)
-        a2[:,:,0] = work
-        g (work, scaled)
-        a2[:,:,1] = work
-        b (work, scaled)
-        a2[:,:,2] = work
-
-        return a2
-
-# Viewer GUI
-
-import gobject, gtk
-gdk = gtk.gdk
-from gtk import glade
-
-# A lot of this is copied from omega/gtkUtil.py as
-# a temp hack. Should be integrated.
-
-def _makeGladeFile ():
-    import os
-    f = os.path.dirname (__file__)
-    return os.path.join (f, 'ndshow.glade')
-
-_gladefile = _makeGladeFile ()
-
-class ArrayWindow (object):
-    def __init__ (self, array, parent=None, title=None, enlarge=1, **kwargs):
-        self.xform = ArrayTransformer (array, **kwargs)
-
-        self.enlargement = enlarge
-        self.xml = xml = glade.XML (_gladefile)        
-        xml.signal_autoconnect (self)
-
-        # Window setup
-        
-        self.win = win = xml.get_widget ('window')
-        if title is not None: win.set_title (str (title))
-        if parent is not None: win.set_transient_for (parent)
-
-        # Image setup - do this before UI controls so that
-        # their signal callbacks can set the image correctly.
-        
-        self.img = xml.get_widget ('img')
-        self.colorscale_img = xml.get_widget ('colorscale_img')
-
-        # Sync UI to our input settings
-
-        cb = xml.get_widget ('cb_clamping')
-        cb.set_active (self.xform.clamping)
-
-        cb = xml.get_widget ('cb_scaling')
-        cb.set_active (self.xform.scaling)
-
-        cb = xml.get_widget ('cb_coloring')
-        cb.set_active (self.xform.coloring)
-
-        xml.get_widget ('sb_enlargement').set_value (self.enlargement)
-        
-        # Statusbar setup
-        
-        self.statusbar = xml.get_widget ('statusbar')
-        self.sbctxt = self.statusbar.get_context_id ('Position')
-
-        # All done. Draw the thing.
-
-        self.updateColorscaleImage ()
-        self.update ()
-
-    def makePixbuf (self, scaled, e):
-        nrow, ncol = scaled.shape
-        arr = self.xform.makePixbufArray (scaled, e)
-        pb = gdk.pixbuf_new_from_array (arr, gdk.COLORSPACE_RGB, 8)
-
-        if e != 1:
-            pb = pb.scale_simple (ncol * e, nrow * e, gdk.INTERP_NEAREST)
-
-        return pb
-
-    def update (self):
-        pb = self.makePixbuf (self.xform.getScaled (), self.enlargement)
-        self.img.set_from_pixbuf (pb)
-
-    # Colorscale demo image
-
-    _lastColorscaleWidth = -1
-    
-    def updateColorscaleImage (self):
-        alloc = self.colorscale_img.get_allocation ()
-        ncol = alloc.width
-        nrow = 16
-        self._lastColorscaleWidth = ncol
-
-        if self.xform.invertScale:
-            scale = N.linspace (2**24 - 1, 0, ncol)
-        else:
-            scale = N.linspace (0, 2**24 - 1, ncol)
-            
-        scale = N.vstack ((scale, scale, scale, scale))
-        scale = N.vstack ((scale, scale, scale, scale))
-
-        pb = self.makePixbuf (scale, 1)
-        self.colorscale_img.set_from_pixbuf (pb)
-
-    def onColorscaleAllocate (self, image, allocation):
-        if allocation.width == self._lastColorscaleWidth:
-            return
-
-        self.updateColorscaleImage ()
-        
-    # Event handlers.
-
-    sbmid = None
-    
-    def onMotionNotify (self, ebox, event):
-        if self.sbmid != None:
-            self.statusbar.remove (self.sbctxt, self.sbmid)
-
-        (x, y) = event.get_coords ()
-
-        # Map to image coordinates. This feels sketchy.
-        
-        ncol, nrow = self.xform.orig_ncol, self.xform.orig_nrow
-        enl = self.enlargement
-        alloc = self.img.get_allocation ()
-        x -= (alloc.width - ncol * enl) / 2
-        y -= (alloc.height - nrow * enl) / 2
-
-        col, row = int (x) // enl, int (y) // enl
-
-        if col < 0 or row < 0 or col >= ncol or row >= nrow:
-            return
-        
-        try:
-            val = 'value %g' % self.xform.orig_data[row,col]
-        except Exception, e:
-            val = 'error getting value: %s' % e
-            
-        txt = 'Row %d, col %d; %s' % (row, col, val)
-        self.sbmid = self.statusbar.push (self.sbctxt, txt)
-
-    def onClampingChanged (self, combo):
-        try:
-            self.xform.setClamping (combo.get_active ())
-        except:
-            combo.set_active (ArrayTransformer.CLAMPING_MINMAX)
-        
-        self.update ()
-        
-    def onScalingChanged (self, combo):
-        self.xform.setScaling (combo.get_active ())
-        self.update ()
-
-    def onInvertToggled (self, toggle):
-        self.xform.setInvertScale (toggle.get_active ())
-        self.updateColorscaleImage ()
-        self.update ()
-        
-    def onColoringChanged (self, combo):
-        self.xform.setColoring (combo.get_active ())
-        self.updateColorscaleImage ()
-        self.update ()
-        
-    def onEnlargementChanged (self, spinbutton):
-        self.enlargement = spinbutton.get_value_as_int ()
-        self.update ()
+import cairo
+import gtk
+
+
+class Viewport (gtk.DrawingArea):
+    getshape = None
+    getsurface = None
+
+    centerx = 0
+    centery = 0
+    # The data pixel coordinate of the central pixel of the displayed
+    # window
+
+    scale = None
+    # From data space to viewer space: e.g., scale = 2 means that
+    # each data pixel occupies 2 pixels on-screen.
+
+    drag_win_x0 = drag_win_y0 = None
+    drag_dc_x0 = drag_dc_y0 = None
+
+
+    def __init__ (self):
+        super (Viewport, self).__init__ ()
+        self.add_events (gtk.gdk.POINTER_MOTION_MASK |
+                         gtk.gdk.BUTTON_PRESS_MASK |
+                         gtk.gdk.BUTTON_RELEASE_MASK |
+                         gtk.gdk.SCROLL_MASK)
+        self.connect ('expose-event', self._on_expose)
+        self.connect ('scroll-event', self._on_scroll)
+        self.connect ('button-press-event', self._on_button_press)
+        self.connect ('button-release-event', self._on_button_release)
+        self.connect ('motion-notify-event', self._on_motion_notify)
+
+
+    def setShapeGetter (self, getshape):
+        if getshape is not None and not callable (getshape):
+            raise ValueError ()
+        self.getshape = getshape
+        return self
+
+
+    def setSurfaceGetter (self, getsurface):
+        if getsurface is not None and not callable (getsurface):
+            raise ValueError ()
+        self.getsurface = getsurface
+        return self
+
+
+    def autoscale (self):
+        if self.allocation is None:
+            raise Exception ('Must be called after allocation')
+        if self.getshape is None:
+            raise Exception ('Must be called after setting shape-getter')
+
+        aw = self.allocation.width
+        ah = self.allocation.height
+
+        dw, dh = self.getshape ()
+
+        wratio = float (aw) / dw
+        hratio = float (ah) / dh
+
+        self.scale = min (wratio, hratio)
+        self.centerx = 0.5 * dw
+        self.centery = 0.5 * dh
+        self.queue_draw ()
+        return self
+
+
+    def center (self):
+        if self.getshape is None:
+            raise Exception ('Must be called after setting shape-getter')
+
+        dw, dh = self.getshape ()
+        self.centerx = 0.5 * dw
+        self.centery = 0.5 * dh
+        self.queue_draw ()
+        return self
+
+
+    def _on_expose (self, alsoself, event):
+        if self.getshape is None or self.getsurface is None:
+            return False
+
+        if self.scale is None:
+            self.autoscale ()
+
+        w = self.allocation.width
+        seendatawidth = w / self.scale
+        xoffset = 0.5 * seendatawidth - self.centerx
+        h = self.allocation.height
+        seendataheight = h / self.scale
+        yoffset = 0.5 * seendataheight - self.centery
+
+        surface, xoffset, yoffset = self.getsurface (xoffset, yoffset,
+                                                     seendatawidth, seendataheight)
+
+        ctxt = self.window.cairo_create ()
+        ctxt.scale (self.scale, self.scale)
+        ctxt.set_source_surface (surface, xoffset, yoffset)
+        pat = ctxt.get_source ()
+        pat.set_extend (cairo.EXTEND_NONE)
+        pat.set_filter (cairo.FILTER_NEAREST)
+        ctxt.paint ()
+
+        return True
+
+
+    def _on_scroll (self, alsoself, event):
+        oldscale = self.scale
+        newscale = self.scale
+
+        if event.direction == gtk.gdk.SCROLL_UP:
+            newscale *= 1.05
+
+        if event.direction == gtk.gdk.SCROLL_DOWN:
+            newscale /= 1.05
+
+        if newscale == oldscale:
+            return False
+
+        self.scale = newscale
+        self.queue_draw ()
+        return True
+
+
+    def _on_button_press (self, alsoself, event):
+        if event.type == gtk.gdk.BUTTON_PRESS and event.button == 1:
+            self.grab_add ()
+            self.drag_win_x0 = event.x
+            self.drag_win_y0 = event.y
+            self.drag_dc_x0 = self.centerx
+            self.drag_dc_y0 = self.centery
+            return True
+
+        if event.type == gtk.gdk._2BUTTON_PRESS and event.button == 1:
+            dx = event.x - 0.5 * self.allocation.width
+            dy = event.y - 0.5 * self.allocation.height
+            self.centerx += dx / self.scale
+            self.centery += dy / self.scale
+            self.queue_draw ()
+            # Prevent the drag-release code from running. (Double-click events
+            # are preceded by single-click events.)
+            self.grab_remove ()
+            self.drag_win_x0 = None
+            return True
+
+        return False
+
+
+    def _on_button_release (self, alsoself, event):
+        if event.type == gtk.gdk.BUTTON_RELEASE and event.button == 1:
+            if self.drag_win_x0 is None:
+                return False
+
+            self.grab_remove ()
+            self.centerx = self.drag_dc_x0 + (self.drag_win_x0 - event.x) / self.scale
+            self.centery = self.drag_dc_y0 + (self.drag_win_y0 - event.y) / self.scale
+            self.drag_win_x0 = self.drag_win_y0 = None
+            self.drag_dc_x0 = self.drag_dc_y0 = None
+            self.queue_draw ()
+            return True
+
+        return False
+
+    def _on_motion_notify (self, alsoself, event):
+        if self.drag_win_x0 is None:
+            return False
+
+        self.centerx = self.drag_dc_x0 + (self.drag_win_x0 - event.x) / self.scale
+        self.centery = self.drag_dc_y0 + (self.drag_win_y0 - event.y) / self.scale
+        self.queue_draw ()
+        return True
+
+
+DEFAULT_WIN_WIDTH = 600
+DEFAULT_WIN_HEIGHT = 400
+
+
+class Viewer (object):
+    def __init__ (self, title='Array Viewer', default_width=DEFAULT_WIN_WIDTH,
+                  default_height=DEFAULT_WIN_HEIGHT):
+        self.viewport = Viewport ()
+        self.win = gtk.Window (gtk.WINDOW_TOPLEVEL)
+        self.win.set_title (title)
+        self.win.set_default_size (default_width, default_height)
+        self.win.add (self.viewport)
+        self.win.connect ('key-press-event', self._on_key_press)
+
+
+    def setShapeGetter (self, getshape):
+        self.viewport.setShapeGetter (getshape)
+        return self
+
+
+    def setSurfaceGetter (self, getsurface):
+        self.viewport.setSurfaceGetter (getsurface)
+        return self
+
+
+    def _on_key_press (self, widget, event):
+        kn = gtk.gdk.keyval_name (event.keyval)
+        modmask = gtk.accelerator_get_default_mod_mask ()
+        isctrl = (event.state & modmask) == gtk.gdk.CONTROL_MASK
+
+        if kn == 'a' and isctrl:
+            self.viewport.autoscale ()
+            return True
+
+        if kn == 'e' and isctrl:
+            self.viewport.center ()
+            return True
+
+        if kn == 'w' and isctrl:
+            self.win.destroy ()
+            return True
+
+        if kn == '1' and isctrl:
+            self.viewport.scale = 1.
+            self.viewport.queue_draw ()
+            return True
+
+        return False
+
+
+def view (array):
+    h, w = array.shape
+    stride = cairo.ImageSurface.format_stride_for_width (cairo.FORMAT_ARGB32, w)
+    # stride is in bytes:
+    assert stride % 4 == 0
+    imgdata = N.empty ((h, stride // 4), dtype=N.uint32)
+    imagesurface = cairo.ImageSurface.create_for_data (imgdata, cairo.FORMAT_ARGB32,
+                                                       w, h, stride)
+
+    imgdata.fill (0xFF000000) # 100% alpha
+    amin, amax = array.min (), array.max ()
+    imgdata += (array - amin) * (255. / (amax - amin))
+    if N.ma.is_masked (array):
+        imgdata -= 0xFF000000 * array.mask
+
+    def getshape ():
+        return w, h
+
+    def getsurface (xoffset, yoffset, width, height):
+        return imagesurface, xoffset, yoffset
+
+    viewer = Viewer ()
+    viewer.setShapeGetter (getshape)
+    viewer.setSurfaceGetter (getsurface)
+    viewer.win.show_all ()
+    viewer.win.connect ('destroy', gtk.main_quit)
+    gtk.main ()

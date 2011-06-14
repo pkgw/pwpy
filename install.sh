@@ -7,7 +7,11 @@ if [ ! -f instdest ] ; then
     exit 1
 fi
 
+if [ x"$1" = x-v ] ; then
+    vee=v
+fi
+
 dest=`cat instdest`
 dest=`eval echo $dest`
 set -e
-cp -vp *.py *.glade $dest
+cp -p$vee *.py $dest
