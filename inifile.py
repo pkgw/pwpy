@@ -41,14 +41,15 @@ import re
 
 sectionre = re.compile (r'^\[(.*)]\s*$')
 keyre = re.compile (r'^(\S+)\s*=(.*)$') # leading space chomped later
+escre = re.compile (r'^(\S+)\s*=\s*"(.*)"\s*$')
 
 def readStream (stream):
     section = None
     key = None
     data = None
 
-    for line in stream:
-        line = line.split ('#', 1)[0]
+    for fullline in stream:
+        line = fullline.split ('#', 1)[0]
 
         m = sectionre.match (line)
         if m is not None:
@@ -67,6 +68,18 @@ def readStream (stream):
             if key is not None:
                 section.setone (key, data.strip ().decode ('utf8'))
                 key = data = None
+            continue
+
+        m = escre.match (fullline)
+        if m is not None:
+            if section is None:
+                raise Exception ('key seen without section!')
+            if key is not None:
+                section.setone (key, data.strip ().decode ('utf8'))
+            key = m.group (1)
+            data = m.group (2).replace (r'\"', '"').replace (r'\n', '\n').replace (r'\\', '\\')
+            section.setone (key, data.decode ('utf8'))
+            key = data = None
             continue
 
         m = keyre.match (line)
