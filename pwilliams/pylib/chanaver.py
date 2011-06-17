@@ -184,7 +184,7 @@ def _channelAverage (gen, out, naver, slop, banner, args):
             vishnd.copyHeader (outhnd, 'history')
             outhnd.openHistory ()
             outhnd.writeHistory (banner)
-            outhnd.logInvocation ('PYTHON chanaver', ['chanaver'] + args)
+            outhnd.logInvocation ('PYTHON chanaver', args)
             outhnd.writeHistory ('PYTHON chanaver: naver=%d slop=%f' % (naver, slop))
             outhnd.closeHistory ()
 

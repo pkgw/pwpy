@@ -285,7 +285,7 @@ def task (args):
         gi.toDataset (h)
         h.openHistory ()
         h.writeHistory (banner)
-        h.logInvocation ('PYTHON gptext', ['gptext'] + args)
+        h.logInvocation ('PYTHON gptext', args)
         h.closeHistory ()
         h.close ()
     elif mode == 'createvis':
@@ -294,7 +294,7 @@ def task (args):
         gi.toDataset (h)
         h.openHistory ()
         h.writeHistory (banner)
-        h.logInvocation ('PYTHON gptext', ['gptext'] + args)
+        h.logInvocation ('PYTHON gptext', args)
         h.closeHistory ()
         h.close ()
     else:
