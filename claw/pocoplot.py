@@ -98,6 +98,13 @@ newsortar = n.sort(sortar, order=['ntot'])
 newsortar2 = n.sort(sortar2, order=['ntot'])
 newsortar3 = n.sort(sortar3, order=['ntot'])
 
+# print out integration number of each pulse
+#ff = open('tmp.txt','a')
+#tt = n.array( newsortar.tolist())
+#for i in range(len(tt)):
+#    print >> ff, tt[i,0], tt[i,1]
+#ff.close()
+
 ntotdiff = []; ntotdiff2 = []; ntotdiff3 = []
 for i in range(len(newsortar)-1):
     ntotdiff.append(newsortar[i+1][0] - newsortar[i][0])
