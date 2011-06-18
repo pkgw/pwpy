@@ -74,7 +74,6 @@ pyata/atactl.py
 pyata/ataprobe.py
 pyata/calibrators.py
 pyata/fxlaunch.sh
-pyata/rfi.py
 pylib/ata2mir.py
 pylib/atabpass.py
 pylib/calctsys.py
