@@ -125,8 +125,8 @@ class Fluxer (object):
             if not flags.any ():
                 continue
 
-            pol = uvdat.getPol ()
-            variance = uvdat.getVariance ()
+            pol = inp.getPol ()
+            variance = inp.getVariance ()
             t = preamble[3]
 
             # Separation into intervals -- time to flush?

@@ -120,7 +120,7 @@ def task (args):
             # We're on to a new set of baselines. Get the number
             # of pols in this next set and remind ourselves to
             # update the 'npol' variable if necessary.
-            nPol = uvdat.getNPol ()
+            nPol = dIn.getNPol ()
             doneNPol = False
 
         if uvt.updated ():
@@ -158,7 +158,7 @@ def task (args):
 
             anyChange = True
 
-        pol = uvdat.getPol ()
+        pol = dIn.getPol ()
 
         if not doneNPol:
             # If necessary, write out a new value for the

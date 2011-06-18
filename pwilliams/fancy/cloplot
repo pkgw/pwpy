@@ -115,7 +115,7 @@ class ClosureComputer (object):
 
             if hprev is None:
                 hprev = ihandle
-                curname = uvdat.getCurrentName ()
+                curname = ihandle.path ()
             elif ihandle is not hprev:
                 data = self.ag.finish ().T
                 if data.size == 0:
@@ -123,7 +123,7 @@ class ClosureComputer (object):
                 else:
                     sets.append ((curname, data))
                 hprev = ihandle
-                curname = uvdat.getCurrentName ()
+                curname = ihandle.path ()
 
             if self.startnewdump:
                 nseen = fracerrsq = 0
@@ -153,7 +153,7 @@ class ClosureComputer (object):
                 continue
 
             corr = data[w].mean ()
-            var = uvdat.getVariance () / w.size
+            var = ihandle.getVariance () / w.size
 
             if bp == (ap1, ap3):
                 corr = corr.conj ()

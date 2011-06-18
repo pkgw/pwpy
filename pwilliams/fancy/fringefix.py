@@ -137,7 +137,7 @@ for dIn, preamble, data, flags in uvdat.read ():
         first = False
 
     if nPol == 0:
-        nPol = uvdat.getNPol ()
+        nPol = dIn.getNPol ()
         doneNPol = False
 
     if uvt.updated ():
@@ -188,7 +188,7 @@ for dIn, preamble, data, flags in uvdat.read ():
 
     # Hey! We actually have some data processing to do!
 
-    pol = uvdat.getPol ()
+    pol = dIn.getPol ()
 
     #if i % 5000 == 0:
     #    print 'Orig UVW:', u, v, w

@@ -89,7 +89,7 @@ for ihandle, preamble, data, flags in uvdat.read ():
 
     if tprev is None:
         ihandle.copyHeader (ohandle, 'history')
-        linetype = uvdat.getLinetype ()
+        linetype = ihandle.getLinetype (astext=True)
         ihandle.initVarsAsInput (linetype)
         ohandle.initVarsAsOutput (ihandle, linetype)
         ohandle.openHistory ()
@@ -103,7 +103,7 @@ for ihandle, preamble, data, flags in uvdat.read ():
             preamble[3] = time = tprev
 
     if nPol == 0:
-        nPol = uvdat.getNPol ()
+        nPol = ihandle.getNPol ()
         doneNPol = False
 
     if not doneNPol:
@@ -114,7 +114,7 @@ for ihandle, preamble, data, flags in uvdat.read ():
         doneNPol = True
 
     ihandle.copyLineVars (ohandle)
-    ohandle.writeVarInt ('pol', uvdat.getPol ())
+    ohandle.writeVarInt ('pol', ihandle.getPol ())
     ohandle.write (preamble, data, flags)
     tprev = time
     nPol -= 1

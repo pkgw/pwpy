@@ -551,7 +551,7 @@ class ClosureProcessor (object):
             time = preamble[3]
             bp = util.mir2pbp32 (inp, preamble)
     
-            var = uvdat.getVariance ()
+            var = inp.getVariance ()
             inttime = inp.getVarFloat ('inttime')
     
             # Some first checks.

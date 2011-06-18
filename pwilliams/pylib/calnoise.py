@@ -184,7 +184,7 @@ class NoiseCal (object):
                     elif instr != self.instr:
                         util.die ('input instrument changed from "%s" to '
                                   '"%s" in "%s"', self.instr, instr,
-                                  uvdat.getCurrentName ())
+                                  inp.path ())
                 previnp = inp
 
             # the 'a' uvdat options limits us to autocorrelations,
@@ -783,7 +783,7 @@ def tui_checkcal (args):
         data = data[w]
         var = 0.5 * (data.real.var (ddof=1) + data.imag.var (ddof=1))
         uvar = N.sqrt (1. / (w.size - 1)) * var # uncert in variance msmt
-        thy = uvdat.getVariance ()
+        thy = inp.getVariance ()
         samples.add ((var - thy) / uvar)
 
     samples = samples.finish ()

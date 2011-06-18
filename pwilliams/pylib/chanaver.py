@@ -266,13 +266,13 @@ def _channelAverage (gen, out, naver, slop, banner, args):
         vishnd.copyMarkedVars (outhnd)
 
         if npol == 0:
-            npol = uvdat.getNPol ()
+            npol = vishnd.getNPol ()
             if npol != prevnpol:
                 outhnd.writeVarInt ('npol', npol)
                 npolvaried = npolvaried or prevnpol != 0
                 prevnpol = npol
 
-        outhnd.writeVarInt ('pol', uvdat.getPol ())
+        outhnd.writeVarInt ('pol', vishnd.getPol ())
         outhnd.write (preamble, outdata, outflags)
         npol -= 1
 
