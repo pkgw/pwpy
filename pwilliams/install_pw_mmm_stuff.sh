@@ -40,8 +40,6 @@ uvlwrevert
 uvrevert
 walsh_adc_conflict.sh
 walsh-flags.py
-fancy/ampadd.py
-fancy/amprfi
 fancy/applytsys
 fancy/atabpass
 fancy/ataglue.py
@@ -63,7 +61,6 @@ fancy/gpmergepols
 fancy/gptext
 fancy/gpunity
 fancy/mdl-makeimage
-fancy/multiflag2
 fancy/pwflux
 fancy/pwmodel
 fancy/qimage
@@ -78,11 +75,8 @@ pyata/ataprobe.py
 pyata/calibrators.py
 pyata/fxlaunch.sh
 pyata/rfi.py
-pylib/amprfi.py
 pylib/ata2mir.py
 pylib/atabpass.py
-pylib/blflag.py
-pylib/blmapper.glade
 pylib/calctsys.py
 pylib/calnoise.py
 pylib/chanaver.py
@@ -91,8 +85,6 @@ pylib/dualscal.py
 pylib/gpmergepols.py
 pylib/gptext.py
 pylib/hhaa.dat
-pylib/multiflag.py
-pylib/multiflag2.py
 pylib/numutils.py
 pylib/pwflux.py
 pylib/pwmodel.py

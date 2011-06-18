@@ -1,5 +1,3 @@
-yaddaay adasdas das
-
 This directory contains various of my (Peter Williams) reduction
 scripts. I'll try my best to make it obvious what they do, but no
 promises.
@@ -16,8 +14,11 @@ allowing you to run various useful ata* commands in Python.
 The scripts contained in the "fancy" subdirectory
 (mmm/pwilliams/fancy) rely on my bridge between Python and Miriad. See
 
-http://badgrads.berkeley.edu/doku.php?id=miriad_in_python
+http://astro.berkeley.edu/~pkwill/miriad-python/
 
-for information on how to give those scripts a spin.
+for information on how to give those scripts a spin. The same goes for
+the scripts in "pylib", which are loadable Python modules that also
+perform data analysis tasks. (Many of the scripts in fancy/ just call
+out to functionality in pylib.)
 
   -- Peter Williams <pwilliams@astro.berkeley.edu>
