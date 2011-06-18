@@ -203,7 +203,7 @@ for dIn, preamble, data, flags in uvdat.read ():
     # Apply correction. This is homegrown but I've heard people say that
     # a sinc is what you want. 
     
-    inttime = dIn.getVarFirstFloat ('inttime', 10.0)
+    inttime = dIn.getScalar ('inttime', 10.0)
     corr = N.abs (1. / N.sinc (rate * inttime)) # / N.pi)) # XXX N.pi!!!!!!!!!11!!!
 
     #uvd = N.sqrt (u**2 + (preamble[1] * dIn.getVarDouble ('sfreq', nSpec))**2) * 1e-3

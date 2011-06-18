@@ -208,9 +208,9 @@ def _channelAverage (gen, out, naver, slop, banner, args):
         if tracker.updated ():
             # Potentially new spectral configuration.
 
-            nspect = vishnd.getVarFirstInt ('nspect', 0)
-            nwide = vishnd.getVarFirstInt ('nwide', 0)
-            nchan = vishnd.getVarFirstInt ('nchan', 0)
+            nspect = vishnd.getScalar ('nspect', 0)
+            nwide = vishnd.getScalar ('nwide', 0)
+            nchan = vishnd.getScalar ('nchan', 0)
 
             if nspect != 1:
                 raise InputStructureError (vis, 'require exactly one spectral window')

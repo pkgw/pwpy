@@ -746,15 +746,15 @@ class DataProcessor (object):
 
             toTrack = ['nants', 'jyperk', 'inttime']        
 
-            nants = inp.getVarFirstInt ('nants', 0)
+            nants = inp.getScalar ('nants', 0)
             assert nants > 0
-            nspect = inp.getVarFirstInt ('nspect', 0)
-            nwide = inp.getVarFirstInt ('nwide', 0)
+            nspect = inp.getScalar ('nspect', 0)
+            nwide = inp.getScalar ('nwide', 0)
             # assert nspect > 0 or nwide > 0 FIXME: support all this
             assert nspect == 1 and nwide == 0
-            jyperk = inp.getVarFirstFloat ('jyperk', 0.0)
+            jyperk = inp.getScalar ('jyperk', 0.0)
             assert jyperk > 0
-            inttime = inp.getVarFirstFloat ('inttime', 10.0)
+            inttime = inp.getScalar ('inttime', 10.0)
             assert inttime > 0.
         
             if nspect > 0:
@@ -935,17 +935,17 @@ def rewriteData (banner, vis, out, solutions, varyJyPerK, **kwargs):
 
             toTrack = ['nants', 'inttime']
 
-            nants = inp.getVarFirstInt ('nants', 0)
+            nants = inp.getScalar ('nants', 0)
             assert nants > 0
-            nspect = inp.getVarFirstInt ('nspect', 0)
-            nwide = inp.getVarFirstInt ('nwide', 0)
+            nspect = inp.getScalar ('nspect', 0)
+            nwide = inp.getScalar ('nwide', 0)
             assert nspect > 0 or nwide > 0
-            inttime = inp.getVarFirstFloat ('inttime', 10.0)
+            inttime = inp.getScalar ('inttime', 10.0)
             assert inttime > 0.
         
             if not varyJyPerK:
                 toTrack.append ('jyperk')
-                jyperk = inp.getVarFirstFloat ('jyperk', 0.0)
+                jyperk = inp.getScalar ('jyperk', 0.0)
                 assert jyperk > 0
 
             if nspect > 0:

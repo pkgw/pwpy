@@ -34,7 +34,7 @@ for vname in sys.argv[1:]:
         assert data.size == 1
 
         if src is None:
-            src = dIn.getVarFirstString ('source', 'unknown')
+            src = dIn.getScalar ('source', 'unknown')
 
         # Calculate fringe rate. From Thompson, Moran, & Swenson sec. 4.4.
         # Need to convert u from nanoseconds to wavelengths.
@@ -45,7 +45,7 @@ for vname in sys.argv[1:]:
         flux = models[src] (sfreq * 1000.)
         dec = dIn.getVarDouble ('dec', 1) * deg2rad
         rate = -omega_e * u * N.cos (dec)
-        inttime = dIn.getVarFirstFloat ('inttime', 10.0)
+        inttime = dIn.getScalar ('inttime', 10.0)
         dphi = rate * inttime
         corr = N.abs (1. / N.sinc (dphi))
 
