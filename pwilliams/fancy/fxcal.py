@@ -246,7 +246,7 @@ dump (dOut, autos, crosses)
 if not polsVaried:
     # Number of pols never varied, so it's valid to write out
     # a single 'npol' in the header of the entire dataset.
-    dOut.writeHeaderInt ('npol', saveNPol)
+    dOut.setScalarItem ('npol', N.int32, saveNPol)
 
 # All done. Write history entry and quit.
 

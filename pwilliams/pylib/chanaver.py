@@ -279,7 +279,7 @@ def _channelAverage (gen, out, naver, slop, banner, args):
     # All done. 
 
     if not npolvaried:
-        outhnd.writeHeaderInt ('npol', prevnpol)
+        outhnd.setScalarItem ('npol', N.int32, prevnpol)
 
     outhnd.close ()
 

@@ -120,6 +120,6 @@ for ihandle, preamble, data, flags in uvdat.read ():
     nPol -= 1
 
 if not polsVaried:
-    ohandle.writeHeaderInt ('npol', savedNPol)
+    ohandle.setScalarItem ('npol', N.int32, savedNPol)
 
 ohandle.close ()

@@ -91,11 +91,11 @@ def merge (name1, ds1, name2, ds2, outset, banner, ttol):
     outset.writeHistory (banner)
     outset.logInvocation ('GPMERGEPOLS')
 
-    outset.writeHeaderInt ('nsols', gr1.nsols)
-    outset.writeHeaderInt ('nfeeds', 2)
-    outset.writeHeaderInt ('ntau', 0)
-    outset.writeHeaderInt ('ngains', nants * 2)
-    outset.writeHeaderDouble ('interval', int1)
+    outset.setScalarItem ('nsols', N.int32, gr1.nsols)
+    outset.setScalarItem ('nfeeds', N.int32, 2)
+    outset.setScalarItem ('ntau', N.int32, 0)
+    outset.setScalarItem ('ngains', N.int32, nants * 2)
+    outset.setScalarItem ('interval', N.float64, int1)
 
     gout = outset.getItem ('gains', 'w')
     gbuf = N.empty (nants * 2, dtype=N.complex64)

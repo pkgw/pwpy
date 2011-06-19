@@ -208,8 +208,8 @@ class Modeler (object):
             phnd = pv.open ('a')
             phnd.writeVarInt ('npol', 1)
             phnd.writeVarInt ('pol', util.POL_I)
-            phnd.writeHeaderInt ('npol', 1)
-            phnd.writeHeaderInt ('pol', util.POL_I)
+            phnd.setScalarItem ('npol', N.int32, 1)
+            phnd.setScalarItem ('pol', N.int32, util.POL_I)
             phnd.close ()
 
             cv = self.out.vvis ('cal' + pol)

@@ -68,11 +68,11 @@ class GainsInfo (object):
 
         ngains = self.nants * (self.nfeeds + int (self.havetau))
 
-        handle.writeHeaderInt ('nsols', len (self.times))
-        handle.writeHeaderInt ('nfeeds', self.nfeeds)
-        handle.writeHeaderInt ('ntau', int (self.havetau))
-        handle.writeHeaderInt ('ngains', ngains)
-        handle.writeHeaderDouble ('interval', self.interval)
+        handle.setScalarItem ('nsols', N.int32, len (self.times))
+        handle.setScalarItem ('nfeeds', N.int32, self.nfeeds)
+        handle.setScalarItem ('ntau', N.int32, int (self.havetau))
+        handle.setScalarItem ('ngains', N.int32, ngains)
+        handle.setScalarItem ('interval', N.float64, self.interval)
 
         gi = handle.getItem ('gains', 'w')
         offset = 8
