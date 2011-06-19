@@ -48,7 +48,7 @@ class GainsInfo (object):
     def fromDataset (self, handle):
         from mirtask.readgains import GainsReader
 
-        self.interval = handle.getHeaderDouble ('interval', 0.5)
+        self.interval = handle.getScalarHeader ('interval', 0.5)
         if self.interval <= 0.:
             raise BadInfoError ('interval should be positive; got %s',
                                 self.interval)

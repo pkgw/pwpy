@@ -177,7 +177,7 @@ class NoiseCal (object):
 
         for inp, preamble, data, flags in gen:
             if previnp is None or inp is not previnp:
-                instr = inp.getHeaderString ('arfinstr', 'UNDEF')
+                instr = inp.getScalarHeader ('arfinstr', 'UNDEF')
                 if instr != 'UNDEF':
                     if self.instr is None:
                         self.instr = instr
