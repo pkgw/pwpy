@@ -58,12 +58,12 @@ item = ds.getItem ('gains', 'w')
 ofs = 8
 
 for i in xrange (time.size):
-    t = time[0]
-    g = gains[0]
+    t = time[i]
+    g = gains[i]
 
-    item.writeDoubles (t, ofs)
+    item.write (ofs, N.float64, [t])
     ofs += 8
-    item.writeComplex (g, ofs)
+    item.write (ofs, N.complex64, g)
     ofs += 8 * gr.ngains
 
 del item

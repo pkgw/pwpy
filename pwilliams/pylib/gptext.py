@@ -78,9 +78,9 @@ class GainsInfo (object):
         offset = 8
 
         for i, time in enumerate (self.times):
-            gi.writeDoubles (time, offset, 1)
+            gi.write (offset, N.float64, [time])
             offset += 8
-            gi.writeComplex (self.data[i], offset, ngains)
+            gi.write (offset, N.complex64, self.data[i])
             offset += 8 * ngains
 
         gi.close ()

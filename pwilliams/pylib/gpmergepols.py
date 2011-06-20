@@ -128,9 +128,9 @@ def merge (name1, ds1, name2, ds2, outset, banner, ttol):
         gbuf[0::2] = g1
         gbuf[1::2] = g2
 
-        gout.writeDoubles (t1, offset, 1)
+        gout.write (offset, N.float64, [t1])
         offset += 8
-        gout.writeComplex (gbuf, offset, 2 * nants)
+        gout.write (offset, N.complex64, gbuf)
         offset += 8 * 2 * nants
 
     del gout
