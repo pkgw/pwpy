@@ -57,11 +57,11 @@ DEFAULT_TTOL = 1.0 / 86400
 
 def merge (name1, ds1, name2, ds2, outset, banner, ttol):
     # Read in gains, check consistency
-    int1 = ds1.getScalarHeader ('interval', 0)
+    int1 = ds1.getScalarItem ('interval', 0)
     gr1 = readgains.GainsReader (ds1)
     gr1.prep ()
 
-    int2 = ds1.getScalarHeader ('interval', 0)
+    int2 = ds1.getScalarItem ('interval', 0)
     gr2 = readgains.GainsReader (ds2)
     gr2.prep ()
 
@@ -167,7 +167,7 @@ def task (args):
         outset = miriad.Data (opts.out).open ('rw')
     else:
         outset = miriad.Data (opts.out).open ('c')
-        ds1.copyHeader (outset, 'history')
+        ds1.copyItem (outset, 'history')
 
     try:
         merge (opts.vis[0], ds1, opts.vis[1], ds2, outset, banner, ttol)

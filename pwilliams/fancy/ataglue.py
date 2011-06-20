@@ -146,7 +146,7 @@ in1.setPreambleType ('uvw', 'time', 'baseline')
 in2 = VisData (opts.vis[1]).open ('rw')
 in2.setPreambleType ('uvw', 'time', 'baseline')
 
-in1.copyHeader (dOut, 'history')
+in1.copyItem (dOut, 'history')
 dOut.openHistory ()
 dOut.writeHistory (banner)
 dOut.logInvocation ('ATAGLUE')

@@ -81,7 +81,7 @@ def dualSelfCal (vis, out, usemself=False, ttol=DEFAULT_TTOL, outexists=False,
         else:
             dest = out.open ('c')
         src1 = vis[0].open ('rw')
-        src1.copyHeader (dest, 'history')
+        src1.copyItem (dest, 'history')
         src1.close ()
 
     if len (select) == 0:

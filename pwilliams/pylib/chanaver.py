@@ -181,7 +181,7 @@ def _channelAverage (gen, out, naver, slop, banner, args):
                                            'expected (one of rjc)' % corrtype)
             outhnd.setCorrelationType (corrtype)
 
-            vishnd.copyHeader (outhnd, 'history')
+            vishnd.copyItem (outhnd, 'history')
             outhnd.openHistory ()
             outhnd.writeHistory (banner)
             outhnd.logInvocation ('PYTHON chanaver', args)

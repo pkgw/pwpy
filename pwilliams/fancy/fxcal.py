@@ -140,7 +140,7 @@ for dIn, preamble, data, flags in uvdat.read ():
         
     if first:
         # If very first file, copy the history entry.
-        dIn.copyHeader (dOut, 'history')
+        dIn.copyItem (dOut, 'history')
         first = False
 
     if nPol == 0:
@@ -201,7 +201,7 @@ for dIn, preamble, data, flags in uvdat.read ():
         # If necessary, write out a new value for the
         # 'npol' variable. If npol has changed, note
         # that so that we know not to write a
-        # dataset-wide npol header variable.
+        # dataset-wide npol item
         
         if nPol != saveNPol:
             dOut.writeVarInt ('npol', nPol)
@@ -245,7 +245,7 @@ dump (dOut, autos, crosses)
 
 if not polsVaried:
     # Number of pols never varied, so it's valid to write out
-    # a single 'npol' in the header of the entire dataset.
+    # a single 'npol' for the entire dataset.
     dOut.setScalarItem ('npol', N.int32, saveNPol)
 
 # All done. Write history entry and quit.

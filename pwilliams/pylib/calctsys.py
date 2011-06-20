@@ -964,7 +964,7 @@ def rewriteData (banner, vis, out, solutions, varyJyPerK, **kwargs):
                 raise Exception ('No channels to copy')
 
             dOut.setCorrelationType (corrType)
-            inp.copyHeader (dOut, 'history')
+            inp.copyItem (dOut, 'history')
             inp.initVarsAsInput (' ') # ???
 
             if varyJyPerK:

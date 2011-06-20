@@ -88,7 +88,7 @@ for ihandle, preamble, data, flags in uvdat.read ():
     # multiple input datasets are specified.
 
     if tprev is None:
-        ihandle.copyHeader (ohandle, 'history')
+        ihandle.copyItem (ohandle, 'history')
         linetype = ihandle.getLinetype (astext=True)
         ihandle.initVarsAsInput (linetype)
         ohandle.initVarsAsOutput (ihandle, linetype)

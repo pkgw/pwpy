@@ -133,7 +133,7 @@ for dIn, preamble, data, flags in uvdat.read ():
         
     if first:
         # If very first file, copy the history entry.
-        dIn.copyHeader (dOut, 'history')
+        dIn.copyItem (dOut, 'history')
         first = False
 
     if nPol == 0:
