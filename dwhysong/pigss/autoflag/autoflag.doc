@@ -25,8 +25,9 @@
 	  noband      Skip the internal bandpass calibration step
 	  nophase     Skip test of phase variance on calibrator data
 	  norfi       Skip the narrow-band and transient RFI flagging steps (not recommended)
+	  nowide      Skip the wide-band RFI flagging step
 	  dist        Skip the data distribution test
-	  noise       Skip the baseline noise test
+	  nonoise     Skip the baseline noise test
 	  nosingle    Skip RFI flagging for single visibilities
 	  ata         Check for spectral corruption (for ATA data only)
 	  interpolate Copy flags from previous/next calibrator scans to source scans
