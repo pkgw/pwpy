@@ -42,11 +42,11 @@ class poco:
         self.approxuvw = True      # flag to make template visibility file to speed up writing of dm track data
         self.baseline_order = n.array([ 257, 258, 514, 261, 517, 1285, 262, 518, 1286, 1542, 259, 515, 773, 774, 771, 516, 1029, 1030, 772, 1028, 1287, 1543, 775, 1031, 1799, 1544, 776, 1032, 1800, 2056, 260, 263, 264, 519, 520, 1288])   # second iteration of bl nums
 #        self.pulsewidth = 0.0066 * n.ones(len(self.chans)) # pulse width of b0329+54
-        self.pulsewidth = 0 * n.ones(len(self.chans)) # pulse width of crab
+        self.pulsewidth = 0 * n.ones(len(self.chans)) # pulse width of crab and m31 candidates
         # set dmarr
 #        self.dmarr = [26.8]  # b0329+54
-        self.dmarr = [56.8]  # crab
-#        self.dmarr = n.arange(50,126,2.7)       # dm trials for m31. spacing set for 50% efficiency for band from 722-796 MHz, 1.2 ms integrations
+#        self.dmarr = [56.8]  # crab
+        self.dmarr = n.arange(50,126,2.7)       # dm trials for m31. spacing set for 50% efficiency for band from 722-796 MHz, 1.2 ms integrations
 #        self.tshift = 0.2     # not implemented yet
         self.nskip = int(nskip*self.nbl)    # number of iterations to skip (for reading in different parts of buffer)
         nskip = int(self.nskip)
@@ -147,13 +147,12 @@ class poco:
 
         mean = self.dataph.mean()
         std = self.dataph.std()
-        abs = (self.dataph - mean)/std
-#        abs = self.dataph
+#        abs = (self.dataph - mean)/std
+        abs = self.dataph
         print 'Data mean, std: %f, %f' % (mean, std)
 
         p.figure(1)
         ax = p.imshow(n.rot90(abs), aspect='auto', origin='upper', interpolation='nearest', extent=(min(reltime),max(reltime),0,len(chans)))
-#        ax = p.imshow(n.rot90(abs), aspect='auto', origin='upper', interpolation='nearest', extent=(min(reltime),max(reltime),min(chans),max(chans)))
         p.colorbar(ax)
         p.yticks(n.arange(0,len(self.chans),4), (self.chans[(n.arange(0,len(self.chans), 4))]))
         p.xlabel('Relative time (s)')
@@ -174,10 +173,10 @@ class poco:
         Returns fit parameters.
         """
 
-        logname = self.file.split('_')[0:3]
-        logname.append('fitsp.txt')
-        logname = string.join(logname,'_')
-        log = open(logname,'a')
+#        logname = self.file.split('_')[0:3]
+#        logname.append('fitsp.txt')
+#        logname = string.join(logname,'_')
+#        log = open(logname,'a')
 
         freq = self.sfreq + self.chans * self.sdf             # freq array in GHz
 
@@ -214,10 +213,10 @@ class poco:
             savename = string.join(savename,'.')
             print 'Saving file as ', savename
             p.savefig(savename)
-            print >> log, savename, 'Fit results: ', p1, '. obsrms: ', obsrms, '. $\Chi^2$: ', chisq
+#            print >> log, savename, 'Fit results: ', p1, '. obsrms: ', obsrms, '. $\Chi^2$: ', chisq
         else:
-            print >> log, self.file, 'Fit results: ', p1, '. obsrms: ', obsrms, '. $\Chi^2$: ', chisq
-
+            pass
+#            print >> log, self.file, 'Fit results: ', p1, '. obsrms: ', obsrms, '. $\Chi^2$: ', chisq
 
     def dmtrack(self, dm = 0., t0 = 0., show=0):
         """Takes dispersion measure in pc/cm3 and time offset from first integration in seconds.
@@ -701,7 +700,7 @@ class poco:
                 print self.nskip/self.nbl, nints, (dmind, tind), 'Peak, (sig): ', peak, epeak, '(', peak/epeak, ')'
 
 
-    def uvfitdmt0(self, dmbin, t0bin, bgwindow=10, tshift=0, show=1):
+    def uvfitdmt0(self, dmbin, t0bin, bgwindow=10, tshift=0, show=1, mode='fit'):
         """ Makes and fits a point source to background subtracted visibilities for a given dmbin and t0bin.
         tshift can shift the actual t0bin earlier to allow reading small chunks of data relative to pickle.
         """
@@ -718,27 +717,63 @@ class poco:
         if not status:  # if writetrack fails, exit this iteration
             return 0
 
-        try:
-            # fit point source model to visibilities
-            print
-            print 'UVfit for nskip=%d, dm[%d] = %.1f, and trel[%d] = %.3f.' % (self.nskip/self.nbl, dmbin, self.dmarr[dmbin], t0bin-tshift, self.reltime[t0bin-tshift])
-            txt = TaskUVFit (vis=outroot+'.mir', object='point', select='-auto').snarf()
+        if mode == 'fit':
+            try:
+                # fit point source model to visibilities
+                print
+                print 'UVfit for nskip=%d, dm[%d] = %.1f, and trel[%d] = %.3f.' % (self.nskip/self.nbl, dmbin, self.dmarr[dmbin], t0bin-tshift, self.reltime[t0bin-tshift])
+                txt = TaskUVFit (vis=outroot+'.mir', object='point', select='-auto').snarf()
 
-            # parse output of imfit
-            # print '012345678901234567890123456789012345678901234567890123456789'
-            peak = float(txt[0][8][30:38])
-            epeak = float(txt[0][8][46:])
-            off_ra = float(txt[0][9][30:38])
-            eoff_ra = float(txt[0][10][31:42])
-            off_dec = float(txt[0][9][40:])
-            eoff_dec = float(txt[0][10][42:])
-            print 'Fit peak %.2f +- %.2f' % (peak, epeak)
-            shutil.rmtree (outroot + '.mir', ignore_errors=True)
-            return peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
-        except:
-            print 'Something broke in/after uvfit!'
-            shutil.rmtree (outroot + '.mir', ignore_errors=True)
-            return 0
+                # parse output of imfit
+                # print '012345678901234567890123456789012345678901234567890123456789'
+                peak = float(txt[0][8][30:38])
+                epeak = float(txt[0][8][46:])
+                off_ra = float(txt[0][9][30:38])
+                eoff_ra = float(txt[0][10][31:42])
+                off_dec = float(txt[0][9][40:])
+                eoff_dec = float(txt[0][10][42:])
+                print 'Fit peak %.2f +- %.2f' % (peak, epeak)
+                shutil.rmtree (outroot + '.mir', ignore_errors=True)
+                return peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
+            except:
+                print 'Something broke in/after uvfit!'
+                shutil.rmtree (outroot + '.mir', ignore_errors=True)
+                return 0
+
+        elif mode == 'grid':
+            llen = 150
+            mlen = 150
+            linspl = n.linspace(-4000,4000,llen)
+            linspm = n.linspace(-4000,4000,mlen)
+            snrarr = n.zeros((llen, mlen))
+            
+            for i in range(llen):
+                print 'Starting loop ', i
+                for j in range(mlen):
+                    try:
+                        txt = TaskUVFit (vis=outroot+'.mir', object='point', select='-auto', spar='0,'+str(linspl[i])+','+str(linspm[j]), fix='xy').snarf()
+#                        print txt[0][8:10]
+                        peak = float(txt[0][8][30:38])
+                        epeak = float(txt[0][8][46:])
+                        off_ra = float(txt[0][9][30:38])
+                        off_dec = float(txt[0][9][40:])
+                        snrarr[i, j] = peak/epeak
+                    except:
+                        print 'Something broke in/after uvfit!'
+
+            peak = n.where(snrarr == snrarr.max())
+            print 'Peak: ', snrarr[peak]
+            print 'Location: ', peak, (linspl[peak[0]], linspm[peak[1]])
+            print
+            print 'Center SNR: ', snrarr[llen/2,llen/2]
+
+            log = open('log.txt','a')
+            print >> log, outroot, snrarr[peak], peak, (linspl[peak[0]], linspm[peak[1]])
+            log.close()
+
+            ax = p.imshow(snrarr, aspect='auto', origin='lower', interpolation='nearest')
+            p.colorbar()
+            p.savefig(outroot + '.png')
 
 
     def uvfitdmt02 (self, dmbin, t0bin, bgwindow=10, tshift=0, show=1, mode='default'):
@@ -750,6 +785,21 @@ class poco:
         datadiffarr = self.tracksub(dmbin, t0bin, bgwindow=bgwindow)
         int0 = int((t0bin + tshift) * self.nbl)
         meanfreq = n.mean(self.sfreq + self.sdf * self.chans )
+
+        datadiffarr2 = self.tracksub(dmbin, t0bin+bgwindow-20, bgwindow=bgwindow)   # arbitrary offset to measure typical noise in bg
+        datadiffarr3 = self.tracksub(dmbin, t0bin+bgwindow-15, bgwindow=bgwindow)   # arbitrary offset to measure typical noise in bg
+        datadiffarr4 = self.tracksub(dmbin, t0bin+bgwindow+15, bgwindow=bgwindow)   # arbitrary offset to measure typical noise in bg
+        datadiffarr5 = self.tracksub(dmbin, t0bin+bgwindow+20, bgwindow=bgwindow)   # arbitrary offset to measure typical noise in bg
+        datadiffarr6 = self.tracksub(dmbin, t0bin+bgwindow+25, bgwindow=bgwindow)   # arbitrary offset to measure typical noise in bg
+        obsrms2 = n.std((datadiffarr2[0].mean(axis=1)).imag)      # std of imag part is std of real part
+        obsrms3 = n.std((datadiffarr3[0].mean(axis=1)).imag)      # std of imag part is std of real part
+        obsrms4 = n.std((datadiffarr4[0].mean(axis=1)).imag)      # std of imag part is std of real part
+        obsrms5 = n.std((datadiffarr5[0].mean(axis=1)).imag)      # std of imag part is std of real part
+        obsrms6 = n.std((datadiffarr6[0].mean(axis=1)).imag)      # std of imag part is std of real part
+        obsrms = n.median([obsrms2, obsrms3, obsrms4, obsrms5, obsrms6])
+        print 'obsrms:', obsrms
+        p.plot(datadiffarr[0].mean(axis=1).real, datadiffarr[0].mean(axis=1).imag, '.')
+        p.show()
 
         # get flags to help select good ants
         vis = miriad.VisData(self.file,)
@@ -776,9 +826,14 @@ class poco:
         print 'UVfit2 for nskip=%d, dm[%d] = %.1f, and trel[%d] = %.3f.' % (self.nskip/self.nbl, dmbin, self.dmarr[dmbin], t0bin-tshift, self.reltime[t0bin-tshift])
 
         vi = lambda a, l, m, u, v, w: a * n.exp(-2j * n.pi * (u*l + v*m)) # + w*n.sqrt(1 - l**2 - m**2)))  # ignoring w term
-        def errfunc (p, u, v, w, y):
+        def errfunc (p, u, v, w, y, obsrms):
             a, l, m = p
-            err = y - vi(a, l, m, u, v, w)
+            err = (y - vi(a, l, m, u, v, w))/obsrms
+            return err.real + err.imag
+
+        def errfunc2 (p, l, m, u, v, w, y):
+            a = p
+            err = (y - vi(a, l, m, u, v, w))
             return err.real + err.imag
 
         def ltoa (l):
@@ -787,11 +842,11 @@ class poco:
 
         if mode == 'default':
             p0 = [100.,0.,0.]
-            out = opt.leastsq(errfunc, p0, args = (u, v, w, data), full_output=1)
+            out = opt.leastsq(errfunc, p0, args = (u, v, w, data, obsrms), full_output=1)
             p1 = out[0]
             covar = out[1]
             print 'Fit results (Jy, arcsec, arcsec):', p1[0], ltoa(p1[1]), ltoa(p1[2])
-            print 'Change in sumsq: %.2f to %.2f' % (n.sum(errfunc(p0, u, v, w, data)**2), n.sum(errfunc(p1, u, v, w, data)**2))
+            print 'Change in sumsq: %.2f to %.2f' % (n.sum(errfunc(p0, u, v, w, data, obsrms)**2), n.sum(errfunc(p1, u, v, w, data, obsrms)**2))
 
             print 'here\'s some stuff...'
             print covar
@@ -799,58 +854,51 @@ class poco:
             print n.sqrt(covar[1][1])
         elif mode == 'map':
             p0 = [100.,0.,0.]
-            out = opt.leastsq(errfunc, p0, args = (u, v, w, data), full_output=1)
+            out = opt.leastsq(errfunc, p0, args = (u, v, w, data, obsrms), full_output=1)
             p1 = out[0]
             covar = out[1]
 
-            llen = 150
-            mlen = 150
+            llen = 20
+            mlen = 20
             sumsq = n.zeros((llen, mlen))
-            linspl = n.linspace(-0.01,0.01,llen)   # dl=0.026 => 1.5 deg (half ra width of andromeda)
-            linspm = n.linspace(-0.01,0.01,mlen)   # dl=0.01 => 0.57 deg (half dec width of andromeda)
+            linspl = n.linspace(-0.005,0.005,llen)   # dl=0.026 => 1.5 deg (half ra width of andromeda)
+            linspm = n.linspace(-0.005,0.005,mlen)   # dl=0.01 => 0.57 deg (half dec width of andromeda)
             for i in range(llen):
                 for j in range(mlen):
-                    sumsq[i, j] = n.sum(errfunc([p1[0], linspl[i], linspm[j]], u, v, w, data)**2)
+                    sumsq[i, j] = n.sum(errfunc([p1[0], linspl[i], linspm[j]], u, v, w, data, obsrms)**2)
 
             mins = n.where(sumsq < 1.01 * sumsq.min())
-            print mins, sumsq[mins]
-            print ltoa(linspl[mins[0]])
-            print ltoa(linspm[mins[1]])
-            p.plot(mins[1], mins[0],'w.')
+            print 'Best fit: ', p1
+            print 'Red. chisq: ', sumsq[mins][0]/(9-3)
+            print 'Location: ', mins, (ltoa(linspl[mins[0]])[0], ltoa(linspm[mins[1]])[0])
+            p.plot(mins[1], mins[0], 'w.')
             p.imshow(sumsq)
             p.colorbar()
+            p.show()
         elif mode == 'lsgrid':
-            llen = 10
-            mlen = 100
-            sumsq = n.zeros((llen, mlen))
-            linspl = n.linspace(-0.01,0.01,llen)   # dl=0.026 => 1.5 deg (half ra width of andromeda)
-            linspm = n.linspace(0.026,0.026,mlen)   # dl=0.01 => 0.57 deg (half dec width of andromeda)
-            p0 = [100.,0.,0.]
+            llen = 30
+            mlen = 30
+            linspl = n.linspace(-0.005,0.005,llen)   # dl=0.026 => 1.5 deg (half ra width of andromeda)
+            linspm = n.linspace(-0.005,0.005,mlen)   # dl=0.01 => 0.57 deg (half dec width of andromeda)
+            amparr = n.zeros((llen, mlen))
+            p0 = [100.]
             
-            sumsq = n.sum(errfunc(p0, u, v, w, data)**2)
             for i in range(llen):
-                
                 for j in range(mlen):
-                    out = opt.leastsq(errfunc, [p0[0], linspl[i], linspm[j]], args = (u, v, w, data), full_output=1)
-                    sumsqnew = n.sum(errfunc(out[0], u, v, w, data)**2)
-                    if sumsqnew < sumsq:
-                        print 'for (%d, %d), sumsq went from %.1f to %.1f' % (i, j, sumsq, sumsqnew)
-                        sumsq = sumsqnew.copy()
-                        p1 = out[0]
-                        covar = out[1]
+                    out = opt.leastsq(errfunc2, p0, args = (linspl[i], linspm[j], u, v, w, data), full_output=1)
+                    amparr[i, j] = out[0]
 
-            print 'Fit results (Jy, arcsec, arcsec):', p1[0], ltoa(p1[1]), ltoa(p1[2])
-            print 'Change in sumsq: %.2f to %.2f' % (n.sum(errfunc(p0, u, v, w, data)**2), n.sum(errfunc(p1, u, v, w, data)**2))
+            maxs = n.where(amparr >= 0.9*amparr.max())
+            print 'Peak: ', amparr.max()
+            print 'Location: ', maxs, (ltoa(linspl[maxs[0]]), ltoa(linspm[maxs[1]]))
+            print 'SNR: ', amparr.max()/(obsrms/n.sqrt(9))
+            print
+            print 'Center: ', amparr[15,15]
+            print 'Center SNR: ', amparr[15,15]/(obsrms/n.sqrt(9))
 
-            print 'here\'s some stuff...'
-            print covar
-            print n.sqrt(covar[0][0])
-            print n.sqrt(covar[1][1])
-        elif mode == 'anneal':
-            # ?
-            pass
-
-#        return peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
+            ax = p.imshow(amparr, aspect='auto', origin='lower', interpolation='nearest')
+            p.colorbar()
+            p.show()
 
 
     def dmlc(self, dmbin, tbin, nints = 50):
@@ -1435,12 +1483,13 @@ def process_pickle(filename, pathin, mode='image'):
 #                print 'obsrms first try:', obsrms
 #                shutil.rmtree(bgname, ignore_errors=True)
 #               newfile = string.join(pv.file.split('.')[:-1]) + '.' + str(pv.nskip/pv.nbl) + '-' + 'dm' + str(dmbinarr[peaktrial]) + 't' + str(bgwindow) + '.mir'
+#
                 newfile = string.join(pv.file.split('.')[:-1], '.') + '.' + str(pv.nskip/pv.nbl) + '-' + 'dm' + str(dmbinarr[peaktrial]) + 't' + str(tbinarr[peaktrial]) + '.mir'
                 print 'Loading file', newfile
                 pv2 = poco(newfile, nints=1)
                 pv2.prep()
                 pv2.fitspec(obsrms=0, save=0)
-#                p.show()
+                p.show()
                 shutil.rmtree(newfile, ignore_errors=True)
         elif mode == 'dmt0':
             pv.makedmt0()
@@ -1457,8 +1506,14 @@ def process_pickle(filename, pathin, mode='image'):
                 peak, std = results
                 print peak, std
         elif mode == 'uvfit':
-            peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = pv.uvfitdmt0(dmbinarr[peaktrial], tbinarr[peaktrial])
-            print peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
+            uvmode = 'elsegrid'
+            if uvmode == 'grid':
+                pv.uvfitdmt02(dmbinarr[peaktrial], tbinarr[peaktrial], mode='lsgrid')
+            else:
+                uvmode = 'grid'
+                results = pv.uvfitdmt0(dmbinarr[peaktrial], tbinarr[peaktrial], mode='grid')
+#                peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec = results
+#                print peak, epeak, off_ra, eoff_ra, off_dec, eoff_dec
         elif mode == 'dump':
             # write dmtrack data out for imaging
             pv.writetrack(track)
@@ -1487,10 +1542,9 @@ if __name__ == '__main__':
     fileroot = 'poco_crab_201103_16.mir'
     pathin = 'data/'
     pathout = 'tst/'
-#    edge = 150 # m31 search up to dm=131 and pulse starting at first unflagged channel
+    edge = 150 # m31 search up to dm=131 and pulse starting at first unflagged channel
 #    edge = 35 # b0329 search at dm=28.6 and pulse starting at first unflagged channel
-    edge = 70 # Crab search at dm=56.8 and pulse starting at first unflagged channel
-#    edge = 360  # Crab DM of 56.8 and for DM track starting at freq=0
+#    edge = 70 # Crab search at dm=56.8 and pulse starting at first unflagged channel
 
     if len(sys.argv) == 1:
         # if no args, search for pulses
@@ -1505,7 +1559,7 @@ if __name__ == '__main__':
     elif len(sys.argv) == 2:
         # if pickle, then plot data or dm search results
         print 'Assuming input file is pickle of candidate...'
-        process_pickle(sys.argv[1], pathin=pathin, mode='imsearch')
+        process_pickle(sys.argv[1], pathin=pathin, mode='spec')
     elif len(sys.argv) == 7:
         # if pickle, then plot data or dm search results
         print 'Time limited searching for pulses... with %s, %s, %s' % (fileroot, pathin, pathout)

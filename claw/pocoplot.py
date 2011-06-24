@@ -14,7 +14,7 @@ import scipy.optimize as opt
 filename = 'b0329_fixdm_ph/poco_b0329_173027_fitsp.txt'
 filename2 = 'b0329_fixdm_uv/poco_b0329_173027_fitsp.txt'
 filename3 = 'b0329_fixdm_im2/poco_b0329_173027_fitsp.txt'
-mode='flux'
+mode='index'
 
 f = asciidata.AsciiData(filename)
 name = n.array(f.columns[0])
@@ -77,6 +77,7 @@ for nn in name3:
     pkl = pickle.load(open(pklname))
     detsig3.append(pkl[6][0])
 
+
 ntot = n.array(chunk)*131000 + n.array(nskip) + n.array(nint)
 ntot2 = n.array(chunk2)*131000 + n.array(nskip2) + n.array(nint2)
 ntot3 = n.array(chunk3)*131000 + n.array(nskip3) + n.array(nint3)
@@ -85,13 +86,15 @@ dtype1 = [('ntot', int), ('flux', float)]
 dtype2 = [('ntot', int), ('flux', float), ('detsig', float)]
 sortar = []; sortar2 = []; sortar3 = []
 for i in range(len(ntot)):
-    sortar.append( (ntot[i], meanflux[i]) )
+    sortar.append( (ntot[i], meanflux[i], ind[i]) )
+#    sortar.append( (ntot[i], meanflux[i]) )
 for i in range(len(ntot2)):
     sortar2.append( (ntot2[i], meanflux2[i], detsig2[i]) )
 for i in range(len(ntot3)):
     sortar3.append( (ntot3[i], meanflux3[i], detsig3[i]) )
 
-sortar = n.array(sortar, dtype=dtype1)
+sortar = n.array(sortar, dtype=dtype2)
+#sortar = n.array(sortar, dtype=dtype1)
 sortar2 = n.array(sortar2, dtype=dtype2)
 sortar3 = n.array(sortar3, dtype=dtype2)
 newsortar = n.sort(sortar, order=['ntot'])
@@ -117,7 +120,7 @@ ntotdiff2.append(0)
 ntotdiff3.append(0)
 ntotdiff = n.array(ntotdiff) ; ntotdiff2 = n.array(ntotdiff2); ntotdiff3 = n.array(ntotdiff3)
 
-good1 = n.where(ntotdiff > 0)[0]
+good1 = n.where(n.array(newsortar.tolist())[:,1] > 55.)[0]
 good2 = n.where( (ntotdiff2 > 0) & (n.array(newsortar2.tolist())[:,2] > 5.6) )[0]
 good3 = n.where( (n.array(newsortar3.tolist())[:,2] > 7.0) & (n.array(newsortar3.tolist())[:,1] > 0.) & (ntotdiff3 > 0))[0]
 print 'lengths (orig, new): ', len(ntotdiff), len(good1), len(ntotdiff2), len(good2), len(ntotdiff3), len(good3)
@@ -144,26 +147,27 @@ if mode == 'flux':
     centers = n.array([(hist[1][i+1] + hist[1][i])/2 for i in range(len(hist[1])-1)])
     errs = 1+(n.sqrt(hist[0] + 0.75))
     p.errorbar(centers,hist[0],yerr=errs,fmt=None,ecolor='b', capsize=0)
-    fitignore = n.where(hist[1] >= 40)[0].min()
+    fitignore = n.where(hist[1] >= 80)[0].min()
     print 'ignore, ', fitignore
     p1,success = opt.leastsq(errfunc, p0[:], args = (centers[fitignore:], hist[0][fitignore:], errs[fitignore:]))
     print p1
-    p.clf()
-#    p.plot(centers,fitfunc(p1[:],centers), 'y', label='Fit powerlaw slope=%.1f' % p1[1])
-#    p.xlabel('Flux (Jy)')
-#    p.ylabel('Number of pulses')
-#    p.legend()
-#    p.axis([-170,430,0,500])
-#    p.show()
+#    p.clf()
 
-    hist = p.hist(meanflux, align='mid', histtype='bar', bins=hist[1], label='Beamforming', color='b')
-    hist2 = p.hist(meanflux2, align='mid', histtype='step', bins=hist[1], label='UV fit', color='g')
+    p.plot(centers,fitfunc(p1[:],centers), 'y', linewidth=2.5, label='Fit powerlaw slope=%.1f' % p1[1])
+    p.xlabel('Flux (Jy)')
+    p.ylabel('Number of pulses')
+    p.legend()
+    p.axis([-170,430,0,500])
+    p.show()
+
+    hist = p.hist(meanflux, align='mid', histtype='bar', alpha=0.3, bins=hist[1], label='Beamforming', color='b')
+    hist2 = p.hist(meanflux2, align='mid', histtype='step', linewidth=2.5, bins=hist[1], label='UV fit', color='g')
     centers2 = n.array([(hist2[1][i+1] + hist2[1][i])/2 for i in range(len(hist2[1])-1)])
     errs2 = 1+(n.sqrt(hist2[0] + 0.75))
     p.errorbar(centers2,hist2[0],yerr=errs2,fmt=None,ecolor='g', capsize=0)
     p12,success = opt.leastsq(errfunc, p0[:], args = (centers2[fitignore:], hist2[0][fitignore:], errs2[fitignore:]))
 
-    hist3 = p.hist(meanflux3, align='mid', histtype='step', bins=hist[1], label='Dirty Image', color='r')
+    hist3 = p.hist(meanflux3, align='mid', histtype='step', linewidth=2.5, bins=hist[1], label='Dirty Image', color='r')
     centers3 = n.array([(hist3[1][i+1] + hist3[1][i])/2 for i in range(len(hist3[1])-1)])
     errs3 = 1+(n.sqrt(hist3[0] + 0.75))
     p.errorbar(centers3,hist3[0],yerr=errs3,fmt=None,ecolor='r', capsize=0)
@@ -188,6 +192,8 @@ elif mode == 'index':
     errfunc = lambda p, x, y, rms: ((y - fitfunc(p, x))/rms)**2
     p0 = [10,0,10]
 
+    ind = (n.array( newsortar.tolist() )[:,2] )[good1]   # to select limited set of pulses
+    print len(ind)
     hist = p.hist(ind, align='mid',bins=n.arange(-50,50,2))
     p.clf()
     centers = n.array([(hist[1][i+1] + hist[1][i])/2 for i in range(len(hist[1])-1)])
@@ -196,9 +202,9 @@ elif mode == 'index':
     p1,success = opt.leastsq(errfunc, p0[:], args = (centers, hist[0], errs))
     print 'model', p1
 
-    hist = p.hist(ind, align='mid',bins=hist[1], label='Observed')
+    hist = p.hist(ind, align='mid', bins=hist[1], label='Observed')
     p.errorbar(centers,hist[0],yerr=errs,fmt=None,ecolor='b', capsize=0)
-    p.plot(centers,fitfunc(p1[:],centers), 'y', label='Best-fit Gaussian')
+    p.plot(centers,fitfunc(p1[:],centers), 'y', linewidth=2.5, label='Best-fit Gaussian')
     p.legend()
     p.xlabel('Spectral index')
     p.ylabel('Number of pulses')

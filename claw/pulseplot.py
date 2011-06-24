@@ -54,7 +54,7 @@ def main(start=0, stop=10, save=1):
             pv = pocovis.poco(pathin + dataname, nints=nints, nskip=nintskip)
             pv.prep()
             track = pv.tracksub(0, tbin, bgwindow=bgwindow)
-            spec = track[0].mean(axis=0).real
+            spec = (track[0]).mean(axis=0).real
             dynsp.append(spec)
 
     p.figure(1)
@@ -66,7 +66,7 @@ def main(start=0, stop=10, save=1):
     p.ylabel('Pulse number')
     if save:
         savename = filename.split('.')[:-1]
-        savename.append(str(start) + '-' + str(stop) + '_dynsp.png')
+        savename.append(str(start) + '-' + str(stop) + '_dynsp.ps')
         savename = string.join(savename,'.')
         print 'Saving file as ', savename
         p.savefig(savename)
@@ -78,8 +78,8 @@ if __name__ == '__main__':
     save = 1
     spacing = 100
     if len(sys.argv) == 1:
-        starts = n.arange(0,2000,spacing)
-        stops = n.arange(spacing,2100,spacing)
+        starts = n.arange(1600,2000,spacing)
+        stops = n.arange(1700,2100,spacing)
 
         for i in range(len(starts)):
             main(starts[i], stops[i], save=save)

@@ -159,3 +159,4 @@ def display(directory, start=0, stop=0):
 if __name__ == '__main__':
 #    display('crab_fixdm_ph/', start=30, stop=40)
     display('b0329_fixdm_im2/', start=0, stop=0)
+
