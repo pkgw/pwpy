@@ -17,14 +17,36 @@ Combining these numbers, we find that a single element has a system equivalent f
 S_{sys}=\frac{1}{2}G_{ant}{\eta}T_{sys}
 \end{equation}
 
-\noindent A factor of one-half is introduced due to the fact that we only detect a single polarization. $G_{ant}$ is the gain of the antenna, which for a 1.8 meter primary with $\eta=0.6$ is 1809 Jy/K. This gives an SEFD of $S_{ant}=181\text{ kJy}$. Assuming a minute of integration time\footnote{An estimate of one minute for calibration is made to conservatively limit the number of calibrators considered adequate for calibration. Obviously, more time for calibration can be allocated, which will in turn increase the number of viable calibrators (although not likely by a significant amount).}, for a single baseline we expect to see a signal to noise ratio of $SNR=\frac{S_{Cal}}{0.738\text{ Jy}}$. Assuming an array of 19 elements packed into a hex configuration\footnote{Giving a synthesized beamwidth of approximately 8.5 arcminutes}, integrating over a minute with a bandwidth of 1 GHz will produce an image with a theoretical RMS noise of 39.9 mJy/beam. 
+\noindent A factor of one-half is introduced due to the fact that we only detect a single polarization. $G_{ant}$ is the gain of the antenna, which for a 1.8 meter primary with $\eta=0.6$ is 1809 Jy/K. This gives an SEFD of $S_{ant}=181\text{ kJy}$. Assuming a minute of integration time\footnote{An estimate of one minute for calibration is made to conservatively limit the number of calibrators considered adequate for calibration. Obviously, more time for calibration can be allocated, which will in turn increase the number of viable calibrators (although not likely by a significant amount).}, for a single baseline we expect to see a signal to noise ratio of $SNR=\frac{S_{Cal}}{0.738\text{ Jy}}$. Assuming an array of 19 elements packed into a hex configuration, integrating over a minute with a bandwidth of 1 GHz will produce an image with a theoretical RMS noise of 39.9 mJy/beam. 
 
-Our primary science driver - the detection of CO within star-forming regions of primordial galaxies - requires that we integrate down to a level of 1 microKelvin in a channel of velocity width of 100 km/s. Assuming 264 elements in the full array, with a system temperature of 50 K for all antennas, this means that 420 minutes of integration time will be required per pointing, which will produce an image with a theoretical noise RMS of 0.967 mJy/beam. A one minute integration on a calibrator with 1 GHz of bandwidth will produce an image with a theoretical noise RMS of 1.4 mJy/beam.
+Our primary science driver - the detection of CO within star-forming regions of primordial galaxies - requires that we integrate down to a level of 1 microKelvin in a channel of velocity width of 100 km/s. The prototype will have a velocity resolution of roughly 300 km/s, although assuming that the brightness temperature constraint is the same for both velocity resolutions, a single pointing will require 1767 hours of observing time, and will produce an image with a theoretical noise RMS of 0.967 mJy/beam. For comparison, the full 264 element array with a system temperature of 50 K for all elements will require 7 hours of integration per pointing.
 
-For a 1.8 meter primary, the DACOTA primary will have a field of view that covers roughly 0.258 square degrees, with sidelobes down to -30 dB (relative to the peak of the sythesized beam) extending over approximately 4.13 square degrees. Over the primary field of view, we expect to see a total of 76 mJy of flux from point sources above the noise threshold, the brightest point source that we expect to see over the extended field of view is 230 mJy. This implies that DACOTA will need to schieve a minimum dynamic range of 80 in imaging during calibration, and preferably a dynamic range of 240.
+For a 1.8 meter primary, the DACOTA primary will have a field of view that covers roughly 0.258 square degrees, with sidelobes down to -30 dB (relative to the peak of the sythesized beam) extending over approximately 4.13 square degrees. We expect to see a total of 135 mJy of flux from point sources above the noise threshold\footnote{This number represents the total flux over the sky weighted by the primary beam}, the brightest point source that we expect to see over the extended field of view is 280 mJy. This implies that DACOTA will need to schieve a minimum dynamic range of 140 in imaging during calibration, and preferably a dynamic range of 290.
 
-These constraints put some upper limits of viable calibrator choices, particularly with the DACTOTA prototype. Ideally, we are restricted to looking at calibrators whose fluxes are above 9.5 Jy if we are limited to one minute of calibration with the prototype. 
-
+These constraints put some upper limits of viable calibrator choices, particularly with the DACTOTA prototype. Ideally, we are restricted to looking at calibrators whose fluxes are above 5.6 Jy (although ideally 11.6 Jy) if we are limited to one minute of calibration with the prototype. 
+\begin{table}
+\begin{center}
+\label{List of Calibrators}
+\begin{tabular}{|c|c||r|r|r|r|} \hline
+Name & IAU Name & RA (J2000) & Dec (J2000) & 2 cm flux \\
+\hline
+\hline
+3C84 & 0319+415 & 03h19m48s & +41d30m42s & 20.7 Jy \\
+N/A & 0609-157 & 06h09m41s & -15d42m41s & 9.0 Jy \\
+N/A & 0927+390 & 09h27m03s & +39d02m21s & 6.60 Jy \\
+3C273 & 1229+020 & 12h29m07s & +02d03m09s & 34.0 Jy \\
+3C279 & 1256-057 & 12h56m11s & -05d47m22s & 21.8 Jy \\
+3C345 & 1642+398 & 16h42m59s & +39d48m37s & 13.0 Jy \\
+N/A & 1733-130 & 17h33m03s & -13d04m50s & 11.0 Jy \\
+N/A & 1924-292 & 19h24m51s & -29d14m30s & 17.0 Jy \\
+3C446 & 2225-049 & 22h25m47s & -04d57m01s & 6.60 Jy \\
+3C454.3 & 2253+161 & 22h53m58s & +16d08m54s & 15.0 Jy \\
+\hline
+\end{tabular}
+\caption{List of viable DACOTA Prototype calibrators\label{tablecal}} 
+\end{center}
+\end{table}
+\\
 Assuming that the primary contribution to the system temperature is in the preamp, then we expect 
 
 
