@@ -10,6 +10,16 @@
  *	TODO:
  *		Bandpass cal using all data, not individual scans
  *		Option to bandpass calibrate on non-cal data
+ *
+ *		Use skew/kertosis to decide when to flag, especially
+ *
+ *		wide-band/corruption Use data array instead of med_spec when
+ *		computing variance for wide-band/corruption/narrow RFI
+ *
+ *		wide-band is O(n^2) in n_gain_ch. Could be made O(n log(n)) by
+ *		chainging corrupt() to find the smallest variance and compare
+ *		each spectral bin variance to that. Better yet, use skew and
+ *		kertosis.
  */
 
 
@@ -157,6 +167,11 @@ void getopt_dave() {
 	interpolate=present[10];
 	nowiderfi=present[11];
 	savebpass=present[12];
+
+	if (savebpass && noband) {
+		fprintf(stderr,"Error: you must solve for bandpass solutions if you want to save them!\n");
+		abort();
+	}
 }
 
 
@@ -1155,7 +1170,7 @@ void flag_wide_rfi(bin_struct *bin, unsigned n_blocks, float nsigma) {
 	unsigned int start, end, pol, bl, n_bl, n_ants, n_chan, ch, idx, i, j, width;
 	complex float dev[n_blocks], tmp;
 	int n;
-	char str[3];
+	//char str[3];
 	unsigned nflag=0;
 
 	n_bl = bin->visdata->n_bl;

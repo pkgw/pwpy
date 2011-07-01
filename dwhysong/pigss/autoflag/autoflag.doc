@@ -20,14 +20,15 @@
 %A options
 	This gives several processing options. Possible values are:
 	  noflag      Do not write the flag table; useful to see what would be done
-	  reten       Flag any baseline with less than 50% initial retention
-	  time        Examine the time-series data for each scan
 	  noband      Skip the internal bandpass calibration step
 	  nophase     Skip test of phase variance on calibrator data
 	  norfi       Skip the narrow-band and transient RFI flagging steps (not recommended)
-	  nowide      Skip the wide-band RFI flagging step
-	  dist        Skip the data distribution test
-	  nonoise     Skip the baseline noise test
-	  nosingle    Skip RFI flagging for single visibilities
 	  ata         Check for spectral corruption (for ATA data only)
+	  dist        Skip the data distribution test
+	  noise       Perform the baseline noise test
+	  reten       Flag any baseline with less than 50% initial retention
+	  time        Examine the time-series data for each scan
+	  nosingle    Skip RFI flagging for single visibilities
 	  interpolate Copy flags from previous/next calibrator scans to source scans
+	  nowide      Skip the wide-band RFI flagging step
+	  savebpass   Write out the bandpass solutions
