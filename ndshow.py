@@ -17,10 +17,16 @@ Ctrl-1 to set scale to unity
 import numpy as N
 import cairo
 import gtk
+import sys # tmp for stdout flush
+
+DRAG_TYPE_NONE = 0
+DRAG_TYPE_PAN = 1
+DRAG_TYPE_TUNER = 2
 
 
 class Viewport (gtk.DrawingArea):
     getshape = None
+    settuning = None
     getsurface = None
 
     centerx = 0
@@ -32,6 +38,12 @@ class Viewport (gtk.DrawingArea):
     # From data space to viewer space: e.g., scale = 2 means that
     # each data pixel occupies 2 pixels on-screen.
 
+    needtune = True
+    tunerx = 0
+    tunery = 1.
+    tunerscale = 200
+
+    drag_type = DRAG_TYPE_NONE
     drag_win_x0 = drag_win_y0 = None
     drag_dc_x0 = drag_dc_y0 = None
 
@@ -53,6 +65,14 @@ class Viewport (gtk.DrawingArea):
         if getshape is not None and not callable (getshape):
             raise ValueError ()
         self.getshape = getshape
+        return self
+
+
+    def setTuningSetter (self, settuning):
+        if settuning is not None and not callable (settuning):
+            raise ValueError ()
+        self.settuning = settuning
+        self.needtune = True
         return self
 
 
@@ -101,6 +121,9 @@ class Viewport (gtk.DrawingArea):
 
         if self.scale is None:
             self.autoscale ()
+        if self.needtune:
+            self.settuning (self.tunerx, self.tunery)
+            self.needtune = False
 
         w = self.allocation.width
         seendatawidth = w / self.scale
@@ -124,42 +147,85 @@ class Viewport (gtk.DrawingArea):
 
 
     def _on_scroll (self, alsoself, event):
-        oldscale = self.scale
-        newscale = self.scale
+        modmask = gtk.accelerator_get_default_mod_mask ()
 
-        if event.direction == gtk.gdk.SCROLL_UP:
-            newscale *= 1.05
+        if (event.state & modmask) == 0:
+            oldscale = self.scale
+            newscale = self.scale
 
-        if event.direction == gtk.gdk.SCROLL_DOWN:
-            newscale /= 1.05
+            if event.direction == gtk.gdk.SCROLL_UP:
+                newscale *= 1.05
 
-        if newscale == oldscale:
-            return False
+            if event.direction == gtk.gdk.SCROLL_DOWN:
+                newscale /= 1.05
 
-        self.scale = newscale
-        self.queue_draw ()
-        return True
+            if newscale == oldscale:
+                return False
+
+            self.scale = newscale
+            self.queue_draw ()
+            return True
+
+        if (event.state & modmask) == gtk.gdk.SHIFT_MASK:
+            oldscale = self.tunerscale
+            newscale = self.tunerscale
+
+            if event.direction == gtk.gdk.SCROLL_UP:
+                newscale *= 1.05
+
+            if event.direction == gtk.gdk.SCROLL_DOWN:
+                newscale /= 1.05
+
+            if newscale == oldscale:
+                return False
+
+            self.tunerscale = newscale
+            return True
+
+        return False
 
 
     def _on_button_press (self, alsoself, event):
+        modmask = gtk.accelerator_get_default_mod_mask ()
+
         if event.type == gtk.gdk.BUTTON_PRESS and event.button == 1:
             self.grab_add ()
             self.drag_win_x0 = event.x
             self.drag_win_y0 = event.y
-            self.drag_dc_x0 = self.centerx
-            self.drag_dc_y0 = self.centery
-            return True
+
+            if (event.state & modmask) == 0:
+                self.drag_type = DRAG_TYPE_PAN
+                self.drag_dc_x0 = self.centerx
+                self.drag_dc_y0 = self.centery
+                return True
+
+            if (event.state & modmask) == gtk.gdk.SHIFT_MASK:
+                self.drag_type = DRAG_TYPE_TUNER
+                self.drag_dc_x0 = self.tunerx
+                self.drag_dc_y0 = self.tunery
+                return True
+
+            return False
 
         if event.type == gtk.gdk._2BUTTON_PRESS and event.button == 1:
             dx = event.x - 0.5 * self.allocation.width
             dy = event.y - 0.5 * self.allocation.height
-            self.centerx += dx / self.scale
-            self.centery += dy / self.scale
+
+            if (event.state & modmask) == 0:
+                self.centerx += dx / self.scale
+                self.centery += dy / self.scale
+            elif (event.state & modmask) == gtk.gdk.SHIFT_MASK:
+                self.tunerx += dx / self.tunerscale
+                self.tunery += dy / self.tunerscale
+                self.needtune = True
+            else:
+                return False
+
             self.queue_draw ()
             # Prevent the drag-release code from running. (Double-click events
             # are preceded by single-click events.)
             self.grab_remove ()
-            self.drag_win_x0 = None
+            self.drag_type = DRAG_TYPE_NONE
             return True
 
         return False
@@ -167,31 +233,46 @@ class Viewport (gtk.DrawingArea):
 
     def _on_button_release (self, alsoself, event):
         if event.type == gtk.gdk.BUTTON_RELEASE and event.button == 1:
-            if self.drag_win_x0 is None:
+            if self.drag_type == DRAG_TYPE_NONE:
                 return False
 
             self.grab_remove ()
-            self.centerx = self.drag_dc_x0 + (self.drag_win_x0 - event.x) / self.scale
-            self.centery = self.drag_dc_y0 + (self.drag_win_y0 - event.y) / self.scale
+
+            if self.drag_type == DRAG_TYPE_PAN:
+                self.centerx = self.drag_dc_x0 + (self.drag_win_x0 - event.x) / self.scale
+                self.centery = self.drag_dc_y0 + (self.drag_win_y0 - event.y) / self.scale
+            elif self.drag_type == DRAG_TYPE_TUNER:
+                self.tunerx = self.drag_dc_x0 + (event.x - self.drag_win_x0) / self.tunerscale
+                self.tunery = self.drag_dc_y0 + (event.y - self.drag_win_y0) / self.tunerscale
+                self.needtune = True
+            else:
+                return False
+
             self.drag_win_x0 = self.drag_win_y0 = None
             self.drag_dc_x0 = self.drag_dc_y0 = None
+            self.drag_type = DRAG_TYPE_NONE
             self.queue_draw ()
             return True
 
         return False
 
     def _on_motion_notify (self, alsoself, event):
-        if self.drag_win_x0 is None:
+        if self.drag_type == DRAG_TYPE_NONE:
             return False
+        elif self.drag_type == DRAG_TYPE_PAN:
+            self.centerx = self.drag_dc_x0 + (self.drag_win_x0 - event.x) / self.scale
+            self.centery = self.drag_dc_y0 + (self.drag_win_y0 - event.y) / self.scale
+        elif self.drag_type == DRAG_TYPE_TUNER:
+            self.tunerx = self.drag_dc_x0 + (event.x - self.drag_win_x0) / self.tunerscale
+            self.tunery = self.drag_dc_y0 + (event.y - self.drag_win_y0) / self.tunerscale
+            self.needtune = True
 
-        self.centerx = self.drag_dc_x0 + (self.drag_win_x0 - event.x) / self.scale
-        self.centery = self.drag_dc_y0 + (self.drag_win_y0 - event.y) / self.scale
         self.queue_draw ()
         return True
 
 
-DEFAULT_WIN_WIDTH = 600
-DEFAULT_WIN_HEIGHT = 400
+DEFAULT_WIN_WIDTH = 800
+DEFAULT_WIN_HEIGHT = 600
 
 
 class Viewer (object):
@@ -207,6 +288,11 @@ class Viewer (object):
 
     def setShapeGetter (self, getshape):
         self.viewport.setShapeGetter (getshape)
+        return self
+
+
+    def setTuningSetter (self, settuning):
+        self.viewport.setTuningSetter (settuning)
         return self
 
 
@@ -242,6 +328,12 @@ class Viewer (object):
 
 def view (array):
     h, w = array.shape
+    amin, amax = array.min (), array.max ()
+    if not N.isfinite (amin):
+        amin = array[N.where (N.isfinite (array))].min ()
+    if not N.isfinite (amax):
+        amax = array[N.where (N.isfinite (array))].max ()
+
     stride = cairo.ImageSurface.format_stride_for_width (cairo.FORMAT_ARGB32, w)
     # stride is in bytes:
     assert stride % 4 == 0
@@ -249,20 +341,50 @@ def view (array):
     imagesurface = cairo.ImageSurface.create_for_data (imgdata, cairo.FORMAT_ARGB32,
                                                        w, h, stride)
 
-    imgdata.fill (0xFF000000) # 100% alpha
-    amin, amax = array.min (), array.max ()
-    imgdata += (array - amin) * (255. / (amax - amin))
     if N.ma.is_masked (array):
-        imgdata -= 0xFF000000 * array.mask
+        imgdata[:,:] = 0xFF000000 * ~array.mask
+        zerofilled = array.filled (0)
+    else:
+        imgdata.fill (0xFF000000) # 100% alpha
+        zerofilled = array
+
+    # Translate to 32-bit signed fixed-point. 0 is data min and
+    # 0x0FFFFFF0 is data max; this gives a dynamic range of ~1.67e7
+    # within the data, 4 bits of dynamic range for fractional values,
+    # and 3 bits of dynamic range for out-of-scale values. The
+    # smallest value we can represent is min - 8 * (max - min) and
+    # the largest is 8 * (max - min) + min.
+
+    fixed = (zerofilled - amin) * (0x0FFFFFF0 / (amax - amin)).astype (N.int32)
+    clipped = N.zeros ((h, w), dtype=N.int32)
 
     def getshape ():
         return w, h
+
+    def settuning (tunerx, tunery):
+        # TODO: could have different clipping behaviors. Regular clipping,
+        # mark with some crazy color, flag (ie alpha -> 0)
+        N.bitwise_and (imgdata, 0xFF000000, imgdata)
+
+        fmin = int (0x0FFFFFF0 * tunerx)
+        fmax = int (0x0FFFFFF0 * tunery)
+
+        if fmin == fmax:
+            # Can't use += because then Python thinks imgdata is a
+            # function-local variable.
+            N.add (imgdata, 255 * (fixed > fmin), imgdata)
+        else:
+            N.clip (fixed, fmin, fmax, clipped)
+            N.subtract (clipped, fmin, clipped)
+            N.multiply (clipped, 255. / (fmax - fmin), clipped)
+            N.add (imgdata, clipped, imgdata)
 
     def getsurface (xoffset, yoffset, width, height):
         return imagesurface, xoffset, yoffset
 
     viewer = Viewer ()
     viewer.setShapeGetter (getshape)
+    viewer.setTuningSetter (settuning)
     viewer.setSurfaceGetter (getsurface)
     viewer.win.show_all ()
     viewer.win.connect ('destroy', gtk.main_quit)
