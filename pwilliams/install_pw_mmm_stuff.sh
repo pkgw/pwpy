@@ -64,6 +64,7 @@ fancy/mdl-makeimage
 fancy/pwflux
 fancy/pwmodel
 fancy/qimage
+fancy/rtft
 fancy/showgains
 fancy/uvasimg
 fancy/varcat
