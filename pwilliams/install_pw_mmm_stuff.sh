@@ -63,6 +63,7 @@ fancy/gpunity
 fancy/mdl-makeimage
 fancy/pwflux
 fancy/pwmodel
+fancy/pwshow
 fancy/qimage
 fancy/rtft
 fancy/showgains
