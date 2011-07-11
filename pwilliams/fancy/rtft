@@ -71,6 +71,12 @@ def im_to_vis (map, beam, gvbase, wts):
     beamdims = h.axes.copy ()
     h.close ()
 
+    if beamdims.size == 3:
+        # If no SDB, no fourth axis; map always has four axes
+        tmp = N.ones (4)
+        tmp[:3] = beamdims
+        beamdims = tmp
+
     if not (beamdims - mapdims).any ():
         effbeam = beam
         cleanup_effbeam = False
@@ -127,7 +133,6 @@ def im_to_vis (map, beam, gvbase, wts):
     # preserve source RA/Dec for roundtripping
 
     h = map.open ('rw')
-    mapdims = h.axes.copy ()
     ctr1 = h.getScalarItem ('crval1')
     ctr2 = h.getScalarItem ('crval2')
     h.close ()
