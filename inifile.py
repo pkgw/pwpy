@@ -10,11 +10,14 @@ class Holder (object):
 
     def set (self, **kwargs):
         for name, value in kwargs.iteritems ():
-            setattr (self, name, value)
+            self.__dict__[name] = value
         return self
 
+    def get (self, name, defval=None):
+        return self.__dict__.get (name, defval)
+
     def setone (self, name, value):
-        setattr (self, name, value)
+        self.__dict__[name] = value
         return self
 
     def has (self, name):
