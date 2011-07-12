@@ -25,6 +25,8 @@ DRAG_TYPE_TUNER = 2
 
 
 class Viewport (gtk.DrawingArea):
+    bgpattern = None
+
     getshape = None
     settuning = None
     getsurface = None
@@ -59,6 +61,8 @@ class Viewport (gtk.DrawingArea):
         self.connect ('button-press-event', self._on_button_press)
         self.connect ('button-release-event', self._on_button_release)
         self.connect ('motion-notify-event', self._on_motion_notify)
+
+        self.bgpattern = cairo.SolidPattern (0.1, 0.1, 0.1)
 
 
     def setShapeGetter (self, getshape):
@@ -136,6 +140,9 @@ class Viewport (gtk.DrawingArea):
                                                      seendatawidth, seendataheight)
 
         ctxt = self.window.cairo_create ()
+        ctxt.set_source (self.bgpattern)
+        ctxt.paint ()
+
         ctxt.scale (self.scale, self.scale)
         ctxt.set_source_surface (surface, xoffset, yoffset)
         pat = ctxt.get_source ()
@@ -341,12 +348,14 @@ def view (array):
     imagesurface = cairo.ImageSurface.create_for_data (imgdata, cairo.FORMAT_ARGB32,
                                                        w, h, stride)
 
+    imgdata.fill (0xFF000000)
+
     if N.ma.is_masked (array):
-        imgdata[:,:] = 0xFF000000 * ~array.mask
-        zerofilled = array.filled (0)
+        filled = array.filled (amin)
+        antimask = ~array.mask
     else:
-        imgdata.fill (0xFF000000) # 100% alpha
-        zerofilled = array
+        filled = array
+        antimask = None
 
     # Translate to 32-bit signed fixed-point. 0 is data min and
     # 0x0FFFFFF0 is data max; this gives a dynamic range of ~1.67e7
@@ -355,7 +364,7 @@ def view (array):
     # smallest value we can represent is min - 8 * (max - min) and
     # the largest is 8 * (max - min) + min.
 
-    fixed = (zerofilled - amin) * (0x0FFFFFF0 / (amax - amin)).astype (N.int32)
+    fixed = (filled - amin) * (0x0FFFFFF0 / (amax - amin)).astype (N.int32)
     clipped = N.zeros ((h, w), dtype=N.int32)
 
     def getshape ():
@@ -378,6 +387,9 @@ def view (array):
             N.subtract (clipped, fmin, clipped)
             N.multiply (clipped, 255. / (fmax - fmin), clipped)
             N.add (imgdata, clipped, imgdata)
+
+        if antimask is not None:
+            N.multiply (imgdata, antimask, imgdata)
 
     def getsurface (xoffset, yoffset, width, height):
         return imagesurface, xoffset, yoffset
