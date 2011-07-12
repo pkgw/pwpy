@@ -401,3 +401,81 @@ def view (array):
     viewer.win.show_all ()
     viewer.win.connect ('destroy', gtk.main_quit)
     gtk.main ()
+
+
+def blink (arrays, cadence=0.6):
+    import time, glib
+
+    n = len (arrays)
+    amin = amax = h = w = None
+
+    for array in arrays:
+        thish, thisw = array.shape
+        thismin, thismax = array.min (), array.max ()
+
+        if not N.isfinite (thismin):
+            thismin = array[N.where (N.isfinite (array))].min ()
+        if not N.isfinite (thismax):
+            thismax = array[N.where (N.isfinite (array))].max ()
+
+        if amin is None:
+            w, h, amin, amax = thisw, thish, thismin, thismax
+        else:
+            if thisw != w:
+                raise ValueError ('array widths not all equal')
+            if thish != h:
+                raise ValueError ('array heights not all equal')
+
+            amin = min (amin, thismin)
+            amax = max (amax, thismax)
+
+    stride = cairo.ImageSurface.format_stride_for_width (cairo.FORMAT_ARGB32, w)
+    # stride is in bytes:
+    assert stride % 4 == 0
+    imgdata = N.empty ((n, h, stride // 4), dtype=N.uint32)
+
+    surfaces = [None] * n
+
+    for i in xrange (n):
+        array = arrays[i]
+        surfaces[i] = cairo.ImageSurface.create_for_data (imgdata[i], cairo.FORMAT_ARGB32,
+                                                          w, h, stride)
+
+        clipped = N.clip (array, amin, amax)
+
+        # Premultiplied alpha: if alpha = 0, entire uint32 should be zero.
+
+        imgdata[i].fill (0xFF000000)
+        N.bitwise_or (imgdata[i],
+                      ((clipped - amin) * 0xFF / (amax - amin)).astype (N.uint32),
+                      imgdata[i])
+
+        if N.ma.is_masked (array):
+            N.multiply (imgdata[i], ~array.mask, imgdata[i])
+
+    t0 = time.time ()
+
+    def getshape ():
+        return w, h
+
+    def settuning (tunerx, tunery):
+        pass
+
+    def getsurface (xoffset, yoffset, width, height):
+        i = int (N.floor (((time.time () - t0) / cadence) % n))
+        return surfaces[i], xoffset, yoffset
+
+    viewer = Viewer ()
+    viewer.setShapeGetter (getshape)
+    viewer.setTuningSetter (settuning)
+    viewer.setSurfaceGetter (getsurface)
+    viewer.win.show_all ()
+    viewer.win.connect ('destroy', gtk.main_quit)
+
+    def refresh ():
+        viewer.viewport.queue_draw ()
+        return True
+
+    sid = glib.timeout_add (int (cadence * 1000), refresh)
+    gtk.main ()
+    glib.source_remove (sid)
