@@ -156,15 +156,20 @@ class Viewport (gtk.DrawingArea):
     def _on_scroll (self, alsoself, event):
         modmask = gtk.accelerator_get_default_mod_mask ()
 
-        if (event.state & modmask) == 0:
+        if (event.state & modmask) in (0, gtk.gdk.CONTROL_MASK):
             oldscale = self.scale
             newscale = self.scale
 
+            if event.state & modmask == gtk.gdk.CONTROL_MASK:
+                factor = 1.2
+            else:
+                factor = 1.05
+
             if event.direction == gtk.gdk.SCROLL_UP:
-                newscale *= 1.05
+                newscale *= factor
 
             if event.direction == gtk.gdk.SCROLL_DOWN:
-                newscale /= 1.05
+                newscale /= factor
 
             if newscale == oldscale:
                 return False
