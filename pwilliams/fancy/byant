@@ -21,6 +21,10 @@ from mirtask import uvdat, keys, util
 _uvd = lambda inp, preamble, datum: \
     0.001 * N.sqrt (preamble[0]**2 + preamble[1]**2)
 
+_u = lambda a1, a2, inp, preamble, datum: 0.001 * preamble[0]
+_v = lambda a1, a2, inp, preamble, datum: 0.001 * preamble[1]
+_w = lambda inp, preamble, datum: 0.001 * preamble[2]
+
 _ti = lambda inp, preamble, datum: preamble[3]
 
 _dtime = lambda inp, preamble, datum: ((preamble[3] - 0.5) % 1.0) * 24
@@ -37,6 +41,9 @@ _im = lambda theant, otherant, inp, preamble, datum: datum.imag
 _partner = lambda theant, otherant, inp, preamble, datum: otherant
 
 funcs = { 'uvdistance': (_uvd, False),
+          'uu': (_u, True),
+          'vv': (_v, True),
+          'ww': (_w, False),
           'phase': (_ph, True), # antdep because BL ordering affects sign
           'amplitude': (_amp, False),
           'real': (_re, False),
