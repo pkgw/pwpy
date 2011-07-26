@@ -162,7 +162,7 @@ for dIn, p, d, f in uvdat.read ():
             tup = dIn.probeVar (v)
 
             if tup is None:
-                die ('no such variable "%s" in dataset %s!', v, dIn.name)
+                die ('no such variable "%s" in dataset %s!', v, dIn.path ())
 
             vtype = tup[0]
             vlen = tup[1]
@@ -185,7 +185,7 @@ for dIn, p, d, f in uvdat.read ():
             elif vtype == 'c': get = lambda: dIn.getVarComplex (v, vlen)
             else:
                 die ('unhandled or ungettable variable type "%s" for "%s" in '
-                     'dataset %s!', vtype, v, dIn.name)
+                     'dataset %s!', vtype, v, dIn.path ())
 
             # Ok, we have all the info we need. For some reason I need to stuff
             # vlen into the tuple, otherwise old values seem to get thrown away or
