@@ -2,8 +2,9 @@
 UI features of the viewport:
 
 click-drag to pan
-scrollwheel to zoom in/out
+scrollwheel to zoom in/out (Ctrl to do so more aggressively)
 double-click to recenter
+shift-click-drag to adjust color scale (prototype)
 
 Added by the toplevel window viewer:
 
@@ -11,7 +12,8 @@ Ctrl-A to autoscale data to fit window
 Ctrl-E to center the data in the window
 Ctrl-W to close the window
 Ctrl-1 to set scale to unity
-
+Ctrl-S to save the data to "data.png" under the current rendering options
+  (but not zoomed to the current view of the data).
 """
 
 import numpy as N
@@ -119,9 +121,47 @@ class Viewport (gtk.DrawingArea):
         return self
 
 
-    def _on_expose (self, alsoself, event):
+    def write_data_as_png (self, filename):
+        if self.getshape is None:
+            raise Exception ('Must be called after setting shape-getter')
+        if self.getsurface is None:
+            raise Exception ('Must be called after setting surface-getter')
+
+        if self.needtune:
+            self.settuning (self.tunerx, self.tunery)
+            self.needtune = False
+
+        dw, dh = self.getshape ()
+        surface, xoffset, yoffset = self.getsurface (0, 0, dw, dh)
+        surface.write_to_png (filename)
+
+
+    def write_view_as_png (self, filename):
+        if self.getshape is None:
+            raise Exception ('Must be called after setting shape-getter')
+        if self.getsurface is None:
+            raise Exception ('Must be called after setting surface-getter')
+        if self.allocation is None:
+            raise Exception ('Must be called after allocation')
+
+        width = self.allocation.width
+        height = self.allocation.height
+
+        stride = cairo.ImageSurface.format_stride_for_width (cairo.FORMAT_ARGB32,
+                                                             width)
+        assert stride % 4 == 0 # stride is in bytes
+        viewdata = N.empty ((height, stride // 4), dtype=N.uint32)
+        viewsurface = cairo.ImageSurface.create_for_data (viewdata, cairo.FORMAT_ARGB32,
+                                                          width, height, stride)
+        ctxt = cairo.Context (viewsurface)
+        self._draw_in_context (ctxt, width, height)
+        viewsurface.write_to_png (filename)
+
+
+    def _draw_in_context (self, ctxt, width, height):
         if self.getshape is None or self.getsurface is None:
-            return False
+            raise Exception ('Must be called after setting '
+                             'shape-getter and surface-getter')
 
         if self.scale is None:
             self.autoscale ()
@@ -129,20 +169,16 @@ class Viewport (gtk.DrawingArea):
             self.settuning (self.tunerx, self.tunery)
             self.needtune = False
 
-        w = self.allocation.width
-        seendatawidth = w / self.scale
+        seendatawidth = width / self.scale
         xoffset = 0.5 * seendatawidth - self.centerx
-        h = self.allocation.height
-        seendataheight = h / self.scale
+        seendataheight = height / self.scale
         yoffset = 0.5 * seendataheight - self.centery
 
         surface, xoffset, yoffset = self.getsurface (xoffset, yoffset,
                                                      seendatawidth, seendataheight)
 
-        ctxt = self.window.cairo_create ()
         ctxt.set_source (self.bgpattern)
         ctxt.paint ()
-
         ctxt.scale (self.scale, self.scale)
         ctxt.set_source_surface (surface, xoffset, yoffset)
         pat = ctxt.get_source ()
@@ -150,6 +186,14 @@ class Viewport (gtk.DrawingArea):
         pat.set_filter (cairo.FILTER_NEAREST)
         ctxt.paint ()
 
+
+    def _on_expose (self, alsoself, event):
+        if self.getshape is None or self.getsurface is None:
+            return False
+
+        self._draw_in_context (self.window.cairo_create (),
+                               self.allocation.width,
+                               self.allocation.height)
         return True
 
 
@@ -333,6 +377,14 @@ class Viewer (object):
         if kn == '1' and isctrl:
             self.viewport.scale = 1.
             self.viewport.queue_draw ()
+            return True
+
+        if kn == 's' and isctrl:
+            import sys
+            print 'Writing data.png ...',
+            sys.stdout.flush ()
+            self.viewport.write_data_as_png ('data.png')
+            print 'done'
             return True
 
         return False
