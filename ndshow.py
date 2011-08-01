@@ -3,6 +3,7 @@ UI features of the viewport:
 
 click-drag to pan
 scrollwheel to zoom in/out (Ctrl to do so more aggressively)
+  (Shift to change color scale adjustment sensitivity)
 double-click to recenter
 shift-click-drag to adjust color scale (prototype)
 
@@ -121,7 +122,7 @@ class Viewport (gtk.DrawingArea):
         return self
 
 
-    def write_data_as_png (self, filename):
+    def writeDataAsPNG (self, filename):
         if self.getshape is None:
             raise Exception ('Must be called after setting shape-getter')
         if self.getsurface is None:
@@ -136,7 +137,7 @@ class Viewport (gtk.DrawingArea):
         surface.write_to_png (filename)
 
 
-    def write_view_as_png (self, filename):
+    def writeViewAsPNG (self, filename):
         if self.getshape is None:
             raise Exception ('Must be called after setting shape-getter')
         if self.getsurface is None:
@@ -383,7 +384,7 @@ class Viewer (object):
             import sys
             print 'Writing data.png ...',
             sys.stdout.flush ()
-            self.viewport.write_data_as_png ('data.png')
+            self.viewport.writeDataAsPng ('data.png')
             print 'done'
             return True
 
