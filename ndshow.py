@@ -15,6 +15,7 @@ Ctrl-W to close the window
 Ctrl-1 to set scale to unity
 Ctrl-S to save the data to "data.png" under the current rendering options
   (but not zoomed to the current view of the data).
+Ctrl-P to print out data pixel coordinates of current pointer location
 """
 
 import numpy as N
@@ -157,6 +158,18 @@ class Viewport (gtk.DrawingArea):
         ctxt = cairo.Context (viewsurface)
         self._draw_in_context (ctxt, width, height)
         viewsurface.write_to_png (filename)
+
+
+    def getPointerDataCoords (self):
+        if self.allocation is None:
+            raise Exception ('Must be called after allocation')
+
+        x, y = self.get_pointer ()
+        dx = x - 0.5 * self.allocation.width
+        dy = y - 0.5 * self.allocation.height
+        datax = self.centerx + dx / self.scale
+        datay = self.centery + dy / self.scale
+        return datax, datay
 
 
     def _draw_in_context (self, ctxt, width, height):
@@ -386,6 +399,12 @@ class Viewer (object):
             sys.stdout.flush ()
             self.viewport.writeDataAsPng ('data.png')
             print 'done'
+            return True
+
+        if kn == 'p' and isctrl:
+            import sys
+            print self.viewport.getPointerDataCoords ()
+            sys.stdout.flush ()
             return True
 
         return False
