@@ -16,11 +16,18 @@ Ctrl-1 to set scale to unity
 Ctrl-S to save the data to "data.png" under the current rendering options
   (but not zoomed to the current view of the data).
 Ctrl-P to print out data pixel coordinates of current pointer location
+
+Added by cycler:
+
+Ctrl-K to move to next plane
+Ctrl-J to move to previous plane
+Ctrl-C to toggle automatic cycling
+
 """
 
 import numpy as N
 import cairo
-import gtk
+import glib, gtk
 import sys # tmp for stdout flush
 
 DRAG_TYPE_NONE = 0
@@ -480,7 +487,134 @@ def view (array):
     gtk.main ()
 
 
-def blink (arrays, cadence=0.6):
+class Cycler (Viewer):
+    getn = None
+    getshapei = None
+    getsurfacei = None
+
+    i = None
+    sourceid = None
+
+    def __init__ (self, title='Array Cycler', default_width=DEFAULT_WIN_WIDTH,
+                  default_height=DEFAULT_WIN_HEIGHT, cadence=0.6):
+        self.cadence = cadence
+
+        self.viewport = Viewport ()
+        self.win = gtk.Window (gtk.WINDOW_TOPLEVEL)
+        self.win.set_title (title)
+        self.win.set_default_size (default_width, default_height)
+        self.win.connect ('key-press-event', self._on_key_press)
+        self.win.connect ('realize', self._on_realize)
+        self.win.connect ('unrealize', self._on_unrealize)
+
+        vb = gtk.VBox ()
+        vb.pack_start (self.viewport, True, True, 2)
+        hb = gtk.HBox ()
+        vb.pack_start (hb, False, True, 2)
+        self.cur_label = gtk.Label ()
+        self.cur_label.set_alignment (0, 0.5)
+        hb.pack_start (self.cur_label, True, True, 2)
+        self.cycle_tbutton = gtk.ToggleButton ('Cycle')
+        hb.pack_start (self.cycle_tbutton, False, True, 2)
+        self.win.add (vb)
+
+        self.viewport.setShapeGetter (self._get_shape)
+        self.viewport.setSurfaceGetter (self._get_surface)
+        self.viewport.setTuningSetter (self._set_tuning)
+
+        self.cycle_tbutton.set_active (True)
+
+
+    def setNGetter (self, getn):
+        if not callable (getn):
+            raise ValueError ('not callable')
+        self.getn = getn
+        return self
+
+
+    def _get_shape (self):
+        if self.i is None:
+            self.setCurrent (0)
+        return self.getshapei (self.i)
+
+
+    def setShapeGetter (self, getshapei):
+        if not callable (getshapei):
+            raise ValueError ('not callable')
+        self.getshapei = getshapei
+        return self
+
+
+    def _get_surface (self, xoffset, yoffset, width, height):
+        if self.i is None:
+            self.setCurrent (0)
+        return self.getsurfacei (self.i, xoffset, yoffset, width, height)
+
+
+    def setSurfaceGetter (self, getsurfacei):
+        if not callable (getsurfacei):
+            raise ValueError ('not callable')
+        self.getsurfacei = getsurfacei
+        return self
+
+
+    def _set_tuning (self, tunerx, tunery):
+        pass
+
+
+    def setCurrent (self, index):
+        n = self.getn ()
+        index = index % n
+
+        if index == self.i:
+            return
+
+        self.i = index
+        self.cur_label.set_markup ('<b>Current plane:</b> %d of %d' %
+                                   (self.i + 1, n))
+        self.viewport.queue_draw ()
+
+
+    def _on_realize (self, widget):
+        if self.sourceid is not None:
+            return
+        self.sourceid = glib.timeout_add (int (self.cadence * 1000), self._do_cycle)
+
+
+    def _on_unrealize (self, widget):
+        if self.sourceid is None:
+            return
+        glib.source_remove (self.sourceid)
+        self.sourceid = None
+
+
+    def _do_cycle (self):
+        if self.cycle_tbutton.get_active ():
+            self.setCurrent (self.i + 1)
+        return True
+
+
+    def _on_key_press (self, widget, event):
+        kn = gtk.gdk.keyval_name (event.keyval)
+        modmask = gtk.accelerator_get_default_mod_mask ()
+        isctrl = (event.state & modmask) == gtk.gdk.CONTROL_MASK
+
+        if kn == 'j' and isctrl:
+            self.setCurrent (self.i - 1)
+            return True
+
+        if kn == 'k' and isctrl:
+            self.setCurrent (self.i + 1)
+            return True
+
+        if kn == 'c' and isctrl:
+            self.cycle_tbutton.set_active (not self.cycle_tbutton.get_active ())
+            return True
+
+        return super (Cycler, self)._on_key_press (widget, event)
+
+
+def cycle (arrays, cadence=0.6):
     import time, glib
 
     n = len (arrays)
@@ -532,27 +666,21 @@ def blink (arrays, cadence=0.6):
 
     t0 = time.time ()
 
-    def getshape ():
+    def getn ():
+        return n
+
+    def getshapei (i):
         return w, h
 
-    def settuning (tunerx, tunery):
-        pass
-
-    def getsurface (xoffset, yoffset, width, height):
-        i = int (N.floor (((time.time () - t0) / cadence) % n))
+    def getsurfacei (i, xoffset, yoffset, width, height):
         return surfaces[i], xoffset, yoffset
 
-    viewer = Viewer ()
-    viewer.setShapeGetter (getshape)
-    viewer.setTuningSetter (settuning)
-    viewer.setSurfaceGetter (getsurface)
-    viewer.win.show_all ()
-    viewer.win.connect ('destroy', gtk.main_quit)
+    cycler = Cycler ()
+    cycler.setNGetter (getn)
+    cycler.setShapeGetter (getshapei)
+    cycler.setSurfaceGetter (getsurfacei)
+    cycler.win.show_all ()
+    cycler.win.connect ('destroy', gtk.main_quit)
 
-    def refresh ():
-        viewer.viewport.queue_draw ()
-        return True
-
-    sid = glib.timeout_add (int (cadence * 1000), refresh)
     gtk.main ()
-    glib.source_remove (sid)
+
