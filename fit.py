@@ -181,10 +181,6 @@ class FitBase (object):
     _fitExport = None
 
     def __init__ (self):
-        if self._paramNames is None:
-            raise Exception ('FitBase implementation %s needs to set _paramNames' \
-                             % (self.__class__))
-        
         self.x = self.y = self.sigmas = None
     
     def setData (self, x, y, sigmas=None):
@@ -535,6 +531,82 @@ class LeastSquaresFit (FitBase):
         self.params = _N.atleast_1d (pfit)
         self.uncerts = _N.sqrt (cov.diagonal ())
         self.cov = cov
+
+
+class CustomLeastSquaresFit (LeastSquaresFit):
+    """A fit whose implementation is set by setting member functions.
+Before an instance may be used, you must call `setup`. Example::
+
+   def model (a, b, c):
+       return lambda x: a * N.exp (b * x**2) + c
+
+   f = CustomLeastSquaresFit ().setup (model, 1, -0.5, 0)
+   f.setData (x, y).fakeSigmas (1).fit ().printParams ()
+
+The parameter names will be determined from the function argument names.
+"""
+
+    _paramNames = None
+    _modeler = None
+    _guesser = None
+
+    def setup (self, model, *guess):
+        """Set the model function and initial guess.
+
+:arg callable model: a function that creates a model function
+:arg guess: guess values or a guess function
+:returns: *self*
+
+The model function works so that::
+
+   modelinstancefunc = model (param1, param2, ...)
+   modeldata = modelinstancefunc (x)
+
+The guess is either a list of guess values, or a callable guess
+function. If it is the latter, it will be used to generate a guess
+from the data, and it should have a prototype of ``paramguesstuple =
+guess (x, y)``.
+
+For example::
+
+   def model (a, b, c):
+       return lambda x: a * N.exp (b * x**2) + c
+
+   fitobj.setup (model, 1, -0.5, 0)
+
+   def guess (x, y):
+       return y.max (), -0.5 / y.var (), y.mean ()
+
+   fitobj.setup (model, guess)
+
+"""
+        self._modeler = model
+        self._paramNames = model.func_code.co_varnames[:model.func_code.co_argcount]
+
+        if len (guess) == 1 and callable (guess[0]):
+            self._guesser = guess[0]
+        else:
+            if len (guess) != len (self._paramNames):
+                raise ValueError ('guess size does not match number of '
+                                  'model parameters')
+            guess = _N.asarray (guess)
+            def guesser (x, y):
+                return guess
+            self._guesser = guesser
+
+        return self
+
+
+    def makeModel (self, *params):
+        if self._modeler is None:
+            raise Exception ('setup() has not been called')
+        return self._modeler (*params)
+
+
+    def guess (self):
+        if self._guesser is None:
+            raise Exception ('setup() has not been called')
+        return self._guesser (self.x, self.y)
 
 
 class ConstrainedMinFit (FitBase):
