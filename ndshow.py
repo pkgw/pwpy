@@ -490,10 +490,12 @@ def view (array):
 class Cycler (Viewer):
     getn = None
     getshapei = None
+    settuningi = None
     getsurfacei = None
 
     i = None
     sourceid = None
+    needtune = None
 
     def __init__ (self, title='Array Cycler', default_width=DEFAULT_WIN_WIDTH,
                   default_height=DEFAULT_WIN_HEIGHT, cadence=0.6):
@@ -545,6 +547,22 @@ class Cycler (Viewer):
         return self
 
 
+    def _set_tuning (self, tunerx, tunery):
+        if self.i is None:
+            self.setCurrent (0)
+        self.settuningi (self.i, tunerx, tunery)
+        self.needtune.fill (True)
+        self.needtune[self.i] = False
+
+
+    def setTuningSetter (self, settuningi):
+        if not callable (settuningi):
+            raise ValueError ('not callable')
+        self.settuningi = settuningi
+        self.viewport.setTuningSetter (self._set_tuning) # force retune
+        return self
+
+
     def _get_surface (self, xoffset, yoffset, width, height):
         if self.i is None:
             self.setCurrent (0)
@@ -558,16 +576,20 @@ class Cycler (Viewer):
         return self
 
 
-    def _set_tuning (self, tunerx, tunery):
-        pass
-
-
     def setCurrent (self, index):
         n = self.getn ()
         index = index % n
 
+        if self.needtune is None or self.needtune.size != n:
+            self.needtune = N.ones (n, dtype=N.bool_)
+
         if index == self.i:
             return
+
+        if self.needtune[index]:
+            # Force the viewport to call settuning the next time it
+            # needs to
+            self.viewport.setTuningSetter (self._set_tuning)
 
         self.i = index
         self.cur_label.set_markup ('<b>Current plane:</b> %d of %d' %
@@ -644,27 +666,24 @@ def cycle (arrays, cadence=0.6):
     # stride is in bytes:
     assert stride % 4 == 0
     imgdata = N.empty ((n, h, stride // 4), dtype=N.uint32)
-
+    fixed = N.empty ((n, h, w), dtype=N.int32)
+    antimask = N.empty ((n, h, w), dtype=N.bool_)
     surfaces = [None] * n
 
-    for i in xrange (n):
-        array = arrays[i]
+    imgdata.fill (0xFF000000)
+
+    for i, array in enumerate (arrays):
         surfaces[i] = cairo.ImageSurface.create_for_data (imgdata[i], cairo.FORMAT_ARGB32,
                                                           w, h, stride)
 
-        clipped = N.clip (array, amin, amax)
-
-        # Premultiplied alpha: if alpha = 0, entire uint32 should be zero.
-
-        imgdata[i].fill (0xFF000000)
-        N.bitwise_or (imgdata[i],
-                      ((clipped - amin) * 0xFF / (amax - amin)).astype (N.uint32),
-                      imgdata[i])
-
         if N.ma.is_masked (array):
-            N.multiply (imgdata[i], ~array.mask, imgdata[i])
+            filled = array.filled (amin)
+            antimask[i] = ~array.mask
+        else:
+            filled = array
+            antimask[i].fill (True)
 
-    t0 = time.time ()
+        fixed[i] = (filled - amin) * (0x0FFFFFF0 / (amax - amin))
 
     def getn ():
         return n
@@ -672,12 +691,31 @@ def cycle (arrays, cadence=0.6):
     def getshapei (i):
         return w, h
 
+    clipped = N.zeros ((h, w), dtype=N.int32) # scratch array
+
+    def settuningi (i, tunerx, tunery):
+        N.bitwise_and (imgdata[i], 0xFF000000, imgdata[i])
+
+        fmin = int (0x0FFFFFF0 * tunerx)
+        fmax = int (0x0FFFFFF0 * tunery)
+
+        if fmin == fmax:
+            N.add (imgdata[i], 255 * (fixed[i] > fmin), imgdata[i])
+        else:
+            N.clip (fixed[i], fmin, fmax, clipped)
+            N.subtract (clipped, fmin, clipped)
+            N.multiply (clipped, 255. / (fmax - fmin), clipped)
+            N.add (imgdata[i], clipped, imgdata[i])
+
+        N.multiply (imgdata[i], antimask[i], imgdata[i])
+
     def getsurfacei (i, xoffset, yoffset, width, height):
         return surfaces[i], xoffset, yoffset
 
     cycler = Cycler ()
     cycler.setNGetter (getn)
     cycler.setShapeGetter (getshapei)
+    cycler.setTuningSetter (settuningi)
     cycler.setSurfaceGetter (getsurfacei)
     cycler.win.show_all ()
     cycler.win.connect ('destroy', gtk.main_quit)
