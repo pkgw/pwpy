@@ -1,0 +1,10 @@
+Here's a list of modules that I wrote but removed because they haven't
+been used for a while. Consult this file before writing a new module
+from scratch!
+
+cosmology.py -- evaluate standard FRW cosmological integrals
+elcmp.py -- "Compare elevations of various sources over time"
+mpfit.py -- semi-customized version of Python port of Markwardt's
+            mpfit; deprecated in favor of pwmpfit.git
+numstd.py -- import a subset of numpy functions, popaarray(), and rms()
+tweaky.py -- plot a function with tunable parameters and see their effect
