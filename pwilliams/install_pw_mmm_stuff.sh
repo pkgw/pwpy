@@ -26,6 +26,7 @@ mirargmerge
 pg2eps
 polsplit
 pwflag
+pwimage2fits
 sfind-to-olay
 show
 sortinplace

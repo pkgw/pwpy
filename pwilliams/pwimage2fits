@@ -1,0 +1,6 @@
+#! /bin/sh
+in="$1"
+shift
+out="$1"
+shift
+exec image2fits in="$in" out="$out" "$@"
