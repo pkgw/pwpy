@@ -21,4 +21,4 @@ for im in images[1:]:
 for im in images:
     im.mask = jointmask
 
-ndshow.blink (images)
+ndshow.cycle (images)
