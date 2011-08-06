@@ -1,22 +1,55 @@
 #! /usr/bin/env python
 
-import sys, miriad, ndshow, numpy as N
+import sys, os.path, miriad, ndshow, numpy as N
 from mirtask import util
 
 if len (sys.argv) < 3:
     util.die ('usage: blink <image1> <image2> [...]')
 
+
 def load (path):
-    h = miriad.ImData (path).open ('rw')
-    data = h.readPlane (axes=[], topIsZero=True)
-    h.close ()
+    data = None
+
+    if os.path.exists (os.path.join (path, 'image')):
+        h = miriad.ImData (path).open ('rw')
+        data = h.readPlane (axes=[], topIsZero=True)
+        h.close ()
+    elif os.path.isfile (path):
+        f = open (path, 'rb')
+        sniff = f.read (9)
+        f.close ()
+
+        if sniff.startswith ('SIMPLE  ='):
+            import pyfits
+            hdulist = pyfits.open (path, mode='readonly')
+            data = hdulist[0].data
+            hdulist.close ()
+
+            while data.shape[0] == 1:
+                data = data[0]
+
+            data = N.flipud (data) # same topIsZero issue as MIRIAD
+            data = N.ma.MaskedArray (data, shrink=False)
+
+    if data is None:
+        util.die ('don\'t know what to do with file "%s"', path)
+
     return data
+
 
 images = [load (p) for p in sys.argv[1:]]
 
-jointmask = images[0].mask
-for im in images[1:]:
-    N.logical_or (jointmask, im.mask, jointmask)
+# If a mask is "nomask", we can't do straightforward or'ing of
+# masks, so this is more complicated than you might expect.
+
+jointmask = N.ma.nomask
+
+for i in xrange (len (images)):
+    if jointmask is N.ma.nomask:
+        if images[i].mask is not N.ma.nomask:
+            jointmask = images[i].mask
+    else:
+        N.logical_or (jointmask, images[i].mask, jointmask)
 
 for im in images:
     im.mask = jointmask
