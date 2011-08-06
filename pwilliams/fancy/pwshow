@@ -1,13 +1,34 @@
 #! /usr/bin/env python
 
-import sys, miriad, ndshow
+import sys, os.path, miriad, ndshow, numpy as N
 from mirtask import util
 
 if len (sys.argv) != 2:
     util.die ('usage: pwshow <image>')
 
-h = miriad.ImData (sys.argv[1]).open ('rw')
-data = h.readPlane (axes=[], topIsZero=True)
-h.close ()
+data = None
+
+if os.path.exists (os.path.join (sys.argv[1], 'image')):
+    h = miriad.ImData (sys.argv[1]).open ('rw')
+    data = h.readPlane (axes=[], topIsZero=True)
+    h.close ()
+elif os.path.isfile (sys.argv[1]):
+    f = open (sys.argv[1], 'rb')
+    sniff = f.read (9)
+    f.close ()
+
+    if sniff.startswith ('SIMPLE  ='):
+        import pyfits
+        hdulist = pyfits.open (sys.argv[1], mode='readonly')
+        data = hdulist[0].data
+        hdulist.close ()
+
+        while data.shape[0] == 1:
+            data = data[0]
+
+        data = N.flipud (data) # same topIsZero issue as MIRIAD
+
+if data is None:
+    util.die ('don\'t know what to do with file "%s"', sys.argv[1])
 
 ndshow.view (data)
