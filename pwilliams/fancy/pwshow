@@ -3,8 +3,12 @@
 import sys, os.path, miriad, ndshow, numpy as N
 from mirtask import util
 
+fft = '-f' in sys.argv
+if fft:
+    sys.argv.remove ('-f')
+
 if len (sys.argv) != 2:
-    util.die ('usage: pwshow <image>')
+    util.die ('usage: pwshow [-f] <image>')
 
 data = None
 
@@ -30,5 +34,8 @@ elif os.path.isfile (sys.argv[1]):
 
 if data is None:
     util.die ('don\'t know what to do with file "%s"', sys.argv[1])
+
+if fft:
+    data = N.abs (N.fft.ifftshift (N.fft.fft2 (N.fft.fftshift (data))))
 
 ndshow.view (data)
