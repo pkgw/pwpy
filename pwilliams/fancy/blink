@@ -54,4 +54,4 @@ for i in xrange (len (images)):
 for im in images:
     im.mask = jointmask
 
-ndshow.cycle (images)
+ndshow.cycle (images, sys.argv[1:])
