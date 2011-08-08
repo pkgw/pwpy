@@ -490,6 +490,7 @@ def view (array):
 class Cycler (Viewer):
     getn = None
     getshapei = None
+    getdesci = None
     settuningi = None
     getsurfacei = None
 
@@ -513,9 +514,11 @@ class Cycler (Viewer):
         vb.pack_start (self.viewport, True, True, 2)
         hb = gtk.HBox ()
         vb.pack_start (hb, False, True, 2)
-        self.cur_label = gtk.Label ()
-        self.cur_label.set_alignment (0, 0.5)
-        hb.pack_start (self.cur_label, True, True, 2)
+        self.plane_label = gtk.Label ()
+        self.plane_label.set_alignment (0, 0.5)
+        hb.pack_start (self.plane_label, True, True, 2)
+        self.desc_label = gtk.Label ()
+        hb.pack_start (self.desc_label, True, True, 2)
         self.cycle_tbutton = gtk.ToggleButton ('Cycle')
         hb.pack_start (self.cycle_tbutton, False, True, 2)
         self.win.add (vb)
@@ -544,6 +547,13 @@ class Cycler (Viewer):
         if not callable (getshapei):
             raise ValueError ('not callable')
         self.getshapei = getshapei
+        return self
+
+
+    def setDescGetter (self, getdesci):
+        if not callable (getdesci):
+            raise ValueError ('not callable')
+        self.getdesci = getdesci
         return self
 
 
@@ -592,8 +602,9 @@ class Cycler (Viewer):
             self.viewport.setTuningSetter (self._set_tuning)
 
         self.i = index
-        self.cur_label.set_markup ('<b>Current plane:</b> %d of %d' %
-                                   (self.i + 1, n))
+        self.plane_label.set_markup ('<b>Current plane:</b> %d of %d' %
+                                     (self.i + 1, n))
+        self.desc_label.set_text (self.getdesci (self.i))
         self.viewport.queue_draw ()
 
 
@@ -636,7 +647,7 @@ class Cycler (Viewer):
         return super (Cycler, self)._on_key_press (widget, event)
 
 
-def cycle (arrays, cadence=0.6):
+def cycle (arrays, descs, cadence=0.6):
     import time, glib
 
     n = len (arrays)
@@ -691,6 +702,9 @@ def cycle (arrays, cadence=0.6):
     def getshapei (i):
         return w, h
 
+    def getdesci (i):
+        return descs[i]
+
     clipped = N.zeros ((h, w), dtype=N.int32) # scratch array
 
     def settuningi (i, tunerx, tunery):
@@ -715,6 +729,7 @@ def cycle (arrays, cadence=0.6):
     cycler = Cycler ()
     cycler.setNGetter (getn)
     cycler.setShapeGetter (getshapei)
+    cycler.setDescGetter (getdesci)
     cycler.setTuningSetter (settuningi)
     cycler.setSurfaceGetter (getsurfacei)
     cycler.win.show_all ()
