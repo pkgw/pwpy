@@ -11,6 +11,8 @@ Added by the toplevel window viewer:
 
 Ctrl-A to autoscale data to fit window
 Ctrl-E to center the data in the window
+Ctrl-F to fullscreen the window
+Escape to un-fullscreen it
 Ctrl-W to close the window
 Ctrl-1 to set scale to unity
 Ctrl-S to save the data to "data.png" under the current rendering options
@@ -389,6 +391,14 @@ class Viewer (object):
 
         if kn == 'e' and isctrl:
             self.viewport.center ()
+            return True
+
+        if kn == 'f' and isctrl:
+            self.win.fullscreen ()
+            return True
+
+        if kn == 'Escape':
+            self.win.unfullscreen ()
             return True
 
         if kn == 'w' and isctrl:
