@@ -404,7 +404,7 @@ class Viewer (object):
             import sys
             print 'Writing data.png ...',
             sys.stdout.flush ()
-            self.viewport.writeDataAsPng ('data.png')
+            self.viewport.writeDataAsPNG ('data.png')
             print 'done'
             return True
 
