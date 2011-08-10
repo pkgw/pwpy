@@ -3,8 +3,12 @@
 import sys, os.path, miriad, ndshow, numpy as N
 from mirtask import util
 
+fft = '-f' in sys.argv
+if fft:
+    sys.argv.remove ('-f')
+
 if len (sys.argv) < 3:
-    util.die ('usage: blink <image1> <image2> [...]')
+    util.die ('usage: blink [-f] <image1> <image2> [...]')
 
 
 def load (path):
@@ -41,6 +45,10 @@ def load (path):
 
     if data is None:
         util.die ('don\'t know what to do with file "%s"', path)
+
+    if fft:
+        data = N.abs (N.fft.ifftshift (N.fft.fft2 (N.fft.fftshift (data.filled (0)))))
+        data = N.ma.MaskedArray (data)
 
     return data
 
