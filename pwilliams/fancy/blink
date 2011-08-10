@@ -14,6 +14,14 @@ def load (path):
         h = miriad.ImData (path).open ('rw')
         data = h.readPlane (axes=[], topIsZero=True)
         h.close ()
+    elif os.path.exists (os.path.join (path, 'table.dat')):
+        import pyrap.tables
+        t = pyrap.tables.table (path, ack=False)
+        data = t.getcol ('map', nrow=1)[0]
+        t.close ()
+        data = N.squeeze (data)
+        data = N.flipud (data) # same topIsZero issue as MIRIAD
+        data = N.ma.MaskedArray (data)
     elif os.path.isfile (path):
         f = open (path, 'rb')
         sniff = f.read (9)
@@ -29,7 +37,7 @@ def load (path):
                 data = data[0]
 
             data = N.flipud (data) # same topIsZero issue as MIRIAD
-            data = N.ma.MaskedArray (data, shrink=False)
+            data = N.ma.MaskedArray (data)
 
     if data is None:
         util.die ('don\'t know what to do with file "%s"', path)

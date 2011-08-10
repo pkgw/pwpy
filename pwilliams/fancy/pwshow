@@ -16,6 +16,13 @@ if os.path.exists (os.path.join (sys.argv[1], 'image')):
     h = miriad.ImData (sys.argv[1]).open ('rw')
     data = h.readPlane (axes=[], topIsZero=True)
     h.close ()
+elif os.path.exists (os.path.join (sys.argv[1], 'table.dat')):
+    import pyrap.tables
+    t = pyrap.tables.table (sys.argv[1], ack=False)
+    data = t.getcol ('map', nrow=1)[0]
+    t.close ()
+    data = N.squeeze (data)
+    data = N.flipud (data) # same topIsZero issue as MIRIAD
 elif os.path.isfile (sys.argv[1]):
     f = open (sys.argv[1], 'rb')
     sniff = f.read (9)
@@ -26,10 +33,7 @@ elif os.path.isfile (sys.argv[1]):
         hdulist = pyfits.open (sys.argv[1], mode='readonly')
         data = hdulist[0].data
         hdulist.close ()
-
-        while data.shape[0] == 1:
-            data = data[0]
-
+        data = N.squeeze (data)
         data = N.flipud (data) # same topIsZero issue as MIRIAD
 
 if data is None:
