@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python
 """
 Quick script for plotting and fitting distributions of PoCo pulses.
@@ -14,7 +15,7 @@ import scipy.optimize as opt
 filename = 'b0329_fixdm_ph/poco_b0329_173027_fitsp.txt'
 filename2 = 'b0329_fixdm_uv/poco_b0329_173027_fitsp.txt'
 filename3 = 'b0329_fixdm_im2/poco_b0329_173027_fitsp.txt'
-mode='index'
+mode='flux'
 
 f = asciidata.AsciiData(filename)
 name = n.array(f.columns[0])
@@ -120,7 +121,7 @@ ntotdiff2.append(0)
 ntotdiff3.append(0)
 ntotdiff = n.array(ntotdiff) ; ntotdiff2 = n.array(ntotdiff2); ntotdiff3 = n.array(ntotdiff3)
 
-good1 = n.where(n.array(newsortar.tolist())[:,1] > 55.)[0]
+good1 = n.where(n.array(newsortar.tolist())[:,1] > 0.)[0]
 good2 = n.where( (ntotdiff2 > 0) & (n.array(newsortar2.tolist())[:,2] > 5.6) )[0]
 good3 = n.where( (n.array(newsortar3.tolist())[:,2] > 7.0) & (n.array(newsortar3.tolist())[:,1] > 0.) & (ntotdiff3 > 0))[0]
 print 'lengths (orig, new): ', len(ntotdiff), len(good1), len(ntotdiff2), len(good2), len(ntotdiff3), len(good3)
@@ -160,11 +161,11 @@ if mode == 'flux':
     p.axis([-170,430,0,500])
     p.show()
 
-    hist = p.hist(meanflux, align='mid', histtype='bar', alpha=0.3, bins=hist[1], label='Beamforming', color='b')
-    hist2 = p.hist(meanflux2, align='mid', histtype='step', linewidth=2.5, bins=hist[1], label='UV fit', color='g')
+    hist = p.hist(meanflux, align='mid', histtype='bar', bins=hist[1], label='Beamforming', color='b')
+    hist2 = p.hist(meanflux2, align='mid', histtype='step', linewidth=2.5, bins=hist[1], label='UV fit', color='y')
     centers2 = n.array([(hist2[1][i+1] + hist2[1][i])/2 for i in range(len(hist2[1])-1)])
     errs2 = 1+(n.sqrt(hist2[0] + 0.75))
-    p.errorbar(centers2,hist2[0],yerr=errs2,fmt=None,ecolor='g', capsize=0)
+    p.errorbar(centers2,hist2[0],yerr=errs2,fmt=None,ecolor='y', capsize=0)
     p12,success = opt.leastsq(errfunc, p0[:], args = (centers2[fitignore:], hist2[0][fitignore:], errs2[fitignore:]))
 
     hist3 = p.hist(meanflux3, align='mid', histtype='step', linewidth=2.5, bins=hist[1], label='Dirty Image', color='r')
