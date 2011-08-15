@@ -1,0 +1,43 @@
+#! /usr/bin/env casa-python
+# -*- python -*-
+
+# Measurement Set W-Projecting Fourier Transform and Subtract ...
+# equivalent of the casa commands 'ft' and, optionally, 'uvsub', using
+# w-projection in the FT stage.
+#
+# Usage: mswpftsub [-s] <MS path> <model path>
+
+import sys, os.path, casac
+
+dosub = '-s' in sys.argv
+if dosub:
+    sys.argv.remove ('-s')
+
+if len (sys.argv) != 3:
+    print >>sys.stderr, 'Usage: mswpftsub [-s] <MS path> <model path>'
+    sys.exit (1)
+
+mspath = sys.argv[1]
+mdlpath = sys.argv[2]
+
+if not os.path.isdir (mspath):
+    print >>sys.stderr, 'mswpftsub: error: "%s" is not a MS directory' % mspath
+    sys.exit (1)
+
+if not os.path.isdir (mdlpath):
+    print >>sys.stderr, 'mswpftsub: error: "%s" is not a model image' % mdlpath
+    sys.exit (1)
+
+im = casac.homefinder.find_home_by_name ('imagerHome').create ()
+im.open (mspath, usescratch=True)
+im.selectvis (usescratch=True)
+im.defineimage ()
+im.setoptions (ftmachine='wproject', wprojplanes=128)
+im.ft (model=[mdlpath])
+im.close ()
+
+if dosub:
+    ms = casac.homefinder.find_home_by_name ('msHome').create ()
+    ms.open (thems=mspath, nomodify=False)
+    ms.uvsub (False)
+    ms.close ()

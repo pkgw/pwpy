@@ -14,6 +14,10 @@ pfx=`eval echo $pfx`
 
 if [ x"$1" = x-v ] ; then
     vee=v
+    echo=echo
+else
+    vee=
+    echo=:
 fi
 
 programs='
@@ -71,6 +75,10 @@ fancy/rtft
 fancy/showgains
 fancy/uvasimg
 fancy/varcat
+ms/msclearimaging
+ms/msconcat
+ms/mssetupimaging
+ms/mswpftsub
 '
 
 modules='
@@ -96,3 +104,13 @@ pylib/pwmodel.py
 set -e
 cp -p$vee $programs $pfx/bin
 cp -p$vee $modules $pfx/lib/python/site-packages
+
+if [ -f casapfx ] ; then
+    $echo "Creating $pfx/bin/casa-python."
+    casa=`cat casapfx`
+    casa=`eval echo $casa`
+    sed -e "s|%casa%|$casa|g" <ms/casa-python.in >$pfx/bin/casa-python
+    chmod 755 $pfx/bin/casa-python
+else
+    cp -p$vee ms/casa-python.fail $pfx/bin/casa-python
+fi

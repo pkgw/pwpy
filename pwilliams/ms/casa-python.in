@@ -1,0 +1,13 @@
+#! /bin/sh
+
+CASAPATH=%casa%
+
+if [ x"$LD_LIBRARY_PATH" = x ] ; then
+   LD_LIBRARY_PATH="$CASAPATH/lib64"
+else
+   LD_LIBRARY_PATH="$CASAPATH/lib64:$LD_LIBRARY_PATH"
+fi
+
+PYTHONPATH=
+export LD_LIBRARY_PATH PYTHONPATH CASAPATH
+exec $CASAPATH/lib64/casapy/bin/python "$@"
