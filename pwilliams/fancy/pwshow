@@ -7,39 +7,47 @@ fft = '-f' in sys.argv
 if fft:
     sys.argv.remove ('-f')
 
-if len (sys.argv) != 2:
+if len (sys.argv) < 2:
     util.die ('usage: pwshow [-f] <image>')
 
-data = None
+anyfailures = False
 
-if os.path.exists (os.path.join (sys.argv[1], 'image')):
-    h = miriad.ImData (sys.argv[1]).open ('rw')
-    data = h.readPlane (axes=[], topIsZero=True)
-    h.close ()
-elif os.path.exists (os.path.join (sys.argv[1], 'table.dat')):
-    import pyrap.tables
-    t = pyrap.tables.table (sys.argv[1], ack=False)
-    data = t.getcol ('map', nrow=1)[0]
-    t.close ()
-    data = N.squeeze (data)
-    data = N.flipud (data) # same topIsZero issue as MIRIAD
-elif os.path.isfile (sys.argv[1]):
-    f = open (sys.argv[1], 'rb')
-    sniff = f.read (9)
-    f.close ()
+for path in sys.argv[1:]:
+    data = None
 
-    if sniff.startswith ('SIMPLE  ='):
-        import pyfits
-        hdulist = pyfits.open (sys.argv[1], mode='readonly')
-        data = hdulist[0].data
-        hdulist.close ()
+    if os.path.exists (os.path.join (path, 'image')):
+        h = miriad.ImData (path).open ('rw')
+        data = h.readPlane (axes=[], topIsZero=True)
+        h.close ()
+    elif os.path.exists (os.path.join (path, 'table.dat')):
+        import pyrap.tables
+        t = pyrap.tables.table (path, ack=False)
+        data = t.getcol ('map', nrow=1)[0]
+        t.close ()
         data = N.squeeze (data)
         data = N.flipud (data) # same topIsZero issue as MIRIAD
+    elif os.path.isfile (path):
+        f = open (path, 'rb')
+        sniff = f.read (9)
+        f.close ()
 
-if data is None:
-    util.die ('don\'t know what to do with file "%s"', sys.argv[1])
+        if sniff.startswith ('SIMPLE  ='):
+            import pyfits
+            hdulist = pyfits.open (path, mode='readonly')
+            data = hdulist[0].data
+            hdulist.close ()
+            data = N.squeeze (data)
+            data = N.flipud (data) # same topIsZero issue as MIRIAD
 
-if fft:
-    data = N.abs (N.fft.ifftshift (N.fft.fft2 (N.fft.fftshift (data))))
+    if data is None:
+        print >>sys.stderr, 'pwshow: don\'t know what to do with path "%s"' % path
+        anyfailures = True
+        continue
 
-ndshow.view (data)
+    if fft:
+        data = N.abs (N.fft.ifftshift (N.fft.fft2 (N.fft.fftshift (data))))
+
+    ndshow.view (data)
+
+if anyfailures:
+    sys.exit (1)
