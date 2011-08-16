@@ -1,0 +1,31 @@
+#! /usr/bin/env python
+# -*- python -*-
+
+# Execute lwimager, presetting the 'nchan' and 'spwid' keywords to
+# select all channels in all spectral windows.
+
+import sys, os.path, pyrap.tables
+
+mspaths = []
+kwargs = []
+
+for arg in sys.argv[1:]:
+    if '=' in arg:
+        kwargs.append (arg)
+    else:
+        mspaths.append (arg)
+
+if len (mspaths) != 1:
+    print >>sys.stderr, 'mfsimager: error: expect exactly one MS argument (arg without "=")'
+    sys.exit (1)
+
+t = pyrap.tables.table (os.path.join (mspaths[0], 'SPECTRAL_WINDOW'), ack=False)
+nchan = t.getcol ('NUM_CHAN')
+t.close ()
+
+kwargs.append ('spwid=' + ','.join (str (x) for x in xrange (nchan.size)))
+kwargs.append ('nchan=' + ','.join (str (x) for x in nchan))
+
+args = ['lwimager', 'ms=' + mspaths[0]] + kwargs
+# print >>sys.stderr, '+', ' '.join (args)
+os.execvp ('lwimager', args)

@@ -75,6 +75,7 @@ fancy/rtft
 fancy/showgains
 fancy/uvasimg
 fancy/varcat
+ms/mfsimager
 ms/msclearimaging
 ms/msconcat
 ms/mssetupimaging
