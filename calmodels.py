@@ -57,7 +57,7 @@ def _makeGenericBaarsSpindex (a, b, c, fmin, fmax):
         if any (freqInMHz < fmin) or any (freqInMHz > fmax):
             raise Exception ('Going beyond frequency limits of model!')
         
-        return b + 2 * c * lf
+        return b + 2 * c * log10 (freqInMHz)
 
     return f
 
