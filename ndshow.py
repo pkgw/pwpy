@@ -458,7 +458,7 @@ def view (array):
     # smallest value we can represent is min - 8 * (max - min) and
     # the largest is 8 * (max - min) + min.
 
-    fixed = (filled - amin) * (0x0FFFFFF0 / (amax - amin)).astype (N.int32)
+    fixed = ((filled - amin) * (0x0FFFFFF0 / (amax - amin))).astype (N.int32)
     clipped = N.zeros ((h, w), dtype=N.int32)
 
     def getshape ():
