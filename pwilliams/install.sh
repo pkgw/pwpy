@@ -78,6 +78,7 @@ fancy/varcat
 ms/mfsimager
 ms/msclearimaging
 ms/msconcat
+ms/mshistory
 ms/msimgadd
 ms/mssetupimaging
 ms/mswpftsub
