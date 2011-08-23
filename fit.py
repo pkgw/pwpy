@@ -202,7 +202,7 @@ class FitBase (object):
 
     def fakeSigmas (self, val):
         """Set the uncertainty of every data point to a fixed value."""
-        self.sigmas = _N.zeros_like (self.x) + val
+        self.sigmas = _N.zeros_like (self.y) + val
         return self
 
     def fakeDataSigmas (self, x, sigmas, *params):
@@ -212,7 +212,7 @@ class FitBase (object):
         self.sigmas = _N.asfarray (sigmas)
         
         mfunc = self.makeModel (*params)
-        self.y = mfunc (self.x) + _N.random.standard_normal (self.x.shape) * self.sigmas
+        self.y = mfunc (self.x) + _N.random.standard_normal (self.y.shape) * self.sigmas
 
         return self
         
@@ -225,7 +225,7 @@ class FitBase (object):
 
         y = mfunc (self.x)
         self.sigmas = y * frac
-        self.y = y + _N.random.standard_normal (self.x.shape) * self.sigmas
+        self.y = y + _N.random.standard_normal (self.y.shape) * self.sigmas
 
         return self
 
