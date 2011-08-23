@@ -41,7 +41,7 @@ for path in sys.argv[1:]:
             data = N.flipud (data) # same topIsZero issue as MIRIAD
 
     if data is None:
-        print >>sys.stderr, 'pwshow: don\'t know what to do with path "%s"' % path
+        print >>sys.stderr, 'pwshow: don’t know what to do with path “%s”' % path
         anyfailures = True
         continue
 
