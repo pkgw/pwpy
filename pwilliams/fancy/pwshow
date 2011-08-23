@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+# -*- mode: python; coding: utf-8 -*-
 
 import sys, os.path, miriad, ndshow, numpy as N
 from mirtask import util
@@ -47,7 +48,7 @@ for path in sys.argv[1:]:
     if fft:
         data = N.abs (N.fft.ifftshift (N.fft.fft2 (N.fft.fftshift (data))))
 
-    ndshow.view (data)
+    ndshow.view (data, title=path + ' — Array Viewer')
 
 if anyfailures:
     sys.exit (1)
