@@ -10,7 +10,7 @@ mspaths = []
 kwargs = []
 
 for arg in sys.argv[1:]:
-    if '=' in arg:
+    if '=' in arg or arg[0] == '-':
         kwargs.append (arg)
     else:
         mspaths.append (arg)
