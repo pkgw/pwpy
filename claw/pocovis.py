@@ -42,6 +42,9 @@ class poco:
         self.sdf = 0.104/self.nchan   # dfreq per channel in GHz
         self.approxuvw = True      # flag to make template visibility file to speed up writing of dm track data
         self.baseline_order = n.array([ 257, 258, 514, 261, 517, 1285, 262, 518, 1286, 1542, 259, 515, 773, 774, 771, 516, 1029, 1030, 772, 1028, 1287, 1543, 775, 1031, 1799, 1544, 776, 1032, 1800, 2056, 260, 263, 264, 519, 520, 1288])   # second iteration of bl nums
+        self.baseline_pairs =[(0, 0), (0, 1), (1, 1), (0, 4), (1, 4), (4, 4), (0, 5), (1, 5), (4, 5), (5, 5), (0, 2), (1, 2), (4, 2), (5, 2), (2, 2), (1, 3), (4, 3), (5, 3), (2, 3), (3, 3), (4, 6), (5, 6), (2, 6), (3, 6), (6, 6), (5, 7), (2, 7), (3, 7), (6, 7), (7, 7), (0, 3), (0, 6), (0, 7), (1, 6), (1, 7), (4, 7)] # python numbering
+# typical poco unflagged baselines (self.data): 1,3,4,6,7,8,10,11,13  (python numbering)
+# corresponding baselines [(1,2),(1,5),(2,5),(1,6),(2,6),(5,6),(1,3),(2,3),(3,6)] (miriad numbering)
         self.pulsewidth = 0.0066 * n.ones(len(self.chans)) # pulse width of b0329+54
 #        self.pulsewidth = 0 * n.ones(len(self.chans)) # pulse width of crab and m31 candidates
         # set dmarr
@@ -965,6 +968,36 @@ class poco:
                 ax = p.imshow(amparr, aspect='auto', origin='lower', interpolation='nearest')
                 p.colorbar()
                 p.show()
+
+
+    def closure(self, dmbin, bgwindow=0):
+        """Calculates the closure phase for each integration, averaging over all channels (for now).
+        """
+
+        triph = lambda d,i,j,k: n.mod(n.angle(d[i]) + n.angle(d[j]) - n.angle(d[k]), 2*n.pi)  # assumes all bl have low ant first (true for poco)
+#        triples = [(0,2,1),(0,4,3),(1,5,3),(2,5,4),(0,7,6),(1,8,6),(2,8,7)]  # antenna triples for good poco data: 012, 013, 023, 123, 014, 024, 124 (orig, wrong)
+        triples = [(0,7,6),(0,2,1),(0,4,3),(6,8,3),(1,5,3),(7,8,3),(2,5,4)]  # antenna triples for good poco data: 123, 125, 126, 136, 156, 236, 256 (correct!)
+
+# option 1: average over frequency
+        triarr = n.zeros((len(triples), len(self.data)))
+# option 2: no freq avg
+#        triarr = n.zeros((len(self.data)-2*bgwindow-1, len(triples), len(self.data[0,0])))
+
+        print 'Building array of triple phases'
+
+        for int in range(len(self.data)):
+            diff = self.tracksub(dmbin, int, bgwindow=bgwindow)
+            if len(n.shape(diff)) == 1:    # no track
+                continue
+            diffmean = diff[0].mean(axis=1)    # option 1
+            for tr in range(len(triples)):
+                (i,j,k) = triples[tr]
+                triarr[tr,int] = triph(diffmean, i, j, k)   # option 1
+#                triarr[int,tr] = triph(diff[0], i, j, k)    # option 2
+
+            print 'Completed loop %d' % (int)
+
+        return triarr
 
 
     def dmlc(self, dmbin, tbin):
