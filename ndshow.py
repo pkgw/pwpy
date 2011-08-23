@@ -427,7 +427,7 @@ class Viewer (object):
         return False
 
 
-def view (array):
+def view (array, title='Array Viewer'):
     h, w = array.shape
     amin, amax = array.min (), array.max ()
     if not N.isfinite (amin):
@@ -488,7 +488,7 @@ def view (array):
     def getsurface (xoffset, yoffset, width, height):
         return imagesurface, xoffset, yoffset
 
-    viewer = Viewer ()
+    viewer = Viewer (title=title)
     viewer.setShapeGetter (getshape)
     viewer.setTuningSetter (settuning)
     viewer.setSurfaceGetter (getsurface)
