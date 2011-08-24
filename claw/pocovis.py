@@ -970,7 +970,7 @@ class poco:
                 p.show()
 
 
-    def closure(self, dmbin, bgwindow=0):
+    def closure(self, dmbin, bgwindow=0, show=0):
         """Calculates the closure phase for each integration, averaging over all channels (for now).
         """
 
@@ -995,9 +995,23 @@ class poco:
                 triarr[tr,int] = triph(diffmean, i, j, k)   # option 1
 #                triarr[int,tr] = triph(diff[0], i, j, k)    # option 2
 
-            print 'Completed loop %d' % (int)
+#            print 'Completed loop %d' % (int)
 
-        return triarr
+        tristd = triarr.std(axis=0)
+        tristd2 = n.mod(triarr + n.pi, 2*n.pi).std(axis=0)
+        peaks = n.where( (tristd > 0.01) & (tristd < 0.4) )[0]
+        peaks2 = n.where( (tristd2 > 0.01) & (tristd2 < 0.4) )[0]
+
+        if show:
+            p.plot(tristd, 'b.')
+            p.plot(tristd2, 'g.')
+            p.plot(tristd[peaks],'b*')
+            p.plot(tristd2[peaks2],'g*')
+            p.show()
+
+        peakstot = n.concatenate( (peaks, peaks2) )
+        peaksstdtot = n.concatenate( (tristd[peaks], tristd2[peaks2]) )
+        return peakstot,peaksstdtot
 
 
     def dmlc(self, dmbin, tbin):
@@ -1265,6 +1279,66 @@ def pulse_search_phasecenter(fileroot, pathin, pathout, nints=10000, edge=0):
                 pklout = open(pathout + string.join(file.split('.')[:-1], '.') + '.' + str(nskip) + '.pkl', 'wb')
                 pickle.dump((file, nskip, nints, peaks[0], pv.dmarr[peaks[0][0]], peaks[1], peakssig), pklout)
                 pklout.close()
+
+        fileout.close
+
+
+def pulse_search_closure(fileroot, pathin, pathout, nints=10000, edge=0):
+    """Blind search for pulses via closure phase.
+    """
+
+    maxints = 131000
+
+    filelist = []
+# for crab 201103
+#    for i in [0,1,4,5,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+#    for i in range(0,8):
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+
+# for crab 190348
+#    for i in [0,1,2,3,4,5,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+#    for i in [1,3,4,5,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+#    for i in [0,1,2,3]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
+
+# for b0329 173027
+#    for i in [0,1,2,3,4,5,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+#    for i in [0,1,2,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+#    for i in [0,1,2,3]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_2' + str(i) + '.mir')
+
+# for m31 154202
+#    for i in [0,1,2,3,4,5,6,7,8,9]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_0' + str(i) + '.mir')
+#    for i in [0,1,2,3,4,5,6]:
+#        filelist.append(string.join(fileroot.split('.')[:-1]) + '_1' + str(i) + '.mir')
+
+# hack to search single file for pulses
+    filelist = [fileroot]
+
+    # loop over miriad data and time chunks
+    for file in filelist:
+        fileout = open(pathout + string.join(file.split('.')[:-1], '.') + '.txt', 'a')
+
+        for nskip in range(0, maxints-(nints-edge), nints-edge):
+#        for nskip in range(0, 2000, 2000):
+            print
+            print 'Starting file %s with nskip %d' % (file, nskip)
+
+            # load data
+            pv = poco(pathin + file, nints=nints, nskip=nskip)
+            pv.prep()
+
+            # searches for closure phase dips
+            peaks, peaksstd = pv.closure(0)
+            print peaks, peaksstd
+            print >> fileout, file, nskip, nints, peaks, peaksstd
+            print
 
         fileout.close
 
@@ -1650,9 +1724,10 @@ if __name__ == '__main__':
         # if no args, search for pulses
         print 'Searching for pulses...'
         try:
-            cProfile.run('pulse_search_uvfit(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=500, edge=edge)')
+#            cProfile.run('pulse_search_uvfit(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=500, edge=edge)')
 #            pulse_search_image(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge, mode='dirty', sig=7.0)
 #            pulse_search_phasecenter(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)
+            cProfile.run('pulse_search_closure(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)')
 #            pulse_search_reim(fileroot=fileroot, pathin=pathin, pathout=pathout, nints=2000, edge=edge)
         except AttributeError:
             exit(0)
