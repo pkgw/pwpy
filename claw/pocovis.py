@@ -971,47 +971,61 @@ class poco:
 
 
     def closure(self, dmbin, bgwindow=0, show=0):
-        """Calculates the closure phase for each integration, averaging over all channels (for now).
+        """Calculates the closure phase or bispectrum for each integration, averaging over all channels (for now).
+        Detection can be done by averaging closure phases (bad) or finding when all triples have SNR over a threshold.
         """
 
-        triph = lambda d,i,j,k: n.mod(n.angle(d[i]) + n.angle(d[j]) - n.angle(d[k]), 2*n.pi)  # assumes all bl have low ant first (true for poco)
-#        triples = [(0,2,1),(0,4,3),(1,5,3),(2,5,4),(0,7,6),(1,8,6),(2,8,7)]  # antenna triples for good poco data: 012, 013, 023, 123, 014, 024, 124 (orig, wrong)
-        triples = [(0,7,6),(0,2,1),(0,4,3),(6,8,3),(1,5,3),(7,8,3),(2,5,4)]  # antenna triples for good poco data: 123, 125, 126, 136, 156, 236, 256 (correct!)
+        triph = lambda d,i,j,k: n.mod(n.angle(d[i]) + n.angle(d[j]) - n.angle(d[k]), 2*n.pi)  # triple phase
+        bisp = lambda d,i,j,k: d[i] * d[j] * n.conj(d[k])     # bispectrum w/o normalization
+        triples = [(0,7,6),(0,2,1),(0,4,3),(6,8,3),(1,5,3),(7,8,4),(2,5,4)]  # antenna triples for good poco data: 123, 125, 126, 136, 156, 236, 256 (correct! miriad numbering)
 
-# option 1: average over frequency
-        triarr = n.zeros((len(triples), len(self.data)))
-# option 2: no freq avg
+# option 1: triple phase average over frequency
+#        triarr = n.zeros((len(triples), len(self.data)))
+# option 2: triple phase no freq avg
 #        triarr = n.zeros((len(self.data)-2*bgwindow-1, len(triples), len(self.data[0,0])))
+# option 3: bispectrum
+        bisparr = n.zeros((len(triples), len(self.data)), dtype=n.dtype('complex'))
 
-        print 'Building array of triple phases'
-
+        print 'Building closure quantity array...'
         for int in range(len(self.data)):
             diff = self.tracksub(dmbin, int, bgwindow=bgwindow)
             if len(n.shape(diff)) == 1:    # no track
                 continue
-            diffmean = diff[0].mean(axis=1)    # option 1
+            diffmean = diff[0].mean(axis=1)    # option 1, 3
             for tr in range(len(triples)):
                 (i,j,k) = triples[tr]
-                triarr[tr,int] = triph(diffmean, i, j, k)   # option 1
-#                triarr[int,tr] = triph(diff[0], i, j, k)    # option 2
+                bisparr[tr,int] = complex(bisp(diffmean, i, j, k))    # option 3
 
-#            print 'Completed loop %d' % (int)
+        bispstd = n.array( [n.sqrt((n.abs(bisparr[i]**2).mean())) for i in range(len(triples))] )
+        print 'First pass, bispstd: ', bispstd  
+        threesig = n.array( [n.where( bisparr[i] < 3*bisparr[i].std() )[0] for i in range(len(triples))] )
+        bispstd = n.array( [n.sqrt((n.abs(bisparr[i,threesig[i]]**2).mean())) for i in range(len(triples))] )
+        print 'Second pass, bispstd: ', bispstd  
 
-        tristd = triarr.std(axis=0)
-        tristd2 = n.mod(triarr + n.pi, 2*n.pi).std(axis=0)
-        peaks = n.where( (tristd > 0.01) & (tristd < 0.4) )[0]
-        peaks2 = n.where( (tristd2 > 0.01) & (tristd2 < 0.4) )[0]
+        bispsnr = n.array( [2*bisparr[i].real/bispstd[i] for i in range(len(triples))] )
+
+# option 3
+        peaks = n.where( bispsnr > 5 )   # significant pulse for bispectrum with snr > 5
+        peakswhere = n.array([], dtype='int')
+        peaksint = []
+        for i in n.unique(peaks[1]):
+            npeaks = n.where(peaks[1] == i)[0]
+            if len(npeaks) == len(triples):     # set threshold for all triples 
+                peakswhere = n.concatenate( (peakswhere,npeaks) )
+                peaksint.append(i)
 
         if show:
-            p.plot(tristd, 'b.')
-            p.plot(tristd2, 'g.')
-            p.plot(tristd[peaks],'b*')
-            p.plot(tristd2[peaks2],'g*')
+            p.plot(peaks[1][peakswhere],bispsnr[peaks][peakswhere],'*')
+            for i in range(len(bispsnr)):
+                p.plot(bispsnr[i],'.')
             p.show()
 
-        peakstot = n.concatenate( (peaks, peaks2) )
-        peaksstdtot = n.concatenate( (tristd[peaks], tristd2[peaks2]) )
-        return peakstot,peaksstdtot
+# option 1 and 2
+#        peakstot = n.concatenate( (peaks, peaks2) )
+#        peaksstdtot = n.concatenate( (tristd[peaks], tristd2[peaks2]) )
+#        return peakstot,peaksstdtot
+
+        return (peaks[0][peakswhere], peaks[1][peakswhere]), bispsnr[peaks][peakswhere]
 
 
     def dmlc(self, dmbin, tbin):
@@ -1323,7 +1337,7 @@ def pulse_search_closure(fileroot, pathin, pathout, nints=10000, edge=0):
 
     # loop over miriad data and time chunks
     for file in filelist:
-        fileout = open(pathout + string.join(file.split('.')[:-1], '.') + '.txt', 'a')
+        fileout = open(pathout + string.join(file.split('.')[:-1], '.') + '_nocal.txt', 'a')
 
         for nskip in range(0, maxints-(nints-edge), nints-edge):
 #        for nskip in range(0, 2000, 2000):
@@ -1331,7 +1345,7 @@ def pulse_search_closure(fileroot, pathin, pathout, nints=10000, edge=0):
             print 'Starting file %s with nskip %d' % (file, nskip)
 
             # load data
-            pv = poco(pathin + file, nints=nints, nskip=nskip)
+            pv = poco(pathin + file, nints=nints, nskip=nskip, nocal=True)
             pv.prep()
 
             # searches for closure phase dips
@@ -1713,7 +1727,8 @@ if __name__ == '__main__':
     print 'Greetings, human.'
     print ''
 
-    fileroot = 'poco_b0329_173027_00.mir'
+    fileroot = 'tmp.mir'
+#    fileroot = 'poco_b0329_173027_00.mir'
     pathin = 'data/'
     pathout = 'tst/'
 #    edge = 150 # m31 search up to dm=131 and pulse starting at first unflagged channel

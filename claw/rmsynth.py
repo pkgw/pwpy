@@ -99,6 +99,7 @@ def plot_fd(fd):
     p.xlim(min(stuff), max(stuff))
     p.xlabel('Faraday depth (rad/m2)')
     p.ylabel('Polarized flux (Jy)')
+    p.show()
 
 def calc_spectrum(fd, show=0):
     """Returns the fft of a fd, which is Stokes Q, U spectrum.  Optionally plots.
@@ -404,3 +405,12 @@ def calc_ifft_old(fft, fd=[0], beam=[0]):
         p.show()
 
     return fd2
+
+
+if __name__ == '__main__':
+    print 'Generating Faraday depth distribution...'
+    fd = fd_point_random(num=2)
+    plot_fd(fd)
+    print
+    print 'Transforming to RM spectrum...'
+    sp = calc_spectrum(fd, show=1)
