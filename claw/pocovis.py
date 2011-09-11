@@ -976,8 +976,13 @@ class poco:
         """
 
         triph = lambda d,i,j,k: n.mod(n.angle(d[i]) + n.angle(d[j]) - n.angle(d[k]), 2*n.pi)  # triple phase
-        bisp = lambda d,i,j,k: d[i] * d[j] * n.conj(d[k])     # bispectrum w/o normalization
-        triples = [(0,7,6),(0,2,1),(0,4,3),(6,8,3),(1,5,3),(7,8,4),(2,5,4)]  # antenna triples for good poco data: 123, 125, 126, 136, 156, 236, 256 (correct! miriad numbering)
+
+# use triples
+#        bisp = lambda d,i,j,k: d[i] * d[j] * n.conj(d[k])     # bispectrum w/o normalization
+#        triples = [(0,7,6),(0,2,1),(0,4,3),(6,8,3),(1,5,3),(7,8,4),(2,5,4)]  # antenna triples for good poco data: 123, 125, 126, 136, 156, 236, 256 (correct! miriad numbering)
+# use quads
+        bisp = lambda d,i,j,k,l: d[i] * d[j] * d[k] * n.conj(d[l])     # bispectrum w/o normalization
+        triples = [(0,7,6,3),(0,2,1,3)]  # antenna triples for good poco data: 1236, 1256 (correct! miriad numbering)
 
 # option 1: triple phase average over frequency
 #        triarr = n.zeros((len(triples), len(self.data)))
@@ -993,8 +998,12 @@ class poco:
                 continue
             diffmean = diff[0].mean(axis=1)    # option 1, 3
             for tr in range(len(triples)):
-                (i,j,k) = triples[tr]
-                bisparr[tr,int] = complex(bisp(diffmean, i, j, k))    # option 3
+# use triples
+#                (i,j,k) = triples[tr]
+#                bisparr[tr,int] = complex(bisp(diffmean, i, j, k))    # option 3
+# use quads
+                (i,j,k,l) = triples[tr]
+                bisparr[tr,int] = complex(bisp(diffmean, i, j, k, l))    # option 3
 
         bispstd = n.array( [n.sqrt((n.abs(bisparr[i]**2).mean())) for i in range(len(triples))] )
         print 'First pass, bispstd: ', bispstd  
@@ -1002,7 +1011,8 @@ class poco:
         bispstd = n.array( [n.sqrt((n.abs(bisparr[i,threesig[i]]**2).mean())) for i in range(len(triples))] )
         print 'Second pass, bispstd: ', bispstd  
 
-        bispsnr = n.array( [2*bisparr[i].real/bispstd[i] for i in range(len(triples))] )
+#        bispsnr = n.array( [2*bisparr[i].real/bispstd[i] for i in range(len(triples))] )
+        bispsnr = n.array( [2*bisparr[i]/bispstd[i] for i in range(len(triples))] )
 
 # option 3
         peaks = n.where( bispsnr > 5 )   # significant pulse for bispectrum with snr > 5
@@ -1015,9 +1025,12 @@ class poco:
                 peaksint.append(i)
 
         if show:
+            p.figure(1)
             p.plot(peaks[1][peakswhere],bispsnr[peaks][peakswhere],'*')
             for i in range(len(bispsnr)):
                 p.plot(bispsnr[i],'.')
+            p.figure(2)
+            p.plot(bispsnr[0].real, bispsnr[0].imag,'.')
             p.show()
 
 # option 1 and 2

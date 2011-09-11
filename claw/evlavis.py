@@ -38,7 +38,7 @@ class poco:
 #        self.sfreq = 1.796  # freq for first channel in GHz
 #        self.sdf = 0.128/self.nchan   # dfreq per channel in GHz
         self.approxuvw = True      # flag to make template visibility file to speed up writing of dm track data
-        self.pulsewidth = 0 * n.ones(len(self.chans)) # pulse width of crab and m31 candidates
+        self.pulsewidth = 0.02 * n.ones(len(self.chans)) # pulse width of crab and m31 candidates
         self.dmarr = [56.8]  # crab
         self.nskip = int(nskip*self.nbl)    # number of iterations to skip (for reading in different parts of buffer)
         nskip = int(self.nskip)
@@ -56,16 +56,16 @@ class poco:
             # Loop to skip some data and read shifted data into original data arrays
             if i == 0:
                 # get few general variables
-                self.nants0 = inp.getVarFirstInt ('nants', 0)
-                self.inttime0 = inp.getVarFirstFloat ('inttime', 10.0)
-                self.nspect0 = inp.getVarFirstInt ('nspect', 0)
-                self.nwide0 = inp.getVarFirstInt ('nwide', 0)
-                self.sdf0 = inp.getVarDouble ('sdf', self.nspect0)
-                self.nschan0 = inp.getVarInt ('nschan', self.nspect0)
-                self.ischan0 = inp.getVarInt ('ischan', self.nspect0)
-                self.sfreq0 = inp.getVarDouble ('sfreq', self.nspect0)
-                self.restfreq0 = inp.getVarDouble ('restfreq', self.nspect0)
-                self.pol0 = inp.getVarInt ('pol')
+                self.nants0 = inp.getScalar ('nants', 0)
+                self.inttime0 = inp.getScalar ('inttime', 10.0)
+                self.nspect0 = inp.getScalar ('nspect', 0)
+                self.nwide0 = inp.getScalar ('nwide', 0)
+                self.sdf0 = inp.getScalar ('sdf', self.nspect0)
+                self.nschan0 = inp.getScalar ('nschan', self.nspect0)
+                self.ischan0 = inp.getScalar ('ischan', self.nspect0)
+                self.sfreq0 = inp.getScalar ('sfreq', self.nspect0)
+                self.restfreq0 = inp.getScalar ('restfreq', self.nspect0)
+                self.pol0 = inp.getScalar ('pol')
 
                 self.sfreq = self.sfreq0
                 self.sdf = self.sdf0
@@ -889,6 +889,82 @@ class poco:
             ax = p.imshow(amparr, aspect='auto', origin='lower', interpolation='nearest')
             p.colorbar()
             p.show()
+
+
+    def closure(self, dmbin, bgwindow=0, show=0):
+        """Calculates the closure phase or bispectrum for each integration, averaging over all channels (for now).
+        Detection can be done by averaging closure phases (bad) or finding when all triples have SNR over a threshold.
+        """
+
+        triph = lambda d,i,j,k: n.mod(n.angle(d[i]) + n.angle(d[j]) - n.angle(d[k]), 2*n.pi)  # triple phase
+
+# use triples
+# evla ants: 5 12 13 22 23 24 28
+#0 0-1  1 0-2  2 1-2  3 0-3  4 1-3  5 2-3  6 0-4  7 1-4  8 2-4  9 3-4  10 0-5  11 1-5  12 2-5  13 3-5  14 4-5  15 0-6  16 1-6  17 2-6  18 3-6  19 4-6  20 5-6
+# **triples not closing**  3 and 5 seem ok?
+        bisp = lambda d,i,j,k: d[i] * d[j] * n.conj(d[k])     # bispectrum w/o normalization
+        triples = [(0,2,1),(0,4,3),(0,7,6),(0,11,10),(0,16,15),(1,5,3),(1,8,6),(1,12,10),(1,17,15),(3,9,6),(3,13,10),(0,18,15),(6,14,10),(6,19,15),(10,20,15)]  # evla triples 7ants, 15 triples (012, 013, 014, 015, 016, 023, 024, 025, 026, 034, 035, 036, 045, 046, 056)
+
+# use quads
+#        bisp = lambda d,i,j,k,l: d[i] * d[j] * d[k] * n.conj(d[l])     # bispectrum w/o normalization
+#        triples = [()]  # quads
+
+# option 1: triple phase average over frequency
+#        triarr = n.zeros((len(triples), len(self.data)))
+# option 2: triple phase no freq avg
+#        triarr = n.zeros((len(self.data)-2*bgwindow-1, len(triples), len(self.data[0,0])))
+# option 3: bispectrum
+        bisparr = n.zeros((len(triples), len(self.data)), dtype=n.dtype('complex'))
+
+        print 'Building closure quantity array...'
+        for int in range(len(self.data)):
+            diff = self.tracksub(dmbin, int, bgwindow=bgwindow)
+            if len(n.shape(diff)) == 1:    # no track
+                continue
+            diffmean = diff[0].mean(axis=1)    # option 1, 3
+            for tr in range(len(triples)):
+# use triples
+                (i,j,k) = triples[tr]
+                bisparr[tr,int] = complex(bisp(diffmean, i, j, k))    # option 3
+# use quads
+#                (i,j,k,l) = triples[tr]
+#                bisparr[tr,int] = complex(bisp(diffmean, i, j, k, l))    # option 3
+
+        bispstd = n.array( [n.sqrt((n.abs(bisparr[i]**2).mean())) for i in range(len(triples))] )
+        print 'First pass, bispstd: ', bispstd  
+        threesig = n.array( [n.where( bisparr[i] < 3*bisparr[i].std() )[0] for i in range(len(triples))] )
+        bispstd = n.array( [n.sqrt((n.abs(bisparr[i,threesig[i]]**2).mean())) for i in range(len(triples))] )
+        print 'Second pass, bispstd: ', bispstd  
+
+#        bispsnr = n.array( [2*bisparr[i].real/bispstd[i] for i in range(len(triples))] )
+        bispsnr = n.array( [2*bisparr[i]/bispstd[i] for i in range(len(triples))] )
+
+# option 3
+        peaks = n.where( bispsnr > 5 )   # significant pulse for bispectrum with snr > 5
+        peakswhere = n.array([], dtype='int')
+        peaksint = []
+        for i in n.unique(peaks[1]):
+            npeaks = n.where(peaks[1] == i)[0]
+            if len(npeaks) == len(triples):     # set threshold for all triples 
+                peakswhere = n.concatenate( (peakswhere,npeaks) )
+                peaksint.append(i)
+
+        if show:
+            p.figure(1)
+            p.plot(peaks[1][peakswhere],bispsnr[peaks][peakswhere],'*')
+            for i in range(len(bispsnr)):
+                p.plot(bispsnr[i],'.',label=str(i))
+            p.legend()
+            p.figure(2)
+            p.plot(bispsnr[0].real, bispsnr[0].imag,'.')
+            p.show()
+
+# option 1 and 2
+#        peakstot = n.concatenate( (peaks, peaks2) )
+#        peaksstdtot = n.concatenate( (tristd[peaks], tristd2[peaks2]) )
+#        return peakstot,peaksstdtot
+
+        return (peaks[0][peakswhere], peaks[1][peakswhere]), bispsnr[peaks][peakswhere]
 
 
     def dmlc(self, dmbin, tbin, nints = 50):
