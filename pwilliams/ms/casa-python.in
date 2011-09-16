@@ -2,12 +2,18 @@
 
 CASAPATH=%casa%
 
-if [ x"$LD_LIBRARY_PATH" = x ] ; then
-   LD_LIBRARY_PATH="$CASAPATH/lib64"
+if [ -d $CASAPATH/lib64 ] ; then
+    lib=$CASAPATH/lib64
 else
-   LD_LIBRARY_PATH="$CASAPATH/lib64:$LD_LIBRARY_PATH"
+    lib=$CASAPATH/lib
+fi
+
+if [ x"$LD_LIBRARY_PATH" = x ] ; then
+   LD_LIBRARY_PATH="$lib"
+else
+   LD_LIBRARY_PATH="$lib:$LD_LIBRARY_PATH"
 fi
 
 PYTHONPATH=
 export LD_LIBRARY_PATH PYTHONPATH CASAPATH
-exec $CASAPATH/lib64/casapy/bin/python "$@"
+exec $lib/casapy/bin/python "$@"
