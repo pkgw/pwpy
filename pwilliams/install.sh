@@ -80,6 +80,7 @@ ms/msclearimaging
 ms/msconcat
 ms/mshistory
 ms/msimgadd
+ms/msimsub
 ms/mssetupimaging
 ms/mswpftsub
 '

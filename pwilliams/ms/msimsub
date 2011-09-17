@@ -1,0 +1,79 @@
+#! /usr/bin/env casa-python
+# -*- python -*-
+
+import sys, casac, os.path
+
+ia = casac.homefinder.find_home_by_name ('imageHome').create ()
+
+overwrite = '-f' in sys.argv
+if overwrite:
+    sys.argv.remove ('-f')
+
+if len (sys.argv) != 7:
+    print >>sys.stderr, """Usage: msimsub [-f] <left> <bottom> <right> <top> <imgin> <imgout>
+
+The box to extract is defined by pixel indices in the sky plane. The
+spans are inclusive -- for an image of width 1, <left> and <right>
+should be the same. Pixel (0,0) is the bottom left corner (and, indeed,
+pixel indices are zero-based).
+
+Negative pixel indices have the size of the relevant axis added to them,
+then one subtracted; this gives similar semantics as the corresponding
+Python syntax, although the definition is different due to the inclusiveness
+of the spans.
+
+Use -f to overwrite the output image if it exists.
+"""
+    sys.exit (1)
+
+left, bottom, right, top = [int (x) for x in sys.argv[1:5]]
+inpath = sys.argv[5]
+outpath = sys.argv[6]
+
+if not os.path.isdir (inpath):
+    print >>sys.stderr, 'msimsub: error: no such input "%s"' % inpath
+    sys.exit (1)
+
+if os.path.isdir (outpath) and not overwrite:
+    print >>sys.stderr, 'msimsub: error: output "%s" already exists' % outpath
+    sys.exit (1)
+
+ia.open (inpath)
+shape = ia.shape ()
+nx = shape[0]
+ny = shape[1]
+
+if left < 0:
+    left += nx - 1
+if right < 0:
+    right += nx - 1
+if bottom < 0:
+    bottom += ny - 1
+if top < 0:
+    top += nx - 1
+
+if left > right:
+    print >>sys.stderr, 'msimsub: error: desired output width is negative (x from %d to %d)' \
+        % (left, right)
+    sys.exit (1)
+
+if bottom > top:
+    print >>sys.stderr, 'msimsub: error: desired output height is negative (y from %d to %d)' \
+        % (bottom, top)
+    sys.exit (1)
+
+if right > nx:
+    print >>sys.stderr, 'msimsub: error: right bound extends beyond image edge (%d vs %d)' \
+        % (right, nx)
+    sys.exit (1)
+
+if top > ny:
+    print >>sys.stderr, 'msimsub: error: top bound extends beyond image edge (%d vs %d)' \
+        % (top, ny)
+    sys.exit (1)
+
+tool = ia.collapse ('mean', [len (shape) - 1], outpath, '',
+                    '%d,%d,%d,%d' % (left, bottom, right, top),
+                    '', '', '', overwrite)
+tool.done ()
+ia.done ()
