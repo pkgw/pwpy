@@ -31,15 +31,17 @@ class poco:
         nchan = self.nchan
         li = range(nchan)
         self.chans = n.array(li)
-        self.nbl = 21
+        self.nbl = 16
+#        self.nbl = 21
         nbl = self.nbl
         initsize = nints*self.nbl   # number of integrations to read in a single chunk
 #        self.sfreq = 1.284  # freq for first channel in GHz
 #        self.sfreq = 1.796  # freq for first channel in GHz
 #        self.sdf = 0.128/self.nchan   # dfreq per channel in GHz
         self.approxuvw = True      # flag to make template visibility file to speed up writing of dm track data
-        self.pulsewidth = 0.02 * n.ones(len(self.chans)) # pulse width of crab and m31 candidates
-        self.dmarr = [56.8]  # crab
+        self.pulsewidth = 0.0 * n.ones(len(self.chans)) # pulse width of crab and m31 candidates
+#        self.dmarr = [56.8]  # crab
+        self.dmarr = n.arange(40,70,2)
         self.nskip = int(nskip*self.nbl)    # number of iterations to skip (for reading in different parts of buffer)
         nskip = int(self.nskip)
         self.file = file
@@ -102,6 +104,7 @@ class poco:
             print 'Data read!'
             print 'Shape of raw data, flags, time:'
             print self.rawdata.shape, self.flags.shape, self.reltime.shape
+            print 'First time (s from day): ', (time[0]-int(time[0]))*24*3600
             print 
         except ValueError:
             print 'Could not reshape data arrays. Incomplete read?'
@@ -891,23 +894,22 @@ class poco:
             p.show()
 
 
-    def closure(self, dmbin, bgwindow=0, show=0):
+    def closure(self, dmbin, bgwindow=10, show=0):
         """Calculates the closure phase or bispectrum for each integration, averaging over all channels (for now).
         Detection can be done by averaging closure phases (bad) or finding when all triples have SNR over a threshold.
         """
 
         triph = lambda d,i,j,k: n.mod(n.angle(d[i]) + n.angle(d[j]) - n.angle(d[k]), 2*n.pi)  # triple phase
+        bisp = lambda d,i,j,k: d[i] * d[j] * n.conj(d[k])     # bispectrum w/o normalization
 
 # use triples
 # evla ants: 5 12 13 22 23 24 28
 #0 0-1  1 0-2  2 1-2  3 0-3  4 1-3  5 2-3  6 0-4  7 1-4  8 2-4  9 3-4  10 0-5  11 1-5  12 2-5  13 3-5  14 4-5  15 0-6  16 1-6  17 2-6  18 3-6  19 4-6  20 5-6
-# **triples not closing**  3 and 5 seem ok?
-        bisp = lambda d,i,j,k: d[i] * d[j] * n.conj(d[k])     # bispectrum w/o normalization
-        triples = [(0,2,1),(0,4,3),(0,7,6),(0,11,10),(0,16,15),(1,5,3),(1,8,6),(1,12,10),(1,17,15),(3,9,6),(3,13,10),(0,18,15),(6,14,10),(6,19,15),(10,20,15)]  # evla triples 7ants, 15 triples (012, 013, 014, 015, 016, 023, 024, 025, 026, 034, 035, 036, 045, 046, 056)
+#        triples = [(0,2,1),(0,4,3),(0,7,6),(0,11,10),(0,16,15),(1,5,3),(1,8,6),(1,12,10),(1,17,15),(3,9,6),(3,13,10),(0,18,15),(6,14,10),(6,19,15),(10,20,15)]  # evla triples 7ants, 15 triples (012, 013, 014, 015, 016, 023, 024, 025, 026, 034, 035, 036, 045, 046, 056)
 
-# use quads
-#        bisp = lambda d,i,j,k,l: d[i] * d[j] * d[k] * n.conj(d[l])     # bispectrum w/o normalization
-#        triples = [()]  # quads
+# **triples not closing due to missing bls** redid as "clean". new bls:
+#0 0-1  1 0-2  2 0-3  3 2-3  4 0-4  5 1-4  6 3-4  7 0-5  8 1-5  9 4-5  10 0-6  11 1-6  12 2-6  13 3-6  14 4-6  15 5-6
+        triples = [(0,5,4),(0,8,7),(0,11,10),(1,3,2),(1,12,10),(2,6,4),(2,13,10),(4,9,7),(4,14,10),(7,15,10)]  # evla triples after cleaning, 15 triples (014, 015, 016, 023, 026, 034, 036, 045, 046, 056)
 
 # option 1: triple phase average over frequency
 #        triarr = n.zeros((len(triples), len(self.data)))
@@ -917,18 +919,15 @@ class poco:
         bisparr = n.zeros((len(triples), len(self.data)), dtype=n.dtype('complex'))
 
         print 'Building closure quantity array...'
-        for int in range(len(self.data)):
+        for int in range(len(self.data)-bgwindow):
             diff = self.tracksub(dmbin, int, bgwindow=bgwindow)
             if len(n.shape(diff)) == 1:    # no track
                 continue
             diffmean = diff[0].mean(axis=1)    # option 1, 3
             for tr in range(len(triples)):
-# use triples
                 (i,j,k) = triples[tr]
-                bisparr[tr,int] = complex(bisp(diffmean, i, j, k))    # option 3
-# use quads
-#                (i,j,k,l) = triples[tr]
-#                bisparr[tr,int] = complex(bisp(diffmean, i, j, k, l))    # option 3
+#                bisparr[tr,int] = complex(bisp(diffmean, i, j, k))    # option 3
+                bisparr[tr,int] = complex(diffmean[i] * diffmean[j] * n.conj(diffmean[k]))    # option 3
 
         bispstd = n.array( [n.sqrt((n.abs(bisparr[i]**2).mean())) for i in range(len(triples))] )
         print 'First pass, bispstd: ', bispstd  
@@ -938,25 +937,30 @@ class poco:
 
 #        bispsnr = n.array( [2*bisparr[i].real/bispstd[i] for i in range(len(triples))] )
         bispsnr = n.array( [2*bisparr[i]/bispstd[i] for i in range(len(triples))] )
+        bispsnr = bispsnr.mean(axis=0)
 
-# option 3
         peaks = n.where( bispsnr > 5 )   # significant pulse for bispectrum with snr > 5
-        peakswhere = n.array([], dtype='int')
-        peaksint = []
-        for i in n.unique(peaks[1]):
-            npeaks = n.where(peaks[1] == i)[0]
-            if len(npeaks) == len(triples):     # set threshold for all triples 
-                peakswhere = n.concatenate( (peakswhere,npeaks) )
-                peaksint.append(i)
+#        peakswhere = n.array([], dtype='int')
+#        peaksint = []
+#        for i in n.unique(peaks[1]):
+#            npeaks = n.where(peaks[1] == i)[0]
+#            if len(npeaks) == len(triples):     # set threshold for all triples 
+#                peakswhere = n.concatenate( (peakswhere,npeaks) )
+#                peaksint.append(i)
 
         if show:
+#            p.figure(1)
+#            p.plot(peaks[1][peakswhere],bispsnr[peaks][peakswhere],'*')
+#            for i in range(len(bispsnr)):
+#                p.plot(bispsnr[i],'.',label=str(i))
+#            p.legend()
+#            p.figure(2)
+#            p.plot(bispsnr.real[0], bispsnr.imag[0],'.')
+#            p.show()
             p.figure(1)
-            p.plot(peaks[1][peakswhere],bispsnr[peaks][peakswhere],'*')
-            for i in range(len(bispsnr)):
-                p.plot(bispsnr[i],'.',label=str(i))
-            p.legend()
+            p.plot(bispsnr,'.')
             p.figure(2)
-            p.plot(bispsnr[0].real, bispsnr[0].imag,'.')
+            p.plot(bispsnr.real, bispsnr.imag,'.')
             p.show()
 
 # option 1 and 2
@@ -964,7 +968,8 @@ class poco:
 #        peaksstdtot = n.concatenate( (tristd[peaks], tristd2[peaks2]) )
 #        return peakstot,peaksstdtot
 
-        return (peaks[0][peakswhere], peaks[1][peakswhere]), bispsnr[peaks][peakswhere]
+#        return (peaks[0][peakswhere], peaks[1][peakswhere]), bispsnr[peaks][peakswhere]
+        return peaks, bispsnr[peaks]
 
 
     def dmlc(self, dmbin, tbin, nints = 50):

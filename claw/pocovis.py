@@ -48,7 +48,8 @@ class poco:
         self.pulsewidth = 0.0066 * n.ones(len(self.chans)) # pulse width of b0329+54
 #        self.pulsewidth = 0 * n.ones(len(self.chans)) # pulse width of crab and m31 candidates
         # set dmarr
-        self.dmarr = [26.8]  # b0329+54
+#        self.dmarr = [26.8]  # b0329+54
+        self.dmarr = n.arange(5,45,3)
 #        self.dmarr = [56.8]  # crab
 #        self.dmarr = n.arange(50,126,2.7)       # dm trials for m31. spacing set for 50% efficiency for band from 722-796 MHz, 1.2 ms integrations
 #        self.tshift = 0.2     # not implemented yet
