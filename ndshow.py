@@ -30,7 +30,168 @@ Ctrl-C to toggle automatic cycling
 import numpy as N
 import cairo
 import glib, gtk
-import sys # tmp for stdout flush
+
+
+DEFAULT_TILESIZE = 128
+
+class LazyComputer (object):
+    buffer = None
+    tilesize = None
+    valid = None
+
+
+    def setBuffer (self, buffer):
+        self.buffer = buffer
+        return self
+
+
+    def allocBuffer (self, template):
+        if N.ma.is_masked (template):
+            self.buffer = N.ma.empty (template.shape)
+            self.buffer.mask = template.mask
+        else:
+            self.buffer = N.empty (template.shape)
+        return self
+
+
+    def setTileSize (self, tilesize=DEFAULT_TILESIZE):
+        self.tilesize = tilesize
+        h, w = self.buffer.shape
+        nxt = (w + tilesize - 1) // tilesize
+        nyt = (h + tilesize - 1) // tilesize
+        self.valid = N.zeros ((nyt, nxt))
+        return self
+
+
+    def ensureRegionUpdated (self, data, xoffset, yoffset, width, height):
+        ts = self.tilesize
+        buf = self.buffer
+        valid = self.valid
+        func = self._makeFunc (N.ma.is_masked (data))
+
+        tilej = xoffset // ts
+        tilei = yoffset // ts
+        nxt = (xoffset + width + ts - 1) // ts - tilej
+        nyt = (yoffset + height + ts - 1) // ts - tilei
+
+        tyofs = tilei
+        pyofs = tilei * ts
+
+        for i in xrange (nyt):
+            txofs = tilej
+            pxofs = tilej * ts
+
+            for j in xrange (nxt):
+                if not valid[tyofs,txofs]:
+                    func (data[pyofs:pyofs+ts,pxofs:pxofs+ts],
+                          buf[pyofs:pyofs+ts,pxofs:pxofs+ts])
+                    valid[tyofs,txofs] = 1
+
+                pxofs += ts
+                txofs += 1
+            pyofs += ts
+            tyofs += 1
+
+        return self
+
+
+    def ensureAllUpdated (self, data):
+        return self.ensureRegionUpdated (data, 0, 0, data.shape[1], data.shape[0])
+
+
+    def invalidate (self):
+        self.valid.fill (0)
+        return self
+
+
+class Clipper (LazyComputer):
+    dmin = None
+    dmax = None
+
+    def defaultBounds (self, data):
+        dmin, dmax = data.min (), data.max ()
+
+        if not N.isfinite (dmin):
+            dmin = data[N.where (N.isfinite (data))].min ()
+        if not N.isfinite (dmax):
+            dmax = data[N.where (N.isfinite (data))].max ()
+
+        self.dmin = dmin
+        self.dmax = dmax
+        return self
+
+
+    def _makeFunc (self, ismasked):
+        dmin = self.dmin
+        scale = 1. / (self.dmax - dmin)
+
+        if not ismasked:
+            def func (src, dest):
+                N.subtract (src, dmin, dest)
+                N.multiply (dest, scale, dest)
+                N.clip (dest, 0, 1, dest)
+        else:
+            def func (src, dest):
+                N.subtract (src, dmin, dest)
+                N.multiply (dest, scale, dest)
+                N.clip (dest, 0, 1, dest)
+                dest.mask[:] = src.mask
+
+        return func
+
+
+class ColorMapper (LazyComputer):
+    def __init__ (self, mapname):
+        import colormaps
+        self.mapper = colormaps.factory_map[mapname]()
+
+
+    def allocBuffer (self, template):
+        self.buffer = N.empty (template.shape, dtype=N.uint32)
+        self.buffer.fill (0xFF000000)
+        return self
+
+
+    def _makeFunc (self, ismasked):
+        mapper = self.mapper
+        scratch = N.zeros ((self.tilesize, self.tilesize), dtype=N.uint32)
+
+        if not ismasked:
+            def func (src, dest):
+                effscratch = scratch[:dest.shape[0],:dest.shape[1]]
+                mapped = mapper (src)
+                dest.fill (0xFF000000)
+                N.multiply (mapped[:,:,0], 0xFF, effscratch)
+                N.left_shift (effscratch, 16, effscratch)
+                N.bitwise_or (dest, effscratch, dest)
+                N.multiply (mapped[:,:,1], 0xFF, effscratch)
+                N.left_shift (effscratch, 8, effscratch)
+                N.bitwise_or (dest, effscratch, dest)
+                N.multiply (mapped[:,:,2], 0xFF, effscratch)
+                N.bitwise_or (dest, effscratch, dest)
+        else:
+            scratch2 = N.zeros ((self.tilesize, self.tilesize), dtype=N.uint32)
+
+            def func (src, dest):
+                effscratch = scratch[:dest.shape[0],:dest.shape[1]]
+                effscratch2 = scratch2[:dest.shape[0],:dest.shape[1]]
+                mapped = mapper (src)
+
+                dest.fill (0xFF000000)
+                N.multiply (mapped[:,:,0], 0xFF, effscratch)
+                N.left_shift (effscratch, 16, effscratch)
+                N.bitwise_or (dest, effscratch, dest)
+                N.multiply (mapped[:,:,1], 0xFF, effscratch)
+                N.left_shift (effscratch, 8, effscratch)
+                N.bitwise_or (dest, effscratch, dest)
+                N.multiply (mapped[:,:,2], 0xFF, effscratch)
+                N.bitwise_or (dest, effscratch, dest)
+
+                N.invert (src.mask, effscratch2)
+                N.multiply (dest, effscratch2, dest)
+
+        return func
+
 
 DRAG_TYPE_NONE = 0
 DRAG_TYPE_PAN = 1
@@ -434,65 +595,43 @@ class Viewer (object):
         return False
 
 
-def view (array, title='Array Viewer'):
+def view (array, title='Array Viewer', colormap='black_to_blue'):
+    clipper = Clipper ()
+    clipper.allocBuffer (array)
+    clipper.setTileSize ()
+    clipper.defaultBounds (array)
+    processed = clipper.buffer
+
+    mapper = ColorMapper (colormap)
+    mapper.allocBuffer (array)
+    mapper.setTileSize ()
+
     h, w = array.shape
-    amin, amax = array.min (), array.max ()
-    if not N.isfinite (amin):
-        amin = array[N.where (N.isfinite (array))].min ()
-    if not N.isfinite (amax):
-        amax = array[N.where (N.isfinite (array))].max ()
-
-    stride = cairo.ImageSurface.format_stride_for_width (cairo.FORMAT_ARGB32, w)
-    # stride is in bytes:
-    assert stride % 4 == 0
-    imgdata = N.empty ((h, stride // 4), dtype=N.uint32)
-    imagesurface = cairo.ImageSurface.create_for_data (imgdata, cairo.FORMAT_ARGB32,
-                                                       w, h, stride)
-
-    imgdata.fill (0xFF000000)
-
-    if N.ma.is_masked (array):
-        filled = array.filled (amin)
-        antimask = ~array.mask
-    else:
-        filled = array
-        antimask = None
-
-    # Translate to 32-bit signed fixed-point. 0 is data min and
-    # 0x0FFFFFF0 is data max; this gives a dynamic range of ~1.67e7
-    # within the data, 4 bits of dynamic range for fractional values,
-    # and 3 bits of dynamic range for out-of-scale values. The
-    # smallest value we can represent is min - 8 * (max - min) and
-    # the largest is 8 * (max - min) + min.
-
-    fixed = ((filled - amin) * (0x0FFFFFF0 / (amax - amin))).astype (N.int32)
-    clipped = N.zeros ((h, w), dtype=N.int32)
+    imagesurface = cairo.ImageSurface.create_for_data (mapper.buffer,
+                                                       cairo.FORMAT_ARGB32,
+                                                       w, h, w * 4)
 
     def getshape ():
         return w, h
 
+    orig_min = clipper.dmin
+    orig_span = clipper.dmax - orig_min
+
     def settuning (tunerx, tunery):
-        # TODO: could have different clipping behaviors. Regular clipping,
-        # mark with some crazy color, flag (ie alpha -> 0)
-        N.bitwise_and (imgdata, 0xFF000000, imgdata)
-
-        fmin = int (0x0FFFFFF0 * tunerx)
-        fmax = int (0x0FFFFFF0 * tunery)
-
-        if fmin == fmax:
-            # Can't use += because then Python thinks imgdata is a
-            # function-local variable.
-            N.add (imgdata, 255 * (fixed > fmin), imgdata)
-        else:
-            N.clip (fixed, fmin, fmax, clipped)
-            N.subtract (clipped, fmin, clipped)
-            N.multiply (clipped, 255. / (fmax - fmin), clipped)
-            N.add (imgdata, clipped, imgdata)
-
-        if antimask is not None:
-            N.multiply (imgdata, antimask, imgdata)
+        clipper.dmin = orig_span * tunerx + orig_min
+        clipper.dmax = orig_span * tunery + orig_min
+        clipper.invalidate ()
+        mapper.invalidate ()
 
     def getsurface (xoffset, yoffset, width, height):
+        pxofs = max (int (N.floor (-xoffset)), 0)
+        pyofs = max (int (N.floor (-yoffset)), 0)
+        pw = min (int (N.ceil (width)), w - pxofs)
+        ph = min (int (N.ceil (height)), h - pyofs)
+
+        clipper.ensureRegionUpdated (array, pxofs, pyofs, pw, ph)
+        mapper.ensureRegionUpdated (processed, pxofs, pyofs, pw, ph)
+
         return imagesurface, xoffset, yoffset
 
     viewer = Viewer (title=title)
