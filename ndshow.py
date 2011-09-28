@@ -321,13 +321,15 @@ class Viewport (gtk.DrawingArea):
                 return False
 
             self.grab_remove ()
+            dx = self.drag_win_x0 - event.x
+            dy = self.drag_win_y0 - event.y
 
             if self.drag_type == DRAG_TYPE_PAN:
-                self.centerx = self.drag_dc_x0 + (self.drag_win_x0 - event.x) / self.scale
-                self.centery = self.drag_dc_y0 + (self.drag_win_y0 - event.y) / self.scale
+                self.centerx = self.drag_dc_x0 + dx / self.scale
+                self.centery = self.drag_dc_y0 + dy / self.scale
             elif self.drag_type == DRAG_TYPE_TUNER:
-                self.tunerx = self.drag_dc_x0 + (event.x - self.drag_win_x0) / self.tunerscale
-                self.tunery = self.drag_dc_y0 + (event.y - self.drag_win_y0) / self.tunerscale
+                self.tunerx = self.drag_dc_x0 - dx / self.tunerscale
+                self.tunery = self.drag_dc_y0 - dy / self.tunerscale
                 self.needtune = True
             else:
                 return False
