@@ -88,3 +88,36 @@ def repeat(num=100, source=0+0j, show=0):
     print 'bispectrum:', bisig, 'sigma'
 
     return n.array([intsig, dmsig, mdsig, bisig])
+
+def plotfig(s=1, num=27, t=5):
+    """Plots figure showing snr of signal seen by various algorithms.
+    """
+
+    snrbi = lambda s,num: 1/2. * s**3 * n.sqrt((num-1)*(num-2)/2.)
+    snrco = lambda s,num: s * n.sqrt(num*(num-1)/2.)
+    snrin = lambda s,num: s**2/n.sqrt(1+s**2) * n.sqrt(num*(num-1)/2.)
+
+    p.figure(1)
+    p.plot(s, snrbi(s,num), label='Bispectrum')
+    p.plot(s, snrco(s,num), label='Coherent Beamforming')
+    p.plot(s, snrin(s,num), label='Incoherent Beamforming')
+    p.xlabel('SNR per baseline')
+    p.ylabel('SNR')
+    p.legend()
+
+    sig_vla = 0.05 # 1 sigma, EVLA baseline sensitivity in 10 ms, 1 GHz, dual pol
+    sbi = lambda num,thresh: sig_vla * n.power(2*thresh/n.sqrt((num-1)*(num-2)/2.), 1/3.)
+    sco = lambda num,thresh: sig_vla * thresh/n.sqrt(num*(num-1)/2.)
+#    1/s**4 + 1/s**2 - nbl/(thresh)**2 = 0
+    sin = lambda num,thresh: sig_vla * n.sqrt( 2 / (n.sqrt(1 + 2*num*(num-1)/(thresh)**2) - 1) )
+
+    p.figure(2)
+    num = n.arange(3,30)
+    p.plot(num, sbi(num,t), label='Bispectrum')
+    p.plot(num, sco(num,t), label='Coherent Beamforming')
+    p.plot(num, sin(num,t), label='Incoherent Beamforming')
+    p.xlabel('Number of Antennas')
+    p.ylabel('Flux Limit (Jy)')
+    p.legend()
+
+    p.show()
