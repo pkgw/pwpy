@@ -31,7 +31,6 @@ class poco:
         nchan = self.nchan
 #        self.chans = n.arange(6,58)
 #        li = range(4,23) + range(37,49)   # must match flagging range; miriad 1-4, 24-38, 50-64
-#        li = range(2,10) + range(11,23) + range(37,39) + range(40,41) + range(44,49)   # must match flagging range; miriad 1-2, 11, 24-37, 40, 42-44, 50-64
         li = range(3,10) + range(11,23) + range(37,39) + range(40,41) + range(44,49)   # must match flagging range; miriad 1-2, 11, 24-37, 40, 42-44, 50-64
         self.chans = n.array(li)
         self.nbl = 36
@@ -48,8 +47,8 @@ class poco:
         self.pulsewidth = 0.0066 * n.ones(len(self.chans)) # pulse width of b0329+54
 #        self.pulsewidth = 0 * n.ones(len(self.chans)) # pulse width of crab and m31 candidates
         # set dmarr
-#        self.dmarr = [26.8]  # b0329+54
-        self.dmarr = n.arange(5,45,3)
+        self.dmarr = [26.8]  # b0329+54
+#        self.dmarr = n.arange(5,45,3)
 #        self.dmarr = [56.8]  # crab
 #        self.dmarr = n.arange(50,126,2.7)       # dm trials for m31. spacing set for 50% efficiency for band from 722-796 MHz, 1.2 ms integrations
 #        self.tshift = 0.2     # not implemented yet
@@ -527,8 +526,9 @@ class poco:
             for j in range(len(reltime)):
                 dmtrack = self.dmtrack(dm=dmarr[i], t0=reltime[j])
                 if ((dmtrack[1][0] == 0) & (dmtrack[1][len(dmtrack[1])-1] == len(self.chans)-1)):   # use only tracks that span whole band
-#                    dmt0arr[i,j] = n.abs((((self.data).mean(axis=1))[dmtrack[0],dmtrack[1]]).mean())
+#                    dmt0arr[i,j] = n.abs(self.data.mean(axis=1)[dmtrack[0],dmtrack[1]].mean())
                     dmt0arr[i,j] = ((((self.data).mean(axis=1))[dmtrack[0],dmtrack[1]]).mean()).real    # use real part to detect on axis, but keep gaussian dis'n
+
             print 'dedispersed for ', dmarr[i]
 
         self.dmt0arr = dmt0arr
@@ -1000,18 +1000,18 @@ class poco:
                 (i,j,k) = triples[tr]
                 bisparr[tr,int] = complex(bisp(diffmean, i, j, k))    # option 3
 
-        bispstd = n.array( [n.sqrt((n.abs(bisparr[i]**2).mean())) for i in range(len(triples))] )
+        bisparr = bisparr.mean(axis=0)
+        bispstd = bisparr.std()
         print 'First pass, bispstd: ', bispstd  
-        threesig = n.array( [n.where( bisparr[i] < 3*bisparr[i].std() )[0] for i in range(len(triples))] )
-        bispstd = n.array( [n.sqrt((n.abs(bisparr[i,threesig[i]]**2).mean())) for i in range(len(triples))] )
+        threesig = n.where( (bisparr > bisparr.mean() - 3*bispstd) & (bisparr < bisparr.mean() + 3*bispstd) )
+        print 'Cutting shape to', n.shape(threesig[0])
+        bispstd = bisparr[threesig].std()
         print 'Second pass, bispstd: ', bispstd  
 
-        bispsnr = n.array( [2*bisparr[i].real/bispstd[i] for i in range(len(triples))] )
-
-        # normalize SNR by average of all triples?
-
-        bispsnr = bispsnr.mean(axis=0)
+        # normalize by noise and average across all unique triples
+        bispsnr = bisparr.real/bispstd
         peaks = n.where( bispsnr > 5 )   # significant pulse for bispectrum with snr > 5
+
 #        peakswhere = n.array([], dtype='int')
 #        peaksint = []
 #        for i in n.unique(peaks[1]):
