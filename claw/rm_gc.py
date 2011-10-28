@@ -90,14 +90,15 @@ def medianmap(da, tilesize=30):
 
     return damed
 
-def hist(da):
+def hist(da, nbins=70):
     """Makes a single histogram of any 2d array given.
     Returns best-fit Lorentzian parameters.
     """
 
     import scipy.optimize as opt
 
-    hist,edges = n.histogram(da,bins=50)
+    hist,edges = n.histogram(da,bins=nbins)
+    hist = hist/((180/70.) * 25)
     centers = [(edges[i:i+2]).mean() for i in range(len(edges)-1)]
 
     lorentzian = lambda a,b,c,d,x: a + b**2 / (c**2 + (x - d)**2)
@@ -113,5 +114,9 @@ def hist(da):
         print 'Chi^2, Results: ', n.sum(errfunc(p1, centers, hist)), p1
         p0 = p1
 
-    p.plot(centers, hist)
+    p.errorbar(centers, hist, yerr=n.sqrt(hist), fmt=None)
     p.plot(centers, fitfunc(p1, centers), '--')
+    p.xlabel('Delta Theta (deg)')
+    p.ylabel('Number of beams')
+
+    return centers,hist
