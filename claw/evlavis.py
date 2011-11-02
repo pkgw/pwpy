@@ -24,7 +24,7 @@ import scipy.stats.morestats as morestats
 #font= FontProperties(size='x-small');
 
 
-class poco:
+class evla:
     def __init__(self, file, nints=1000, nskip=0, nocal=False, nopass=False):
         # initialize
         self.nchan = 64
@@ -40,8 +40,8 @@ class poco:
 #        self.sdf = 0.128/self.nchan   # dfreq per channel in GHz
         self.approxuvw = True      # flag to make template visibility file to speed up writing of dm track data
         self.pulsewidth = 0.0 * n.ones(len(self.chans)) # pulse width of crab and m31 candidates
-#        self.dmarr = [56.8]  # crab
-        self.dmarr = n.arange(40,70,2)
+        self.dmarr = [56.8]  # crab
+#        self.dmarr = n.arange(40,70,2)
         self.nskip = int(nskip*self.nbl)    # number of iterations to skip (for reading in different parts of buffer)
         nskip = int(self.nskip)
         self.file = file
@@ -83,8 +83,13 @@ class poco:
             else:
                 break     # stop at initsize
 
-            if not (i % (nbl*1000)):
+            if not (i % (nbl*50)):
                 print 'Read integration ', str(i/nbl)
+                if i == nbl*50:
+                    print pr[:nbl,4]
+#                if i > 0:
+#                    if pr[:nbl,4][0] != pr[i-nbl:i,4][0]:
+#                        print "Whoops! dropped one..."
             i = i+1
 
         if i < initsize:
@@ -99,7 +104,6 @@ class poco:
             self.preamble = pr
             time = self.preamble[::nbl,3]
             self.reltime = 24*3600*(time - time[0])      # relative time array in seconds. evla times change...?
-#            self.reltime = 0.012 * n.arange(len(time))    # can also set fixed integration times...
             print
             print 'Data read!'
             print 'Shape of raw data, flags, time:'
@@ -148,8 +152,8 @@ class poco:
         ax = p.imshow(n.rot90(abs), aspect='auto', origin='upper', interpolation='nearest', extent=(0,len(reltime),0,len(chans)), vmin=-4, vmax=4)
         p.colorbar(ax)
         p.yticks(n.arange(0,len(self.chans),4), (self.chans[(n.arange(0,len(self.chans), 4))]))
-        p.xlabel('Relative time (s)')
-        p.ylabel('Channel (flagged data removed)')
+        p.xlabel('Time (integration)')
+        p.ylabel('Channel') # (flagged data removed)')
         if save:
             savename = self.file.split('.')[:-1]
             savename.append(str(self.nskip/self.nbl) + '.spec.png')
@@ -909,14 +913,15 @@ class poco:
 
 # **triples not closing due to missing bls** redid as "clean". new bls:
 #0 0-1  1 0-2  2 0-3  3 2-3  4 0-4  5 1-4  6 3-4  7 0-5  8 1-5  9 4-5  10 0-6  11 1-6  12 2-6  13 3-6  14 4-6  15 5-6
-        triples = [(0,5,4),(0,8,7),(0,11,10),(1,3,2),(1,12,10),(2,6,4),(2,13,10),(4,9,7),(4,14,10),(7,15,10)]  # evla triples after cleaning, 15 triples (014, 015, 016, 023, 026, 034, 036, 045, 046, 056)
+        triples = [(0,5,4),(0,8,7),(0,11,10),(1,3,2),(1,12,10),(2,6,4),(2,13,10),(4,9,7),(4,14,10),(7,15,10)]  # evla triples after cleaning, 15 triples (014, 015, 016, 023, 026, 034, 036, 045, 046, 056) # only unique ones here
 
 # option 1: triple phase average over frequency
 #        triarr = n.zeros((len(triples), len(self.data)))
 # option 2: triple phase no freq avg
 #        triarr = n.zeros((len(self.data)-2*bgwindow-1, len(triples), len(self.data[0,0])))
 # option 3: bispectrum
-        bisparr = n.zeros((len(triples), len(self.data)), dtype=n.dtype('complex'))
+#        bisparr = n.zeros((len(triples), len(self.data)), dtype=n.dtype('complex'))
+        bisparr = n.zeros((len(triples), len(self.data)))
 
         print 'Building closure quantity array...'
         for int in range(len(self.data)-bgwindow):
@@ -927,26 +932,19 @@ class poco:
             for tr in range(len(triples)):
                 (i,j,k) = triples[tr]
 #                bisparr[tr,int] = complex(bisp(diffmean, i, j, k))    # option 3
-                bisparr[tr,int] = complex(diffmean[i] * diffmean[j] * n.conj(diffmean[k]))    # option 3
+                bisparr[tr,int] = n.real(bisp(diffmean, i, j, k))    # option 3
 
-        bispstd = n.array( [n.sqrt((n.abs(bisparr[i]**2).mean())) for i in range(len(triples))] )
-        print 'First pass, bispstd: ', bispstd  
-        threesig = n.array( [n.where( bisparr[i] < 3*bisparr[i].std() )[0] for i in range(len(triples))] )
-        bispstd = n.array( [n.sqrt((n.abs(bisparr[i,threesig[i]]**2).mean())) for i in range(len(triples))] )
-        print 'Second pass, bispstd: ', bispstd  
+        bispstdb = bisparr.std(axis=0)
+        bispmeanb = bisparr.mean(axis=0)
+        bispstdt = bispmeanb.std()
+        print 'First pass, bispstd in time: ', bispstdt
+        threesig = n.where( (bispmeanb > bispmeanb.mean() - 3*bispstdt) & (bispmeanb < bispmeanb.mean() + 3*bispstdt) )
+        bispstdt = bispmeanb[threesig].std()
+        print 'Second pass, bispstd in time: ', bispstdt, ' over', n.shape(threesig[0])
 
-#        bispsnr = n.array( [2*bisparr[i].real/bispstd[i] for i in range(len(triples))] )
-        bispsnr = n.array( [2*bisparr[i]/bispstd[i] for i in range(len(triples))] )
-        bispsnr = bispsnr.mean(axis=0)
-
-        peaks = n.where( bispsnr > 5 )   # significant pulse for bispectrum with snr > 5
-#        peakswhere = n.array([], dtype='int')
-#        peaksint = []
-#        for i in n.unique(peaks[1]):
-#            npeaks = n.where(peaks[1] == i)[0]
-#            if len(npeaks) == len(triples):     # set threshold for all triples 
-#                peakswhere = n.concatenate( (peakswhere,npeaks) )
-#                peaksint.append(i)
+        # normalize by noise and average across all unique triples
+        bispsnr = bispmeanb.real/bispstdt
+        peaks = n.where( (bispsnr > 5) & (bispmeanb > bispstdb) )   # significant pulse for bispectrum with snr > 5 and small variance between triples
 
         if show:
 #            p.figure(1)
@@ -969,8 +967,22 @@ class poco:
 #        return peakstot,peaksstdtot
 
 #        return (peaks[0][peakswhere], peaks[1][peakswhere]), bispsnr[peaks][peakswhere]
-        return peaks, bispsnr[peaks]
+        return peaks, bispmeanb, bispstdb
 
+
+    def specmod(self, dmbin, bgwindow=10):
+
+        smarr = n.zeros(len(self.dataph))
+
+        print 'Building spectral modulation array...'
+        for int in range(len(self.dataph)-bgwindow):
+            diff = self.tracksub(dmbin, int, bgwindow=bgwindow)
+            if len(n.shape(diff)) == 1:    # no track
+                continue
+            bfspec = diff[0].mean(axis=0).real
+            smarr[int] = n.sqrt( ((bfspec**2).mean() - bfspec.mean()**2) / bfspec.mean()**2 )
+
+        return smarr
 
     def dmlc(self, dmbin, tbin, nints = 50):
         """Plots lc for DM bin over range of timebins.

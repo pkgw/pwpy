@@ -93,13 +93,8 @@ def plotfig(s=-1, num=-1, t=5):
     """Plots figure showing snr of signal seen by various algorithms.
     """
 
-    if s == -1:
-        s = n.arange(1,40)/20.
-    elif num == -1:
-        num = n.arange(3,28)
-    else:
-        print 'Need to specify s or num.'
-        exit(0)
+    s = n.arange(1,14)/10.
+    num = 27
 
     # functions for statistic of snr vs. snr per baseline (s) and antenna number (num)
     snrbi = lambda s,num: 1/2. * s**3 * n.sqrt(num*(num-1)*(num-2)/6.)    # cornwell 1987, kulkarni 1989, rogers et al. 1995
@@ -109,10 +104,10 @@ def plotfig(s=-1, num=-1, t=5):
     snrinin = lambda s,num: 1/n.sqrt(2) * s * n.sqrt(num)
 
     p.figure(1)
-    p.plot(s, snrbi(s,num), label='Bispectrum')
-    p.plot(s, snrco(s,num), label='Coherent Beamforming')
-    p.plot(s, snrin(s,num), label='Incoherent Baseline Beamforming')
-    p.plot(s, snrinin(s,num), label='Incoherent Antenna Beamforming')
+    p.plot(s, snrbi(s,num), 'b', label='Bispectrum')
+    p.plot(s, snrco(s,num), 'r--', label='Coherent Beamforming')
+    p.plot(s, snrin(s,num), 'g.', label='Incoherent Baseline Beamforming')
+    p.plot(s, snrinin(s,num), 'y-.', label='Incoherent Antenna Beamforming')
     p.xlabel('SNR per baseline')
     p.ylabel('SNR')
     p.legend(loc=0)
@@ -148,10 +143,10 @@ def plotfig(s=-1, num=-1, t=5):
 #    p.plot(num, sco(num,t), label='Coherent Beamforming')
 #    p.plot(num, sin(num,t), label='Incoherent Beamforming')
     # computational...
-    p.plot(num, sbiarr, label='Bispectrum')
-    p.plot(num, scoarr, label='Coherent Beamforming')
-    p.plot(num, sinarr, label='Incoherent Baseline Beamforming')
-    p.plot(num, sininarr, label='Incoherent Antenna Beamforming')
+    p.plot(num, sbiarr, 'b', label='Bispectrum')
+    p.plot(num, scoarr, 'r--', label='Coherent Beamforming')
+    p.plot(num, sinarr, 'g.', label='Incoherent Baseline Beamforming')
+    p.plot(num, sininarr, 'y-.', label='Incoherent Antenna Beamforming')
     p.xlabel('Number of Antennas')
     p.ylabel('Flux Limit (%d sigma; Jy)' % (t))
     p.legend()
