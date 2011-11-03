@@ -74,11 +74,12 @@ class NoiseCal (object):
         solution = self.solution
         saps = self.saps
         n = len (saps)
+        maxant = util.apAnt (saps[-1]) + 1
 
         msefds = N.empty (n)
         pstds = N.empty (n)
-        antcounts = N.zeros (n)
-        antprods = N.ones (n)
+        antcounts = N.zeros (maxant)
+        antprods = N.ones (maxant)
 
         for i in xrange (n):
             info = raras[i]
@@ -509,6 +510,10 @@ else:
             # Get the factor that will go in front of the RARAs for
             # jyperk computations. Do this for autocorrs too because
             # there's no reason not to.
+
+            if state.instr not in self.byinstr:
+                raise Exception ('need information for instrument ' +
+                                 state.instr)
 
             byap, default = self.byinstr[state.instr]
             cal1 = byap.get (ap1, default)
