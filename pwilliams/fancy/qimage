@@ -240,6 +240,9 @@ All of the supported options are:
 
 
     def run (self):
+        if isinstance (self.invert.stokes, basestring):
+            self.invert.stokes = [self.invert.stokes]
+
         if self.invert.stokes is None or len (self.invert.stokes) == 0:
             stokes = ['ii']
         else:
