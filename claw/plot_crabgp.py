@@ -78,9 +78,23 @@ if mode == 'd':
 
 elif mode == 'f':
     freqs = n.arange(5,100)/10.
-    rate = lambda flux,alpha,freq,fsc,tmin: 1/(24*60.)* 5e10 * ((freq/0.812)**(alpha) * (8/2.)**2 * ( n.sqrt((10*tmin)**2 + (100*(fsc/freq)**4.4)**2) ) * flux)**(-2.5)
+    rate = lambda flux,alpha,freq,fsc,tmin,diam: (206265*3e-1/freq/diam/60/5.0)**2 * 5e10 * ((freq/0.812)**(alpha) * (8/2.)**2 * 10*n.sqrt(tmin**2 + (fsc/freq)**(4.4*2)) * flux)**(-2.5)
 
+    # note big dependence on relative values of spectral index and pulse scattering index.
+    fsc = 4.0
+
+    norm100 = 1/(rate(0.0065, 3.4, 2.0, 4.0, 100., 100.) * 29/24.)
+    norm10 = 1/(rate(0.0065*n.sqrt(100/10.), 3.4, 2.0, 4.0, 10., 100.) * 29/24.)
     # limits and rates of number of pulses from a single gc crab pulsar
 #    p.plot(freqs, 10*rate(0.0065, freqs, 17., 10 ))  # macquart et al. 2010 pulsars in central 50" for 10 hours (single pulse search)
-    p.plot(freqs, 29*rate(0.0065, 3.4, freqs, 3.5, 100), 'g--', label='D09 limit') # deneva pulsars in 5.8' beam at 2 ghz for 29x1 hours
-    p.plot(freqs, 6*12*rate(0.035/n.sqrt(10), 3.4, freqs, 3.5, 10 ), 'b', label='Proposed')  # evla proposal including survey speed 6x better than d09
+    p.plot(freqs, norm10*rate(0.035, 3.4, freqs, fsc, 10., 25.), 'b', label='10 ms @ EVLA')  # evla proposal including survey speed 6x better than d09
+    p.plot(freqs, norm100*rate(0.035/n.sqrt(10), 3.4, freqs, fsc, 100., 25.), 'b--', label='100 ms @ EVLA')  # evla proposal including survey speed 6x better than d09
+    p.plot(freqs, norm10*rate(0.0065*n.sqrt(100/10.), 3.4, freqs, fsc, 10., 100.), 'g', label='10 ms @ D09') # deneva pulsars in 5.8' beam at 2 ghz for 29x1 hours
+    p.plot(freqs, norm100*rate(0.0065, 3.4, freqs, fsc, 100., 100.), 'g--', label='100 ms @ D09') # deneva pulsars in 5.8' beam at 2 ghz for 29x1 hours
+    p.plot(2., 24/29., 'g*')
+#    p.errorbar(2., 24/29., yerr=0.3, capsize=4, uplims=0, lolims=1, fmt='g')
+    p.loglog()
+    p.xlabel('Frequency (GHz)')
+    p.ylabel('GC Crab pulse rate (day$^{-1}$)')
+    p.legend()
+    p.show()
