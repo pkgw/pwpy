@@ -50,7 +50,8 @@ __all__ = 'dualSelfCal task'.split ()
 
 
 def dualSelfCal (vis, out, usemself=False, ttol=DEFAULT_TTOL, outexists=False,
-                 serial=False, select='', banner='PYTHON dualSelfCal', **kwargs):
+                 serial=False, select='', postinterval=None,
+                 banner='PYTHON dualSelfCal', **kwargs):
     vis = ensureiterable (vis)
 
     if len (vis) == 0:
@@ -118,6 +119,9 @@ def dualSelfCal (vis, out, usemself=False, ttol=DEFAULT_TTOL, outexists=False,
 
     for workset in worksets:
         workset.delete ()
+
+    if postinterval is not None:
+        dest.setScalarItem ('interval', N.float32, postinterval / (60. * 24))
 
 
 # AWFF/ARF workflow interface
