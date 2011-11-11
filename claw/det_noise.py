@@ -115,7 +115,7 @@ def plotfig(s=-1, num=-1, t=5):
     # invert equations to get flux limits
     # option 1: analytic inversion
     sig_vla = 0.06 # 1 sigma, EVLA baseline sensitivity in 10 ms, 1 GHz, dual pol
-    sbi = lambda num,thresh: sig_vla * n.power(2*thresh/n.sqrt((num-1)*(num-2)/2.), 1/3.) # cornwell 1987
+    sbi = lambda num,thresh: sig_vla * n.power(2*thresh/n.sqrt(num*(num-1)*(num-2)/6.), 1/3.) # cornwell 1987
     sco = lambda num,thresh: sig_vla * thresh/n.sqrt(num*(num-1)/2.)
 #    1/s**4 + 1/s**2 - nbl/(thresh)**2 = 0
     sin = lambda num,thresh: sig_vla * n.sqrt( 2 / (n.sqrt(1 + 2*num*(num-1)/(thresh)**2) - 1) )
