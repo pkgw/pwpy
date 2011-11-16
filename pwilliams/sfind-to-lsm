@@ -1,0 +1,51 @@
+#! /usr/bin/env python
+
+"""Convert an sfind logfile into an LSM file, suitable for use with
+MeqTrees Tigger (and other packages, I believe)."""
+
+# FIXME: hardcoding frequency
+# FIXME: not clear whether LSM flux is peak or integrated
+# FIXME: assuming unpolarized, spindex = 0
+
+import sys
+
+if len (sys.argv) != 2:
+    print >>sys.stderr, 'Usage: sfind-to-lsm <sfind logfile or ->'
+    sys.exit (1)
+
+if sys.argv[1] == '-':
+    stream = sys.stdin
+else:
+    stream = open (sys.argv[1])
+
+n = 1
+
+for line in stream:
+    if line[0] == '#':
+        continue
+
+    a = line.strip ().split ()
+
+    try:
+        q = a[0].split (':')
+        ra = int (q[0]), int (q[1]), float (q[2])
+        q = a[1].split (':')
+        dec = int (q[0]), int (q[1]), float (q[2])
+        pkmjy = float (a[4])
+        bmaj, bmin, pa = [float (q) for q in a[7:10]]
+    except Exception, e:
+        print >>sys.stderr, 'Error parsing line \"%s\": %s' % (line, e)
+        sys.exit (1)
+
+    ident = 'sf%03d' % n
+
+    # name HH MM SS dd mm ss I Q U V spindex RM ex ey pa freq0 tags...
+    # HH/MM/SS are RA in hours
+    # dd/mm/ss are dec in degrees
+    # I Q U V in Jy, peak or total values???
+    # ex ey pa, appear to be in radians???
+    # freq0 in **Hz**
+    print '%s %02d %02d %5.2f %02d %02d %5.2f %f 0 0 0 0 0 %f %f %f 3090000000' \
+        % (ident, ra[0], ra[1], ra[2], dec[0], dec[1], dec[2],
+           pkmjy*1e-3, bmaj/206265., bmin/206265., pa*3.14159/180.)
+    n += 1
