@@ -58,6 +58,7 @@ fancy/byant
 fancy/calctsys
 fancy/calnoise
 fancy/chanaver
+fancy/checkshadow
 fancy/cloplot
 fancy/closanal
 fancy/dualscal
