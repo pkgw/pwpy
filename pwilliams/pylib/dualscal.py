@@ -30,6 +30,15 @@
  depending on the data flagging and contents of the raw observations.
  Default is 1 second, which should be strict but not overly so.
 
+@ postinterval
+ The SELFCAL tasks use the "interval" keyword to specify both the
+ averaging interval for determining the selfcal solution and the time
+ tolerance that will be used for extrapolating solutions when the
+ gains are applied. The "postinterval" keyword can be used to override
+ this latter value, so that selfcal solutions can be derived on a fast
+ timescale but then extrapolated to more distant times. "postinterval"
+ is measured in minutes and defaults to "interval".
+
 @ options
  Options are specified separated by commas. Minimum-match is used.
 
@@ -183,6 +192,7 @@ def task (args):
                'relax', 'apriori', 'noscale', 'mosaic', 'verbose')
     # Specific to this task:
     ks.keyword ('ttol', 'd', DEFAULT_TTOL * 86400)
+    ks.keyword ('postinterval', 'd', N.nan)
     ks.option ('usemself', 'serial')
 
     kws = ks.process (args)
@@ -195,6 +205,9 @@ def task (args):
         kws.select = ''
 
     kws.ttol /= 86400. # seconds -> days
+
+    if N.isnan (kws.postinterval):
+        kws.postinterval = None
 
     if kws.out == ' ':
         out = None
@@ -233,7 +246,7 @@ def task (args):
     # Ready to do the real work
 
     dualSelfCal (vises, out, kws.usemself, kws.ttol, False, kws.serial,
-                 kws.select, banner, **rest)
+                 kws.select, kws.postinterval, banner, **rest)
     return 0
 
 
