@@ -31,6 +31,7 @@ pg2eps
 polsplit
 pwflag
 pwimage2fits
+pwimage2mir
 sfind-to-lsm
 sfind-to-olay
 show

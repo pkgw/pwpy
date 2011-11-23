@@ -1,0 +1,7 @@
+#! /bin/sh
+in="$1"
+shift
+out="$1"
+shift
+image2fits in="$in" out="$out".fits
+fits op=xyin in="$out".fits out="$out" && rm "$out.fits"
