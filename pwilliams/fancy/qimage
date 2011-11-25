@@ -102,7 +102,8 @@ class QuickImager (object):
         self._addOpt ('force', OptSetter (self, 'force'))
         # RESTOR has a mode option as well, but we set it internally
         # so we don't expose it to the user
-        self._addArg ('mode', ArgSetter (self.invert, 'mode'))
+        self._addArg ('imode', ArgSetter (self.invert, 'mode'))
+        self._addArg ('cmode', ArgSetter (self.clean, 'mode'))
         self._addArg ('ifwhm', ArgSetter (self.invert, 'fwhm'))
         self._addArg ('rfwhm', ArgSetter (self.restore, 'fwhm'))
 
