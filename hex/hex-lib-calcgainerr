@@ -41,7 +41,7 @@ if not vis1.exists:
 
 if len (sys.argv) == 6:
     h = vis1.open ('rw')
-    nfeeds = h.getHeaderInt ('nfeeds', 0)
+    nfeeds = h.getScalarItem ('nfeeds', 0)
     h.close ()
 
     if nfeeds == 1:

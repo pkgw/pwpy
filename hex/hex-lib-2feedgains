@@ -94,8 +94,8 @@ def ensureTwoFeeds (vis):
 
     # Now, rewrite the gains
 
-    handle.writeHeaderInt ('ngains', newngains)
-    handle.writeHeaderInt ('nfeeds', 2)
+    handle.setScalarItem ('ngains', N.int, newngains)
+    handle.setScalarItem ('nfeeds', N.int, 2)
 
     gitem = handle.getItem ('gains', 'w')
     offset = 8
