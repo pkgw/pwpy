@@ -94,17 +94,20 @@ def plotfig(s=-1, num=-1, t=5):
     """
 
     s = n.arange(1,14)/10.
-    num = 27
+    num = 64
 
     # functions for statistic of snr vs. snr per baseline (s) and antenna number (num)
     snrbi = lambda s,num: 1/2. * s**3 * n.sqrt(num*(num-1)*(num-2)/6.)    # cornwell 1987, kulkarni 1989, rogers et al. 1995
     snrbi2 = lambda s,num: 1 / ( 1/(3 * s**3 * n.sqrt(num*(num-1)*(num-2)/6.)) + 1/(s * n.sqrt(num*(num-1)/2.)))  # kulkarni 1989 ** with correlated noise! **
+    snrmega = lambda s,num: 1/2. * s**5 * n.sqrt(num*(num-1)*(num-2)*(num-3)*(num-4)/120.)
     snrco = lambda s,num: s * n.sqrt(num*(num-1)/2.)
     snrin = lambda s,num: 1/2. * s**2/n.sqrt(1+s**2) * n.sqrt(num*(num-1)/2.)  # tms
     snrinin = lambda s,num: 1/n.sqrt(2) * s * n.sqrt(num)
 
     p.figure(1)
+    p.loglog()
     p.plot(s, snrbi(s,num), 'b', label='Bispectrum')
+#    p.plot(s, snrmega(s,num), 'y', label='Mega')
     p.plot(s, snrco(s,num), 'r--', label='Coherent Beamforming')
     p.plot(s, snrin(s,num), 'g.', label='Incoherent Baseline Beamforming')
     p.plot(s, snrinin(s,num), 'y-.', label='Incoherent Antenna Beamforming')
@@ -114,26 +117,29 @@ def plotfig(s=-1, num=-1, t=5):
 
     # invert equations to get flux limits
     # option 1: analytic inversion
-    sig_vla = 0.06 # 1 sigma, EVLA baseline sensitivity in 10 ms, 1 GHz, dual pol
-    sbi = lambda num,thresh: sig_vla * n.power(2*thresh/n.sqrt(num*(num-1)*(num-2)/6.), 1/3.) # cornwell 1987
+    sig_vla = 0.063 # 1 sigma, EVLA baseline sensitivity in 10 ms, 1 GHz, dual pol
+    sbi = lambda num,thresh: sig_vla * n.power(2*thresh/n.sqrt(num*(num-1)*(num-2)/6.), 1/3.) # cornwell 1987 ... s * num**(-1/2)
     sco = lambda num,thresh: sig_vla * thresh/n.sqrt(num*(num-1)/2.)
 #    1/s**4 + 1/s**2 - nbl/(thresh)**2 = 0
     sin = lambda num,thresh: sig_vla * n.sqrt( 2 / (n.sqrt(1 + 2*num*(num-1)/(thresh)**2) - 1) )
 
     # option 2: computational inversion
-    num = n.arange(3,30)
+    num = n.arange(3,65)
     sbiarr = []
+#    smegaarr = []
     scoarr = []
     sinarr = []
     sininarr = []
-    sarr = n.arange(1,1000)/100.
+    sarr = n.arange(1,10000)/1000.
     for nn in num:
         sbiarr.append(sarr[n.where(snrbi(sarr,nn) > t)[0][0]])
+#        smegaarr.append(sarr[n.where(snrmega(sarr,nn) > t)[0][0]])
         scoarr.append(sarr[n.where(snrco(sarr,nn) > t)[0][0]])
         sinarr.append(sarr[n.where(snrin(sarr,nn) > t)[0][0]])
         sininarr.append(sarr[n.where(snrinin(sarr,nn) > t)[0][0]])
 
     sbiarr = sig_vla*n.array(sbiarr)
+#    smegaarr = sig_vla*n.array(smegaarr)
     scoarr = sig_vla*n.array(scoarr)
     sinarr = sig_vla*n.array(sinarr)
     sininarr = sig_vla*n.array(sininarr)
@@ -144,9 +150,15 @@ def plotfig(s=-1, num=-1, t=5):
 #    p.plot(num, sin(num,t), label='Incoherent Beamforming')
     # computational...
     p.plot(num, sbiarr, 'b', label='Bispectrum')
+#    p.plot(num, smegaarr, 'y', label='Mega')
     p.plot(num, scoarr, 'r--', label='Coherent Beamforming')
     p.plot(num, sinarr, 'g.', label='Incoherent Baseline Beamforming')
     p.plot(num, sininarr, 'y-.', label='Incoherent Antenna Beamforming')
+    p.text(5, 0.2, 'PoCo', rotation='vertical', horizontalalignment='center',verticalalignment='center',fontsize=14)
+    p.text(27, 0.2, 'EVLA', rotation='vertical', horizontalalignment='center',verticalalignment='center',fontsize=14)
+    p.text(36, 0.2, 'ASKAP', rotation='vertical', horizontalalignment='center',verticalalignment='center',fontsize=14)
+    p.text(48, 0.2, 'LOFAR', rotation='vertical', horizontalalignment='center',verticalalignment='center',fontsize=14)
+    p.text(64, 0.2, 'MeerKAT', rotation='vertical', horizontalalignment='center',verticalalignment='center',fontsize=14)
     p.xlabel('Number of Antennas')
     p.ylabel('Flux Limit (%d sigma; Jy)' % (t))
     p.legend()
