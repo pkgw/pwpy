@@ -74,7 +74,6 @@ class paper:
                 continue 
 
             if (i-nskip) < initsize:
-                print data
                 da[i-nskip] = data
                 fl[i-nskip] = flags
                 pr[i-nskip] = preamble
@@ -158,6 +157,7 @@ class paper:
             savename = string.join(savename,'.')
             print 'Saving file as ', savename
             p.savefig(savename)
+            p.clf()
         else:
             p.show()
             
@@ -271,7 +271,7 @@ class paper:
             for k in trackon[1]:
                 twidths.append(len(n.array(trackon)[0][list(n.where(n.array(trackon[1]) == k)[0])]))
 
-            bgrange = range(-bgwindow/2 - max(twidths) + tbin, -max(twidths) + tbin) + range(max(twidths) + tbin, max(twidths) + bgwindow/2 + tbin + 1)
+            bgrange = range( max(-bgwindow/2 - max(twidths) + tbin, 0), -max(twidths) + tbin) + range(max(twidths) + tbin, max(twidths) + bgwindow/2 + tbin + 1)
 
 # ** includes negative times!
 #            print 'bgrange = ', bgrange
@@ -937,27 +937,53 @@ class paper:
         return n.array(bltrips)
 
 
-    def bisplc(self, chan=100, dmbin=0, bgwindow=2, a1=1):
+    def bisplc(self, chan=50, dmbin=0, bgwindow=2, a1=0, save=0):
         """Generate lightcurve of all bispectra.
         Use a1 to use subset of triples starting with antenna a1.
         """
 
         bisp = lambda d,i,j,k: n.complex(d[i] * d[j] * n.conj(d[k]))     # bispectrum w/o normalization
+
+        # theoretical relations for std of bispectra (on pulse) and snr of mean bispectrum
+        sigb = lambda s, q: n.sqrt( (q**3)**2 + (n.sqrt(3)*s**2*q**3)**2)
+#        sigb = lambda s, Q: n.sqrt(3) * s**2 * Q**3  # kulkarni 1989, high s
+        snrb = lambda s: 1/2. * n.sqrt(self.nants*(self.nants-1)*(self.nants-2)/6.) * s**3  # rogers et al. 1995
+        Q = 0.014  # ???
+
         triples = self.tripgen(a1=a1)
 
         dibi = n.zeros((len(self.data)-bgwindow, len(triples)), dtype='complex')
-
-        for int in range(len(self.data)-bgwindow):
+        for int in range(bgwindow+1, len(self.data)-(bgwindow+1)):
             diff = self.tracksub(dmbin, int, bgwindow=bgwindow)
             if len(n.shape(diff)) == 1:    # no track
                 continue
-            diffmean = diff[0,:,chan]  # take channel 100
+            diffmean = diff[0,:,chan]
 
             for trip in range(len(triples)):
                 ii, jj, kk = triples[trip]
                 dibi[int, trip] = bisp(diffmean, ii, jj, kk)
 
-        return dibi.mean(axis=1), dibi.std(axis=1)
+        dibimean = dibi.mean(axis=1)
+        dibistd = dibi.std(axis=1)
+
+        if save:
+            p.figure(1)
+            p.subplot(211)
+            p.plot(dibistd, dibimean, 'b.')
+            smax = (2/n.sqrt(self.nants*(self.nants-1)*(self.nants-2))*max(dibimean/dibimean.std()))**(1/3.)
+            p.plot(sigb(smax*(n.arange(1,11)/10.), Q), dibimean.std()*snrb(smax*(n.arange(1,11)/10.)), 'b')
+            p.xlabel('$\sigma_b$')
+            p.ylabel('b')
+            p.subplot(212)
+            p.plot(dibimean/dibimean.std(), 'b.')
+            p.xlabel('Integation')
+            p.ylabel('SNR$_{bisp}$')
+            savename = self.file.split('.')[:-1]
+            savename.append(str(self.nskip/self.nbl) + '.bisplc.png')
+            savename = string.join(savename,'.')
+            p.savefig(savename)
+            p.clf()                           
+        return dibimean, dibistd
 
 
     def closure(self, dmbin, bgwindow=10, show=0):
