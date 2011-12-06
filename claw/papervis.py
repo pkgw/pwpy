@@ -937,12 +937,12 @@ class paper:
         return n.array(bltrips)
 
 
-    def bisplc(self, chan=50, dmbin=0, bgwindow=2, a1=0, save=0):
+    def bisplc(self, dmbin=0, bgwindow=2, a1=0, save=0):
         """Generate lightcurve of all bispectra.
         Use a1 to use subset of triples starting with antenna a1.
         """
 
-        bisp = lambda d,i,j,k: n.complex(d[i] * d[j] * n.conj(d[k]))     # bispectrum w/o normalization
+        bisp = lambda d,i,j,k: (d[:,i] * d[:,j] * n.conj(:,d[k])).mean()     # bispectrum w/o normalization
 
         # theoretical relations for std of bispectra (on pulse) and snr of mean bispectrum
         sigb = lambda s, q: n.sqrt( (q**3)**2 + (n.sqrt(3)*s**2*q**3)**2)
@@ -957,7 +957,7 @@ class paper:
             diff = self.tracksub(dmbin, int, bgwindow=bgwindow)
             if len(n.shape(diff)) == 1:    # no track
                 continue
-            diffmean = diff[0,:,chan]
+            diffmean = diff[0]
 
             for trip in range(len(triples)):
                 ii, jj, kk = triples[trip]
