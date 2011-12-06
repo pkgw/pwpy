@@ -945,9 +945,10 @@ class paper:
         if chan == -1:
             chans = self.chans
         else:
-            chans = chan
+            chans = n.array([chan])
 
-        bisp = lambda d,i,j,k: (d[i] * d[j] * n.conj(d[k])).mean()     # bispectrum w/o normalization
+#        bisp = lambda d,i,j,k: n.complex(d[i] * d[j] * n.conj(d[k]))    # bispectrum w/o normalization
+        bisp = lambda d,i,j,k: (d[:,i] * d[:,j] * n.conj(d[:,k])).mean()     # bispectrum w/o normalization
 
         # theoretical relations for std of bispectra (on pulse) and snr of mean bispectrum
         sigb = lambda s, q: n.sqrt( (q**3)**2 + (n.sqrt(3)*s**2*q**3)**2)
@@ -958,15 +959,15 @@ class paper:
         triples = self.tripgen(a1=a1)
 
         dibi = n.zeros((len(self.data)-bgwindow, len(triples)), dtype='complex')
-        for int in range(bgwindow+1, len(self.data)-(bgwindow+1)):
-            diff = self.tracksub(dmbin, int, bgwindow=bgwindow)
+        for ii in range(bgwindow+1, len(self.data)-(bgwindow+1)):
+            diff = self.tracksub(dmbin, ii, bgwindow=bgwindow)
             if len(n.shape(diff)) == 1:    # no track
                 continue
             diffmean = diff[0, :, chans]
 
             for trip in range(len(triples)):
-                ii, jj, kk = triples[trip]
-                dibi[int, trip] = bisp(diffmean, ii, jj, kk)
+                i, j, k = triples[trip]
+                dibi[ii, trip] = bisp(diffmean, i, j, k)
 
         dibimean = dibi.mean(axis=1)
         dibistd = dibi.std(axis=1)
@@ -1011,15 +1012,15 @@ class paper:
         bisparr = n.zeros((len(triples), len(self.data)))
 
         print 'Building closure quantity array...'
-        for int in range(len(self.data)-bgwindow):
-            diff = self.tracksub(dmbin, int, bgwindow=bgwindow)
+        for ii in range(len(self.data)-bgwindow):
+            diff = self.tracksub(dmbin, ii, bgwindow=bgwindow)
             if len(n.shape(diff)) == 1:    # no track
                 continue
             diffmean = diff[0].mean(axis=1)    # option 1, 3
             for tr in range(len(triples)):
                 (i,j,k) = triples[tr]
-#                bisparr[tr,int] = complex(bisp(diffmean, i, j, k))    # option 3
-                bisparr[tr,int] = n.real(bisp(diffmean, i, j, k))    # option 3
+#                bisparr[tr,ii] = complex(bisp(diffmean, i, j, k))    # option 3
+                bisparr[tr,ii] = n.real(bisp(diffmean, i, j, k))    # option 3
 
         bispstdb = bisparr.std(axis=0)
         bispmeanb = bisparr.mean(axis=0)
@@ -1062,12 +1063,12 @@ class paper:
         smarr = n.zeros(len(self.dataph))
 
         print 'Building spectral modulation array...'
-        for int in range(len(self.dataph)-bgwindow):
-            diff = self.tracksub(dmbin, int, bgwindow=bgwindow)
+        for ii in range(len(self.dataph)-bgwindow):
+            diff = self.tracksub(dmbin, ii, bgwindow=bgwindow)
             if len(n.shape(diff)) == 1:    # no track
                 continue
             bfspec = diff[0].mean(axis=0).real
-            smarr[int] = n.sqrt( ((bfspec**2).mean() - bfspec.mean()**2) / bfspec.mean()**2 )
+            smarr[ii] = n.sqrt( ((bfspec**2).mean() - bfspec.mean()**2) / bfspec.mean()**2 )
 
         return smarr
 
