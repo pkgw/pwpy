@@ -942,7 +942,7 @@ class paper:
         Use a1 to use subset of triples starting with antenna a1.
         """
 
-        bisp = lambda d,i,j,k: (d[:,i] * d[:,j] * n.conj(:,d[k])).mean()     # bispectrum w/o normalization
+        bisp = lambda d,i,j,k: (d[:,i] * d[:,j] * n.conj(d[:,k])).mean()     # bispectrum w/o normalization
 
         # theoretical relations for std of bispectra (on pulse) and snr of mean bispectrum
         sigb = lambda s, q: n.sqrt( (q**3)**2 + (n.sqrt(3)*s**2*q**3)**2)
