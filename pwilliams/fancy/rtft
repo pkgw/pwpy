@@ -1,44 +1,52 @@
 #! /usr/bin/env python
 # -*- mode: python; coding: utf-8 -*-
 
-# Roundtrippable Fourier transform: go from (dirty map, dirty beam) to
-# (gridded visibilities, gridded weights) or vice versa.
-#
-# Usage: either
-#   rtft mp bm gv wt
-# or
-#   rtft gv wt mp bm
-#
-# Where "mp" is the dirty map, "beam" is the dirty beam, "gv" are the
-# gridded visibilities, and "wt" are the gridded visibility weights.
-# In both cases, the first two arguments are inputs and the second
-# two are outputs. The kind of transform is autodetected from whether
-# the first argument contains paths named "re" and "im".
-#
-# All of these are MIRIAD images except "gv", which is a directory
-# containing four MIRIAD images named "re", "im", "am", and "ph",
-# corresponding to the respective components of the complex gridded
-# visibilities. (Only "re" and "im" are strictly necessary, but one is
-# often interested in looking at "am" and "ph".)
-#
-# Due to lack of precise information about which UV cells have nonzero
-# weights, and the need to possibly undo the "double" or "sdb" options
-# to invert, the roundtrip cannot be perfect.
-#
-# On the first point: the FT of the dirty beam is the image of gridded
-# UV weights, many of which should be exactly zero. However, due to
-# roundoff, these pixels are not exactly zero. rtft chooses a cutoff
-# in UV weight amplitude and masks all pixels that have amplitudes
-# below the cutoff. It does this by looking for the first minimum in
-# the histogram of amplitudes; this should correspond to the crossover
-# point between numerical noise around zero weights and
-# lightly-weighted valid pixels. This process, of course, is only a
-# heuristic and cannot reproduce the exact weights used inside INVERT.
-#
-# On the second point: if the beam is not the exact same shape as the
-# map, only a subset of it will be used in the Fourier transform. This
-# limitation could perhaps be worked around.
+"""
+rtft [-c<number>] [input mp/gv] [input bm/wt] [output gv/mp] [output wt/bm]
 
+Roundtrippable Fourier transform: go from (dirty map, dirty beam) to
+(gridded visibilities, gridded weights) or vice versa.
+
+The arguments should be either
+    rtft [-c<number>] mp bm gv wt
+or
+    rtft gv wt mp bm
+
+Where "mp" is the dirty map, "beam" is the dirty beam, "gv" are the
+gridded visibilities, and "wt" are the gridded visibility weights.  In
+both cases, the first two arguments are inputs and the second two are
+outputs. The kind of transform is autodetected from whether the first
+argument contains paths named "re" and "im".
+
+All of these are MIRIAD images except "gv", which is a directory
+containing four MIRIAD images named "re", "im", "am", and "ph",
+corresponding to the respective components of the complex gridded
+visibilities. (Only "re" and "im" are strictly necessary, but one is
+often interested in looking at "am" and "ph".)
+
+Due to lack of precise information about which UV cells have nonzero
+weights, and the need to possibly undo the "double" or "sdb" options
+to invert, the roundtrip cannot be perfect.
+
+On the first point: the FT of the dirty beam is the image of gridded
+UV weights, many of which should be exactly zero. However, due to
+roundoff, these pixels are not exactly zero. rtft chooses a cutoff in
+UV weight amplitude and masks all pixels that have amplitudes below
+the cutoff. It does this by looking for the first minimum in the
+histogram of amplitudes; this should correspond to the crossover point
+between numerical noise around zero weights and lightly-weighted valid
+pixels. This process, of course, is only a heuristic and cannot
+reproduce the exact weights used inside INVERT. The "-c" option scales
+the cutoff by the specified number. For instance,
+
+  rtft -c0.5 mp bm gv wt
+
+uses a cutoff half of that determined by the histogram algorithm.
+
+On the second point: if the beam is not the exact same shape as the
+map, only a subset of it will be used in the Fourier transform. This
+limitation could perhaps be worked around.
+"""
 
 import sys, os.path, miriad, numpy as N
 from mirexec import TaskFFT, TaskMaths, TaskIMom, TaskImSub
@@ -51,7 +59,7 @@ def im (base, *extra):
     return miriad.ImData (os.path.join (base, *extra))
 
 
-def im_to_vis (map, beam, gvbase, wts):
+def im_to_vis (map, beam, gvbase, wts, cutofffactor):
     wgvs = [im (gvbase, x) for x in 'wt.re wt.im wt.am ph'.split ()]
     gvs = [im (gvbase, x) for x in 're im am ph'.split ()]
 
@@ -109,7 +117,7 @@ def im_to_vis (map, beam, gvbase, wts):
     else:
         util.die ('cannot find weight amplitude cutoff')
 
-    cutoff = edges[i]
+    cutoff = edges[i] * cutofffactor
 
     tmp = wts.vim ('tmp.mask')
     TaskMaths (exp='<%s>' % wts, mask='<%s>.gt.%.18e' % (wts, cutoff),
@@ -187,8 +195,15 @@ def vis_to_im (gvbase, wts, map, beam):
 def go (args):
     miriad.basicTrace ()
 
+    cutofffactor = 1
+    for i in range (len (args)):
+        if args[i].startswith ('-c'):
+            cutofffactor = float (args[i][2:])
+            del args[i]
+            break
+
     if len (args) != 4:
-        util.die ('usage: rtft [input mp/gv] [input bm/wt] [output gv/mp] [output wt/bm]')
+        util.wrongusage (__doc__, 'expect 4 non-option arguments')
 
     in1 = miriad.ImData (args[0])
     in2 = miriad.ImData (args[1])
@@ -207,10 +222,11 @@ def go (args):
     if os.path.exists (in1.path ('re')) and os.path.exists (in1.path ('im')):
         vis_to_im (str (in1), in2, out1, out2)
     else:
-        im_to_vis (in1, in2, str (out1), out2)
+        im_to_vis (in1, in2, str (out1), out2, cutofffactor)
 
     return 0
 
 
 if __name__ == '__main__':
+    util.checkusage (__doc__)
     sys.exit (go (sys.argv[1:]))

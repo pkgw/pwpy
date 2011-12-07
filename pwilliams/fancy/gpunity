@@ -15,8 +15,9 @@
 
 import sys, miriad
 from mirtask import keys, readgains
-from mirtask.util import printBannerSvn
+from mirtask.util import printBannerSvn, checkusage, wrongusage, die
 
+checkusage (__doc__)
 SVNID = '$Id$'
 banner = printBannerSvn ('gpunity', 'keep delays but set gains to 1+0j', SVNID)
 
@@ -27,8 +28,7 @@ ks.keyword ('vis', 'f', ' ')
 opts = ks.process ()
 
 if opts.vis == ' ':
-    print >>sys.stderr, 'Error: an input file must be given'
-    sys.exit (1)
+    wrongusage (__doc__, 'an input file must be given')
 
 # Init gains, check that args make sense given the dataset.
 
@@ -38,8 +38,7 @@ gr.prep ()
 ndata = gr.nfeeds + gr.ntau
 
 if gr.ntau != 1:
-    print >>sys.stderr, 'Error: use gpedit if your dataset doesn\'t have delay info.'
-    sys.exit (1)
+    die ('use gpedit if your dataset doesn\'t have delay info')
 
 # Read and edit data. Could no doubt be more efficient.
 

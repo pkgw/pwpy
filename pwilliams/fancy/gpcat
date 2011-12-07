@@ -55,9 +55,10 @@
 import sys, os
 import miriad
 from mirtask import keys, readgains
-from mirtask.util import jdToFull, printBannerSvn
+from mirtask.util import jdToFull, printBannerSvn, checkusage, wrongusage, die
 import numpy as N
 
+checkusage (__doc__)
 SVNID = '$Id$'
 banner = printBannerSvn ('gpcat', 'print antenna gains tables', SVNID)
 
@@ -69,12 +70,10 @@ ks.option ('phase', 'delay')
 opts = ks.process ()
 
 if opts.vis == ' ':
-    print >>sys.stderr, 'Error: an input file must be given'
-    sys.exit (1)
+    wrongusage (__doc__, 'an input file must be given')
 
 if opts.delay and opts.phase:
-    print >>sys.stderr, 'Error: \'delay\' and \'phase\' options are mutually exclusive.'
-    sys.exit (1)
+    wrongusage (__doc__, '"delay" and "phase" options are mutually exclusive')
 
 if opts.rank > 0:
     rankMode = True
@@ -89,12 +88,10 @@ ndata = gr.nfeeds + gr.ntau
 
 fnum = opts.feed - 1
 if fnum < 0 or fnum > 1:
-    print >>sys.stderr, 'Error: illegal feed number %d' % opts.feed
-    sys.exit (1)
+    die ('illegal feed number %d', opts.feed)
 if fnum >= gr.nfeeds:
-    print >>sys.stderr, 'Error: requested data for feed %d but dataset only has %d feed(s)' \
-          % (opts.feed, gr.nfeeds)
-    sys.exit (1)
+    die ('requested data for feed %d but dataset only has %d feed(s)',
+         opts.feed, gr.nfeeds)
 
 print 'Found gain entries for %d antennas.' % (gr.nants)
 

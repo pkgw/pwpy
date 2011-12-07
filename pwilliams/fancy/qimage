@@ -3,10 +3,43 @@
 #
 # Quickly image UV datasets, deconvolving with CLEAN.
 
+'''
+qimage [keyword=|options=|filename|...]
+
+Each argument can be one of:
+
+  keyword=value1[,value2,...] Set a keyword
+  options=opt1[,opt2,...]     Turn on options. Minimum match allowed.
+  +opt1[,opt2,...]            Alternative syntax for the above
+  -opt1[,opt2,...]            Turn off options
+  filename                    Name an input visibility datasets
+                              (Limited to not starting with + or -
+                               and not containing an equals sign.)
+
+Running \'qimage file1 file2 ... fileN\' will execute:
+
+  invert vis=file1,file2,...,fileN map=file1.mp beam=file1.bm
+  clean map=file1.mp beam=file1.bm out=file1.cl
+  restor map=file1.mp beam=file1.bm model=file1.cl out=file1.rm
+  restor map=file1.mp beam=file1.bm model=file1.cl out=file1.rr mode=resid
+
+qimage pays attention to the modification times of its input and output
+files and by default will SKIP a step if all of the step\'s outputs are
+newer than its inputs. This can be overridden with the \'force\' option.
+
+Any keyword or option given to qimage will be sent to the appropriate
+task; one of INVERT, CLEAN, or RESTOR. qimage supports a few custom
+keywords and options:
+
+  outbase=BASE - Instead of creating file1.mp, etc, create BASE.mp, etc.
+  +force       - Run all imaging steps, ignoring modification times.
+'''
+
 import sys
 import miriad
 from miriad import VisData
 from mirexec import TaskInvert, TaskClean, TaskRestore, TaskFailError
+from mirtask.util import die, checkusage, wrongusage
 
 def _trace (cmd):
     print '+ %s' % (' '.join (cmd))
@@ -68,16 +101,14 @@ class QuickImager (object):
 
     def _addArg (self, arg, setter):
         if arg in self.argTable:
-            print >>sys.stderr, 'Internal Bug: duplicated keyword', arg
-            sys.exit (1)
+            die ('internal bug: duplicated keyword %s', arg)
 
         self.argTable[arg] = setter
         
 
     def _addOpt (self, opt, setter):
         if opt in self.optTable:
-            print >>sys.stderr, 'Internal Bug: duplicated option', opt
-            sys.exit (1)
+            die ('internal bug: duplicated option %s', opt)
 
         self.optTable[opt] = setter
 
@@ -146,56 +177,21 @@ class QuickImager (object):
             if opt.startswith (minname) and fullname.startswith (opt):
                 return fullname
 
-        print >>sys.stderr, 'Error: unknown option \'%s\'' % opt
-        sys.exit (1)
+        wrongusage (__doc__, 'unknown option "%s"', opt)
 
 
-    def usage (self, f):
-        print >>f, '''qimage - quick simple imaging of UV data
-
-Usage: %s [arguments]
-
-Each argument can be one of:
-
-  keyword=value1[,value2,...] Set a keyword
-  options=opt1[,opt2,...]     Turn on options. Minimum match allowed.
-  +opt1[,opt2,...]            Alternative syntax for the above
-  -opt1[,opt2,...]            Turn off options
-  filename                    Name an input visibility datasets
-                              (Limited to not starting with + or -
-                               and not containing an equals sign.)
-
-Running \'qimage file1 file2 ... fileN\' will execute:
-
-  invert vis=file1,file2,...,fileN map=file1.mp beam=file1.bm
-  clean map=file1.mp beam=file1.bm out=file1.cl
-  restor map=file1.mp beam=file1.bm model=file1.cl out=file1.rm
-  restor map=file1.mp beam=file1.bm model=file1.cl out=file1.rr mode=resid
-
-qimage pays attention to the modification times of its input and output
-files and by default will SKIP a step if all of the step\'s outputs are
-newer than its inputs. This can be overridden with the \'force\' option.
-
-Any keyword or option given to qimage will be sent to the appropriate
-task; one of INVERT, CLEAN, or RESTOR. qimage supports a few custom
-keywords and options:
-
-  outbase=BASE - Instead of creating file1.mp, etc, create BASE.mp, etc.
-  +force       - Run all imaging steps, ignoring modification times.
-
-All of the supported keywords are:
-''' % sys.argv[0]
+    def extrausage (self):
+        s = '\nAll of the supported keywords are:\n'
 
         for arg in sorted (self.argTable.iterkeys ()):
-            print >>f, '  ', self.argTable[arg].format (arg)
+            s += '  ' + self.argTable[arg].format (arg) + '\n'
 
-        print >>f, '''
-
-All of the supported options are:
-'''
+        s += '\nAll of the supported options are:\n'
 
         for opt in sorted (self.optTable.iterkeys ()):
-            print >>f, '  ', self.optTable[opt].format (opt)
+            s += '  ' + self.optTable[opt].format (opt) + '\n'
+
+        return s
 
 
     def parseArgs (self, args):
@@ -217,8 +213,7 @@ All of the supported options are:
                 vals = vals.split (',')
 
                 if kw not in self.argTable:
-                    print >>sys.stderr, 'Error: unknown keyword \'%s\'' % kw
-                    sys.exit (1)
+                    wrongusage (__doc__, 'unknown keyword "%s"', kw)
 
                 if len (vals) == 1:
                     vals = vals[0]
@@ -228,16 +223,14 @@ All of the supported options are:
                 self.argTable['vis'] ([arg])
 
         if len (self.vis) == 0:
-            print >>sys.stderr, 'Error: no input UV files specified!'
-            sys.exit (1)
+            wrongusage (__doc__, 'no input UV files specified')
 
         if self.outbase is None:
             self.outbase = self.vis[0]
 
         for v in self.vis:
             if not VisData (v).exists:
-                print >>sys.stderr, 'Error: input', v, 'does not exist!'
-                sys.exit (1)
+                die ('input %s does not exist', v)
 
 
     def run (self):
@@ -308,11 +301,8 @@ All of the supported options are:
 
 q = QuickImager ()
 q.initTables ()
-
-if len (sys.argv) == 1:
-    q.usage (sys.stdout)
-    sys.exit (0)
-
+__doc__ += q.extrausage ()
+checkusage (__doc__, usageifnoargs=True)
 q.parseArgs (sys.argv[1:])
 
 try:
