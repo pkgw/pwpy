@@ -948,13 +948,12 @@ class paper:
             chans = n.array([chan])
 
 #        bisp = lambda d,i,j,k: n.complex(d[i] * d[j] * n.conj(d[k]))    # bispectrum w/o normalization
-        bisp = lambda d,i,j,k: (d[:,i] * d[:,j] * n.conj(d[:,k])).mean()     # bispectrum w/o normalization
+        bisp = lambda d,i,j,k: d[:,i] * d[:,j] * n.conj(d[:,k])     # bispectrum w/o normalization
 
         # theoretical relations for std of bispectra (on pulse) and snr of mean bispectrum
         sigb = lambda s, q: n.sqrt( (q**3)**2 + (n.sqrt(3)*s**2*q**3)**2)
 #        sigb = lambda s, Q: n.sqrt(3) * s**2 * Q**3  # kulkarni 1989, high s
         snrb = lambda s: 1/2. * n.sqrt(self.nants*(self.nants-1)*(self.nants-2)/6.) * s**3  # rogers et al. 1995
-        Q = 0.014  # ???
 
         triples = self.tripgen(a1=a1)
 
@@ -967,26 +966,42 @@ class paper:
 
             for trip in range(len(triples)):
                 i, j, k = triples[trip]
-                dibi[ii, trip] = bisp(diffmean, i, j, k)
+                dibi[ii, trip] = bisp(diffmean, i, j, k).mean()
 
+        # mean and std are primary products of each trial
         dibimean = dibi.mean(axis=1)
         dibistd = dibi.std(axis=1)
 
         if save:
+            # sigma clip to calculate noise per baseline
+            dibimeanstd = dibimean.real.std()
+            good = n.where( (dibimean < 3*dibimeanstd) & (dibimean > -3*dibimeanstd) )  # find 1sigma region
+            print len(good[0])
+            dibimeanstd = dibimean[good].real.std()
+            good = n.where( (dibimean < 3*dibimeanstd) & (dibimean > -3*dibimeanstd) )  # repeat 1sigma cut
+            print len(good[0])
+            dibimeanstd = dibimean[good].real.std()
+            good = n.where( (dibimean < 3*dibimeanstd) & (dibimean > -3*dibimeanstd) )  # repeat 1sigma cut
+            print len(good[0])
+            dibimeanstd = dibimean[good].real.std()
+            Q = (dibistd[good][bgwindow+1:len(self.data)-(bgwindow+1)]**(1/3.)).mean()
+            print 'Q =', Q
+
+            # plot snrb lc and expected snr vs. sigb relation
             p.figure(1)
             p.subplot(211)
-            p.plot(dibistd, dibimean, 'b.')
-            smax = (2/n.sqrt(self.nants*(self.nants-1)*(self.nants-2))*max(dibimean/dibimean.std()))**(1/3.)
-            p.plot(sigb(smax*(n.arange(1,11)/10.), Q), dibimean.std()*snrb(smax*(n.arange(1,11)/10.)), 'b')
-            p.xlabel('$\sigma_b$')
-            p.ylabel('b')
-            p.subplot(212)
-            p.plot(dibimean/dibimean.std(), 'b.')
+            p.plot(dibimean.real/dibimeanstd, 'b.')
             p.xlabel('Integation')
             p.ylabel('SNR$_{bisp}$')
             savename = self.file.split('.')[:-1]
             savename.append(str(self.nskip/self.nbl) + '.bisplc.png')
             savename = string.join(savename,'.')
+            p.subplot(212)
+            p.plot(dibistd, dibimean.real/dibimeanstd, 'b.')
+            smax = (2/n.sqrt(self.nants*(self.nants-1)*(self.nants-2)/6.)*max(dibimean.real/dibimeanstd))**(1/3.)
+            p.plot(sigb(smax*(n.arange(1,11)/10.), Q), snrb(smax*(n.arange(1,11)/10.)), 'b')
+            p.xlabel('$\sigma_b$')
+            p.ylabel('SNR$_{bisp}$')
             p.savefig(savename)
             p.clf()                           
         return dibimean, dibistd
