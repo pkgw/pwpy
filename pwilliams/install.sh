@@ -86,6 +86,7 @@ ms/msimgadd
 ms/msimsquash
 ms/msimsub
 ms/mssetupimaging
+ms/mssfextract
 ms/mswpftsub
 '
 

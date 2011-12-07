@@ -1,0 +1,293 @@
+#! /usr/bin/env python
+# -*- python -*-
+
+"""
+mssfextract <input image> <keywords=,+options>
+
+Given an input CASA-format image, run SFIND on it and output
+*deconvolved* source parameters.
+
+Suggested sfind keywords: rmsbox=64 alpha=0.5 +fdrpeak
+"""
+
+# Programmer notes:
+"""
+Not very happy with the deconvolution of (near-)pointlike
+sources. I've hacked up the code from gaupar.for which I feel may be
+ill-advised.
+
+TODO: no need for MS-specificity here. Could even autodetect
+the source image type ...
+
+TODO: configurable sorting of output (to find a particular
+source, want RA sort, prolly)
+
+TODO: better module behavior: no util.dies, etc.
+"""
+
+import sys, numpy as N
+from mirtask import util
+
+RAD2ASEC = 3600 * 180 / N.pi
+ASEC2RAD = N.pi / 180 / 3600
+
+
+class Holder (object):
+    pass
+
+
+def warn (fmt, *args):
+    print >>sys.stderr, 'warning:', fmt % args
+
+
+def fortfloat (s):
+    if s[0] == '*':
+        return N.nan
+    return float (s)
+
+
+def gaussianDeconvolve (smaj, smin, spa, bmaj, bmin, bpa):
+    """'s' as in 'source', 'b' as in 'beam'. All arguments
+    in radians.
+
+    Returns dmaj, dmin, dpa, status
+    All numbers in radians.
+    status is one of 'ok', 'pointlike', 'fail'
+
+    Derived from miriad gaupar.for:GauDfac()
+
+    We currently don't do a great job of dealing with pointlike
+    sources. I've added extra code ensure smaj >= bmaj, smin >= bmin,
+    and increased coefficient in front of "limit" from 0.1 to
+    0.5. Feel a little wary about that first change.
+    """
+
+    from numpy import cos, sin, sqrt, min, abs, arctan2
+
+    if smaj < bmaj:
+        smaj = bmaj
+    if smin < bmin:
+        smin = bmin
+
+    alpha = ((smaj * cos (spa))**2 + (smin * sin (spa))**2 -
+             (bmaj * cos (bpa))**2 - (bmin * sin (bpa))**2)
+    beta = ((smaj * sin (spa))**2 + (smin * cos (spa))**2 -
+            (bmaj * sin (bpa))**2 - (bmin * cos (bpa))**2)
+    gamma = 2 * ((smin**2 - smaj**2) * sin (spa) * cos (spa) -
+                 (bmin**2 - bmaj**2) * sin (bpa) * cos (bpa))
+
+    s = alpha + beta
+    t = sqrt ((alpha - beta)**2 + gamma**2)
+    limit = 0.5 * min ([smaj, smin, bmaj, bmin])**2
+    #limit = 0.1 * min ([smaj, smin, bmaj, bmin])**2
+    status = 'ok'
+
+    if alpha < 0 or beta < 0 or s < t:
+        dmaj = dmin = dpa = 0
+
+        if 0.5 * (s - t) < limit and alpha > -limit and beta > -limit:
+            status = 'pointlike'
+        else:
+            #print 'X %.2e %.2e %.2e ; %.2e %.2e %.2e' \
+            #    % (smaj, smin, spa, bmaj, bmin, bpa)
+            #print 'Y %.2e ; %.2e %.2e %.2e ; %.2e %.2e' \
+            #    % (limit, 0.5 * (s - t) / limit, alpha / limit, beta / limit, s, t)
+            status = 'fail'
+    else:
+        dmaj = sqrt (0.5 * (s + t))
+        dmin = sqrt (0.5 * (s - t))
+
+        if abs (gamma) + abs (alpha - beta) == 0:
+            dpa = 0
+        else:
+            dpa = 0.5 * arctan2 (-gamma, alpha - beta)
+
+    return dmaj, dmin, dpa, status
+
+
+# The main implementation
+
+def sfind_extract (inpath, keywords):
+    # First, get beamshape parameters from source image.
+
+    from pyrap.images import image
+
+    h = image (inpath)
+    imageinfo = Holder ()
+    imageinfo.naxis = len (h.shape ())
+
+    bminfo = h.imageinfo ()['restoringbeam']
+    if bminfo['major']['unit'] != 'arcsec':
+        util.die ('unhandled beamshape major axis unit "%s"', bminfo['major']['unit'])
+    if bminfo['minor']['unit'] != 'arcsec':
+        util.die ('unhandled beamshape minor axis unit "%s"', bminfo['minor']['unit'])
+    if bminfo['positionangle']['unit'] != 'deg':
+        util.die ('unhandled beamshape PA unit "%s"', bminfo['positionangle']['unit'])
+
+    imageinfo.bmaj = bminfo['major']['value'] * ASEC2RAD
+    imageinfo.bmin = bminfo['minor']['value'] * ASEC2RAD
+    imageinfo.bpa = bminfo['positionangle']['value'] * N.pi / 180
+
+    # Now convert to MIRIAD format (via FITS), run SFIND, and process
+
+    from tempfile import mkdtemp
+    from os.path import join
+    from os import getcwd, chdir, devnull
+    from shutil import rmtree
+    import subprocess
+    from mirexec import TaskFits, TaskSFind
+
+    origdir = getcwd ()
+    tmpcontainer = mkdtemp (prefix='mssfextract.')
+
+    try:
+        # Generate the FITS file before changing directory in case
+        # inpath is relative. image2fits annoyingly logs to its standard
+        # error.
+        tmpfits = join (tmpcontainer, 'input.fits')
+        subprocess.check_call (['image2fits', 'in=' + inpath, 'out=' + tmpfits],
+                               stdout=open (devnull, 'w'),
+                               stderr=subprocess.STDOUT)
+
+        chdir (tmpcontainer)
+
+        TaskFits (in_='input.fits', out='input.mirimg', op='xyin').runsilent ()
+
+        stdout, stderr = TaskSFind (in_='input.mirimg', **keywords).snarf ()
+        sfinfo = {}
+
+        for l in stdout:
+            if l.startswith ('FDR selected a'):
+                sfinfo['pvalue'] = fortfloat (l.split ()[-1][:-1])
+            if l.startswith ('This corresponds to'):
+                sfinfo['sigmathresh'] = fortfloat (l.split ()[-2])
+            if l.startswith ('which means a minimum'):
+                sfinfo['minflux'] = fortfloat (l.split ()[-2])
+            if l.startswith ('FDR detected'):
+                sfinfo['npix'] = int (l.split ()[-2])
+            if l.startswith ('Of the FDR pixels'):
+                sfinfo['nused'] = int (l.split ()[-6])
+            if l.startswith ('A total of'):
+                sfinfo['nrawsrc'] = int (l.split ()[3])
+
+        print_sources (sfinfo, process_output (imageinfo, open ('sfind.log')))
+    finally:
+        chdir (origdir)
+        try:
+            rmtree (tmpcontainer)
+        except:
+            warn ('couldn\'t remove temporary data directory "%s"', tmpcontainer)
+
+
+_sfindMiscColumns = ('ora_err odec_err pkflux pkflux_err totflux raw_maj '
+                     'raw_min raw_pa bgrms fitrms').split ()
+_sfindMiscOffsets = [24, 32, 40, 50, 58, 68, 74, 80, 86, 92, 100]
+_sfindUnits= [ASEC2RAD, ASEC2RAD, 1e-3, 1e-3, 1e-3, ASEC2RAD,
+              ASEC2RAD, N.pi / 180, 1e-3, 1e-3]
+
+
+def process_output (ii, logstream):
+    sources = []
+
+    for linenum, line in enumerate (logstream):
+        if line[0] == '#':
+            continue
+
+        a = line.strip ().split ()
+        info = Holder ()
+        info.rastr = a[0]
+        info.decstr = a[1]
+
+        for i, name in enumerate (_sfindMiscColumns):
+            substr = line[_sfindMiscOffsets[i]:_sfindMiscOffsets[i+1]]
+
+            if '*' in substr:
+                val = None
+            else:
+                val = float (substr) * _sfindUnits[i]
+
+            setattr (info, name, val)
+
+        if info.raw_maj is None or info.raw_min is None or info.raw_pa is None:
+            warn ('incomplete shape information for sfind source on line %d', linenum + 1)
+            continue
+
+        dmaj, dmin, dpa, status = gaussianDeconvolve (info.raw_maj,
+                                                      info.raw_min,
+                                                      info.raw_pa,
+                                                      ii.bmaj, ii.bmin, ii.bpa)
+
+        if status == 'fail':
+            warn ('failed to deconvolve shape of sfind source on line %d', linenum + 1)
+            continue
+        elif status == 'pointlike':
+            extra = []
+        elif status == 'ok':
+            extra = [dmaj, dmin, dpa]
+        else:
+            util.die ('internal bug, unexpected deconvolution result %s', status)
+
+        sources.append ([info.rastr, info.decstr, info.totflux] + extra)
+
+    # Sort by decreasing total flux
+    sources.sort (key=lambda x: x[2], reverse=True)
+    return sources
+
+
+def print_sources (sfinfo, sources):
+    for k in sorted (sfinfo.iterkeys ()):
+        print '## %s=%s' % (k, sfinfo[k])
+
+    print '# type, RA[hr], dec[deg], totflux[Jy], {major[asec], minor[asec], pa[deg]}'
+
+    for sinfo in sources:
+        if len (sinfo) == 3:
+            print 'point    %s %s %.5f' % (sinfo[0], sinfo[1], sinfo[2])
+        elif len (sinfo) == 6:
+            print 'gaussian %s %s %.5f %6.1f %6.1f %+6.1f' % \
+                (sinfo[0], sinfo[1], sinfo[2], 
+                 sinfo[3] * RAD2ASEC, sinfo[4] * RAD2ASEC, sinfo[5] * 180 / N.pi)
+        else:
+            util.die ('internal bug, unexpected source info %s', sinfo)
+
+
+def cmdline (argv):
+    inpath = None
+    keywords = {}
+
+    util.checkusage (__doc__, argv, usageifnoargs=True)
+
+    for arg in argv[1:]:
+        if '=' in arg:
+            kw, val = arg.split ('=', 1)
+            keywords[kw] = val
+        elif arg[0] == '+':
+            for opt in arg[1:].split (','):
+                keywords[opt] = True
+        elif inpath is not None:
+            util.wrongusage (__doc__, 'only one non-keyword argument is allowed')
+        else:
+            inpath = arg
+
+    if inpath is None:
+        util.wrongusage (__doc__, 'must supply input image path')
+    if 'logfile' in keywords:
+        util.wrongusage (__doc__, 'the "logfile" parameter to sfind may '
+                         'not be overridden')
+    if keywords.get ('fdrimg', False):
+        warn ('the file created by the "fdrimg" option will be discarded')
+    if keywords.get ('sigmaimg', False):
+        warn ('the file created by the "sigmaimg" option will be discarded')
+    if keywords.get ('rmsimg', False):
+        warn ('the file created by the "rmsimg" option will be discarded')
+    if keywords.get ('normimg', False):
+        warn ('the file created by the "normimg" option will be discarded')
+    if keywords.get ('kvannot', False):
+        warn ('the file created by the "kvannot" option will be discarded')
+
+    sfind_extract (inpath, keywords)
+
+
+if __name__ == '__main__':
+    import mirtask.cliutil
+    cmdline (sys.argv)
