@@ -2,10 +2,12 @@
 # -*- python -*-
 
 """
-mssfextract <input image> <keywords=,+options>
+mssfextract <input image> <SFIND keywords=,+options>
 
-Given an input CASA-format image, run SFIND on it and output
-*deconvolved* source parameters.
+Given an input CASA-format image, run SFIND on it and print
+*deconvolved* source parameters on standard output. Options
+on the command line are passed through to SFIND more-or-less
+verbatim.
 
 Suggested sfind keywords: rmsbox=64 alpha=0.5 +fdrpeak
 """
@@ -209,7 +211,8 @@ def process_output (ii, logstream):
             setattr (info, name, val)
 
         if info.raw_maj is None or info.raw_min is None or info.raw_pa is None:
-            warn ('incomplete shape information for sfind source on line %d', linenum + 1)
+            warn ('incomplete shape information for the following sfind '
+                  'source:\n   %s', line.strip ())
             continue
 
         dmaj, dmin, dpa, status = gaussianDeconvolve (info.raw_maj,
@@ -218,7 +221,8 @@ def process_output (ii, logstream):
                                                       ii.bmaj, ii.bmin, ii.bpa)
 
         if status == 'fail':
-            warn ('failed to deconvolve shape of sfind source on line %d', linenum + 1)
+            warn ('failed to deconvolve shape of the following sfind '
+                  'source:\n   %s', line.strip ())
             continue
         elif status == 'pointlike':
             extra = []
