@@ -1,0 +1,254 @@
+#! /usr/bin/env python
+# -*- python -*-
+
+"""
+msimgen <template image> <sourcelist file|-> <output image>
+
+Given a template CASA-format image, create a model image using the
+source information specified in the sourcelist file. (A source file of
+"-" indicates that the information should be read from standard
+input.) See "mssfmodel" for a way to generate such a source list.
+
+Motivation: we want to generate model UV data in CASA derived from
+modeling our images. CASA has no equivalent of MIRIAD's uvmodel to
+generate UV data from source models, and the prospect of hooking up
+uvmodel to CASA on both ends is too much to contemplate. It's annoying
+to have to generate visibilities for point sources via images, but in
+most cases this approach should suffice (I think??).
+"""
+
+# Programmer notes:
+"""
+We assume that RA is the last image axis and Dec is the
+second-to-last. There's probably a way to do this better (though not
+necessarily a very clean way).
+"""
+
+import sys, numpy as N
+from mirtask import util
+
+GAUSSMINFLUX = 1e-6 # see fill_gauss
+ASEC2RAD = N.pi / 180 / 3600
+FWHM2SIGMA = 1. / N.sqrt (8 * N.log (2))
+
+
+def raparse (rastr):
+    hr, mn, sec = rastr.split (':')
+    return (int (hr) + int (mn) / 60. + float (sec) / 3600.) * N.pi / 12
+
+
+def decparse (decstr):
+    if decstr[0] != '-':
+        sgn = 1
+    else:
+        sgn = -1
+        decstr = decstr[1:]
+
+    deg, mn, sec = decstr.split (':')
+    return sgn * (int (deg) + int (mn) / 60. +
+                  float (sec) / 3600.) * N.pi / 180
+
+
+def rad2perpix (pix2world, pixelcoords):
+    """Given pixel coordinates and a transform function, return the
+    angular area of a pixel at those coordinates in radians**2. This
+    can vary depending on the map projection."""
+
+    DELTA = 1e-4
+
+    pixelcoords = list (pixelcoords)
+    w1 = pix2world (pixelcoords)
+    pixelcoords[-1] += DELTA
+    pixelcoords[-2] += DELTA
+    w2 = pix2world (pixelcoords)
+
+    dra = w2[-1] - w1[-1]
+    ddec = w2[-2] - w1[-2]
+    return (dra**2 + ddec**2) / (2 * DELTA**2)
+
+
+def fill_point (image, worldcoords, pixelcoords, data, info):
+    # Because we're unresolved, our total flux T in Jy
+    # will be spread out over 1 pixel, so our flux in
+    # Jy/px is also T.
+
+    # Note: we don't do any bounds-checking
+
+    totflux = info[0]
+
+    c = N.floor (pixelcoords).astype (N.int)
+    d1 = pixelcoords[-1] - c[-1]
+    d2 = pixelcoords[-2] - c[-2]
+
+    data[tuple (c)] += totflux * (1 - d1) * (1 - d2)
+    c[-1] += 1
+    data[tuple (c)] += totflux * d1 * (1 - d2)
+    c[-2] += 1
+    data[tuple (c)] += totflux * d1 * d2
+    c[-1] -= 1
+    data[tuple (c)] += totflux * (1 - d1) * d2
+
+
+def fill_gauss (image, worldcoords, pixelcoords, data, info):
+    # From our total flux in units of Jy and dimensions in arcsec, we
+    # need to compute our peak flux in units of Jy/px. The image
+    # coordinate system lets us convert between pixels and angular
+    # units easily, so this is fairly straightforward.
+
+    # We sidestep some tricky issues about rotation of ra/dec vs
+    # the pixel axis by computing equatorial coordinates for every
+    # pixel that we think is near the source.
+
+    from numpy import (array, ceil, cos, empty, exp, floor, log,
+                       maximum, ones, pi, sin, sqrt, zeros)
+
+    totflux = info[0]
+    smajor = info[1] * ASEC2RAD * FWHM2SIGMA
+    sminor = info[2] * ASEC2RAD * FWHM2SIGMA
+    pa = info[3] * pi / 180
+    srcvol = 2 * pi * smajor * sminor
+    volperpix = rad2perpix (image.toworld, pixelcoords)
+    pkflux = totflux * volperpix / srcvol
+
+    # Compute effective sigmas in RA and Dec directions, then
+    # figure out about how far out we need to image in pixel space
+    # to do a faithful job of representing the source. This is
+    # parametrized by GAUSSMINFLUX, the approximate minimum Jy/px
+    # flux value that we will compute.
+
+    sra = ((sin (pa) / smajor)**2 + (cos (pa) / sminor)**2)**-0.5
+    sdec = ((cos (pa) / smajor)**2 + (sin (pa) / sminor)**2)**-0.5
+    numsigmatotravel = sqrt (2 * log (pkflux / GAUSSMINFLUX))
+
+    dra = sra * numsigmatotravel
+    ddec = sdec * numsigmatotravel
+    deltapix = zeros (4) # minus x, minus y, plus x, plus y
+
+    for c1, c2 in zip ((-1, -1, 1, 1), (-1, 1, -1, 1)):
+        worldwork = array (worldcoords)
+        worldwork[-1] += c1 * dra
+        worldwork[-2] += c2 * ddec
+        delta = pixelcoords - array (image.topixel (worldwork))
+        deltapix[0] = min (deltapix[0], delta[-1])
+        deltapix[1] = min (deltapix[1], delta[-2])
+        deltapix[2] = max (deltapix[2], delta[-1])
+        deltapix[3] = max (deltapix[3], delta[-2])
+
+    # Pad out to at least 3 pixels each way
+    coeff = array ([-1, -1, 1, 1])
+    deltapix = coeff * maximum (coeff * deltapix, ones (4) * 3)
+
+    # Transform to absolute pixels and clip to bounds. abspix[2,3] are
+    # offset by one because they only come up in Python range-type
+    # situations.
+
+    abspix = empty (4, dtype=N.int)
+    abspix[0] = max (floor (deltapix[0] + pixelcoords[-1]), 0)
+    abspix[1] = max (floor (deltapix[1] + pixelcoords[-2]), 0)
+    abspix[2] = min (ceil (deltapix[2] + pixelcoords[-1]) + 1,
+                     image.shape ()[-1])
+    abspix[3] = min (ceil (deltapix[3] + pixelcoords[-2]) + 1,
+                     image.shape ()[-2])
+
+    # Compute the Gaussian values, precreating arrays of ra/dec values
+    # of pixels so we can do most of the math vectorially.
+
+    nx = abspix[2] - abspix[0]
+    ny = abspix[3] - abspix[1]
+    ras = empty ((ny, nx))
+    decs = empty ((ny, nx))
+
+    for ypix in xrange (abspix[1], abspix[3]):
+        dy = ypix - abspix[1]
+        pixelcoords[-2] = ypix
+
+        for xpix in xrange (abspix[0], abspix[2]):
+            dx = xpix - abspix[0]
+            pixelcoords[-1] = xpix
+            w = image.toworld (pixelcoords)
+            ras[dy,dx] = w[-1]
+            decs[dy,dx] = w[-2]
+
+    ras -= worldcoords[-1] # -> delta RA
+    decs -= worldcoords[-2] # -> delta dec
+    b = sin (-2 * pa) * (sminor**-2 - smajor**-2)
+    q = -0.5 * ((ras / sra)**2 + b * ras * decs + (decs / sdec)**2)
+    px = pkflux * exp (q)
+
+    # Finally done.
+    data[...,abspix[1]:abspix[3],abspix[0]:abspix[2]] += px
+
+
+def fill_image (srcstream, outpath, cleardata=True):
+    import pyrap.images as PI
+
+    oi = PI.image (outpath)
+    # Fill in world coord values of axes we don't care about.
+    worldcoords = oi.toworld (N.zeros (len (oi.shape ())))
+    odata = oi.getdata ()
+
+    if cleardata:
+        odata.fill (0)
+
+    for line in srcstream:
+        if line[0] == '#':
+            continue
+
+        a = line.strip ().split ()
+        kind = a[0]
+
+        worldcoords[-1] = raparse (a[1])
+        worldcoords[-2] = decparse (a[2])
+        pixelcoords = N.asarray (oi.topixel (worldcoords))
+        info = map (float, a[3:])
+
+        if kind == 'point':
+            fill_point (oi, worldcoords, pixelcoords, odata, info)
+        elif kind == 'gaussian':
+            fill_gauss (oi, worldcoords, pixelcoords, odata, info)
+        else:
+            util.die ('unhandled source kind "%s"', kind)
+
+    oi.putdata (odata)
+    del oi # ??? how to close?
+
+
+def imgen (inpath, srcstream, outpath):
+    import pyrap.tables as PT, pyrap.images as PI
+
+    PT.tablecopy (inpath, outpath, deep=True)
+    ot = PT.table (outpath, readonly=False, ack=False)
+    ot.putkeyword ('units', 'Jy/pixel')
+    ot.close ()
+
+    try:
+        fill_image (srcstream, outpath, cleardata=True)
+    except:
+        t, v, tb = sys.exc_info ()
+        PT.tabledelete (outpath, ack=False)
+        raise t, v, tb
+
+
+def cmdline (argv):
+    from os.path import exists
+    util.checkusage (__doc__, argv, usageifnoargs=True)
+
+    if len (argv) != 4:
+        util.wrongusage (__doc__, 'exactly 3 arguments expected')
+
+    inpath, srcpath, outpath = argv[1:]
+
+    if exists (outpath):
+        util.die ('output "%s" already exists', outpath)
+
+    if srcpath == '-':
+        srcstream = sys.stdin
+    else:
+        srcstream = open (srcpath)
+
+    imgen (inpath, srcstream, outpath)
+
+
+if __name__ == '__main__':
+    import mirtask.cliutil
+    cmdline (sys.argv)

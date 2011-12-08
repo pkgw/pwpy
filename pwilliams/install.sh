@@ -83,6 +83,7 @@ ms/msclearimaging
 ms/msconcat
 ms/mshistory
 ms/msimgadd
+ms/msimgen
 ms/msimsquash
 ms/msimsub
 ms/mssetupimaging
