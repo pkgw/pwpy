@@ -1,0 +1,296 @@
+#! /usr/bin/env python
+# -*- python; coding: utf-8 -*-
+
+"""
+iminfo <paths...>
+
+Print basic information about images. Like MIRIAD "imhead" but the
+output is more concise and it works on MIRIAD, FITS, or CASA images.
+
+When multiple images are specified, the information for each image
+will be separated by a blank line, and an extra "path" item will be
+printed out indicating which image the information applies to.
+"""
+
+# Developer notes:
+"""
+We fill out a 'Holder' instance. All items should be optional:
+
+kind -- image file format: MIRIAD, CASA, or FITS (for now)
+ra -- pointing center RA in radians
+dec -- pointing center dec in radians
+shape -- ndarray of axis sizes, from least-rapidly-evolving
+  to most-rapidly-evolving (i.e., C-style indexing)
+axtypes -- iterable of strings identifying axis types, of
+  same size as shape; no effort made to standardize the types
+cellra -- the RA size of the reference pixel in radians
+celldec -- the Dec size of the reference pixel in radians
+bmaj -- major axis size of convolving beam (if present) in radians
+bmin -- minor axis size of convolving beam, radians
+bpa -- position angle of convolving beam, east from north, radians
+bunit -- the unit of the pixel data, string, unnormalized
+
+Obviously we could load in a lot more info, but for now these
+are the pieces of information that I'm generally curious about.
+"""
+
+import numpy as N
+from mirtask import util
+
+
+R2A = 3600 * 180 / N.pi
+A2R = N.pi / (3600 * 180)
+R2D = 180 / N.pi
+D2R = N.pi / 180
+R2H = 12 / N.pi
+H2R = N.pi / 12
+
+
+class Holder (object):
+    def __getattr__ (self, attr):
+        return self.__dict__.get (attr, None)
+
+
+def fmtradec (ra, dec):
+    rahr = ra * R2H
+    decdeg = dec * R2D
+
+    hr = int (N.floor (rahr))
+    min = int (N.floor ((rahr - hr) * 60))
+    sec = round (3600 * (rahr - hr - min / 60.), 3)
+
+    if sec >= 60:
+        # Can happen if we round up
+        sec -= 60
+        min += 1
+
+        if min >= 60:
+            min -= 60
+            hr += 1
+
+            if hr >= 24:
+                hr -= 24
+
+    if decdeg >= 0:
+        sgn = '+'
+    else:
+        sgn = '-'
+        decdeg = -decdeg
+
+    deg = int (N.floor (decdeg))
+    amin = int (N.floor ((decdeg - deg) * 60))
+    asec = round (3600 * (decdeg - deg - amin / 60.), 2)
+
+    if asec >= 60:
+        # Can happen if we round up
+        asec -= 60
+        amin += 1
+
+        if amin >= 60:
+            amin -= 60
+            deg += 1
+
+    return '%02d:%02d:%06.3f %s%02d:%02d:%05.2f' % \
+        (hr, min, sec, sgn, deg, amin, asec)
+
+
+def getinfo_miriad (path):
+    import mirtask
+
+    info = Holder ()
+    im = mirtask.XYDataSet (path, 'rw')
+    
+    naxis = im.getScalarItem ('naxis', 0)
+    info.shape = N.empty (naxis, dtype=N.int)
+    info.axtypes = [None] * naxis
+
+    for i in xrange (naxis):
+        q = naxis - 1 - i
+        info.shape[q] = im.getScalarItem ('naxis%d' % (i + 1), 0)
+        info.axtypes[q] = im.getScalarItem ('ctype%d' % (i + 1), '???')
+
+        if info.axtypes[q].startswith ('RA--'):
+            info.ra = im.getScalarItem ('crval%d' % (i + 1))
+            info.cellra = im.getScalarItem ('cdelt%d' % (i + 1))
+        elif info.axtypes[q].startswith ('DEC-'):
+            info.dec = im.getScalarItem ('crval%d' % (i + 1))
+            info.celldec = im.getScalarItem ('cdelt%d' % (i + 1))
+
+    bmaj = im.getScalarItem ('bmaj')
+    if bmaj is not None:
+        info.bmaj = bmaj
+        info.bmin = im.getScalarItem ('bmin')
+        info.bpa = im.getScalarItem ('bpa') * D2R
+
+    info.bunit = im.getScalarItem ('bunit')
+
+    im.close ()
+    return info
+
+
+def getinfo_casa (path):
+    from pyrap.images import image
+    from pyrap.tables import table
+
+    info = Holder ()
+
+    tb = table (path, ack=False)
+    if 'units' in tb.keywordnames ():
+        info.bunit = tb.getkeyword ('units')
+    tb.close ()
+
+    im = image (path)
+    info.shape = im.shape ()
+
+    c = im.coordinates ()
+    info.axtypes = []
+
+    for item in c.get_axes ():
+        if isinstance (item, basestring):
+            info.axtypes.append (item.replace (' ', '_'))
+        else:
+            for subitem in item:
+                info.axtypes.append (subitem.replace (' ', '_'))
+
+    dc = c.get_coordinate ('direction')
+    for i, axname in enumerate (dc.get_axes ()):
+        if axname == 'Right Ascension':
+            info.ra = dc.get_referencevalue ()[i]
+            info.cellra = dc.get_increment ()[i]
+        elif axname == 'Declination':
+            info.dec = dc.get_referencevalue ()[i]
+            info.celldec = dc.get_increment ()[i]
+
+    ii = im.imageinfo ()
+    if 'restoringbeam' in ii:
+        info.bmaj = ii['restoringbeam']['major']['value'] * A2R
+        info.bmin = ii['restoringbeam']['minor']['value'] * A2R
+        info.bpa = ii['restoringbeam']['positionangle']['value'] * D2R
+
+        if ii['restoringbeam']['major']['unit'] != 'arcsec':
+            util.die ('expect restoring beam major axis to be given in arcsec')
+        if ii['restoringbeam']['minor']['unit'] != 'arcsec':
+            util.die ('expect restoring beam minor axis to be given in arcsec')
+        if ii['restoringbeam']['positionangle']['unit'] != 'deg':
+            util.die ('expect restoring beam position angle to be given in degrees')
+
+    del im # ??? how to close?
+    return info
+
+
+def getinfo_fits (path):
+    from pyfits import open
+
+    info = Holder ()
+    header = open (path, mode='readonly')[0].header
+
+    naxis = header.get ('naxis', 0)
+    info.shape = N.empty (naxis, dtype=N.int)
+    info.axtypes = [None] * naxis
+
+    for i in xrange (naxis):
+        q = naxis - 1 - i
+        info.shape[q] = header.get ('naxis%d' % (i + 1), 0)
+        info.axtypes[q] = header.get ('ctype%d' % (i + 1), '???')
+
+        if info.axtypes[q].startswith ('RA--'):
+            if not header.get ('cunit%d' % (i + 1), 'deg').lower ().startswith ('deg'):
+                util.die ('expect RA coordinate to be in degrees')
+            info.ra = header.get ('crval%d' % (i + 1)) * D2R
+            info.cellra = header.get ('cdelt%d' % (i + 1)) * D2R
+        elif info.axtypes[q].startswith ('DEC-'):
+            if not header.get ('cunit%d' % (i + 1), 'deg').lower ().startswith ('deg'):
+                util.die ('expect Dec coordinate to be in degrees')
+            info.dec = header.get ('crval%d' % (i + 1)) * D2R
+            info.celldec = header.get ('cdelt%d' % (i + 1)) * D2R
+
+    bmaj = header.get ('bmaj', None)
+    if bmaj is not None:
+        info.bmaj = bmaj * D2R
+        info.bmin = header.get ('bmin') * D2R
+        info.bpa = header.get ('bpa') * D2R
+
+    info.bunit = header.get ('bunit')
+    del header
+
+    return info
+
+
+def getinfo (path):
+    from os.path import exists, join, isfile
+
+    info = None
+
+    if exists (join (path, 'image')):
+        info = getinfo_miriad (path)
+        info.kind = 'MIRIAD'
+    elif exists (join (path, 'table.dat')):
+        info = getinfo_casa (path)
+        info.kind = 'CASA'
+    elif isfile (path):
+        f = open (path, 'rb')
+        sniff = f.read (9)
+        f.close ()
+
+        if sniff.startswith ('SIMPLE  ='):
+            info = getinfo_fits (path)
+            info.kind = 'FITS'
+
+    if info is None:
+        util.die ('cannot determine image type of "%s"', path)
+
+    return info
+
+
+def printinfo (path):
+    info = getinfo (path)
+
+    print 'kind     =', info.kind
+
+    if info.ra is not None:
+        print 'center   =', fmtradec (info.ra, info.dec)
+
+    if info.shape is not None:
+        print 'shape    =', ' '.join (str (x) for x in info.shape)
+        npix = 1
+        for x in info.shape:
+            npix *= x
+        print 'npix     =', npix
+
+    if info.axtypes is not None:
+        print 'axtypes  =', ' '.join (x for x in info.axtypes)
+
+    if info.cellra is not None:
+        print 'ctrcell  = %f” × %f”' % (info.cellra * R2A,
+                                        info.celldec * R2A)
+
+    if info.bmaj is not None:
+        print 'beam     = %f” × %f” @ %f°' % (info.bmaj * R2A,
+                                              info.bmin * R2A,
+                                              info.bpa * R2D)
+
+        if info.cellra is not None:
+            bmrad2 = 2 * N.pi * info.bmaj * info.bmin / (8 * N.log (2))
+            cellrad2 = info.cellra * info.celldec
+            print 'ctrbmvol = %f px' % N.abs (bmrad2 / cellrad2)
+
+    if info.bunit is not None:
+        print 'bunit    =', info.bunit
+
+
+def cmdline (argv):
+    util.checkusage (__doc__, argv, usageifnoargs=True)
+
+    if len (argv) == 2:
+        printinfo (argv[1])
+    else:
+        for i, path in enumerate (argv[1:]):
+            if i > 0:
+                print
+            print 'path     =', path
+            printinfo (path)
+
+
+if __name__ == '__main__':
+    import mirtask.cliutil, sys
+    cmdline (sys.argv)
