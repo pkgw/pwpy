@@ -1,0 +1,55 @@
+#! /usr/bin/env python
+# -*- python -*-
+
+"""
+msmirhack <input MIRIAD image> <output CASA image>
+
+Copy the contents of a MIRIAD image into a CASA image. It's up to you
+to ensure that all of the metadata, etc, are consistent (or not).
+"""
+
+from mirtask import util
+
+
+def mirhack (inpath, outpath):
+    from mirtask import XYDataSet
+    from pyrap.images import image
+
+    mirin = XYDataSet (inpath, 'rw')
+    indata = mirin.readPlane (axes=[])
+
+    casaout = image (outpath)
+    outdata = casaout.getdata ()
+
+    if indata.size != outdata.size:
+        util.die ('cannot import data: input and output have differing '
+                  'numbers of pixels')
+
+    outdata[:] = indata.reshape (outdata.shape)
+    casaout.putdata (outdata)
+
+    del casaout # ??? how to close?
+    mirin.close ()
+
+
+def cmdline (argv):
+    from os.path import isdir
+    util.checkusage (__doc__, argv, usageifnoargs=True)
+
+    if len (argv) != 3:
+        util.wrongusage (__doc__, 'exactly 2 arguments expected')
+
+    inpath, outpath = argv[1:]
+
+    if not isdir (inpath):
+        util.die ('input "%s" is not a directory', inpath)
+
+    if not isdir (outpath):
+        util.die ('output "%s" is not a directory', outpath)
+
+    mirhack (inpath, outpath)
+
+
+if __name__ == '__main__':
+    import mirtask.cliutil, sys
+    cmdline (sys.argv)
