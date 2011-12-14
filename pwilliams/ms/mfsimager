@@ -9,6 +9,10 @@ import sys, os.path, pyrap.tables
 mspaths = []
 kwargs = []
 
+debug = '--debug' in sys.argv
+if debug:
+    sys.argv.remove ('--debug')
+
 for arg in sys.argv[1:]:
     if '=' in arg or arg[0] == '-':
         kwargs.append (arg)
@@ -28,4 +32,8 @@ kwargs.append ('nchan=' + ','.join (str (x) for x in nchan))
 
 args = ['lwimager', 'ms=' + mspaths[0]] + kwargs
 # print >>sys.stderr, '+', ' '.join (args)
-os.execvp ('lwimager', args)
+
+if debug:
+    os.execvp ('gdb', ['gdb', '--args'] + args)
+else:
+    os.execvp ('lwimager', args)
