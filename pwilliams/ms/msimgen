@@ -4,17 +4,14 @@
 """
 msimgen <template image> <sourcelist file|-> <output image>
 
-Given a template CASA-format image, create a model image using the
-source information specified in the sourcelist file. (A source file of
-"-" indicates that the information should be read from standard
-input.) See "mssfmodel" for a way to generate such a source list.
+Given a template CASA-format image, create a model image (that is, a
+deconvolved image with units Jy/pixel) using the source information
+specified in the sourcelist file. A source file of "-" indicates that
+the information should be read from standard input. See "mssfextract"
+or "msmkrandsrc" for ways to generate such source lists.
 
-Motivation: we want to generate model UV data in CASA derived from
-modeling our images. CASA has no equivalent of MIRIAD's uvmodel to
-generate UV data from source models, and the prospect of hooking up
-uvmodel to CASA on both ends is too much to contemplate. It's annoying
-to have to generate visibilities for point sources via images, but in
-most cases this approach should suffice (I think??).
+If one wants to create model UV data, one can skip the model image
+step by using the new component-list support in "mswpftsub".
 """
 
 # Programmer notes:
