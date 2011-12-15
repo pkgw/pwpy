@@ -119,8 +119,8 @@ def getinfo_miriad (path):
     bmaj = im.getScalarItem ('bmaj')
     if bmaj is not None:
         info.bmaj = bmaj
-        info.bmin = im.getScalarItem ('bmin')
-        info.bpa = im.getScalarItem ('bpa') * D2R
+        info.bmin = im.getScalarItem ('bmin', bmaj)
+        info.bpa = im.getScalarItem ('bpa', 0) * D2R
 
     info.bunit = im.getScalarItem ('bunit')
 
@@ -207,8 +207,8 @@ def getinfo_fits (path):
     bmaj = header.get ('bmaj', None)
     if bmaj is not None:
         info.bmaj = bmaj * D2R
-        info.bmin = header.get ('bmin') * D2R
-        info.bpa = header.get ('bpa') * D2R
+        info.bmin = header.get ('bmin', bmaj) * D2R
+        info.bpa = header.get ('bpa', 0) * D2R
 
     info.bunit = header.get ('bunit')
     del header
