@@ -1,17 +1,24 @@
 #! /usr/bin/env python
 
-import sys, os.path, miriad, ndshow, numpy as N
+"""
+blink [-f] [-m] <image1> <image2> [...]
+
+Cycle between two or more images in an interactive graphical
+display. Each image must be of precisely the same dimensions, but the
+underlying coordinate systems are ignored.
+
+-f -- display the amplitude of the FFT of each image, rather than
+  the raw values
+
+-m -- Normalize each image by its maximum value
+"""
+
+import sys, numpy as N
 from mirtask import util
 
-fft = '-f' in sys.argv
-if fft:
-    sys.argv.remove ('-f')
 
-if len (sys.argv) < 3:
-    util.die ('usage: blink [-f] <image1> <image2> [...]')
-
-
-def load (path):
+def load (path, fft, maxnorm):
+    import os.path, miriad
     data = None
 
     if os.path.exists (os.path.join (path, 'image')):
@@ -46,6 +53,9 @@ def load (path):
     if data is None:
         util.die ('don\'t know what to do with file "%s"', path)
 
+    if maxnorm:
+        data /= N.ma.max (data)
+
     if fft:
         data = N.abs (N.fft.ifftshift (N.fft.fft2 (N.fft.fftshift (data.filled (0)))))
         data = N.ma.MaskedArray (data)
@@ -53,21 +63,46 @@ def load (path):
     return data
 
 
-images = [load (p) for p in sys.argv[1:]]
+def blink (paths, fft, maxnorm):
+    import ndshow
 
-# If a mask is "nomask", we can't do straightforward or'ing of
-# masks, so this is more complicated than you might expect.
+    images = [load (p, fft, maxnorm) for p in paths]
 
-jointmask = N.ma.nomask
+    # If a mask is "nomask", we can't do straightforward or'ing of
+    # masks, so this is more complicated than you might expect.
 
-for i in xrange (len (images)):
-    if jointmask is N.ma.nomask:
-        if images[i].mask is not N.ma.nomask:
-            jointmask = images[i].mask
-    else:
-        N.logical_or (jointmask, images[i].mask, jointmask)
+    jointmask = N.ma.nomask
 
-for im in images:
-    im.mask = jointmask
+    for i in xrange (len (images)):
+        if jointmask is N.ma.nomask:
+            if images[i].mask is not N.ma.nomask:
+                jointmask = images[i].mask
+        else:
+            N.logical_or (jointmask, images[i].mask, jointmask)
 
-ndshow.cycle (images, sys.argv[1:])
+    for im in images:
+        im.mask = jointmask
+
+    ndshow.cycle (images, paths)
+
+
+def cmdline (argv):
+    util.checkusage (__doc__, argv, usageifnoargs=True)
+
+    fft = '-f' in argv
+    if fft:
+        argv.remove ('-f')
+
+    maxnorm = '-m' in argv
+    if maxnorm:
+        argv.remove ('-m')
+
+    if len (argv) < 3:
+        util.wrongusage (__doc__, 'at least two image arguments are required')
+
+    blink (argv[1:], fft, maxnorm)
+
+
+if __name__ == '__main__':
+    import sys, mirtask.cliutil
+    cmdline (sys.argv)
