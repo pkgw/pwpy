@@ -41,12 +41,8 @@ tiph
 ucvc
 uvdam
 uvdph
-uvlock
 uvlwcp
 uvlwrevert
-uvrevert
-walsh_adc_conflict.sh
-walsh-flags.py
 fancy/applytsys
 fancy/atabpass
 fancy/ataglue.py
