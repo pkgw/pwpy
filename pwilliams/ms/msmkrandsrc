@@ -1,0 +1,125 @@
+#! /usr/bin/env python
+# -*- python -*-
+
+"""
+msmkrandsrc <template image> <flux [jy]> <radius [arcsec]> <nsrc>
+
+Generate model information for <nsrc> random point sources of flux
+<flux>, distributed uniformly in a circle of radius <radius> around
+the center of the <template image>. The output is printed to standard
+output and can be piped into msimgen.
+"""
+
+# Programmer notes:
+"""
+TODO:
+
+- Accept visibility MSes as well as image MSes. All we
+really need is the pointing center.
+
+- For now, we don't allow the randum number generator seed to be
+specified explicitly, so our runs aren't reproducible.
+
+- Spectral indices
+
+- Distribution of fluxes as opposed to one fixed value
+
+- Application of primary beam correction
+
+- Making sure that sources are somewhat well-separated
+"""
+
+import numpy as N
+
+
+def fmtradec (ra, dec):
+    rahr = ra * 12 / N.pi
+    decdeg = dec * 180 / N.pi
+
+    hr = int (N.floor (rahr))
+    min = int (N.floor ((rahr - hr) * 60))
+    sec = round (3600 * (rahr - hr - min / 60.), 3)
+
+    if sec >= 60: # this can happen if we round up
+        sec -= 60
+        min += 1
+
+        if min >= 60:
+            min -= 60
+            hr += 1
+
+            if hr >= 24:
+                hr -= 24
+
+    if decdeg >= 0:
+        sgn = '+'
+    else:
+        sgn = '-'
+        decdeg = -decdeg
+
+    deg = int (N.floor (decdeg))
+    amin = int (N.floor ((decdeg - deg) * 60))
+    asec = round (3600 * (decdeg - deg - amin / 60.), 2)
+
+    if asec >= 60:
+        asec -= 60
+        amin += 1
+
+        if amin >= 60:
+            amin -= 60
+            deg += 1
+
+    return '%02d:%02d:%06.3f %s%02d:%02d:%05.2f' % \
+        (hr, min, sec, sgn, deg, amin, asec)
+
+
+def make_random_sources (tmplpath, flux, radius, nsrc):
+    from pyrap.images import image
+    im = image (tmplpath)
+    dc = im.coordinates ().get_coordinate ('direction')
+    refvals = dc.get_referencevalue ()
+    rarad = refvals[dc.get_axes ().index ('Right Ascension')]
+    decrad = refvals[dc.get_axes ().index ('Declination')]
+    radsq = radius**2
+
+    for n in xrange (nsrc):
+        # There's probably a less-dumb way to get a 
+        # uniform distribution on a disk.
+        while True:
+            dra = N.random.uniform (-radius, radius) # arcsec
+            ddec = N.random.uniform (-radius, radius) # arcsec
+            if dra**2 + ddec**2 <= radsq:
+                break
+
+        sdec = decrad + ddec
+        sra = rarad + dra / N.cos (sdec)
+
+        print 'point   ', fmtradec (sra, sdec), flux
+
+
+def cmdline (argv):
+    from mirtask import util
+    util.checkusage (__doc__, argv, usageifnoargs=True)
+
+    if len (argv) != 5:
+        util.wrongusage (__doc__, 'exactly 4 arguments expected')
+
+    tmplpath = argv[1]
+    flux = float (argv[2])
+    radius = float (argv[3]) / 206265.
+    nsrc = int (argv[4])
+
+    if nsrc < 1:
+        util.wrongusage (__doc__, 'must request a positive number of '
+                         'sources (got %d)', nsrc)
+
+    if radius <= 0:
+        util.wrongusage (__doc__, 'must specify a positive radius (got %f)', radius)
+
+    make_random_sources (tmplpath, flux, radius, nsrc)
+
+
+if __name__ == '__main__':
+    import sys, mirtask.cliutil, time
+    N.random.seed (int (time.time ()))
+    cmdline (sys.argv)
