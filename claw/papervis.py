@@ -947,59 +947,55 @@ class paper:
         else:
             chans = n.array([chan])
 
-#        bisp = lambda d,i,j,k: n.complex(d[i] * d[j] * n.conj(d[k]))    # bispectrum w/o normalization
-        bisp = lambda d,i,j,k: d[:,i] * d[:,j] * n.conj(d[:,k])     # bispectrum w/o normalization
+        bisp = lambda d,i,j,k: n.complex(d[i] * d[j] * n.conj(d[k]))    # bispectrum w/o normalization
+#        bisp = lambda d,i,j,k: d[i] * d[j] * n.conj(d[k])     # bispectrum w/o normalization
 
         # theoretical relations for std of bispectra (on pulse) and snr of mean bispectrum
-        sigb = lambda s, q: n.sqrt( (q**3)**2 + (n.sqrt(3)*s**2*q**3)**2)
-#        sigb = lambda s, Q: n.sqrt(3) * s**2 * Q**3  # kulkarni 1989, high s
-        snrb = lambda s: 1/2. * n.sqrt(self.nants*(self.nants-1)*(self.nants-2)/6.) * s**3  # rogers et al. 1995
+        sigb = lambda S, Q: n.sqrt(4 + 6*(S/Q)**2 + 3*(S/Q)**4) * Q**3  # kulkarni 1989
+        mu = lambda s: s / (3*(1+s))
+        sigt = lambda S, Q, num: sigb(S,Q) * n.sqrt( (1 + 3*(num-3)*mu(S/Q)) / (num*(num-1)*(num-2)/6.))
+        sigt0toQ = lambda sigt0, num: (sigt0*n.sqrt(num*(num-1)*(num-2)/(6.*4)))**(1/3.)
 
         triples = self.tripgen(a1=a1)
 
-        dibi = n.zeros((len(self.data)-bgwindow, len(triples)), dtype='complex')
+        dibi = n.zeros((len(self.data)-bgwindow, len(triples)))
         for ii in range(bgwindow+1, len(self.data)-(bgwindow+1)):
             diff = self.tracksub(dmbin, ii, bgwindow=bgwindow)
             if len(n.shape(diff)) == 1:    # no track
                 continue
-            diffmean = diff[0, :, chans]
+            diffmean = diff[0, :, chans].mean(axis=0)
 
             for trip in range(len(triples)):
                 i, j, k = triples[trip]
-                dibi[ii, trip] = bisp(diffmean, i, j, k).mean()
+                dibi[ii, trip] = bisp(diffmean, i, j, k).real
 
         # mean and std are primary products of each trial
         dibimean = dibi.mean(axis=1)
         dibistd = dibi.std(axis=1)
 
         if save:
-            # sigma clip to calculate noise per baseline
-            dibimeanstd = dibimean.real.std()
-            good = n.where( (dibimean < 3*dibimeanstd) & (dibimean > -3*dibimeanstd) )  # find 1sigma region
-            print len(good[0])
-            dibimeanstd = dibimean[good].real.std()
-            good = n.where( (dibimean < 3*dibimeanstd) & (dibimean > -3*dibimeanstd) )  # repeat 1sigma cut
-            print len(good[0])
-            dibimeanstd = dibimean[good].real.std()
-            good = n.where( (dibimean < 3*dibimeanstd) & (dibimean > -3*dibimeanstd) )  # repeat 1sigma cut
-            print len(good[0])
-            dibimeanstd = dibimean[good].real.std()
-            Q = (dibistd[good][bgwindow+1:len(self.data)-(bgwindow+1)]**(1/3.)).mean()
-            print 'Q =', Q
+            good = n.where( (dibistd > 0.5*n.median(dibistd)) & (dibistd < 2.*n.median(dibistd)) )
+            dibimeanstd = dibimean[good].std()
+
+            Q = n.median( (dibistd/2.)**(1/3.) )            # first estimate of Q
+#            Q = sigt0toQ(dibimeanstd, self.nants)              # alternately for Q...
+            print 'Q1 =', n.median( (dibistd/2.)**(1/3.) )
+            print 'Q2 =', sigt0toQ(dibimeanstd, self.nants)
 
             # plot snrb lc and expected snr vs. sigb relation
             p.figure(1)
             p.subplot(211)
-            p.plot(dibimean.real/dibimeanstd, 'b.')
+            p.plot(dibimean/dibimeanstd, 'b.')
             p.xlabel('Integation')
             p.ylabel('SNR$_{bisp}$')
             savename = self.file.split('.')[:-1]
             savename.append(str(self.nskip/self.nbl) + '.bisplc.png')
             savename = string.join(savename,'.')
             p.subplot(212)
-            p.plot(dibistd, dibimean.real/dibimeanstd, 'b.')
-            smax = (2/n.sqrt(self.nants*(self.nants-1)*(self.nants-2)/6.)*max(dibimean.real/dibimeanstd))**(1/3.)
-            p.plot(sigb(smax*(n.arange(1,11)/10.), Q), snrb(smax*(n.arange(1,11)/10.)), 'b')
+            p.plot(dibistd, dibimean/dibimeanstd, 'b.')
+            smax = (dibimean.max())**(1/3.)
+            sarr = smax*n.arange(0,11)/10.
+            p.plot(sigb(sarr, Q), sarr**3/dibimeanstd, 'b')
             p.xlabel('$\sigma_b$')
             p.ylabel('SNR$_{bisp}$')
             p.savefig(savename)

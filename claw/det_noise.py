@@ -94,20 +94,22 @@ def plotfig(s=-1, num=-1, t=5):
     """
 
     s = n.arange(1,14)/10.
-    num = 64
+    num = 27
 
     # functions for statistic of snr vs. snr per baseline (s) and antenna number (num)
-    snrbi = lambda s,num: 1/2. * s**3 * n.sqrt(num*(num-1)*(num-2)/6.)    # cornwell 1987, kulkarni 1989, rogers et al. 1995
-    snrbi2 = lambda s,num: 1 / ( 1/(3 * s**3 * n.sqrt(num*(num-1)*(num-2)/6.)) + 1/(s * n.sqrt(num*(num-1)/2.)))  # kulkarni 1989 ** with correlated noise! **
-    snrmega = lambda s,num: 1/2. * s**5 * n.sqrt(num*(num-1)*(num-2)*(num-3)*(num-4)/120.)
+    mu = lambda s: s / (3*(1+s))  # a possible functional form for mu covariance term in kulkarni 1989
+    sigmat = lambda num, s: n.sqrt( ((1 + 3*(num-3)*mu(s)) / (num * (num-1) * (num-2)/6.)) * (4 + 3*s**4 + 6*s**2))
+
+    snrbi = lambda s,num: 1/2. * s**3 * n.sqrt(num*(num-1)*(num-2)/6.)    # cornwell 1987
+    snrbi2 = lambda s, num: s**3/n.sqrt( (1 + 3*(num-3)*mu(s)) / (num * (num-1) * (num-2)/6.) * (4 + 3*s**4 + 6*s**2))
     snrco = lambda s,num: s * n.sqrt(num*(num-1)/2.)
     snrin = lambda s,num: 1/2. * s**2/n.sqrt(1+s**2) * n.sqrt(num*(num-1)/2.)  # tms
     snrinin = lambda s,num: 1/n.sqrt(2) * s * n.sqrt(num)
 
     p.figure(1)
     p.loglog()
-    p.plot(s, snrbi(s,num), 'b', label='Bispectrum', linewidth=3)
-#    p.plot(s, snrmega(s,num), 'y', label='Mega')
+    p.plot(s, snrbi(s,num), 'b', label='Bispectrum (orig)', linewidth=3)
+    p.plot(s, snrbi2(s,num), 'b--', label='Bispectrum (new)', linewidth=3)
     p.plot(s, snrco(s,num), 'r--', label='Coherent Beamforming', linewidth=3)
     p.plot(s, snrin(s,num), 'g.', label='Incoherent Baseline Beamforming', linewidth=3)
     p.plot(s, snrinin(s,num), 'y-.', label='Incoherent Antenna Beamforming', linewidth=3)
@@ -126,20 +128,20 @@ def plotfig(s=-1, num=-1, t=5):
     # option 2: computational inversion
     num = n.arange(3,65)
     sbiarr = []
-#    smegaarr = []
+    sbiarr2 = []
     scoarr = []
     sinarr = []
     sininarr = []
-    sarr = n.arange(1,10000)/1000.
+    sarr = n.arange(1,20000)/1000.
     for nn in num:
         sbiarr.append(sarr[n.where(snrbi(sarr,nn) > t)[0][0]])
-#        smegaarr.append(sarr[n.where(snrmega(sarr,nn) > t)[0][0]])
+        sbiarr2.append(sarr[n.where(snrbi2(sarr,nn) > t)[0][0]])
         scoarr.append(sarr[n.where(snrco(sarr,nn) > t)[0][0]])
         sinarr.append(sarr[n.where(snrin(sarr,nn) > t)[0][0]])
         sininarr.append(sarr[n.where(snrinin(sarr,nn) > t)[0][0]])
 
     sbiarr = sig_vla*n.array(sbiarr)
-#    smegaarr = sig_vla*n.array(smegaarr)
+    sbiarr2 = sig_vla*n.array(sbiarr2)
     scoarr = sig_vla*n.array(scoarr)
     sinarr = sig_vla*n.array(sinarr)
     sininarr = sig_vla*n.array(sininarr)
@@ -149,8 +151,8 @@ def plotfig(s=-1, num=-1, t=5):
 #    p.plot(num, sco(num,t), label='Coherent Beamforming')
 #    p.plot(num, sin(num,t), label='Incoherent Beamforming')
     # computational...
-    p.plot(num, sbiarr, 'b', label='Bispectrum', linewidth=3)
-#    p.plot(num, smegaarr, 'y', label='Mega')
+    p.plot(num, sbiarr, 'b', label='Bispectrum (orig)', linewidth=3)
+    p.plot(num, sbiarr2, 'b--', label='Bispectrum (new)', linewidth=3)
     p.plot(num, scoarr, 'r--', label='Coherent Beamforming', linewidth=3)
     p.plot(num, sinarr, 'g.', label='Incoherent Baseline Beamforming', linewidth=3)
     p.plot(num, sininarr, 'y-.', label='Incoherent Antenna Beamforming', linewidth=3)

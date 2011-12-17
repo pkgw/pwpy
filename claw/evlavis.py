@@ -13,6 +13,7 @@ import sys, string, os, shutil
 from os.path import join
 #import mirtask
 #from mirtask import uvdat, keys, util
+from mirtask import util
 from mirexec import TaskInvert, TaskClean, TaskRestore, TaskImFit, TaskCgDisp, TaskImStat, TaskUVFit
 import miriad, pickle
 import numpy as n
@@ -31,17 +32,17 @@ class evla:
         nchan = self.nchan
         li = range(nchan)
         self.chans = n.array(li)
+        self.nants = 7
         self.nbl = 16
-#        self.nbl = 21
         nbl = self.nbl
         initsize = nints*self.nbl   # number of integrations to read in a single chunk
 #        self.sfreq = 1.284  # freq for first channel in GHz
 #        self.sfreq = 1.796  # freq for first channel in GHz
 #        self.sdf = 0.128/self.nchan   # dfreq per channel in GHz
         self.approxuvw = True      # flag to make template visibility file to speed up writing of dm track data
-        self.pulsewidth = 0.0 * n.ones(len(self.chans)) # pulse width of crab and m31 candidates
+        self.pulsewidth = 0.006 * n.ones(len(self.chans)) # pulse width of crab and m31 candidates
         self.dmarr = [56.8]  # crab
-#        self.dmarr = n.arange(40,70,2)
+#        self.dmarr = [0.0]
         self.nskip = int(nskip*self.nbl)    # number of iterations to skip (for reading in different parts of buffer)
         nskip = int(self.nskip)
         self.file = file
@@ -898,6 +899,112 @@ class evla:
             p.show()
 
 
+    def tripgen(self, a1=0):
+        """Calculates and returns data indexes (i,j,k) for all closed triples.
+        a1 defines first antenna in triple. only uses that antenna if nonzero.
+        """
+
+        if a1 == 0:
+            amin = 1
+            amax = self.nants+1
+        else:
+            amin = a1
+            amax = a1+1
+
+        blarr = []
+        for bl in self.preamble [0:self.nbl,4]:
+            blarr.append(util.decodeBaseline (bl))
+        blarr = n.array(blarr)
+
+        # first make triples indexes in antenna numbering
+        anttrips = []
+
+#        for i in range(1,self.nants+1):
+        for i in [5,12,13,22,23,24,28]:
+            for j in [12,13,22,23,24,28]:
+                for k in [13,22,23,24,28]:
+                    anttrips.append([i,j,k])
+
+        # next return data indexes for triples
+        bltrips = []
+        for (ant1, ant2, ant3) in anttrips:
+            try:
+                bl1 = n.where( (blarr[:,0] == ant1) & (blarr[:,1] == ant2) )[0][0]
+                bl2 = n.where( (blarr[:,0] == ant2) & (blarr[:,1] == ant3) )[0][0]
+                bl3 = n.where( (blarr[:,0] == ant1) & (blarr[:,1] == ant3) )[0][0]
+                bltrips.append([bl1, bl2, bl3])
+            except IndexError:
+                continue
+
+        return n.array(bltrips)
+
+
+    def bisplc(self, chan=-1, dmbin=0, bgwindow=2, a1=0, save=0):
+        """Generate lightcurve of all bispectra.
+        Use a1 to use subset of triples starting with antenna a1.
+        """
+
+        if chan == -1:
+            chans = self.chans
+        else:
+            chans = n.array([chan])
+
+        bisp = lambda d,i,j,k: n.complex(d[i] * d[j] * n.conj(d[k]))    # bispectrum w/o normalization
+#        bisp = lambda d,i,j,k: d[i] * d[j] * n.conj(d[k])     # bispectrum w/o normalization
+
+        # theoretical relations for std of bispectra (on pulse) and snr of mean bispectrum
+        sigb = lambda S, Q: n.sqrt(4 + 6*(S/Q)**2 + 3*(S/Q)**4) * Q**3  # kulkarni 1989
+        mu = lambda s: s / (3*(1+s))
+        sigt = lambda S, Q, num: sigb(S,Q) * n.sqrt( (1 + 3*(num-3)*mu(S/Q)) / (num*(num-1)*(num-2)/6.))
+        sigt0toQ = lambda sigt0, num: (sigt0*n.sqrt(num*(num-1)*(num-2)/(6.*4)))**(1/3.)
+
+        triples = self.tripgen(a1=a1)
+
+        dibi = n.zeros((len(self.data)-bgwindow, len(triples)))
+        for ii in range(bgwindow+1, len(self.data)-(bgwindow+1)):
+            diff = self.tracksub(dmbin, ii, bgwindow=bgwindow)
+            if len(n.shape(diff)) == 1:    # no track
+                continue
+            diffmean = diff[0, :, chans].mean(axis=0)
+
+            for trip in range(len(triples)):
+                i, j, k = triples[trip]
+                dibi[ii, trip] = bisp(diffmean, i, j, k).real
+
+        # mean and std are primary products of each trial
+        dibimean = dibi.mean(axis=1)
+        dibistd = dibi.std(axis=1)
+
+        if save:
+            good = n.where( (dibistd > 0.5*n.median(dibistd)) & (dibistd < 2.*n.median(dibistd)) )
+            dibimeanstd = dibimean[good].std()
+
+            Q = n.median( (dibistd/2.)**(1/3.) )            # first estimate of Q
+#            Q = sigt0toQ(dibimeanstd, self.nants)              # alternately for Q...
+            print 'Q1 =', n.median( (dibistd/2.)**(1/3.) )
+            print 'Q2 =', sigt0toQ(dibimeanstd, self.nants)
+
+            # plot snrb lc and expected snr vs. sigb relation
+            p.figure(1)
+            p.subplot(211)
+            p.plot(dibimean/dibimeanstd, 'b.')
+            p.xlabel('Integation')
+            p.ylabel('SNR$_{bisp}$')
+            savename = self.file.split('.')[:-1]
+            savename.append(str(self.nskip/self.nbl) + '.bisplc.png')
+            savename = string.join(savename,'.')
+            p.subplot(212)
+            p.plot(dibistd, dibimean/dibimeanstd, 'b.')
+            smax = (dibimean.max())**(1/3.)
+            sarr = smax*n.arange(0,11)/10.
+            p.plot(sigb(sarr, Q), sarr**3/dibimeanstd, 'b')
+            p.xlabel('$\sigma_b$')
+            p.ylabel('SNR$_{bisp}$')
+            p.savefig(savename)
+            p.clf()                           
+        return dibimean, dibistd
+
+
     def closure(self, dmbin, bgwindow=10, show=0):
         """Calculates the closure phase or bispectrum for each integration, averaging over all channels (for now).
         Detection can be done by averaging closure phases (bad) or finding when all triples have SNR over a threshold.
@@ -924,14 +1031,13 @@ class evla:
         bisparr = n.zeros((len(triples), len(self.data)))
 
         print 'Building closure quantity array...'
-        for int in range(len(self.data)-bgwindow):
+        for int in range(bgwindow+1, len(self.data)-bgwindow):
             diff = self.tracksub(dmbin, int, bgwindow=bgwindow)
             if len(n.shape(diff)) == 1:    # no track
                 continue
             diffmean = diff[0].mean(axis=1)    # option 1, 3
             for tr in range(len(triples)):
                 (i,j,k) = triples[tr]
-#                bisparr[tr,int] = complex(bisp(diffmean, i, j, k))    # option 3
                 bisparr[tr,int] = n.real(bisp(diffmean, i, j, k))    # option 3
 
         bispstdb = bisparr.std(axis=0)
