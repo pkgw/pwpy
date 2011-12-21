@@ -41,7 +41,7 @@ class noise:
         p.show()
 
 def repeat(num=100, source=0+0j, show=0):
-    bglen = 1000
+    bglen = 100000
 
     # make detected visibilities on source
     nn = noise(len=num)
@@ -57,7 +57,8 @@ def repeat(num=100, source=0+0j, show=0):
     for i in range(bglen):
         nnoff = noise(len=num)
         nnoff.trip()
-        mdarr.append(n.abs(nnoff.data.mean()))
+#        mdarr.append(n.abs(nnoff.data.mean()))
+        mdarr.append(nnoff.data.real.mean())
         biarr.append(nnoff.bisp.real.mean())
         dmarr.append(nnoff.det().mean())
     mdarr = n.array(mdarr)
@@ -87,7 +88,8 @@ def repeat(num=100, source=0+0j, show=0):
     print 'mean then det:', mdsig, 'sigma'
     print 'bispectrum:', bisig, 'sigma'
 
-    return n.array([intsig, dmsig, mdsig, bisig])
+#    return n.array([intsig, dmsig, mdsig, bisig])
+    return mdarr, biarr
 
 def plotfig(s=-1, num=-1, t=5):
     """Plots figure showing snr of signal seen by various algorithms.
