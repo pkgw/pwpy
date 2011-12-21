@@ -979,7 +979,8 @@ class poco:
         triph = lambda d,i,j,k: n.mod(n.angle(d[i]) + n.angle(d[j]) - n.angle(d[k]), 2*n.pi)  # triple phase
 
 # use triples
-        bisp = lambda d,i,j,k: d[i] * d[j] * n.conj(d[k])     # bispectrum w/o normalization
+        bisp = lambda d,i,j,k: d[i] * d[j] * n.conj(d[k])     # bispectrum
+#        bisp = lambda d,i,j,k: d[i,:] * d[j,:] * n.conj(d[k,:])     # array bispectrum
         triples = [(0,7,6),(0,2,1),(0,4,3),(6,8,3),(1,5,3)]  # antenna triples for good poco data: 123, 125, 126, 136, 156 (correct! miriad numbering). 6 true triples for n=5 is 123 125 126 135 136 156
         
 # option 1: triple phase average over frequency
@@ -987,18 +988,18 @@ class poco:
 # option 2: triple phase no freq avg
 #        triarr = n.zeros((len(self.data)-2*bgwindow-1, len(triples), len(self.data[0,0])))
 # option 3: bispectrum
-        bisparr = n.zeros((len(triples), len(self.data)), dtype=n.dtype('complex'))
+        bisparr = n.zeros((len(triples), len(self.data)))
 
         print 'Building closure quantity array...'
-        for int in range(len(self.data)):
-            diff = self.tracksub(dmbin, int, bgwindow=bgwindow)
+        for ii in range(len(self.data)):
+            diff = self.tracksub(dmbin, ii, bgwindow=bgwindow)
             if len(n.shape(diff)) == 1:    # no track
                 continue
-            diffmean = diff[0].mean(axis=1)    # option 1, 3
+            diffmean = diff[0].mean(axis=1)
             for tr in range(len(triples)):
 # use triples
                 (i,j,k) = triples[tr]
-                bisparr[tr,int] = complex(bisp(diffmean, i, j, k))    # option 3
+                bisparr[tr,ii] = bisp(diffmean, i, j, k).real
 
         bisparr = bisparr.mean(axis=0)
         bispstd = bisparr.std()
