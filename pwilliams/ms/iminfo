@@ -25,6 +25,7 @@ axtypes -- iterable of strings identifying axis types, of
   same size as shape; no effort made to standardize the types
 cellra -- the RA size of the reference pixel in radians
 celldec -- the Dec size of the reference pixel in radians
+freq -- the reference frequency of the image in GHz
 bmaj -- major axis size of convolving beam (if present) in radians
 bmin -- minor axis size of convolving beam, radians
 bpa -- position angle of convolving beam, east from north, radians
@@ -115,6 +116,8 @@ def getinfo_miriad (path):
         elif info.axtypes[q].startswith ('DEC-'):
             info.dec = im.getScalarItem ('crval%d' % (i + 1))
             info.celldec = im.getScalarItem ('cdelt%d' % (i + 1))
+        elif info.axtypes[q].startswith ('FREQ'):
+            info.freq = im.getScalarItem ('crval%d' % (i + 1))
 
     bmaj = im.getScalarItem ('bmaj')
     if bmaj is not None:
@@ -161,6 +164,11 @@ def getinfo_casa (path):
             info.dec = dc.get_referencevalue ()[i]
             info.celldec = dc.get_increment ()[i]
 
+    sc = c.get_coordinate ('spectral')
+    if sc.get_unit () != 'Hz':
+        util.die ('expect spectral reference value to be given in Hz')
+    info.freq = sc.get_referencevalue () * 1e-9
+
     ii = im.imageinfo ()
     if 'restoringbeam' in ii:
         info.bmaj = ii['restoringbeam']['major']['value'] * A2R
@@ -203,6 +211,11 @@ def getinfo_fits (path):
                 util.die ('expect Dec coordinate to be in degrees')
             info.dec = header.get ('crval%d' % (i + 1)) * D2R
             info.celldec = header.get ('cdelt%d' % (i + 1)) * D2R
+        elif info.axtypes[q].startswith ('FREQ'):
+            # TODO: find a FITS file with which to check this logic
+            #if not header.get ('cunit%d' % (i + 1), 'hz').lower ().startswith ('hz'):
+            #    util.die ('expect frequency coordinate to be in hz')
+            info.freq = header.get ('crval%d' % (i + 1)) * 1e-9
 
     bmaj = header.get ('bmaj', None)
     if bmaj is not None:
@@ -249,6 +262,9 @@ def printinfo (path):
 
     if info.ra is not None:
         print 'center   =', fmtradec (info.ra, info.dec)
+
+    if info.freq is not None:
+        print 'freq     = %f GHz' % info.freq
 
     if info.shape is not None:
         print 'shape    =', ' '.join (str (x) for x in info.shape)
