@@ -155,19 +155,31 @@ def getinfo_casa (path):
             for subitem in item:
                 info.axtypes.append (subitem.replace (' ', '_'))
 
-    dc = c.get_coordinate ('direction')
-    for i, axname in enumerate (dc.get_axes ()):
-        if axname == 'Right Ascension':
-            info.ra = dc.get_referencevalue ()[i]
-            info.cellra = dc.get_increment ()[i]
-        elif axname == 'Declination':
-            info.dec = dc.get_referencevalue ()[i]
-            info.celldec = dc.get_increment ()[i]
+    try:
+        # There doesn't seem to be a better way to test for
+        # the existence of a given coordinate.
+        dc = c.get_coordinate ('direction')
+    except ValueError:
+        dc = None
 
-    sc = c.get_coordinate ('spectral')
-    if sc.get_unit () != 'Hz':
-        util.die ('expect spectral reference value to be given in Hz')
-    info.freq = sc.get_referencevalue () * 1e-9
+    if dc is not None:
+        for i, axname in enumerate (dc.get_axes ()):
+            if axname == 'Right Ascension':
+                info.ra = dc.get_referencevalue ()[i]
+                info.cellra = dc.get_increment ()[i]
+            elif axname == 'Declination':
+                info.dec = dc.get_referencevalue ()[i]
+                info.celldec = dc.get_increment ()[i]
+
+    try:
+        sc = c.get_coordinate ('spectral')
+    except ValueError:
+        sc = None
+
+    if sc is not None:
+        if sc.get_unit () != 'Hz':
+            util.die ('expect spectral reference value to be given in Hz')
+        info.freq = sc.get_referencevalue () * 1e-9
 
     ii = im.imageinfo ()
     if 'restoringbeam' in ii:
