@@ -25,6 +25,10 @@ TODO: configurable sorting of output (to find a particular
 source, want RA sort, prolly)
 
 TODO: better module behavior: no util.dies, etc.
+
+TODO: there's code to go ahead if there's no restoring beam
+information, but SFIND requires this info so the code doesn't
+really accomplish anything
 """
 
 import sys, numpy as N
@@ -114,21 +118,28 @@ def sfind_extract (inpath, keywords):
 
     from pyrap.images import image
 
+    sfinfo = {}
+
     h = image (inpath)
     imageinfo = Holder ()
     imageinfo.naxis = len (h.shape ())
 
-    bminfo = h.imageinfo ()['restoringbeam']
-    if bminfo['major']['unit'] != 'arcsec':
-        util.die ('unhandled beamshape major axis unit "%s"', bminfo['major']['unit'])
-    if bminfo['minor']['unit'] != 'arcsec':
-        util.die ('unhandled beamshape minor axis unit "%s"', bminfo['minor']['unit'])
-    if bminfo['positionangle']['unit'] != 'deg':
-        util.die ('unhandled beamshape PA unit "%s"', bminfo['positionangle']['unit'])
+    bminfo = h.imageinfo ().get ('restoringbeam')
+    if bminfo is None:
+        warn ('no restoring beam information; will NOT deconvolve')
+        imageinfo.bmaj = imageinfo.bmin = imageinfo.bpa = None
+        sfinfo['maybestillconvolved'] = 'true'
+    else:
+        if bminfo['major']['unit'] != 'arcsec':
+            util.die ('unhandled beamshape major axis unit "%s"', bminfo['major']['unit'])
+        if bminfo['minor']['unit'] != 'arcsec':
+            util.die ('unhandled beamshape minor axis unit "%s"', bminfo['minor']['unit'])
+        if bminfo['positionangle']['unit'] != 'deg':
+            util.die ('unhandled beamshape PA unit "%s"', bminfo['positionangle']['unit'])
 
-    imageinfo.bmaj = bminfo['major']['value'] * ASEC2RAD
-    imageinfo.bmin = bminfo['minor']['value'] * ASEC2RAD
-    imageinfo.bpa = bminfo['positionangle']['value'] * N.pi / 180
+        imageinfo.bmaj = bminfo['major']['value'] * ASEC2RAD
+        imageinfo.bmin = bminfo['minor']['value'] * ASEC2RAD
+        imageinfo.bpa = bminfo['positionangle']['value'] * N.pi / 180
 
     # Now convert to MIRIAD format (via FITS), run SFIND, and process
 
@@ -156,7 +167,6 @@ def sfind_extract (inpath, keywords):
         TaskFits (in_='input.fits', out='input.mirimg', op='xyin').runsilent ()
 
         stdout, stderr = TaskSFind (in_='input.mirimg', **keywords).snarf ()
-        sfinfo = {}
 
         for l in stdout:
             if l.startswith ('FDR selected a'):
@@ -215,10 +225,14 @@ def process_output (ii, logstream):
                   'source:\n   %s', line.strip ())
             continue
 
-        dmaj, dmin, dpa, status = gaussianDeconvolve (info.raw_maj,
-                                                      info.raw_min,
-                                                      info.raw_pa,
-                                                      ii.bmaj, ii.bmin, ii.bpa)
+        if ii.bmaj is None:
+            dmaj, dmin, dpa = info.raw_maj, info.raw_min, info.raw_pa
+            status = 'ok'
+        else:
+            dmaj, dmin, dpa, status = gaussianDeconvolve (info.raw_maj,
+                                                          info.raw_min,
+                                                          info.raw_pa,
+                                                          ii.bmaj, ii.bmin, ii.bpa)
 
         if status == 'fail':
             warn ('failed to deconvolve shape of the following sfind '
