@@ -680,7 +680,7 @@ def _lmpar (r, ipvt, diag, qtb, delta, x, sdiag, par, enorm, finfo):
         for j in xrange (n - 1):
             wa1[j] /= sdiag[j]
             wa1[j+1:n] -= r[j+1:n,j] * wa1[j]
-        wa1[n-1] /= siag[n-1] # degenerate case
+        wa1[n-1] /= sdiag[n-1] # degenerate case
 
         temp = enorm (wa1, finfo)
         parc = fp / delta / temp**2
