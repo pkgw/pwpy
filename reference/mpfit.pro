@@ -118,7 +118,7 @@
 ;  caller gracefully.  However, during the debugging process, it is
 ;  often useful to halt execution where the error occurred.  When you
 ;  set the NOCATCH keyword, MPFIT will not do any special error
-;  trapping, and execution will stop where ever the error occurred.
+;  trapping, and execution will stop whereever the error occurred.
 ;
 ;  MPFIT does not explicitly change the !ERROR_STATE variable
 ;  (although it may be changed implicitly if MPFIT calls MESSAGE).  It
@@ -164,9 +164,9 @@
 ;  individual values of PARINFO.MPSIDE.  Setting AUTODERIVATIVE=0 is
 ;  equivalent to resetting PARINFO.MPSIDE=3 for all parameters.
 ;
-;  However, be aware that even if the user requests explicit
-;  derivatives for some or all parameters, MPFIT will not always
-;  request explicit derivatives on ever user function call.
+;  Even if the user requests explicit derivatives for some or all
+;  parameters, MPFIT will not always request explicit derivatives on
+;  every user function call.
 ;
 ; EXPLICIT DERIVATIVES - CALLING INTERFACE
 ;
@@ -448,6 +448,25 @@
 ;  constrained to be above 50.
 ;
 ;
+; RECURSION
+;
+;  Generally, recursion is not allowed.  As of version 1.77, MPFIT has
+;  recursion protection which does not allow a model function to
+;  itself call MPFIT.  Users who wish to perform multi-level
+;  optimization should investigate the 'EXTERNAL' function evaluation
+;  methods described below for hard-to-evaluate functions.  That
+;  method places more control in the user's hands.  The user can
+;  design a "recursive" application by taking care.
+;
+;  In most cases the recursion protection should be well-behaved.
+;  However, if the user is doing debugging, it is possible for the
+;  protection system to get "stuck."  In order to reset it, run the
+;  procedure:
+;     MPFIT_RESET_RECURSION
+;  and the protection system should get "unstuck."  It is save to call
+;  this procedure at any time.
+;
+;
 ; COMPATIBILITY
 ;
 ;  This function is designed to work with IDL 5.0 or greater.
@@ -482,7 +501,7 @@
 ;  will check whether the accessed version is 1.70 or greater, without
 ;  performing any numerical processing.
 ;
-;  Because the VERSION and MIN_VERSION keywords were added in MPFIT
+;  The VERSION and MIN_VERSION keywords were added in MPFIT
 ;  version 1.70 and later.  If the caller attempts to use the VERSION
 ;  or MIN_VERSION keywords, and an *older* version of the code is
 ;  present in the caller's path, then IDL will throw an 'unknown
@@ -586,8 +605,31 @@
 ;                    NOTE: to supply your own explicit derivatives,
 ;                      explicitly pass AUTODERIVATIVE=0
 ;
-;   BESTNORM - the value of the summed squared weighted residuals for
-;              the returned parameter values, i.e. TOTAL(DEVIATES^2).
+;   BESTNORM - upon return, the value of the summed squared weighted
+;              residuals for the returned parameter values,
+;              i.e. TOTAL(DEVIATES^2).
+;
+;   BEST_FJAC - upon return, BEST_FJAC contains the Jacobian, or
+;               partial derivative, matrix for the best-fit model.
+;               The values are an array,
+;               ARRAY(N_ELEMENTS(DEVIATES),NFREE) where NFREE is the
+;               number of free parameters.  This array is only
+;               computed if /CALC_FJAC is set, otherwise BEST_FJAC is
+;               undefined.
+;
+;               The returned array is such that BEST_FJAC[I,J] is the
+;               partial derivative of DEVIATES[I] with respect to
+;               parameter PARMS[PFREE_INDEX[J]].  Note that since
+;               deviates are (data-model)*weight, the Jacobian of the
+;               *deviates* will have the opposite sign from the
+;               Jacobian of the *model*, and may be scaled by a
+;               factor.
+;
+;   BEST_RESID - upon return, an array of best-fit deviates.
+;
+;   CALC_FJAC - if set, then calculate the Jacobian and return it in
+;               BEST_FJAC.  If not set, then the return value of
+;               BEST_FJAC is undefined.
 ;
 ;   COVAR - the covariance matrix for the set of parameters returned
 ;           by MPFIT.  The matrix is NxN where N is the number of
@@ -609,7 +651,8 @@
 ;   DOF - number of degrees of freedom, computed as
 ;             DOF = N_ELEMENTS(DEVIATES) - NFREE
 ;         Note that this doesn't account for pegged parameters (see
-;         NPEGGED).
+;         NPEGGED).  It also does not account for data points which
+;         are assigned zero weight by the user function.
 ;
 ;   ERRMSG - a string error or warning message is returned.
 ;
@@ -750,8 +793,13 @@
 ;                 change to a printable character like 'q'.
 ;
 ;   MAXITER - The maximum number of iterations to perform.  If the
-;             number is exceeded, then the STATUS value is set to 5
-;             and MPFIT returns.
+;             number of calculation iterations exceeds MAXITER, then
+;             the STATUS value is set to 5 and MPFIT returns.  
+;
+;             If MAXITER EQ 0, then MPFIT does not iterate to adjust
+;             parameter values; however, the user function is evaluated
+;             and parameter errors/covariance/Jacobian are estimated
+;             before returning.
 ;             Default: 200 iterations
 ;
 ;   MIN_VERSION - The minimum requested version number.  This must be
@@ -820,6 +868,11 @@
 ;
 ;              DOF     = N_ELEMENTS(X) - N_ELEMENTS(PARMS) ; deg of freedom
 ;              PCERROR = PERROR * SQRT(BESTNORM / DOF)   ; scaled uncertainties
+;
+;   PFREE_INDEX - upon return, PFREE_INDEX contains an index array
+;                 which indicates which parameter were allowed to
+;                 vary.  I.e. of all the parameters PARMS, only
+;                 PARMS[PFREE_INDEX] were varied.
 ;
 ;   QUERY - if set, then MPFIT() will return immediately with one of
 ;           the following values:
@@ -1234,12 +1287,20 @@
 ;          CM, 05 Feb 2010
 ;   1.75 - Enforce TIED constraints when preparing to terminate the
 ;          routine, CM, 2010-06-22
+;   1.76 - Documented input keywords now are not modified upon output,
+;          CM, 2010-07-13
+;   1.77 - Upon user request (/CALC_FJAC), compute Jacobian matrix and
+;          return in BEST_FJAC; also return best residuals in
+;          BEST_RESID; also return an index list of free parameters as
+;          PFREE_INDEX; add a fencepost to prevent recursion
+;          CM, 2010-10-27
+;   1.79 - Documentation corrections.  CM, 2011-08-26
 ;
-;  $Id: mpfit.pro,v 1.75 2010/06/22 06:43:35 craigm Exp $
+;  $Id: mpfit.pro,v 1.79 2011/12/08 17:50:32 cmarkwar Exp $
 ;-
 ; Original MINPACK by More' Garbow and Hillstrom, translated with permission
 ; Modifications and enhancements are:
-; Copyright (C) 1997-2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, Craig Markwardt
+; Copyright (C) 1997-2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, Craig Markwardt
 ; This software is provided as is without any warranty whatsoever.
 ; Permission to use, copy, modify, and distribute modified or
 ; unmodified copies is granted, provided this copyright and disclaimer
@@ -2515,7 +2576,7 @@ end
 ;; Parse the RCSID revision number
 function mpfit_revision
   ;; NOTE: this string is changed every time an RCS check-in occurs
-  revision = '$Revision: 1.75 $'
+  revision = '$Revision: 1.79 $'
 
   ;; Parse just the version number portion
   revision = stregex(revision,'\$'+'Revision: *([0-9.]+) *'+'\$',/extract,/sub)
@@ -2543,6 +2604,12 @@ function mpfit_min_version, version, min_version
   if v[0] LT mv[0] then return, 0
   if v[1] LT mv[1] then return, 0
   return, 1
+end
+
+; Manually reset recursion fencepost if the user gets in trouble
+pro mpfit_reset_recursion
+  common mpfit_fencepost, mpfit_fencepost_active
+  mpfit_fencepost_active = 0
 end
 
 ;     **********
@@ -2726,16 +2793,20 @@ end
 ;
 ;     **********
 function mpfit, fcn, xall, FUNCTARGS=fcnargs, SCALE_FCN=scalfcn, $
-                ftol=ftol, xtol=xtol, gtol=gtol, epsfcn=epsfcn, resdamp=damp, $
+                ftol=ftol0, xtol=xtol0, gtol=gtol0, epsfcn=epsfcn, $
+                resdamp=damp0, $
                 nfev=nfev, maxiter=maxiter, errmsg=errmsg, $
-                factor=factor, nprint=nprint, STATUS=info, $
-                iterproc=iterproc, iterargs=iterargs, iterstop=ss,$
+                factor=factor0, nprint=nprint0, STATUS=info, $
+                iterproc=iterproc0, iterargs=iterargs, iterstop=ss,$
                 iterkeystop=iterkeystop, $
                 niter=iter, nfree=nfree, npegged=npegged, dof=dof, $
-                diag=diag, rescale=rescale, autoderivative=autoderiv, $
-                perror=perror, covar=covar, nocovar=nocovar, bestnorm=fnorm, $
+                diag=diag, rescale=rescale, autoderivative=autoderiv0, $
+                pfree_index=ifree, $
+                perror=perror, covar=covar, nocovar=nocovar, $
+                bestnorm=fnorm, best_resid=fvec, $
+                best_fjac=output_fjac, calc_fjac=calc_fjac, $
                 parinfo=parinfo, quiet=quiet, nocatch=nocatch, $
-                fastnorm=fastnorm, proc=proc, query=query, $
+                fastnorm=fastnorm0, proc=proc, query=query, $
                 external_state=state, external_init=extinit, $
                 external_fvec=efvec, external_fjac=efjac, $
                 version=version, min_version=min_version0
@@ -2771,15 +2842,15 @@ function mpfit, fcn, xall, FUNCTARGS=fcnargs, SCALE_FCN=scalfcn, $
   
   ;; Use of double here not a problem since f/x/gtol are all only used
   ;; in comparisons
-  if n_elements(ftol) EQ 0 then ftol = 1.D-10
-  if n_elements(xtol) EQ 0 then xtol = 1.D-10
-  if n_elements(gtol) EQ 0 then gtol = 1.D-10
-  if n_elements(factor) EQ 0 then factor = 100.
-  if n_elements(nprint) EQ 0 then nprint = 1
-  if n_elements(iterproc) EQ 0 then iterproc = 'MPFIT_DEFITER'
-  if n_elements(autoderiv) EQ 0 then autoderiv = 1
-  if n_elements(fastnorm) EQ 0 then fastnorm = 0
-  if n_elements(damp) EQ 0 then damp = 0 else damp = damp[0]
+  if n_elements(ftol0) EQ 0 then ftol = 1.D-10 else ftol = ftol0[0]
+  if n_elements(xtol0) EQ 0 then xtol = 1.D-10 else xtol = xtol0[0]
+  if n_elements(gtol0) EQ 0 then gtol = 1.D-10 else gtol = gtol0[0]
+  if n_elements(factor0) EQ 0 then factor = 100. else factor = factor0[0]
+  if n_elements(nprint0) EQ 0 then nprint = 1 else nprint = nprint0[0]
+  if n_elements(iterproc0) EQ 0 then iterproc = 'MPFIT_DEFITER' else iterproc = iterproc0[0]
+  if n_elements(autoderiv0) EQ 0 then autoderiv = 1 else autoderiv = autoderiv0[0]
+  if n_elements(fastnorm0) EQ 0 then fastnorm = 0 else fastnorm = fastnorm0[0]
+  if n_elements(damp0) EQ 0 then damp = 0 else damp = damp0[0]
 
   ;; These are special configuration parameters that can't be easily
   ;; passed by MPFIT directly.
@@ -2797,6 +2868,18 @@ function mpfit, fcn, xall, FUNCTARGS=fcnargs, SCALE_FCN=scalfcn, $
   nfree = 0L
   npegged = 0L
   dof = 0L
+  output_fjac = 0L
+
+  ;; Set up a persistent fencepost that prevents recursive calls
+  common mpfit_fencepost, mpfit_fencepost_active
+  if n_elements(mpfit_fencepost_active) EQ 0 then mpfit_fencepost_active = 0
+  if mpfit_fencepost_active then begin
+      errmsg = 'ERROR: recursion detected; you cannot run MPFIT recursively'
+      goto, TERMINATE
+  endif
+  ;; Only activate the fencepost if we are not in debugging mode
+  if NOT keyword_set(nocatch) then mpfit_fencepost_active = 1
+
 
   ;; Parameter damping doesn't work when user is providing their own
   ;; gradients.
@@ -2835,8 +2918,9 @@ function mpfit, fcn, xall, FUNCTARGS=fcnargs, SCALE_FCN=scalfcn, $
   ;; Handle error conditions gracefully
   if NOT keyword_set(nocatch) then begin
       catch, catcherror
-      if catcherror NE 0 then begin
+      if catcherror NE 0 then begin  ;; An error occurred!!!
           catch, /cancel
+          mpfit_fencepost_active = 0
           err_string = ''+!error_state.msg
           message, /cont, 'Error detected while '+catch_msg+':'
           message, /cont,    err_string
@@ -3182,6 +3266,8 @@ function mpfit, fcn, xall, FUNCTARGS=fcnargs, SCALE_FCN=scalfcn, $
   iflag = 2
   if NOT isext then begin
       catch_msg = 'calling MPFIT_FDJAC2'
+      ;; NOTE!  If you change this call then change the one during
+      ;; clean-up as well!
       fjac = mpfit_fdjac2(fcn, x, fvec, step, qulim, ulim, dside, $
                           iflag=iflag, epsfcn=epsfcn, $
                           autoderiv=autoderiv, dstep=dstep, $
@@ -3226,6 +3312,9 @@ function mpfit, fcn, xall, FUNCTARGS=fcnargs, SCALE_FCN=scalfcn, $
           endfor
       endif
   endif
+
+  ;; Save a copy of the Jacobian if the user requests it...
+  if keyword_set(calc_fjac) then output_fjac = fjac
 
   ;; Compute the QR factorization of the jacobian
   catch_msg = 'calling MPFIT_QRFAC'
@@ -3521,7 +3610,8 @@ TERMINATE:
                  (qllim AND (x EQ llim)), npegged)
   endif
 
-  if fcn NE '(EXTERNAL)' AND nprint GT 0 AND info GT 0 then begin
+  ;; Calculate final function value (FNORM) and residuals (FVEC)
+  if isext EQ 0 AND nprint GT 0 AND info GT 0 then begin
       catch_msg = 'calling '+fcn
       fvec = mpfit_call(fcn, xnew, _EXTRA=fcnargs)
       catch_msg = 'in the termination phase'
@@ -3565,10 +3655,12 @@ TERMINATE:
             perror[wh] = sqrt(covar[wh, wh])
       endif
   endif
+
 ;  catch_msg = 'returning the result'
 ;  profvals.mpfit = profvals.mpfit + (systime(1) - prof_start)
 
   FINAL_RETURN:
+  mpfit_fencepost_active = 0
   nfev = mpconfig.nfev
   if n_elements(xnew) EQ 0 then return, !values.d_nan
   return, xnew
