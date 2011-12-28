@@ -1074,11 +1074,11 @@ class Problem (object):
 
         # Which parameters have limits?
 
-        qulim = N.where (N.isfinite (self._pinfof[PI_F_ULIMIT,ifree]))
+        qulim = N.isfinite (self._pinfof[PI_F_ULIMIT,ifree])
         ulim = self._pinfof[PI_F_ULIMIT,ifree]
-        qllim = N.where (N.isfinite (self._pinfof[PI_F_LLIMIT,ifree]))
+        qllim = N.isfinite (self._pinfof[PI_F_LLIMIT,ifree])
         llim = self._pinfof[PI_F_LLIMIT,ifree]
-        qanylim = len (qulim[0]) + len (qllim[0]) > 0
+        qanylim = N.any (qulim) or N.any (qllim)
 
         # Init fnorm
 
