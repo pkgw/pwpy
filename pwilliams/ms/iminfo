@@ -1,5 +1,5 @@
 #! /usr/bin/env python
-# -*- python; coding: utf-8 -*-
+# -*- mode: python; coding: utf-8 -*-
 
 """
 iminfo <paths...>
@@ -289,11 +289,11 @@ def printinfo (path):
         print 'axtypes  =', ' '.join (x for x in info.axtypes)
 
     if info.cellra is not None:
-        print 'ctrcell  = %f” × %f”' % (info.cellra * R2A,
+        print 'ctrcell  = %fʺ × %fʺ' % (info.cellra * R2A,
                                         info.celldec * R2A)
 
     if info.bmaj is not None:
-        print 'beam     = %f” × %f” @ %f°' % (info.bmaj * R2A,
+        print 'beam     = %fʺ × %fʺ @ %f°' % (info.bmaj * R2A,
                                               info.bmin * R2A,
                                               info.bpa * R2D)
 
