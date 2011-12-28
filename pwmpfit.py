@@ -1406,6 +1406,7 @@ class Problem (object):
                 self.perror[wh] = N.sqrt (d[wh])
 
         soln.status = status
+        soln.niter = self.niter
         soln.params = self.params
         soln.covar = self.covar
         soln.perror = self.perror
