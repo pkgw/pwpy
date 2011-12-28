@@ -1366,9 +1366,6 @@ class Problem (object):
 
         # End outer loop.
 
-        if len (self.params) == 0:
-            return -1
-
         if nfree == 0:
             self.params = x0.copy ()
         else:
