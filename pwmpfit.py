@@ -1295,7 +1295,7 @@ class Problem (object):
 
                 temp1 = _enorm (alpha * wa3, finfo) / self.fnorm
                 temp2 = N.sqrt (alpha * par) * pnorm / self.fnorm
-                prered = temp1**2 + 0.5 * temp2**2
+                prered = temp1**2 + 2 * temp2**2
                 dirder = -(temp1**2 + temp2**2)
 
                 # Compute ratio of the actual to the predicted reduction.
