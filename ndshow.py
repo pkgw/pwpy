@@ -154,37 +154,50 @@ class ColorMapper (LazyComputer):
 
     def _makeFunc (self, ismasked):
         mapper = self.mapper
-        scratch = N.zeros ((self.tilesize, self.tilesize), dtype=N.uint32)
+        # I used to preallocate this scratch array, but doing
+        # "N.multiply (mapped[:,:,0], 0xFF, effscratch)" causes
+        # segfaults on Fedora 16. So, work around.
+        #scratch = N.zeros ((self.tilesize, self.tilesize), dtype=N.uint32)
 
         if not ismasked:
             def func (src, dest):
-                effscratch = scratch[:dest.shape[0],:dest.shape[1]]
+                #effscratch = scratch[:dest.shape[0],:dest.shape[1]]
                 mapped = mapper (src)
                 dest.fill (0xFF000000)
-                N.multiply (mapped[:,:,0], 0xFF, effscratch)
+                # New code:
+                effscratch = (mapped[:,:,0] * 0xFF).astype (N.uint32)
+                # Old code:
+                #N.multiply (mapped[:,:,0], 0xFF, effscratch)
                 N.left_shift (effscratch, 16, effscratch)
                 N.bitwise_or (dest, effscratch, dest)
-                N.multiply (mapped[:,:,1], 0xFF, effscratch)
+                effscratch = (mapped[:,:,1] * 0xFF).astype (N.uint32)
+                #N.multiply (mapped[:,:,1], 0xFF, effscratch)
                 N.left_shift (effscratch, 8, effscratch)
                 N.bitwise_or (dest, effscratch, dest)
-                N.multiply (mapped[:,:,2], 0xFF, effscratch)
+                effscratch = (mapped[:,:,2] * 0xFF).astype (N.uint32)
+                #N.multiply (mapped[:,:,2], 0xFF, effscratch)
                 N.bitwise_or (dest, effscratch, dest)
         else:
-            scratch2 = N.zeros ((self.tilesize, self.tilesize), dtype=N.uint32)
+            #scratch2 = N.zeros ((self.tilesize, self.tilesize), dtype=N.uint32)
 
             def func (src, dest):
-                effscratch = scratch[:dest.shape[0],:dest.shape[1]]
-                effscratch2 = scratch2[:dest.shape[0],:dest.shape[1]]
+                #effscratch = scratch[:dest.shape[0],:dest.shape[1]]
+                #effscratch2 = scratch2[:dest.shape[0],:dest.shape[1]]
                 mapped = mapper (src)
 
                 dest.fill (0xFF000000)
-                N.multiply (mapped[:,:,0], 0xFF, effscratch)
+                # New code:
+                effscratch = (mapped[:,:,0] * 0xFF).astype (N.uint32)
+                # Old code:
+                #N.multiply (mapped[:,:,0], 0xFF, effscratch)
                 N.left_shift (effscratch, 16, effscratch)
                 N.bitwise_or (dest, effscratch, dest)
-                N.multiply (mapped[:,:,1], 0xFF, effscratch)
+                effscratch = (mapped[:,:,1] * 0xFF).astype (N.uint32)
+                #N.multiply (mapped[:,:,1], 0xFF, effscratch)
                 N.left_shift (effscratch, 8, effscratch)
                 N.bitwise_or (dest, effscratch, dest)
-                N.multiply (mapped[:,:,2], 0xFF, effscratch)
+                effscratch = (mapped[:,:,2] * 0xFF).astype (N.uint32)
+                #N.multiply (mapped[:,:,2], 0xFF, effscratch)
                 N.bitwise_or (dest, effscratch, dest)
 
                 N.invert (src.mask, effscratch2)
