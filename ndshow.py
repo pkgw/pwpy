@@ -607,9 +607,13 @@ def view (array, title='Array Viewer', colormap='black_to_blue'):
     mapper.setTileSize ()
 
     h, w = array.shape
+    stride = cairo.ImageSurface.format_stride_for_width (cairo.FORMAT_ARGB32,
+                                                         w)
+    assert stride % 4 == 0 # stride is in bytes
+    assert stride == 4 * w # size of buffer is set in mapper
     imagesurface = cairo.ImageSurface.create_for_data (mapper.buffer,
                                                        cairo.FORMAT_ARGB32,
-                                                       w, h, w * 4)
+                                                       w, h, stride)
 
     def getshape ():
         return w, h
