@@ -869,7 +869,7 @@ class Problem (object):
                               'are mutually exclusive.')
 
         if self.rescale:
-            if self.diag is None or self.diag.shape != (self.npar, ):
+            if self.diag is None or self.diag.shape != (self._npar, ):
                 raise ValueError ('diag')
             if N.any (self.diag <= 0.):
                 raise ValueError ('diag')
@@ -1021,7 +1021,7 @@ class Problem (object):
 
 
     def pNames (self, *names):
-        if len (names) != self.npar:
+        if len (names) != self._npar:
             raise ValueError ('names')
 
         self._pinfoo[PI_O_NAME] = names
@@ -1514,7 +1514,7 @@ class Problem (object):
     def _doTies (self, p):
         funcs = self._pinfoo[PI_O_TIED]
         
-        for i in xrange (self.npar):
+        for i in xrange (self._npar):
             if funcs[i] is not None:
                 p[i] = funcs[i] (p)
 
