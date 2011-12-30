@@ -1034,7 +1034,7 @@ class Problem (object):
         return self
 
     
-    def _call (self, x, vec, jac):
+    def _ycall (self, x, vec):
         if self._qanytied:
             self._doTies (x)
 
@@ -1044,10 +1044,23 @@ class Problem (object):
             print 'Call: #%4d f(%s) ->' % (self.nfev, x),
         self._yfunc (x, vec)
         if self.debugCalls:
-            print vec, jac
+            print vec
 
         if self.damp > 0:
             N.tanh (vec / self.damp, vec)
+
+
+    def _jcall (self, x, jac):
+        if self._qanytied:
+            self._doTies (x)
+
+        self.nfev += 1
+
+        if self.debugCalls:
+            print 'Call: #%4d j(%s) ->' % (self.nfev, x),
+        self._yfunc (x, jac)
+        if self.debugCalls:
+            print jac
 
 
     def solve (self, x0=None, dtype=N.float):
@@ -1096,9 +1109,9 @@ class Problem (object):
         self._enorm = _enorm
         n = nfree
         fvec = N.ndarray (self._nout, x0.dtype)
-        call = self._call
+        ycall = self._ycall
 
-        call (self.params, fvec, None)
+        ycall (self.params, fvec)
 
         self.fnorm = _enorm (fvec, finfo)
 
@@ -1281,7 +1294,7 @@ class Problem (object):
                 # Evaluate func at x + p and calculate norm
 
                 mperr = 0
-                call (self.params, wa4, None)
+                ycall (self.params, wa4)
                 fnorm1 = _enorm (wa4, finfo)
 
                 # Compute scaled actual reductions
@@ -1379,7 +1392,7 @@ class Problem (object):
             self.params[ifree] = x
 
         if self.nprint > 0: # and self.status > 0
-            call (self.params, fvec, None)
+            ycall (self.params, fvec)
             self.fnorm = _enorm (fvec, finfo)
 
         if self.fnorm is not None and fnorm1 is not None:
@@ -1442,7 +1455,7 @@ class Problem (object):
             # Easy, analytic-derivative case.
             fjac = N.zeros (nall, finfo.dtype)
             fjac[ifree] = 1.0
-            self._call (xall, None, fjac)
+            self._jcall (xall, fjac)
             if len (ifree) < nall:
                 fjac = fjac[:,ifree]
             return fjac
@@ -1479,7 +1492,7 @@ class Problem (object):
             xp = xall.copy ()
             xp[ifree[j]] += h[j]
             fp = N.empty (self._nout, dtype=finfo.dtype)
-            self._call (xp, fp, None)
+            self._ycall (xp, fp)
 
             if dside[j] != DSIDE_TWO:
                 # One-sided derivative
@@ -1488,7 +1501,7 @@ class Problem (object):
                 # Two-sided ... extra func call
                 xp[ifree[j]] = xall[ifree[j]] - h[j]
                 fm = N.empty (self._nout, dtype=finfo.dtype)
-                self._call (xp, fm, None)
+                self._ycall (xp, fm)
                 fjac[:,j] = (fp - fm) / (2 * h[j])
 
         if debug:
@@ -1515,7 +1528,7 @@ class Problem (object):
         # to get the initial value of the function at
         # the specified position.
 
-        self._call (x, fvec, None)
+        self._ycall (x, fvec)
         return self._fdjac2 (x, fvec, ulimit, dside, xall, maxstep, isrel, finfo)
 
 
@@ -1629,7 +1642,7 @@ def _solve_linear ():
 
 @test
 def _simple_automatic_jac ():
-    def f (pars, vec, jac):
+    def f (pars, vec):
         N.exp (pars, vec)
 
     p = Problem (f, None, 1, 1)
@@ -1648,7 +1661,7 @@ def _jac_sidedness ():
     # Make a function with a derivative discontinuity so we can test
     # the sidedness settings.
 
-    def f (pars, vec, jac):
+    def f (pars, vec):
         p = pars[0]
 
         if p >= 0:
@@ -1681,7 +1694,7 @@ def _jac_sidedness ():
 
 @test
 def _jac_stepsizes ():
-    def f (expstep, pars, vec, jac):
+    def f (expstep, pars, vec):
         p = pars[0]
 
         if p != 1.:
@@ -1690,12 +1703,12 @@ def _jac_stepsizes ():
         vec[:] = 1
 
     # Fixed stepsize of 1.
-    p = Problem (lambda p, v, j: f (2., p, v, j), None, 1, 1)
+    p = Problem (lambda p, v: f (2., p, v), None, 1, 1)
     p.pStep (0, 1.)
     p._manual_fdjac2 (1)
 
     # Relative stepsize of 0.1
-    p = Problem (lambda p, v, j: f (1.1, p, v, j), None, 1, 1)
+    p = Problem (lambda p, v: f (1.1, p, v), None, 1, 1)
     p.pStep (0, 0.1, isrel=True)
     p._manual_fdjac2 (1)
 
@@ -1709,12 +1722,12 @@ def _jac_stepsizes ():
 
     # Maximum stepsize, made extremely small to be enforced
     # in default circumstances.
-    p = Problem (lambda p, v, j: f (1 + 1e-11, p, v, j), None, 1, 1)
+    p = Problem (lambda p, v: f (1 + 1e-11, p, v), None, 1, 1)
     p.pStep (0, 0.0, 1e-11)
     p._manual_fdjac2 (1)
 
     # Maximum stepsize and a relative stepsize
-    p = Problem (lambda p, v, j: f (1.1, p, v, j), None, 1, 1)
+    p = Problem (lambda p, v: f (1.1, p, v), None, 1, 1)
     p.pStep (0, 0.5, 0.1, True)
     p._manual_fdjac2 (1)
 
