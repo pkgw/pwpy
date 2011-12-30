@@ -1596,6 +1596,16 @@ class Problem (object):
         return r
 
 
+def checkDerivative (yfunc, jfunc, npar, nout, guess):
+    explicit = N.empty ((nout, npar))
+    jfunc (guess, explicit)
+
+    p = Problem (yfunc, None, npar, nout)
+    auto = p._manual_fdjac2 (guess)
+
+    return explicit, auto
+
+
 def ResidualProblem (yfunc, jfunc, npar, yobs, err,
                      solclass=Solution, reckless=False):
     from numpy import subtract, multiply
