@@ -864,9 +864,9 @@ class Problem (object):
 
         # Consistency checks
 
-        if not ((self.damp > 0.) ^ self.autoderivative):
-            raise ValueError ('Damping factor and autoderivative '
-                              'are mutually exclusive.')
+        if (not self.autoderivative) and self.damp > 0:
+            raise ValueError ('Damping factor not allowed when using '
+                              'explicit derivatives')
 
         if self.rescale:
             if self.diag is None or self.diag.shape != (self._npar, ):
