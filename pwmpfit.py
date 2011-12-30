@@ -1153,8 +1153,7 @@ class Problem (object):
                     diag[N.where (diag == 0)] = 1.
 
                 # Calculate norm of scaled x, initialize step bound delta
-                wa3 = diag * x
-                xnorm = _enorm (wa3, finfo)
+                xnorm = _enorm (diag * x, finfo)
                 delta = self.factor * xnorm
                 if delta == 0.:
                     delta = self.factor
