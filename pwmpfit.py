@@ -715,7 +715,8 @@ class Solution (object):
 
 
 class Problem (object):
-    _func = None
+    _yfunc = None
+    _jfunc = None
     _npar = None
     _nout = None
 
@@ -746,15 +747,15 @@ class Problem (object):
     nocovar = False
     fastnorm = False
     rescale = False
-    autoderivative = True
     quiet = False
     debugCalls = False
     debugJac = False
 
     
-    def __init__ (self, func=None, npar=None, nout=None, solclass=Solution):
-        if func is not None:
-            self.setFunc (func, npar, nout)
+    def __init__ (self, yfunc=None, jfunc=None, npar=None, nout=None,
+                  solclass=Solution):
+        if yfunc is not None:
+            self.setFunc (yfunc, jfunc, npar, nout)
 
         if not issubclass (solclass, Solution):
             raise ValueError ('solclass')
@@ -762,10 +763,13 @@ class Problem (object):
         self.solclass = solclass
 
 
-    def setFunc (self, func, npar, nout):
-        if not callable (func):
-            raise ValueError ('func')
+    def setFunc (self, yfunc, jfunc, npar, nout):
+        if not callable (yfunc):
+            raise ValueError ('yfunc')
         
+        if jfunc is not None and not callable (jfunc):
+            raise ValueError ('jfunc')
+
         try:
             npar = int (npar)
             assert npar > 0
@@ -783,7 +787,8 @@ class Problem (object):
 
         realloc = self._npar is None or self._npar != npar
         
-        self._func = func
+        self._yfunc = yfunc
+        self._jfunc = jfunc
         self._npar = npar
         self._nout = nout
         self.nfev = 0
@@ -813,7 +818,7 @@ class Problem (object):
     
 
     def _fixupCheck (self):
-        if self._func is None:
+        if self._yfunc is None:
             raise ValueError ('No function yet.')
 
         # Coerce parameters to desired types
@@ -833,7 +838,6 @@ class Problem (object):
         self.nocovar = bool (self.nocovar)
         self.fastnorm = bool (self.fastnorm)
         self.rescale = bool (self.rescale)
-        self.autoderivative = bool (self.autoderivative)
         self.quiet = bool (self.quiet)
         self.debugCalls = bool (self.debugCalls)
         self.debugJac = bool (self.debugJac)
@@ -866,7 +870,7 @@ class Problem (object):
 
         # Consistency checks
 
-        if (not self.autoderivative) and self.damp > 0:
+        if self._jfunc is not None and self.damp > 0:
             raise ValueError ('Damping factor not allowed when using '
                               'explicit derivatives')
 
@@ -918,7 +922,8 @@ class Problem (object):
 
 
     def copy (self):
-        n = Problem (self._func, self._npar, self._nout, self.solclass)
+        n = Problem (self._yfunc, self._jfunc, self._npar, self._nout,
+                     self.solclass)
 
         if self._pinfof is not None:
             n._pinfof = self._pinfof.copy ()
@@ -939,7 +944,6 @@ class Problem (object):
         n.nocovar = self.nocovar
         n.fastnorm = self.fastnorm
         n.rescale = self.rescale
-        n.autoderivative = self.autoderivative
         n.quiet = self.quiet
         n.debugCalls = self.debugCalls
         n.debugJac = self.debugJac
@@ -1038,7 +1042,7 @@ class Problem (object):
 
         if self.debugCalls:
             print 'Call: #%4d f(%s) ->' % (self.nfev, x),
-        self._func (x, vec, jac)
+        self._yfunc (x, vec)
         if self.debugCalls:
             print vec, jac
 
@@ -1434,11 +1438,11 @@ class Problem (object):
         m = len (fvec)
         n = len (x)
 
-        if not self.autoderivative:
+        if self._jfunc is not None:
             # Easy, analytic-derivative case.
             fjac = N.zeros (nall, finfo.dtype)
             fjac[ifree] = 1.0
-            self._call (xall, fp, fjac)
+            self._call (xall, None, fjac)
             if len (ifree) < nall:
                 fjac = fjac[:,ifree]
             return fjac
@@ -1579,7 +1583,8 @@ class Problem (object):
 
         return r
 
-def ResidualProblem (func, npar, yobs, err, solclass=Solution, reckless=False):
+def ResidualProblem (yfunc, jfunc, npar, yobs, err,
+                     solclass=Solution, reckless=False):
     from numpy import subtract, multiply
 
     errinv = 1. / err
@@ -1589,26 +1594,20 @@ def ResidualProblem (func, npar, yobs, err, solclass=Solution, reckless=False):
     # FIXME: handle yobs.ndim != 1
 
     if reckless:
-        def wrap (pars, nresids, jac):
-            if nresids is not None:
-                func (pars, nresids) # model Y values => nresids
-                subtract (yobs, nresids, nresids) # abs. residuals => nresids
-                multiply (nresids, errinv, nresids)
-            if jac is not None:
-                assert False
+        def ywrap (pars, nresids):
+            yfunc (pars, nresids) # model Y values => nresids
+            subtract (yobs, nresids, nresids) # abs. residuals => nresids
+            multiply (nresids, errinv, nresids)
     else:
-        def wrap (pars, nresids, jac):
-            if nresids is not None:
-                func (pars, nresids)
-                if not N.all (N.isfinite (nresids)):
-                    raise RuntimeError ('function returned nonfinite values')
-                subtract (yobs, nresids, nresids)
-                multiply (nresids, errinv, nresids)
-                #print 'N:', (nresids**2).sum ()
-            if jac is not None:
-                assert False
+        def ywrap (pars, nresids):
+            yfunc (pars, nresids)
+            if not N.all (N.isfinite (nresids)):
+                raise RuntimeError ('function returned nonfinite values')
+            subtract (yobs, nresids, nresids)
+            multiply (nresids, errinv, nresids)
+            #print 'N:', (nresids**2).sum ()
 
-    return Problem (wrap, npar, yobs.size, solclass)
+    return Problem (ywrap, None, npar, yobs.size, solclass)
 
 
 # Test!
@@ -1621,11 +1620,11 @@ def _solve_linear ():
 
     from numpy import multiply, add
     
-    def f (pars, x, ymodel):
+    def f (pars, ymodel):
         multiply (x, pars[0], ymodel)
         add (ymodel, pars[1], ymodel)
 
-    p = ResidualProblem (f, 2, x, y, 0.01)
+    p = ResidualProblem (f, None, 2, y, 0.01)
     return p.solve ([2.5, 1.5])
 
 @test
@@ -1633,13 +1632,13 @@ def _simple_automatic_jac ():
     def f (pars, vec, jac):
         N.exp (pars, vec)
 
-    p = Problem (f, 1, 1)
+    p = Problem (f, None, 1, 1)
     j = p._manual_fdjac2 (0) 
     Taaae (j, [[1.]])
     j = p._manual_fdjac2 (1) 
     Taaae (j, [[N.e]])
 
-    p = Problem (f, 3, 3)
+    p = Problem (f, None, 3, 3)
     x = N.asarray ([0, 1, 2])
     j = p._manual_fdjac2 (x) 
     Taaae (j, N.diag (N.exp (x)))
@@ -1657,7 +1656,7 @@ def _jac_sidedness ():
         else:
             vec[:] = -p
 
-    p = Problem (f, 1, 1)
+    p = Problem (f, None, 1, 1)
 
     # Default: positive unless against upper limit.
     Taaae (p._manual_fdjac2 (0), [[1.]])
@@ -1691,18 +1690,18 @@ def _jac_stepsizes ():
         vec[:] = 1
 
     # Fixed stepsize of 1.
-    p = Problem (lambda p, v, j: f (2., p, v, j), 1, 1)
+    p = Problem (lambda p, v, j: f (2., p, v, j), None, 1, 1)
     p.pStep (0, 1.)
     p._manual_fdjac2 (1)
 
     # Relative stepsize of 0.1
-    p = Problem (lambda p, v, j: f (1.1, p, v, j), 1, 1)
+    p = Problem (lambda p, v, j: f (1.1, p, v, j), None, 1, 1)
     p.pStep (0, 0.1, isrel=True)
     p._manual_fdjac2 (1)
 
     # Fixed stepsize must be less than max stepsize.
     try:
-        p = Problem (f, 2, 2)
+        p = Problem (f, None, 2, 2)
         p.pStep ((0, 1), (1, 1), (1, 0.5))
         assert False, 'Invalid arguments accepted'
     except ValueError:
@@ -1710,12 +1709,12 @@ def _jac_stepsizes ():
 
     # Maximum stepsize, made extremely small to be enforced
     # in default circumstances.
-    p = Problem (lambda p, v, j: f (1 + 1e-11, p, v, j), 1, 1)
+    p = Problem (lambda p, v, j: f (1 + 1e-11, p, v, j), None, 1, 1)
     p.pStep (0, 0.0, 1e-11)
     p._manual_fdjac2 (1)
 
     # Maximum stepsize and a relative stepsize
-    p = Problem (lambda p, v, j: f (1.1, p, v, j), 1, 1)
+    p = Problem (lambda p, v, j: f (1.1, p, v, j), None, 1, 1)
     p.pStep (0, 0.5, 0.1, True)
     p._manual_fdjac2 (1)
 
