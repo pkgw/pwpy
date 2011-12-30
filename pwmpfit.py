@@ -1419,6 +1419,7 @@ class Problem (object):
 
         return soln
 
+
     def _fdjac2 (self, x, fvec, ulimit, dside, xall, maxstep, isrel, finfo):
         ifree = self._ifree
         debug = self.debugJac
@@ -1491,6 +1492,7 @@ class Problem (object):
                 print 'Jac :', fjac[i]
         return fjac
 
+
     def _manual_fdjac2 (self, xall, dtype=N.float):
         self._fixupCheck ()
 
@@ -1511,7 +1513,7 @@ class Problem (object):
 
         self._call (x, fvec, None)
         return self._fdjac2 (x, fvec, ulimit, dside, xall, maxstep, isrel, finfo)
-        
+
 
     def _doTies (self, p):
         funcs = self._pinfoo[PI_O_TIED]
