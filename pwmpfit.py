@@ -75,6 +75,8 @@ def _enorm_careful (v, finfo):
     
     if mx == 0:
         return v[0] * 0. # preserve type (?)
+    if not N.isfinite (mx):
+        raise ValueError ('computed nonfinite vector norm')
     if mx > agiant or mx < adwarf:
         return mx * N.sqrt (N.dot (v / mx, v / mx))
     
