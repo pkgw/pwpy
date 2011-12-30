@@ -1577,29 +1577,36 @@ class Problem (object):
 
         return r
 
-def ResidualProblem (func, npar, x, yobs, err, solclass=Solution, reckless=False):
+def ResidualProblem (func, npar, yobs, err, solclass=Solution, reckless=False):
     from numpy import subtract, multiply
 
     errinv = 1. / err
     if not N.all (N.isfinite (errinv)):
         raise ValueError ('some uncertainties are zero or nonfinite')
 
-    # FIXME: handle x.ndim != 1, yobs.ndim != 1
+    # FIXME: handle yobs.ndim != 1
 
     if reckless:
         def wrap (pars, nresids, jac):
-            func (pars, x, nresids) # model Y values => nresids
-            subtract (yobs, nresids, nresids) # abs. residuals => nresids
-            multiply (nresids, errinv, nresids)
+            if nresids is not None:
+                func (pars, nresids) # model Y values => nresids
+                subtract (yobs, nresids, nresids) # abs. residuals => nresids
+                multiply (nresids, errinv, nresids)
+            if jac is not None:
+                assert False
     else:
         def wrap (pars, nresids, jac):
-            func (pars, x, nresids)
-            if not N.all (N.isfinite (nresids)):
-                raise RuntimeError ('function returned nonfinite values')
-            subtract (yobs, nresids, nresids)
-            multiply (nresids, errinv, nresids)
+            if nresids is not None:
+                func (pars, nresids)
+                if not N.all (N.isfinite (nresids)):
+                    raise RuntimeError ('function returned nonfinite values')
+                subtract (yobs, nresids, nresids)
+                multiply (nresids, errinv, nresids)
+                #print 'N:', (nresids**2).sum ()
+            if jac is not None:
+                assert False
 
-    return Problem (wrap, npar, x.size, solclass)
+    return Problem (wrap, npar, yobs.size, solclass)
 
 
 # Test!
