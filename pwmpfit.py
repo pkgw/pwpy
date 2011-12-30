@@ -1058,7 +1058,7 @@ class Problem (object):
 
         if self.debugCalls:
             print 'Call: #%4d j(%s) ->' % (self.nfev, x),
-        self._yfunc (x, jac)
+        self._jfunc (x, jac)
         if self.debugCalls:
             print jac
 
@@ -1453,10 +1453,9 @@ class Problem (object):
 
         if self._jfunc is not None:
             # Easy, analytic-derivative case.
-            fjac = N.zeros (nall, finfo.dtype)
-            fjac[ifree] = 1.0
+            fjac = N.zeros ((m, nall), finfo.dtype)
             self._jcall (xall, fjac)
-            if len (ifree) < nall:
+            if n < nall:
                 fjac = fjac[:,ifree]
             return fjac
 
@@ -1596,6 +1595,7 @@ class Problem (object):
 
         return r
 
+
 def ResidualProblem (yfunc, jfunc, npar, yobs, err,
                      solclass=Solution, reckless=False):
     from numpy import subtract, multiply
@@ -1611,6 +1611,11 @@ def ResidualProblem (yfunc, jfunc, npar, yobs, err,
             yfunc (pars, nresids) # model Y values => nresids
             subtract (yobs, nresids, nresids) # abs. residuals => nresids
             multiply (nresids, errinv, nresids)
+        def jwrap (pars, jac):
+            jfunc (pars, jac)
+            multiply (jac, -1, jac)
+            for i in xrange (npar):
+                multiply (jac[:,i], errinv, jac[:,i])
     else:
         def ywrap (pars, nresids):
             yfunc (pars, nresids)
@@ -1619,8 +1624,18 @@ def ResidualProblem (yfunc, jfunc, npar, yobs, err,
             subtract (yobs, nresids, nresids)
             multiply (nresids, errinv, nresids)
             #print 'N:', (nresids**2).sum ()
+        def jwrap (pars, jac):
+            jfunc (pars, jac)
+            if not N.all (N.isfinite (jac)):
+                raise RuntimeError ('jacobian returned nonfinite values')
+            multiply (jac, -1, jac)
+            for i in xrange (npar):
+                multiply (jac[:,i], errinv, jac[:,i])
 
-    return Problem (ywrap, None, npar, yobs.size, solclass)
+    if jfunc is None:
+        jwrap = None
+
+    return Problem (ywrap, jwrap, npar, yobs.size, solclass)
 
 
 # Test!
