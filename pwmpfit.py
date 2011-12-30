@@ -869,9 +869,9 @@ class Problem (object):
                               'are mutually exclusive.')
 
         if self.rescale:
-            if diag is None or diag.shape != (self.npar, ):
+            if self.diag is None or self.diag.shape != (self.npar, ):
                 raise ValueError ('diag')
-            if N.any (diag <= 0.):
+            if N.any (self.diag <= 0.):
                 raise ValueError ('diag')
 
         p = self._pinfof
@@ -1146,7 +1146,9 @@ class Problem (object):
             if self.niter == 1:
                 # If "diag" unspecified, scale according to norms of columns
                 # of the initial jacobian
-                if not self.rescale or len (diag) < n:
+                if self.rescale:
+                    diag = self.diag.copy ()
+                else:
                     diag = wa2.copy ()
                     diag[N.where (diag == 0)] = 1.
 
