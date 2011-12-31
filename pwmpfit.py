@@ -1033,7 +1033,14 @@ class Problem (object):
         self._pinfoo[PI_O_NAME] = names
         return self
 
-    
+
+    def getNDOF (self):
+        if self._ifree is None:
+            self._fixupCheck ()
+
+        return self._nout - self._ifree.size
+
+
     def _ycall (self, x, vec):
         if self._qanytied:
             self._doTies (x)
@@ -1425,6 +1432,7 @@ class Problem (object):
                 wh = N.where (d >= 0)
                 self.perror[wh] = N.sqrt (d[wh])
 
+        soln.ndof = self.getNDOF ()
         soln.status = status
         soln.niter = self.niter
         soln.params = self.params
