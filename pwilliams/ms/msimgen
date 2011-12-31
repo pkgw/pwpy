@@ -2,16 +2,21 @@
 # -*- python -*-
 
 """
-msimgen <template image> <sourcelist file|-> <output image>
+msimgen [-c] <template image> <sourcelist file|-> <output image>
 
-Given a template CASA-format image, create a model image (that is, a
-deconvolved image with units Jy/pixel) using the source information
-specified in the sourcelist file. A source file of "-" indicates that
-the information should be read from standard input. See "mssfextract"
-or "msmkrandsrc" for ways to generate such source lists.
+Given a template CASA-format image, create an image using the source
+information specified in the sourcelist file. By default, the output
+image is a model image, in units if Jy/pixel with no convolution. If
+you want to create model UV data, you can skip the model image step by
+using the new component-list support in "mswpftsub".
 
-If one wants to create model UV data, one can skip the model image
-step by using the new component-list support in "mswpftsub".
+-c -- convolve the model source parameters with the restoring beam
+parameters in the template image, and create an output image in
+units of Jy/beam.
+
+A source file of "-" indicates that the information should be read
+from standard input. See "mssfextract" or "msmkrandsrc" for ways to
+generate such source lists.
 """
 
 # Programmer notes:
@@ -62,6 +67,34 @@ def rad2perpix (pix2world, pixelcoords):
     dra = w2[-1] - w1[-1]
     ddec = w2[-2] - w1[-2]
     return (dra**2 + ddec**2) / (2 * DELTA**2)
+
+
+def convolveGaussians (maj1, min1, pa1, maj2, min2, pa2):
+    # copied from miriad/src/subs/gaupar.for:gaufac()
+    c1 = N.cos (pa1)
+    s1 = N.sin (pa1)
+    c2 = N.cos (pa2)
+    s2 = N.sin (pa2)
+
+    a = (maj1*c1)**2 + (min1*s1)**2 + (maj2*c2)**2 + (min2*s2)**2
+    b = (maj1*s1)**2 + (min1*c1)**2 + (maj2*s2)**2 + (min2*c2)**2
+    g = 2 * ((min1**2 - maj1**2) * s1 * c1 + (min2**2 - maj2**2) * s2 * c2)
+
+    s = a + b
+    t = N.sqrt ((a - b)**2 + g**2)
+    maj3 = N.sqrt (0.5 * (s + t))
+    min3 = N.sqrt (0.5 * (s - t))
+
+    if abs (g) + abs (a - b) == 0:
+        pa3 = 0.
+    else:
+        pa3 = 0.5 * N.arctan2 (-g, a - b)
+
+    # Amplitude of the resulting Gaussian:
+    # f = N.pi / (4 * N.log (2)) * maj1 * min1 * maj2 * min2 \
+    #    / N.sqrt (a * b - 0.25 * g**2)
+
+    return maj3, min3, pa3
 
 
 def fill_point (image, worldcoords, pixelcoords, data, info):
@@ -176,7 +209,7 @@ def fill_gauss (image, worldcoords, pixelcoords, data, info):
     data[...,abspix[1]:abspix[3],abspix[0]:abspix[2]] += px
 
 
-def fill_image (srcstream, outpath, cleardata=True):
+def fill_image (srcstream, outpath, convolve=False, cleardata=True):
     import pyrap.images as PI
 
     oi = PI.image (outpath)
@@ -187,17 +220,53 @@ def fill_image (srcstream, outpath, cleardata=True):
     if cleardata:
         odata.fill (0)
 
+    if convolve:
+        # Need restoring beam info to know what to convolve with
+        ii = oi.imageinfo ()
+        if 'restoringbeam' not in ii:
+            util.die ('requested to convolve model with restoring beam, '
+                      'but beam info not present in template')
+
+        beaminfo = [0, 0, 0]
+        beaminfo[0] = ii['restoringbeam']['major']['value']
+        beaminfo[1] = ii['restoringbeam']['minor']['value']
+        beaminfo[2] = ii['restoringbeam']['positionangle']['value']
+
+        if ii['restoringbeam']['major']['unit'] != 'arcsec':
+            util.die ('expect restoring beam major axis to be given in arcsec')
+        if ii['restoringbeam']['minor']['unit'] != 'arcsec':
+            util.die ('expect restoring beam minor axis to be given in arcsec')
+        if ii['restoringbeam']['positionangle']['unit'] != 'deg':
+            util.die ('expect restoring beam position angle to be given in degrees')
+
     for line in srcstream:
         if line[0] == '#':
             continue
 
         a = line.strip ().split ()
+        if not len (a):
+            continue
+
         kind = a[0]
 
         worldcoords[-1] = raparse (a[1])
         worldcoords[-2] = decparse (a[2])
         pixelcoords = N.asarray (oi.topixel (worldcoords))
         info = map (float, a[3:])
+
+        if convolve:
+            if kind == 'point':
+                kind = 'gaussian'
+                info = info[0] + beaminfo
+            elif kind == 'gaussian':
+                # major/minor can be arbitrary units as long as they're consistent;
+                # PA must be converted from degrees to radians, and back.
+                info[1:4] = convolveGaussians (info[1], info[2], info[3] * N.pi/180,
+                                               beaminfo[0], beaminfo[1],
+                                               beaminfo[2] * N.pi/180)
+                info[3] *= 180 / N.pi
+            else:
+                util.die ('unhandled source kind "%s"', kind)
 
         if kind == 'point':
             fill_point (oi, worldcoords, pixelcoords, odata, info)
@@ -210,16 +279,20 @@ def fill_image (srcstream, outpath, cleardata=True):
     del oi # ??? how to close?
 
 
-def imgen (inpath, srcstream, outpath):
+def imgen (inpath, srcstream, outpath, convolve=False):
     import pyrap.tables as PT, pyrap.images as PI
 
     PT.tablecopy (inpath, outpath, deep=True)
     ot = PT.table (outpath, readonly=False, ack=False)
-    ot.putkeyword ('units', 'Jy/pixel')
+    if convolve:
+        ot.putkeyword ('units', 'Jy/beam')
+    else:
+        ot.putkeyword ('units', 'Jy/pixel')
     ot.close ()
 
     try:
-        fill_image (srcstream, outpath, cleardata=True)
+        fill_image (srcstream, outpath, convolve=convolve,
+                    cleardata=True)
     except:
         t, v, tb = sys.exc_info ()
         PT.tabledelete (outpath, ack=False)
@@ -230,10 +303,19 @@ def cmdline (argv):
     from os.path import exists
     util.checkusage (__doc__, argv, usageifnoargs=True)
 
-    if len (argv) != 4:
-        util.wrongusage (__doc__, 'exactly 3 arguments expected')
+    convolve = False
+    miscargs = []
 
-    inpath, srcpath, outpath = argv[1:]
+    for arg in argv[1:]:
+        if arg == '-c':
+            convolve = True
+        else:
+            miscargs.append (arg)
+
+    if len (miscargs) != 3:
+        util.wrongusage (__doc__, 'exactly 3 nonoption arguments expected')
+
+    inpath, srcpath, outpath = miscargs
 
     if exists (outpath):
         util.die ('output "%s" already exists', outpath)
@@ -243,7 +325,7 @@ def cmdline (argv):
     else:
         srcstream = open (srcpath)
 
-    imgen (inpath, srcstream, outpath)
+    imgen (inpath, srcstream, outpath, convolve=convolve)
 
 
 if __name__ == '__main__':
