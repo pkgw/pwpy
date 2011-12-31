@@ -982,6 +982,7 @@ class poco:
         bisp = lambda d,i,j,k: d[i] * d[j] * n.conj(d[k])     # bispectrum
 #        bisp = lambda d,i,j,k: d[i,:] * d[j,:] * n.conj(d[k,:])     # array bispectrum
         triples = [(0,7,6),(0,2,1),(0,4,3),(6,8,3),(1,5,3)]  # antenna triples for good poco data: 123, 125, 126, 136, 156 (correct! miriad numbering). 6 true triples for n=5 is 123 125 126 135 136 156
+#        triples = [(0,7,6)]  # test
         
 # option 1: triple phase average over frequency
 #        triarr = n.zeros((len(triples), len(self.data)))

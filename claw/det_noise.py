@@ -5,6 +5,7 @@
 
 import numpy as n
 import pylab as p
+import scipy.misc
 import random
 
 class noise:
@@ -31,10 +32,10 @@ class noise:
         return self.datadet
 
     def trip(self):
-        bisp = []
+        bisp = n.zeros(self.len, dtype='complex')
         for i in range(self.len):
-            bisp.append(self.datat[i] * self.datat[i+1] * self.datat[i+2])
-        self.bisp = n.array(bisp)
+            bisp[i] = self.datat[i] * self.datat[i+1] * self.datat[i+2]
+        self.bisp = bisp
 
     def show(self):
         p.plot(self.bisp, '.')
@@ -90,6 +91,68 @@ def repeat(num=100, source=0+0j, show=0):
 
 #    return n.array([intsig, dmsig, mdsig, bisig])
     return mdarr, biarr
+
+
+def threshold(na=3):
+    """Simulate the bispectrum to find threshold in terms of S/Q.
+    Sorts output of both statistics and then takes value based on index where threshold is expected.
+    """
+
+    thresh = 2.9e-7
+    simlen = 100000000   # product of thresh*simlen must be much larger than 1
+
+    thresh = 1.4e-3
+    simlen = 10000
+
+    # make mean bi and bf
+    bimean = n.zeros(thresh*simlen)
+    bfmean = n.zeros(thresh*simlen)
+    ntrip = na*(na-1)*(na-2)/6
+    nbl = na*(na-1)/2
+    print 'nbl=%d, ntrip=%d' % (nbl,ntrip)
+
+    if ntrip >= nbl:
+        nlong = ntrip
+    else:
+        nlong = nbl
+
+    for i in xrange(simlen):
+        nn = noise(len=nlong)
+        nn.trip()
+        bfm = nn.data[0:nbl].real.mean()
+        bim = nn.bisp[0:ntrip].real.mean()
+        if n.any(bfm > bfmean):
+            bfmean[0] = bfm
+            bfmean.sort()
+        if n.any(bim > bimean):
+            bimean[0] =  bim
+            bimean.sort()
+        if not float(i)/simlen - n.round(float(i)/simlen,1):
+            print "%.0f pct complete" % (float(i)/simlen * 100)
+
+    return bfmean.min(), n.power(bimean.min(),1/3.)
+
+
+def bispdist():
+    """Function to plot the bispectrum distribution. Assumes Gaussian-distributed visibilities multiplied together.
+    Based on Lomnicki 1967, JRSS-B, Vol 29, 3.
+    Not quite right. Doesn't account for multiplying complex numbers (vectors).
+    """
+
+    bign = 100
+
+    mg = lambda x, sigma: ((2*n.pi)**(3/2.) * sigma**3)**(-1) * n.sum([phi(x**2 / (2.**3 * sigma**6),j) for j in range(0,bign)])
+    phi = lambda x,j: 1/2. * (x**j * (-1)**j / (scipy.misc.factorial(j))**3) * ( ll(x,j)**2 + 3*pp(j) )
+    pp = lambda j: n.sum([i**(-2.) for i in range(1,bign)]) + n.sum([i**(-2.) for i in range(1,j+1)])
+    ll = lambda x,j: -1*n.log(x) + 3*(-0.577215665 + n.sum([1./i for i in range(1,j+1)]))
+    
+    arr = n.arange(1,100)/10.
+    pl = n.array([mg(x,1) for x in arr])
+    p.plot(arr,pl)
+    p.show()
+
+    return arr,pl
+
 
 def plotfig(s=-1, num=-1, t=5):
     """Plots figure showing snr of signal seen by various algorithms.
