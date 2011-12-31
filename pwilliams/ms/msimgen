@@ -276,7 +276,7 @@ def fill_image (srcstream, outpath, convolve=False, tmplscale=0,
         if convolve:
             if kind == 'point':
                 kind = 'gaussian'
-                info = info[0] + beaminfo
+                info = [info[0]] + beaminfo
             elif kind == 'gaussian':
                 # major/minor can be arbitrary units as long as they're consistent;
                 # PA must be converted from degrees to radians, and back.
