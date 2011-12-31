@@ -1445,6 +1445,26 @@ class Problem (object):
         return soln
 
 
+    def moronsolve (self, x0=None, dtype=N.float, maxiter=20):
+        soln = self.solve (x0, dtype)
+        prevfnorm = soln.fnorm
+        x0 = soln.params
+
+        for i in xrange (maxiter):
+            soln = self.solve (x0, dtype)
+
+            if soln.fnorm > prevfnorm:
+                raise RuntimeError ('lame iteration gave worse results')
+
+            if (prevfnorm - soln.fnorm) / prevfnorm < 1e-3:
+                return soln
+
+            x0 = soln.params
+            prevfnorm = soln.fnorm
+
+        raise RuntimeError ('lame iteration didn\'t converge (%d iters)' % maxiter)
+
+
     def _fdjac2 (self, x, fvec, ulimit, dside, xall, maxstep, isrel, finfo):
         ifree = self._ifree
         debug = self.debugJac
