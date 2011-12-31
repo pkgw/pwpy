@@ -2,7 +2,7 @@
 # -*- python -*-
 
 """
-msimgen [-c] <template image> <sourcelist file|-> <output image>
+msimgen [-c] [-tNN] [-mNN] <template image> <sourcelist file|-> <output image>
 
 Given a template CASA-format image, create an image using the source
 information specified in the sourcelist file. By default, the output
@@ -13,6 +13,14 @@ using the new component-list support in "mswpftsub".
 -c -- convolve the model source parameters with the restoring beam
 parameters in the template image, and create an output image in
 units of Jy/beam.
+
+-tNN -- initialize the output image to be the template scaled by the
+number NN. Default is 0, i.e., ignore the data in the template image.
+Use -t1 to effectively add or subtract the models from the template.
+
+-mNN -- scale the model values by the number NN when creating the
+output image. Default is 1, i.e., add in the models exactly as
+specified. Use -m-1 to subtract the models from the input.
 
 A source file of "-" indicates that the information should be read
 from standard input. See "mssfextract" or "msmkrandsrc" for ways to
@@ -119,11 +127,12 @@ def fill_point (image, worldcoords, pixelcoords, data, info):
     data[tuple (c)] += totflux * (1 - d1) * d2
 
 
-def fill_gauss (image, worldcoords, pixelcoords, data, info):
+def fill_gauss (image, worldcoords, pixelcoords, data, info, beaminfo=None):
     # From our total flux in units of Jy and dimensions in arcsec, we
-    # need to compute our peak flux in units of Jy/px. The image
-    # coordinate system lets us convert between pixels and angular
-    # units easily, so this is fairly straightforward.
+    # need to compute our peak flux in units of Jy/px or Jy/bm. The
+    # latter is pretty trivial. The former is also fairly
+    # straightforward because the image coordinate system lets us
+    # convert between pixels and angular units easily,
 
     # We sidestep some tricky issues about rotation of ra/dec vs
     # the pixel axis by computing equatorial coordinates for every
@@ -136,9 +145,16 @@ def fill_gauss (image, worldcoords, pixelcoords, data, info):
     smajor = info[1] * ASEC2RAD * FWHM2SIGMA
     sminor = info[2] * ASEC2RAD * FWHM2SIGMA
     pa = info[3] * pi / 180
-    srcvol = 2 * pi * smajor * sminor
-    volperpix = rad2perpix (image.toworld, pixelcoords)
-    pkflux = totflux * volperpix / srcvol
+
+    if beaminfo is None:
+        # Work in units of Jy/pixel
+        srcvol = 2 * pi * smajor * sminor
+        volperpix = rad2perpix (image.toworld, pixelcoords)
+        pkflux = totflux * volperpix / srcvol
+    else:
+        # Work in Jy/bm
+        bmaj, bmin, bpa = beaminfo
+        pkflux = totflux * bmaj * bmin / (info[1] * info[2])
 
     # Compute effective sigmas in RA and Dec directions, then
     # figure out about how far out we need to image in pixel space
@@ -148,7 +164,7 @@ def fill_gauss (image, worldcoords, pixelcoords, data, info):
 
     sra = ((sin (pa) / smajor)**2 + (cos (pa) / sminor)**2)**-0.5
     sdec = ((cos (pa) / smajor)**2 + (sin (pa) / sminor)**2)**-0.5
-    numsigmatotravel = sqrt (2 * log (pkflux / GAUSSMINFLUX))
+    numsigmatotravel = sqrt (2 * log (abs (pkflux) / GAUSSMINFLUX))
 
     dra = sra * numsigmatotravel
     ddec = sdec * numsigmatotravel
@@ -209,16 +225,17 @@ def fill_gauss (image, worldcoords, pixelcoords, data, info):
     data[...,abspix[1]:abspix[3],abspix[0]:abspix[2]] += px
 
 
-def fill_image (srcstream, outpath, convolve=False, cleardata=True):
+def fill_image (srcstream, outpath, convolve=False, tmplscale=0,
+                modelscale=1):
     import pyrap.images as PI
 
     oi = PI.image (outpath)
     # Fill in world coord values of axes we don't care about.
     worldcoords = oi.toworld (N.zeros (len (oi.shape ())))
     odata = oi.getdata ()
+    odata *= tmplscale
 
-    if cleardata:
-        odata.fill (0)
+    beaminfo = None
 
     if convolve:
         # Need restoring beam info to know what to convolve with
@@ -254,6 +271,8 @@ def fill_image (srcstream, outpath, convolve=False, cleardata=True):
         pixelcoords = N.asarray (oi.topixel (worldcoords))
         info = map (float, a[3:])
 
+        info[0] *= modelscale # info[0] always the total flux
+
         if convolve:
             if kind == 'point':
                 kind = 'gaussian'
@@ -271,7 +290,8 @@ def fill_image (srcstream, outpath, convolve=False, cleardata=True):
         if kind == 'point':
             fill_point (oi, worldcoords, pixelcoords, odata, info)
         elif kind == 'gaussian':
-            fill_gauss (oi, worldcoords, pixelcoords, odata, info)
+            fill_gauss (oi, worldcoords, pixelcoords, odata, info,
+                        beaminfo=beaminfo)
         else:
             util.die ('unhandled source kind "%s"', kind)
 
@@ -279,7 +299,8 @@ def fill_image (srcstream, outpath, convolve=False, cleardata=True):
     del oi # ??? how to close?
 
 
-def imgen (inpath, srcstream, outpath, convolve=False):
+def imgen (inpath, srcstream, outpath, convolve=False, tmplscale=0,
+           modelscale=1):
     import pyrap.tables as PT, pyrap.images as PI
 
     PT.tablecopy (inpath, outpath, deep=True)
@@ -292,7 +313,7 @@ def imgen (inpath, srcstream, outpath, convolve=False):
 
     try:
         fill_image (srcstream, outpath, convolve=convolve,
-                    cleardata=True)
+                    tmplscale=tmplscale, modelscale=modelscale)
     except:
         t, v, tb = sys.exc_info ()
         PT.tabledelete (outpath, ack=False)
@@ -304,11 +325,17 @@ def cmdline (argv):
     util.checkusage (__doc__, argv, usageifnoargs=True)
 
     convolve = False
+    tmplscale = 0
+    modelscale = 1
     miscargs = []
 
     for arg in argv[1:]:
         if arg == '-c':
             convolve = True
+        elif arg.startswith ('-t'):
+            tmplscale = float (arg[2:])
+        elif arg.startswith ('-m'):
+            modelscale = float (arg[2:])
         else:
             miscargs.append (arg)
 
@@ -325,7 +352,8 @@ def cmdline (argv):
     else:
         srcstream = open (srcpath)
 
-    imgen (inpath, srcstream, outpath, convolve=convolve)
+    imgen (inpath, srcstream, outpath, convolve=convolve,
+           tmplscale=tmplscale, modelscale=modelscale)
 
 
 if __name__ == '__main__':
