@@ -178,11 +178,11 @@ class ColorMapper (LazyComputer):
                 #N.multiply (mapped[:,:,2], 0xFF, effscratch)
                 N.bitwise_or (dest, effscratch, dest)
         else:
-            #scratch2 = N.zeros ((self.tilesize, self.tilesize), dtype=N.uint32)
+            scratch2 = N.zeros ((self.tilesize, self.tilesize), dtype=N.uint32)
 
             def func (src, dest):
                 #effscratch = scratch[:dest.shape[0],:dest.shape[1]]
-                #effscratch2 = scratch2[:dest.shape[0],:dest.shape[1]]
+                effscratch2 = scratch2[:dest.shape[0],:dest.shape[1]]
                 mapped = mapper (src)
 
                 dest.fill (0xFF000000)
