@@ -19,14 +19,14 @@ def mirhack (inpath, outpath):
         indata = im.read ()
 
     casaout = image (outpath)
-    outdata = casaout.getdata ()
+    outdata = casaout.get ()
 
     if indata.size != outdata.size:
         util.die ('cannot import data: input and output have differing '
                   'numbers of pixels')
 
     outdata[:] = indata.reshape (outdata.shape)
-    casaout.putdata (outdata)
+    casaout.put (outdata)
 
     del casaout # ??? how to close?
 
