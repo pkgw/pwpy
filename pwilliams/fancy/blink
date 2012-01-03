@@ -5,7 +5,9 @@ blink [-f] [-m] <image1> <image2> [...]
 
 Cycle between two or more images in an interactive graphical
 display. Each image must be of precisely the same dimensions, but the
-underlying coordinate systems are ignored.
+underlying coordinate systems are ignored. The masks of the images are
+unified; that is, only pixels that are unmasked in every single image
+are shown.
 
 -f -- display the amplitude of the FFT of each image, rather than
   the raw values
@@ -14,51 +16,21 @@ underlying coordinate systems are ignored.
 """
 
 import sys, numpy as N
+import astimage
 from mirtask import util
 
 
 def load (path, fft, maxnorm):
-    import os.path, miriad
-    data = None
-
-    if os.path.exists (os.path.join (path, 'image')):
-        h = miriad.ImData (path).open ('rw')
-        data = h.readPlane (axes=[], topIsZero=True)
-        h.close ()
-    elif os.path.exists (os.path.join (path, 'table.dat')):
-        import pyrap.tables
-        t = pyrap.tables.table (path, ack=False)
-        data = t.getcol ('map', nrow=1)[0]
-        t.close ()
-        data = N.squeeze (data)
-        data = N.flipud (data) # same topIsZero issue as MIRIAD
-        data = N.ma.MaskedArray (data)
-    elif os.path.isfile (path):
-        f = open (path, 'rb')
-        sniff = f.read (9)
-        f.close ()
-
-        if sniff.startswith ('SIMPLE  ='):
-            import pyfits
-            hdulist = pyfits.open (path, mode='readonly')
-            data = hdulist[0].data
-            hdulist.close ()
-
-            while data.shape[0] == 1:
-                data = data[0]
-
-            data = N.flipud (data) # same topIsZero issue as MIRIAD
-            data = N.ma.MaskedArray (data)
-
-    if data is None:
-        util.die ('don\'t know what to do with file "%s"', path)
-
-    if maxnorm:
-        data /= N.ma.max (data)
+    img = astimage.open (path, 'r')
+    data = img.read (squeeze=True, flip=True)
 
     if fft:
         data = N.abs (N.fft.ifftshift (N.fft.fft2 (N.fft.fftshift (data.filled (0)))))
+        #data = N.fft.ifftshift (N.fft.fft2 (N.fft.fftshift (data.filled (0)))).real
         data = N.ma.MaskedArray (data)
+
+    if maxnorm:
+        data /= N.ma.max (data)
 
     return data
 

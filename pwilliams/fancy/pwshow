@@ -1,47 +1,41 @@
 #! /usr/bin/env python
 # -*- mode: python; coding: utf-8 -*-
 
+"""
+pwshow [-f] <image> [images ...]
+
+Display images interactively, in sequence.
+
+-f -- plot the amplitude of the FFT of the images instead
+"""
+
 import sys, os.path, miriad, ndshow, numpy as N
+import astimage
 from mirtask import util
+
+util.checkusage (__doc__, sys.argv, usageifnoargs=True)
 
 fft = '-f' in sys.argv
 if fft:
     sys.argv.remove ('-f')
 
 if len (sys.argv) < 2:
-    util.die ('usage: pwshow [-f] <image>')
+    util.wrongusage (__doc__, 'must provide at least one path')
 
 anyfailures = False
 
 for path in sys.argv[1:]:
-    data = None
+    try:
+        img = astimage.open (path, 'r')
+    except Exception, e:
+        print >>sys.stderr, 'pwshow: can\'t open path “%s”: %s' % (path, e)
+        anyfailures = True
+        continue
 
-    if os.path.exists (os.path.join (path, 'image')):
-        h = miriad.ImData (path).open ('rw')
-        data = h.readPlane (axes=[], topIsZero=True)
-        h.close ()
-    elif os.path.exists (os.path.join (path, 'table.dat')):
-        import pyrap.tables
-        t = pyrap.tables.table (path, ack=False)
-        data = t.getcol ('map', nrow=1)[0]
-        t.close ()
-        data = N.squeeze (data)
-        data = N.flipud (data) # same topIsZero issue as MIRIAD
-    elif os.path.isfile (path):
-        f = open (path, 'rb')
-        sniff = f.read (9)
-        f.close ()
+    data = img.read (squeeze=True, flip=True)
 
-        if sniff.startswith ('SIMPLE  ='):
-            import pyfits
-            hdulist = pyfits.open (path, mode='readonly')
-            data = hdulist[0].data
-            hdulist.close ()
-            data = N.squeeze (data)
-            data = N.flipud (data) # same topIsZero issue as MIRIAD
-
-    if data is None:
-        print >>sys.stderr, 'pwshow: don’t know what to do with path “%s”' % path
+    if data.ndim != 2:
+        print >>sys.stderr, 'pwshow: can\'t make image at “%s” into 2D' % path
         anyfailures = True
         continue
 

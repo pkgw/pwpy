@@ -32,6 +32,7 @@ really accomplish anything
 """
 
 import sys, numpy as N
+import astimage
 from mirtask import util
 
 RAD2ASEC = 3600 * 180 / N.pi
@@ -114,59 +115,55 @@ def gaussianDeconvolve (smaj, smin, spa, bmaj, bmin, bpa):
 # The main implementation
 
 def sfind_extract (inpath, keywords):
-    # First, get beamshape parameters from source image.
+    # Open image and get useful parameters
 
-    from pyrap.images import image
-
+    img = astimage.open (inpath, 'r')
     sfinfo = {}
-
-    h = image (inpath)
     imageinfo = Holder ()
-    imageinfo.naxis = len (h.shape ())
+    imageinfo.naxis = img.shape.size
 
-    bminfo = h.imageinfo ().get ('restoringbeam')
-    if bminfo is None:
+    if img.bmaj is None:
         warn ('no restoring beam information; will NOT deconvolve')
         imageinfo.bmaj = imageinfo.bmin = imageinfo.bpa = None
         sfinfo['maybestillconvolved'] = 'true'
     else:
-        if bminfo['major']['unit'] != 'arcsec':
-            util.die ('unhandled beamshape major axis unit "%s"', bminfo['major']['unit'])
-        if bminfo['minor']['unit'] != 'arcsec':
-            util.die ('unhandled beamshape minor axis unit "%s"', bminfo['minor']['unit'])
-        if bminfo['positionangle']['unit'] != 'deg':
-            util.die ('unhandled beamshape PA unit "%s"', bminfo['positionangle']['unit'])
+        imageinfo.bmaj = img.bmaj
+        imageinfo.bmin = img.bmin
+        imageinfo.bpa = img.bpa
 
-        imageinfo.bmaj = bminfo['major']['value'] * ASEC2RAD
-        imageinfo.bmin = bminfo['minor']['value'] * ASEC2RAD
-        imageinfo.bpa = bminfo['positionangle']['value'] * N.pi / 180
-
-    # Now convert to MIRIAD format (via FITS), run SFIND, and process
+    # Now get it into MIRIAD format (possibly via FITS), run SFIND,
+    # and process. We're going to change directories so canonicalize
+    # the input path
 
     from tempfile import mkdtemp
-    from os.path import join
+    from os.path import join, realpath
     from os import getcwd, chdir, devnull
     from shutil import rmtree
     import subprocess
     from mirexec import TaskFits, TaskSFind
 
     origdir = getcwd ()
+    inpath = realpath (inpath)
     tmpcontainer = mkdtemp (prefix='mssfextract.')
 
     try:
-        # Generate the FITS file before changing directory in case
-        # inpath is relative. image2fits annoyingly logs to its standard
-        # error.
-        tmpfits = join (tmpcontainer, 'input.fits')
-        subprocess.check_call (['image2fits', 'in=' + inpath, 'out=' + tmpfits],
-                               stdout=open (devnull, 'w'),
-                               stderr=subprocess.STDOUT)
+        mirpath = fitspath = None
+
+        if isinstance (img, astimage.MIRIADImage):
+            mirpath = inpath
+        elif isinstance (img, astimage.FITSImage):
+            fitspath = inpath
+        else:
+            fitspath = join (tmpcontainer, 'input.fits')
+            img.saveAsFITS (fitspath)
 
         chdir (tmpcontainer)
 
-        TaskFits (in_='input.fits', out='input.mirimg', op='xyin').runsilent ()
+        if mirpath is None:
+            mirpath = 'input.mirimg'
+            TaskFits (in_=fitspath, out=mirpath, op='xyin').runsilent ()
 
-        stdout, stderr = TaskSFind (in_='input.mirimg', **keywords).snarf ()
+        stdout, stderr = TaskSFind (in_=mirpath, **keywords).snarf ()
 
         for l in stdout:
             if l.startswith ('FDR selected a'):

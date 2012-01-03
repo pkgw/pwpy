@@ -2,21 +2,21 @@
 # -*- python -*-
 
 """
-msmirhack <input MIRIAD image> <output CASA image>
+msimhack <input image> <output CASA image>
 
-Copy the contents of a MIRIAD image into a CASA image. It's up to you
+Copy the contents of an image into a CASA image. It's up to you
 to ensure that all of the metadata, etc, are consistent (or not).
 """
 
+import astimage
 from mirtask import util
 
 
 def mirhack (inpath, outpath):
-    from mirtask import XYDataSet
     from pyrap.images import image
 
-    mirin = XYDataSet (inpath, 'rw')
-    indata = mirin.readPlane (axes=[])
+    with astimage.open (inpath, 'r') as im:
+        indata = im.read ()
 
     casaout = image (outpath)
     outdata = casaout.getdata ()
@@ -29,7 +29,6 @@ def mirhack (inpath, outpath):
     casaout.putdata (outdata)
 
     del casaout # ??? how to close?
-    mirin.close ()
 
 
 def cmdline (argv):
@@ -40,9 +39,6 @@ def cmdline (argv):
         util.wrongusage (__doc__, 'exactly 2 arguments expected')
 
     inpath, outpath = argv[1:]
-
-    if not isdir (inpath):
-        util.die ('input "%s" is not a directory', inpath)
 
     if not isdir (outpath):
         util.die ('output "%s" is not a directory', outpath)

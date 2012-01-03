@@ -14,8 +14,9 @@ output and can be piped into msimgen.
 """
 TODO:
 
-- Accept visibility MSes as well as image MSes. All we
-really need is the pointing center.
+- Accept visibility data as well as image data. All we
+really need is the pointing center. (So, we could just
+let ra/dec be command-line args.)
 
 - For now, we don't allow the randum number generator seed to be
 specified explicitly, so our runs aren't reproducible.
@@ -30,6 +31,7 @@ specified explicitly, so our runs aren't reproducible.
 """
 
 import numpy as N
+import astimage
 
 
 def fmtradec (ra, dec):
@@ -74,27 +76,27 @@ def fmtradec (ra, dec):
 
 
 def make_random_sources (tmplpath, flux, radius, nsrc):
-    from pyrap.images import image
-    im = image (tmplpath)
-    dc = im.coordinates ().get_coordinate ('direction')
-    refvals = dc.get_referencevalue ()
-    rarad = refvals[dc.get_axes ().index ('Right Ascension')]
-    decrad = refvals[dc.get_axes ().index ('Declination')]
+    im = astimage.open (tmplpath, 'r')
+    # FIXME: assuming last two coords are lat/lon, and
+    # we always format them as RA/Dec
+    ctrworld = im.toworld (0.5 * (im.shape - 1))
+    latrad = ctrworld[-2]
+    lonrad = ctrworld[-1]
     radsq = radius**2
 
     for n in xrange (nsrc):
         # There's probably a less-dumb way to get a 
         # uniform distribution on a disk.
         while True:
-            dra = N.random.uniform (-radius, radius) # arcsec
-            ddec = N.random.uniform (-radius, radius) # arcsec
-            if dra**2 + ddec**2 <= radsq:
+            dlat = N.random.uniform (-radius, radius) # arcsec
+            dlon = N.random.uniform (-radius, radius) # arcsec
+            if dlat**2 + dlon**2 <= radsq:
                 break
 
-        sdec = decrad + ddec
-        sra = rarad + dra / N.cos (sdec)
+        slat = latrad + dlat
+        slon = lonrad + dlon / N.cos (slat)
 
-        print 'point   ', fmtradec (sra, sdec), flux
+        print 'point   ', fmtradec (slon, slat), flux
 
 
 def cmdline (argv):

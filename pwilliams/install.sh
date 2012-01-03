@@ -83,7 +83,7 @@ ms/msimgadd
 ms/msimgen
 ms/msimsquash
 ms/msimsub
-ms/msmirhack
+ms/msimhack
 ms/msmkrandsrc
 ms/mssetupimaging
 ms/mssfextract
@@ -95,6 +95,7 @@ pyata/atactl.py
 pyata/ataprobe.py
 pyata/calibrators.py
 pyata/fxlaunch.sh
+pylib/astimage.py
 pylib/ata2mir.py
 pylib/atabpass.py
 pylib/calctsys.py
