@@ -93,16 +93,25 @@ def repeat(num=100, source=0+0j, show=0):
     return mdarr, biarr
 
 
-def threshold(na=3):
+def threshold(na=3,thresh=3):
     """Simulate the bispectrum to find threshold in terms of S/Q.
     Sorts output of both statistics and then takes value based on index where threshold is expected.
     """
 
-    thresh = 2.9e-7
-    simlen = 100000000   # product of thresh*simlen must be much larger than 1
+    if thresh == 3:
+        thresh = 1.3e-3  # 3sigma
+        simlen = 10000
+    elif thresh == 4:
+        thresh = 3.2e-5  # 4sigma
+        simlen = 1000000
+    elif thresh == 5:
+        thresh = 2.9e-7  # 5sigma
+        simlen = 100000000   # product of thresh*simlen must be much larger than 1
+    else:
+        print 'Not a standard sigma threshold'
+        return 0
 
-    thresh = 1.4e-3
-    simlen = 10000
+    print 'thresh=%.1e, simlen=%d' % (thresh,simlen)
 
     # make mean bi and bf
     bimean = n.zeros(thresh*simlen)
