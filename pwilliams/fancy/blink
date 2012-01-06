@@ -39,9 +39,17 @@ def blink (paths, fft, maxnorm):
     import ndshow
 
     images = [load (p, fft, maxnorm) for p in paths]
+    if not len (images):
+        return
 
-    # If a mask is "nomask", we can't do straightforward or'ing of
-    # masks, so this is more complicated than you might expect.
+    shape = images[0].shape
+    for i, im in enumerate (images[1:]):
+        if im.shape != shape:
+            util.die ('shape of "%s" does not agree with that '
+                      'of "%s"', paths[i+1], paths[0])
+
+    # Merge masks. This is more complicated than you might think
+    # since you can't "or" nomask with itself.
 
     jointmask = N.ma.nomask
 
