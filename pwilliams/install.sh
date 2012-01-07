@@ -96,6 +96,7 @@ pyata/ataprobe.py
 pyata/calibrators.py
 pyata/fxlaunch.sh
 pylib/astimage.py
+pylib/astutil.py
 pylib/ata2mir.py
 pylib/atabpass.py
 pylib/calctsys.py
