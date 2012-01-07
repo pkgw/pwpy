@@ -150,8 +150,9 @@ class evla:
 
         p.figure(1)
 #        ax = p.imshow(n.rot90(abs), aspect='auto', origin='upper', interpolation='nearest', extent=(min(reltime),max(reltime),0,len(chans)), vmin=-4, vmax=4)
-        ax = p.imshow(n.rot90(abs), aspect='auto', origin='upper', interpolation='nearest', extent=(0,len(reltime),0,len(chans)), vmin=-4, vmax=4)
-        p.colorbar(ax)
+        ax = p.imshow(n.rot90(abs), aspect='auto', origin='upper', interpolation='nearest', extent=(0,len(reltime),0,len(chans)), vmin=-3, vmax=3)
+        cb = p.colorbar(ax)
+        cb.set_label('Flux Density (Jy)')
         p.yticks(n.arange(0,len(self.chans),4), (self.chans[(n.arange(0,len(self.chans), 4))]))
         p.xlabel('Time (integration)')
         p.ylabel('Channel') # (flagged data removed)')
@@ -960,7 +961,7 @@ class evla:
 
         triples = self.tripgen(a1=a1)
 
-        dibi = n.zeros((len(self.data)-bgwindow, len(triples)))
+        dibi = n.zeros((len(self.data)-bgwindow, len(triples)), dtype='complex')
         for ii in range(bgwindow+1, len(self.data)-(bgwindow+1)):
             diff = self.tracksub(dmbin, ii, bgwindow=bgwindow)
             if len(n.shape(diff)) == 1:    # no track
@@ -969,11 +970,11 @@ class evla:
 
             for trip in range(len(triples)):
                 i, j, k = triples[trip]
-                dibi[ii, trip] = bisp(diffmean, i, j, k).real
+                dibi[ii, trip] = bisp(diffmean, i, j, k)
 
         # mean and std are primary products of each trial
-        dibimean = dibi.mean(axis=1)
-        dibistd = dibi.std(axis=1)
+        dibimean = dibi.real.mean(axis=1)
+        dibistd = dibi.real.std(axis=1)
 
         if save:
             good = n.where( (dibistd > 0.5*n.median(dibistd)) & (dibistd < 2.*n.median(dibistd)) )
@@ -1002,7 +1003,7 @@ class evla:
             p.ylabel('SNR$_{bisp}$')
             p.savefig(savename)
             p.clf()                           
-        return dibimean, dibistd
+        return dibimean, dibistd, dibi
 
 
     def closure(self, dmbin, bgwindow=10, show=0):

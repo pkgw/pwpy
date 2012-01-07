@@ -182,14 +182,14 @@ def plotfig(s=-1, num=-1, t=5):
 
     p.figure(1)
     p.loglog()
-    p.plot(s, snrbi(s,num), 'b', label='Bispectrum (orig)', linewidth=3)
-    p.plot(s, snrbi2(s,num), 'b--', label='Bispectrum (new)', linewidth=3)
+    p.plot(s, snrbi(s,num), 'b', label='Bispectrum', linewidth=3)
+#    p.plot(s, snrbi2(s,num), 'b--', label='Bispectrum (new)', linewidth=3)
     p.plot(s, snrco(s,num), 'r--', label='Coherent Beamforming', linewidth=3)
     p.plot(s, snrin(s,num), 'g.', label='Incoherent Baseline Beamforming', linewidth=3)
     p.plot(s, snrinin(s,num), 'y-.', label='Incoherent Antenna Beamforming', linewidth=3)
     p.xlabel('SNR per baseline')
     p.ylabel('SNR')
-    p.legend(loc=0)
+    p.legend(loc=0, numpoints=1)
 
     # invert equations to get flux limits
     # option 1: analytic inversion
@@ -225,8 +225,8 @@ def plotfig(s=-1, num=-1, t=5):
 #    p.plot(num, sco(num,t), label='Coherent Beamforming')
 #    p.plot(num, sin(num,t), label='Incoherent Beamforming')
     # computational...
-    p.plot(num, sbiarr, 'b', label='Bispectrum (orig)', linewidth=3)
-    p.plot(num, sbiarr2, 'b--', label='Bispectrum (new)', linewidth=3)
+    p.plot(num, sbiarr, 'b', label='Bispectrum', linewidth=3)
+#    p.plot(num, sbiarr2, 'b--', label='Bispectrum (new)', linewidth=3)
     p.plot(num, scoarr, 'r--', label='Coherent Beamforming', linewidth=3)
     p.plot(num, sinarr, 'g.', label='Incoherent Baseline Beamforming', linewidth=3)
     p.plot(num, sininarr, 'y-.', label='Incoherent Antenna Beamforming', linewidth=3)
@@ -237,6 +237,6 @@ def plotfig(s=-1, num=-1, t=5):
     p.text(64, 0.2, 'MeerKAT', rotation='vertical', horizontalalignment='center',verticalalignment='center',fontsize=14)
     p.xlabel('Number of Antennas')
     p.ylabel('Flux Limit (%d sigma; Jy)' % (t))
-    p.legend()
+    p.legend(numpoints=1)
 
     p.show()
