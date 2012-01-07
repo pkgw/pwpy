@@ -16,10 +16,6 @@ TODO: allow writing of data
 
 TODO: for iminfo, need: axis types, ref freq
 
-TODO: use axis types (e.g., self._wcs.{lat,lon,spec}) to allow some kind of
-sanity-checking of image structure and squashing down to "canonical" 2D
-form (I'm thinking 2D with axes of [lat,long]).
-
 TODO: standardized celestial axis types for proper generic formatting
 of RA/Dec ; glat/glon etc
 
@@ -37,7 +33,7 @@ F2S = 1 / N.sqrt (8 * N.log (2)) # FWHM to sigma
 S2F = N.sqrt (8 * N.log (2))
 
 __all__ = ('UnsupportedError AstroImage MIRIADImage CASAImage '
-           'FITSImage open').split ()
+           'FITSImage SimpleImage open').split ()
 
 
 class UnsupportedError (RuntimeError):
@@ -113,6 +109,19 @@ class AstroImage (object):
         raise NotImplementedError ()
 
 
+    def simple (self):
+        lat, lon = self._latlonaxes ()
+
+        if lat < 0 or lon < 0 or lat == lon:
+            raise UnsupportedError ('the image "%s" cannot be reduced to a '
+                                    'single plane', self.path)
+
+        if lat == 0 and lon == 1 and self.shape.size == 2:
+            return self # noop
+
+        return SimpleImage (self, lat, lon)
+
+
     def saveAsFITS (self, path, overwrite=False):
         raise NotImplementedError ()
 
@@ -174,6 +183,17 @@ def _wcs_topixel (wcs, world, wcscale, naxis):
     world = (world / wcscale)[::-1].reshape ((1, naxis))
     pixel = wcs.wcs_sky2pix (world, 0)
     return pixel[0,::-1]
+
+
+def _wcs_latlonaxes (wcs, naxis):
+    lat = lon = -1
+
+    if wcs.wcs.lat >= 0:
+        lat = naxis - 1 - wcs.wcs.lat
+    if wcs.wcs.lng >= 0:
+        lon = naxis - 1 - wcs.wcs.lng
+
+    return lat, lon
 
 
 class MIRIADImage (AstroImage):
@@ -256,6 +276,13 @@ class MIRIADImage (AstroImage):
                                     'but not present in "%s"', self.path)
 
         return _wcs_topixel (self._wcs, world, self._wcscale, self.shape.size)
+
+
+    def _latlonaxes (self):
+        if self._wcs is None:
+            raise UnsupportedError ('world coordinate information is required '
+                                    'but not present in "%s"', self.path)
+        return _wcs_latlonaxes (self._wcs, self.shape.size)
 
 
     def saveAsFITS (self, path, overwrite=False):
@@ -358,6 +385,38 @@ class CASAImage (AstroImage):
         return N.asarray (self._handle.topixel (world / self._wcscale))
 
 
+    def _latlonaxes (self):
+        self._checkOpen ()
+
+        lat = lon = -1
+        flat = []
+
+        for item in self._handle.coordinates ().get_axes ():
+            if isinstance (item, basestring):
+                flat.append (item)
+            else:
+                for subitem in item:
+                    flat.append (subitem)
+
+        for i, name in enumerate (flat):
+            # These symbolic names obtained from 
+            # casacore/coordinates/Coordinates/DirectionCoordinate.cc
+            # Would be nice to have a better system for determining
+            # this a la what wcslib provides.
+            if name in ('Right Ascension', 'Hour Angle', 'Longitude'):
+                if lon == -1:
+                    lon = i
+                else:
+                    lon = -2
+            elif name in ('Declination', 'Latitude'):
+                if lat == -1:
+                    lat = i
+                else:
+                    lat = -2
+
+        return lat, lon
+
+
     def saveAsFITS (self, path, overwrite=False):
         self._checkOpen ()
         self._handle.tofits (path, overwrite=overwrite)
@@ -427,9 +486,113 @@ class FITSImage (AstroImage):
         return _wcs_topixel (self._wcs, world, self._wcscale, self.shape.size)
 
 
+    def _latlonaxes (self):
+        if self._wcs is None:
+            raise UnsupportedError ('world coordinate information is required '
+                                    'but not present in "%s"', self.path)
+        return _wcs_latlonaxes (self._wcs, self.shape.size)
+
+
     def saveAsFITS (self, path, overwrite=False):
         self._checkOpen ()
         self._handle.writeto (path, output_verify='fix', clobber=overwrite)
+
+
+class SimpleImage (AstroImage):
+    def __init__ (self, parent, latax, lonax):
+        self._handle = parent
+        self._latax = latax
+        self._lonax = lonax
+
+        checkworld1 = parent.toworld (parent.shape * 0.) # need float!
+        checkworld2 = parent.toworld (parent.shape - 1.) # (for pyrap)
+        self._topixelok = True
+
+        for i in xrange (parent.shape.size):
+            # Two things to check. Firstly, that all non-lat/lon
+            # axes have only one pixel; this limitation can be relaxed
+            # if we add a mechanism for choosing which non-spatial
+            # pixels to work with.
+            #
+            # Secondly, check that non-lat/lon world coordinates
+            # don't vary over the image; otherwise topixel() will
+            # be broken.
+            if i in (latax, lonax):
+                continue
+            if parent.shape[i] != 1:
+                raise UnsupportedError ('cannot simplif an image with '
+                                        'nondegenerate nonspatial axes')
+            if N.abs (1 - checkworld1[i] / checkworld2[i]) > 1e-6:
+                self._topixelok = False
+
+        self.path = '<subimage of %s>' % parent.path
+        self.shape = N.asarray ([parent.shape[latax], parent.shape[lonax]])
+        self.bmaj = parent.bmaj
+        self.bmin = parent.bmin
+        self.bpa = parent.bpa
+        self.units = parent.units
+
+        self._pctmpl = N.zeros (parent.shape.size)
+        self._wctmpl = parent.toworld (self._pctmpl)
+
+
+    def _closeImpl (self):
+        pass
+
+
+    def read (self, squeeze=False, flip=False):
+        data = self._handle.read (flip=flip)
+        idx = list (self._pctmpl)
+        idx[self._latax] = slice (None)
+        idx[self._lonax] = slice (None)
+        data = data[tuple (idx)]
+
+        if self._latax > self._lonax:
+            # Ensure that order is (lat, lon). Note that unlike the
+            # above operations, this forces a copy of data.
+            data = data.T
+
+        if squeeze:
+            data = data.squeeze () # could be 1-by-N ...
+
+        return data
+
+
+    def toworld (self, pixel):
+        self._checkOpen ()
+        p = self._pctmpl.copy ()
+        p[self._latax] = pixel[0]
+        p[self._lonax] = pixel[1]
+        w = self._handle.toworld (p)
+        world = N.empty (2)
+        world[0] = w[self._latax]
+        world[1] = w[self._lonax]
+        return world
+
+
+    def topixel (self, world):
+        self._checkOpen ()
+        if not self._topixelok:
+            raise UnsupportedError ('mixing in the coordinate system of '
+                                    'this subimage prevents mapping from '
+                                    'world to pixel coordinates')
+
+        w = self._wctmpl.copy ()
+        w[self._latax] = world[0]
+        w[self._lonax] = world[1]
+        p = self._handle.topixel (w)
+        pixel = N.empty (2)
+        pixel[0] = p[self._latax]
+        pixel[1] = p[self._lonax]
+        return pixel
+
+
+    def simple (self):
+        return self
+
+
+    def saveAsFITS (self, path, overwrite=False):
+        raise UnsupportedError ('cannot save subimage as FITS')
 
 
 def open (path, mode):
