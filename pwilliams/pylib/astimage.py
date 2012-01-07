@@ -246,6 +246,7 @@ class MIRIADImage (AstroImage):
             data = self._handle.readPlane ([], topIsZero=flip)
         else:
             data = N.ma.empty (self.shape, dtype=N.float32)
+            data.mask = N.zeros (self.shape, dtype=N.bool)
             n = N.prod (nonplane)
             fdata = data.reshape ((n, self.shape[-2], self.shape[-1]))
 
