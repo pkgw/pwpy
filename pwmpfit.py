@@ -673,7 +673,7 @@ def _lmpar (r, ipvt, diag, qtb, delta, x, sdiag, par, enorm, finfo):
         fp = dxnorm - delta
 
         if (abs (fp) < 0.1 * delta or (parl == 0 and fp <= temp and temp < 0) or
-            iter == 10):
+            iterct == 10):
             break
 
         # "Compute the Newton correction."
