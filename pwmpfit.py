@@ -1423,8 +1423,6 @@ class Problem (object):
                 self.covar = N.zeros ((nn, nn), dtype)
                 for i in xrange (n):
                     self.covar[ifree[i],ifree] = cv[i]
-                ##    indices = ifree[0] + ifree[0][i] * n
-                ##    self.covar[indices] = cv[:,i]
 
                 # Compute errors in parameters
                 self.perror = N.zeros (nn, dtype)
