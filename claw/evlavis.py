@@ -150,12 +150,19 @@ class evla:
 
         p.figure(1)
 #        ax = p.imshow(n.rot90(abs), aspect='auto', origin='upper', interpolation='nearest', extent=(min(reltime),max(reltime),0,len(chans)), vmin=-4, vmax=4)
-        ax = p.imshow(n.rot90(abs), aspect='auto', origin='upper', interpolation='nearest', extent=(0,len(reltime),0,len(chans)), vmin=-3, vmax=3)
+        ax = p.imshow(n.rot90(abs), aspect='auto', origin='upper', interpolation='nearest', extent=(0,len(reltime),0,len(chans)), vmin=-5, vmax=2.5)
         cb = p.colorbar(ax)
-        cb.set_label('Flux Density (Jy)')
+        cb.set_label('Flux Density (Jy)',fontsize=12,fontweight="bold")
+        ax = p.axes()
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['bottom'].set_position(('outward', 20))
+        ax.spines['left'].set_position(('outward', 30))
+        ax.yaxis.set_ticks_position('left')
+        ax.xaxis.set_ticks_position('bottom')
         p.yticks(n.arange(0,len(self.chans),4), (self.chans[(n.arange(0,len(self.chans), 4))]))
-        p.xlabel('Time (integration)')
-        p.ylabel('Channel') # (flagged data removed)')
+        p.xlabel('Time (integration number)',fontsize=12,fontweight="bold")
+        p.ylabel('Frequency Channel',fontsize=12,fontweight="bold")
         if save:
             savename = self.file.split('.')[:-1]
             savename.append(str(self.nskip/self.nbl) + '.spec.png')
