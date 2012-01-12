@@ -22,11 +22,15 @@ S2F = N.sqrt (8 * N.log (2))
 __all__ = 'N pi twopi halfpi R2A A2R R2D D2R R2H H2R F2S S2F'.split ()
 
 
-# Angle normalization
+# Angle and orientation (PA) normalization
+#
+# PA's seem to usually be given in the range [-90, 90]
 
 angcen = lambda a: (((a + pi) % twopi) - pi)
 
-__all__ += 'angcen'.split ()
+orientcen = lambda a: (((a + halfpi) % pi) - halfpi)
+
+__all__ += 'angcen orientcen'.split ()
 
 
 # Formatting/parsing of lat/long/etc
@@ -137,7 +141,53 @@ norm[alization] can be one of 'none', 'raise', or 'wrap'
         (sgn, deg, amin, width, precision, asec)
 
 
-__all__ += 'fmthours fmtdeglon fmtdeglat'.split ()
+def fmtradec (rarad, decrad, precision=2):
+    return fmthours (rarad, precision=precision + 1) + ' ' \
+        + fmtdeglat (decrad, precision=precision)
+
+
+__all__ += 'fmthours fmtdeglon fmtdeglat fmtradec'.split ()
+
+
+# Parsing routines are currently very lame.
+
+def parsehours (hrstr):
+    try:
+        hr, mn, sec = hrstr.split (':')
+        hr = int (hr)
+        mn = int (mn)
+        sec = float (sec)
+    except Exception:
+        raise ValueError ('unable to parse as hours: ' + hrstr)
+
+    if hr < 0 or hr > 23 or mn < 0 or mn > 59 or sec < 0 or sec >= 60.:
+        raise ValueError ('illegal hour specification: ' + hrstr)
+
+    return (hr + mn / 60. + sec / 3600.) * N.pi / 12
+
+
+def parsedeglat (latstr):
+    if latstr[0] != '-':
+        sgn = 1
+    else:
+        sgn = -1
+        latstr = latstr[1:]
+
+    try:
+        deg, mn, sec = latstr.split (':')
+        deg = int (deg)
+        mn = int (mn)
+        sec = float (sec)
+    except Exception:
+        raise ValueError ('unable to parse as latitude: ' + latstr)
+
+    if deg < 0 or deg > 90 or mn < 0 or mn > 59 or sec < 0 or sec >= 60.:
+        raise ValueError ('illegal latitude specification: ' + latstr)
+
+    return sgn * (deg + mn / 60. + sec / 3600.) * N.pi / 180
+
+
+__all__ += 'parsehours parsedeglat'.split ()
 
 
 # Spherical trig
