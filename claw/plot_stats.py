@@ -30,8 +30,8 @@ def compute():
     fig = plt.figure()
     ax1 = plt.axes((0.18, 0.20, 0.55, 0.65))
 
-    plt.plot([27,27], [8, 10.5], 'k--')
-    plt.text(27,9.5, 'EVLA', horizontalalignment='right',verticalalignment='center',fontsize=12,fontweight="bold", rotation='vertical')
+    plt.plot([27,27], [0, 20], 'k--')
+    plt.text(26.8,12, 'EVLA', horizontalalignment='right',verticalalignment='center',fontsize=12,fontweight="bold", rotation='vertical')
     plt.plot(ar, 2+n.log10(bisp(ar)), 'r', label='Bispectrum',lw=2,clip_on=False)
     plt.fill_between(ar, 2+n.log10(cobf(ar,dr_evlad)), 2+n.log10(cobf(ar,dr_evlaa)), clip_on=False, alpha=0.3, facecolor='b')
     plt.plot(ar, 2+n.log10(cobf(ar,dr_evlad)), 'b--', label='Coherent Beamforming',lw=1,clip_on=False)
