@@ -11,15 +11,10 @@ Note that pyrap.images allegedly supports casacore, HDF5, FITS, and
 MIRIAD format images transparently. Frankly, I don't trust it, and I'd
 rather not require that casacore and pyrap be installed.
 
-TODO: allow writing of data
- (useful in msimgen, msimhack)
-
 TODO: for iminfo, need: axis types, ref freq
 
 TODO: standardized celestial axis types for proper generic formatting
 of RA/Dec ; glat/glon etc
-
-TODO: subimages
 """
 
 import numpy as N
@@ -39,16 +34,17 @@ __all__ = ('UnsupportedError AstroImage MIRIADImage CASAImage '
 class UnsupportedError (RuntimeError):
     def __init__ (self, fmt, *args):
         if not len (args):
-            self.message = str (fmt)
+            self._message = str (fmt)
         else:
-            self.message = fmt % args
+            self._message = fmt % args
 
     def __str__ (self):
-        return self.message
+        return self._message
 
 
 class AstroImage (object):
     path = None
+    mode = None
     _handle = None
 
     shape = None
@@ -70,6 +66,7 @@ class AstroImage (object):
 
     def __init__ (self, path, mode):
         self.path = path
+        self.mode = mode
 
 
     def __del__ (self):
@@ -97,7 +94,17 @@ class AstroImage (object):
                                     'closed image at "%s"', self.path)
 
 
+    def _checkWriteable (self):
+        if self.mode == 'r':
+            raise UnsupportedError ('this operation cannot be performed on the '
+                                    'read-only image at "%s"', self.path)
+
+
     def read (self, squeeze=False, flip=False):
+        raise NotImplementedError ()
+
+
+    def write (self, data):
         raise NotImplementedError ()
 
 
@@ -260,6 +267,30 @@ class MIRIADImage (AstroImage):
         return data
 
 
+    def write (self, data):
+        data = N.ma.asarray (data)
+
+        if data.shape != tuple (self.shape):
+            raise ValueError ('data is wrong shape: got %s, want %s' \
+                                  % (data.shape, tuple (self.shape)))
+
+        self._checkOpen ()
+        self._checkWriteable ()
+        nonplane = self.shape[:-2]
+
+        if nonplane.size == 0:
+            self._handle.writePlane (data, [])
+        else:
+            n = N.prod (nonplane)
+            fdata = data.reshape ((n, self.shape[-2], self.shape[-1]))
+
+            for i in xrange (n):
+                axes = N.unravel_index (i, nonplane)
+                self._handle.writePlane (fdata[i], axes)
+
+        return self
+
+
     def toworld (self, pixel):
         # self._wcs is still valid if we've been closed, so no need
         # to _checkOpen().
@@ -374,6 +405,19 @@ class CASAImage (AstroImage):
         return data
 
 
+    def write (self, data):
+        data = N.ma.asarray (data)
+
+        if data.shape != tuple (self.shape):
+            raise ValueError ('data is wrong shape: got %s, want %s' \
+                                  % (data.shape, tuple (self.shape)))
+
+        self._checkOpen ()
+        self._checkWriteable ()
+        self._handle.put (data)
+        return self
+
+
     def toworld (self, pixel):
         self._checkOpen ()
         pixel = N.asarray (pixel)
@@ -473,6 +517,20 @@ class FITSImage (AstroImage):
         return data
 
 
+    def write (self, data):
+        data = N.ma.asarray (data)
+
+        if data.shape != tuple (self.shape):
+            raise ValueError ('data is wrong shape: got %s, want %s' \
+                                  % (data.shape, tuple (self.shape)))
+
+        self._checkOpen ()
+        self._checkWriteable ()
+        self._handle[0].data[:] = data
+        self._handle.flush ()
+        return self
+
+
     def toworld (self, pixel):
         if self._wcs is None:
             raise UnsupportedError ('world coordinate information is required '
@@ -542,6 +600,7 @@ class SimpleImage (AstroImage):
 
 
     def read (self, squeeze=False, flip=False):
+        self._checkOpen ()
         data = self._handle.read (flip=flip)
         idx = list (self._pctmpl)
         idx[self._latax] = slice (None)
@@ -557,6 +616,30 @@ class SimpleImage (AstroImage):
             data = data.squeeze () # could be 1-by-N ...
 
         return data
+
+
+    def write (self, data):
+        data = N.ma.asarray (data)
+
+        if data.shape != tuple (self.shape):
+            raise ValueError ('data is wrong shape: got %s, want %s' \
+                                  % (data.shape, tuple (self.shape)))
+
+        self._checkOpen ()
+        self._checkWriteable ()
+
+        fulldata = N.ma.empty (self._handle.shape, dtype=data.dtype)
+        idx = list (self._pctmpl)
+        idx[self._latax] = slice (None)
+        idx[self._lonax] = slice (None)
+
+        if self._latax > self._lonax:
+            fulldata[tuple (idx)] = data.T
+        else:
+            fulldata[tuple (idx)] = data
+
+        self._handle.write (fulldata)
+        return self
 
 
     def toworld (self, pixel):
