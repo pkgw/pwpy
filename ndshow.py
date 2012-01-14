@@ -820,11 +820,14 @@ class Cycler (Viewer):
         return super (Cycler, self)._on_key_press (widget, event)
 
 
-def cycle (arrays, descs, cadence=0.6):
+def cycle (arrays, descs=None, cadence=0.6):
     import time, glib
 
     n = len (arrays)
     amin = amax = h = w = None
+
+    if descs is None:
+        descs = [''] * n
 
     for array in arrays:
         thish, thisw = array.shape
