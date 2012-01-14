@@ -19,14 +19,10 @@ of RA/Dec ; glat/glon etc
 """
 
 import numpy as N
-from numpy import pi
 
-D2R = pi / 180
+from numpy import pi
+D2R = pi / 180 # if end up needing more of these, start using astutil.py
 R2D = 180 / pi
-A2R = pi / (180 * 3600)
-R2A = 180 * 3600 / pi
-F2S = 1 / N.sqrt (8 * N.log (2)) # FWHM to sigma
-S2F = N.sqrt (8 * N.log (2))
 
 __all__ = ('UnsupportedError AstroImage MIRIADImage CASAImage '
            'FITSImage SimpleImage open').split ()
