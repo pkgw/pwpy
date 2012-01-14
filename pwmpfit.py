@@ -701,8 +701,10 @@ def _lmpar (r, ipvt, diag, qtb, delta, x, sdiag, par, enorm, finfo):
 # The actual user interface to the problem-solving machinery:
 
 class Solution (object):
+    ndof = None
     prob = None
     status = -1
+    niter = None
     perror = None
     params = None
     covar = None
