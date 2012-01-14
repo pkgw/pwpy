@@ -130,7 +130,7 @@ class AstroImage (object):
         raise NotImplementedError ()
 
 
-    def saveAsFITS (self, path, overwrite=False):
+    def saveAsFITS (self, path, overwrite=False, openmode=None):
         raise NotImplementedError ()
 
 
@@ -341,7 +341,7 @@ class MIRIADImage (AstroImage):
         return open (path, openmode)
 
 
-    def saveAsFITS (self, path, overwrite=False):
+    def saveAsFITS (self, path, overwrite=False, openmode=None):
         from mirexec import TaskFits
         import os.path
 
@@ -353,6 +353,10 @@ class MIRIADImage (AstroImage):
                                         'destination already exists' % (self.path, path))
 
         TaskFits (op='xyout', in_=self.path, out=path).runsilent ()
+
+        if openmode is None:
+            return None
+        return FITSImage (path, openmode)
 
 
 def _casa_convert (d, unitstr):
@@ -495,9 +499,13 @@ class CASAImage (AstroImage):
         return open (path, openmode)
 
 
-    def saveAsFITS (self, path, overwrite=False):
+    def saveAsFITS (self, path, overwrite=False, openmode=None):
         self._checkOpen ()
         self._handle.tofits (path, overwrite=overwrite)
+
+        if openmode is None:
+            return None
+        return FITSImage (path, openmode)
 
 
 class FITSImage (AstroImage):
@@ -594,8 +602,8 @@ class FITSImage (AstroImage):
         return open (path, openmod)
 
 
-    def saveAsFITS (self, path, overwrite=False):
-        self.saveCopy (path, overwrite=overwrite)
+    def saveAsFITS (self, path, overwrite=False, openmode=None):
+        return self.saveCopy (path, overwrite=overwrite, openmode=openmode)
 
 
 class SimpleImage (AstroImage):
@@ -720,7 +728,7 @@ class SimpleImage (AstroImage):
         raise UnsupportedError ('cannot save a copy of a subimage')
 
 
-    def saveAsFITS (self, path, overwrite=False):
+    def saveAsFITS (self, path, overwrite=False, openmode=None):
         raise UnsupportedError ('cannot save subimage as FITS')
 
 
