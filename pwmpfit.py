@@ -1494,7 +1494,7 @@ class Problem (object):
         h[wh] = stepi[wh] * N.where (isrel[ifree[wh]], x[wh], 1.)
 
         # Clamp stepsizes to maxstep.
-        N.minimum (h, maxstep, h)
+        N.minimum (h, maxstep[ifree], h)
 
         # Make sure no zero step values
         h[N.where (h == 0)] = eps
