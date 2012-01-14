@@ -8,8 +8,9 @@ regardless of its file format.
 # Developer notes:
 """
 Note that pyrap.images allegedly supports casacore, HDF5, FITS, and
-MIRIAD format images transparently. Frankly, I don't trust it, and I'd
-rather not require that casacore and pyrap be installed.
+MIRIAD format images transparently. Frankly, I don't trust it, I don't
+like the pyrap.images API, and I'd rather not require that casacore
+and pyrap be installed.
 
 TODO: for iminfo, need: axis types, ref freq
 
@@ -623,7 +624,7 @@ class SimpleImage (AstroImage):
             if i in (latax, lonax):
                 continue
             if parent.shape[i] != 1:
-                raise UnsupportedError ('cannot simplif an image with '
+                raise UnsupportedError ('cannot simplify an image with '
                                         'nondegenerate nonspatial axes')
             if N.abs (1 - checkworld1[i] / checkworld2[i]) > 1e-6:
                 self._topixelok = False
