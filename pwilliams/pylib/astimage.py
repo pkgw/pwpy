@@ -129,6 +129,10 @@ class AstroImage (object):
         return SimpleImage (self, lat, lon)
 
 
+    def saveCopy (self, path, overwrite=False, openmode=None):
+        raise NotImplementedError ()
+
+
     def saveAsFITS (self, path, overwrite=False):
         raise NotImplementedError ()
 
@@ -317,6 +321,29 @@ class MIRIADImage (AstroImage):
         return _wcs_latlonaxes (self._wcs, self.shape.size)
 
 
+    def saveCopy (self, path, overwrite=False, openmode=None):
+        import shutil, os.path
+
+        # FIXME: race conditions and such in overwrite checks.
+        # Too lazy to do a better job.
+
+        if os.path.exists (path):
+            if overwrite:
+                if os.path.isdir (path):
+                    shutil.rmtree (path)
+                else:
+                    os.unlink (path)
+            else:
+                raise UnsupportedError ('refusing to copy "%s" to "%s": '
+                                        'destination already exists' % (self.path, path))
+
+        shutil.copytree (self.path, path, symlinks=False)
+
+        if openmode is None:
+            return None
+        return open (path, openmode)
+
+
     def saveAsFITS (self, path, overwrite=False):
         from mirexec import TaskFits
         import os.path
@@ -462,6 +489,15 @@ class CASAImage (AstroImage):
         return lat, lon
 
 
+    def saveCopy (self, path, overwrite=False, openmode=None):
+        self._checkOpen ()
+        self._handle.saveas (path, overwrite=overwrite)
+
+        if openmode is None:
+            return None
+        return open (path, openmode)
+
+
     def saveAsFITS (self, path, overwrite=False):
         self._checkOpen ()
         self._handle.tofits (path, overwrite=overwrite)
@@ -552,9 +588,17 @@ class FITSImage (AstroImage):
         return _wcs_latlonaxes (self._wcs, self.shape.size)
 
 
-    def saveAsFITS (self, path, overwrite=False):
+    def saveCopy (self, path, overwrite=False, openmode=None):
         self._checkOpen ()
         self._handle.writeto (path, output_verify='fix', clobber=overwrite)
+
+        if openmode is None:
+            return None
+        return open (path, openmod)
+
+
+    def saveAsFITS (self, path, overwrite=False):
+        self.saveCopy (path, overwrite=overwrite)
 
 
 class SimpleImage (AstroImage):
@@ -673,6 +717,10 @@ class SimpleImage (AstroImage):
 
     def simple (self):
         return self
+
+
+    def saveCopy (self, path, overwrite=False, openmode=None):
+        raise UnsupportedError ('cannot save a copy of a subimage')
 
 
     def saveAsFITS (self, path, overwrite=False):
