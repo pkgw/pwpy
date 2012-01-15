@@ -723,12 +723,12 @@ class Problem (object):
     _nout = None
 
     _pinfof = None
-    _pinfob = None
     _pinfoo = None
+    _pinfob = None
 
     # These ones are set in _fixupCheck
     _ifree = None
-    _qanytied = None
+    _anytied = None
 
     # Public fields, settable by user at will
     
@@ -754,10 +754,12 @@ class Problem (object):
     debugJac = False
 
     
-    def __init__ (self, yfunc=None, jfunc=None, npar=None, nout=None,
+    def __init__ (self, npar=None, nout=None, yfunc=None, jfunc=None,
                   solclass=Solution):
+        if npar is not None:
+            self.setNPar (npar)
         if yfunc is not None:
-            self.setFunc (yfunc, jfunc, npar, nout)
+            self.setFunc (nout, yfunc, jfunc)
 
         if not issubclass (solclass, Solution):
             raise ValueError ('solclass')
@@ -765,19 +767,174 @@ class Problem (object):
         self.solclass = solclass
 
 
-    def setFunc (self, yfunc, jfunc, npar, nout):
-        if not callable (yfunc):
-            raise ValueError ('yfunc')
-        
-        if jfunc is not None and not callable (jfunc):
-            raise ValueError ('jfunc')
+    # The parameters and their metadata -- can be configured without
+    # setting nout or the functions.
 
+    def setNPar (self, npar):
         try:
             npar = int (npar)
             assert npar > 0
-        except:
-            raise ValueError ('npar')
+        except Exception:
+            raise ValueError ('npar must be a positive integer')
 
+        if self._npar is not None and self._npar == npar:
+            return self
+
+        newinfof = p = N.ndarray ((PI_NUM_F, npar), dtype=N.float)
+        p[PI_F_VALUE] = N.nan
+        p[PI_F_LLIMIT] = -N.inf
+        p[PI_F_ULIMIT] = N.inf
+        p[PI_F_STEP] = 0.
+        p[PI_F_MAXSTEP] = N.inf
+
+        newinfoo = p = N.ndarray ((PI_NUM_O, npar), dtype=N.object)
+        p[PI_O_NAME] = None
+        p[PI_O_TIED] = None
+
+        newinfob = p = N.ndarray (npar, dtype=N.int)
+        p[:] = 0
+
+        if self._npar is not None:
+            overlap = min (self._npar, npar)
+            newinfof[:,:overlap] = self._pinfof[:,:overlap]
+            newinfoo[:,:overlap] = self._pinfoo[:,:overlap]
+            newinfob[:overlap] = self._pinfob[:overlap]
+
+        self._pinfof = newinfof
+        self._pinfoo = newinfoo
+        self._pinfob = newinfob
+        # Return self for easy chaining of calls.
+        self._npar = npar
+        return self
+
+
+    def _setBit (self, idx, mask, cond):
+        p = self._pinfob
+        p[idx] = (p[idx] & ~mask) | N.where (cond, mask, 0x0)
+
+
+    def _getBits (self, mask):
+        return N.where (self._pinfob & mask, True, False)
+
+
+    def pValue (self, idx, value, fixed=False):
+        if N.any (-N.isfinite (value)):
+            raise ValueError ('value')
+
+        self._pinfof[PI_F_VALUE,idx] = value
+        self._setBit (idx, PI_M_FIXED, fixed)
+        return self
+
+
+    def pLimit (self, idx, lower=-N.inf, upper=N.inf):
+        if N.any (lower > upper):
+            raise ValueError ('lower/upper')
+
+        self._pinfof[PI_F_LLIMIT,idx] = lower
+        self._pinfof[PI_F_ULIMIT,idx] = upper
+
+        # Try to be clever here -- setting lower = upper
+        # marks the parameter as fixed.
+
+        w = N.where (lower == upper)
+        if len (w) > 0 and w[0].size > 0:
+            self.pValue (w, N.atleast_1d (lower)[w], True)
+
+        return self
+
+
+    def pStep (self, idx, step, maxstep=N.inf, isrel=False):
+        if N.any (N.isinf (step)):
+            raise ValueError ('step')
+        if N.any ((step > maxstep) & ~isrel):
+            raise ValueError ('step > maxstep')
+
+        self._pinfof[PI_F_STEP,idx] = step
+        self._pinfof[PI_F_MAXSTEP,idx] = maxstep
+        self._setBit (idx, PI_M_RELSTEP, isrel)
+        return self
+
+
+    def pSide (self, idx, mode):
+        if N.any (mode < 0 or mode > 3):
+            raise ValueError ('mode')
+
+        p = self._pinfob
+        p[idx] = (p[idx] & ~PI_M_SIDE) | mode
+        return self
+
+
+    def pPrint (self, idx, doprint):
+        self._setBit (idx, PI_M_PRINT, doprint)
+        return self
+
+
+    def pTie (self, idx, tiefunc):
+        t1 = N.atleast_1d (tiefunc)
+        if not N.all ([x is None or callable (x) for x in t1]):
+            raise ValueError ('tiefunc')
+
+        self._pinfoo[PI_O_TIED,idx] = tiefunc
+        return self
+
+
+    def pName (self, idx, name):
+        self._pinfoo[PI_O_NAME,idx] = name
+        return self
+
+
+    def pNames (self, *names):
+        if len (names) != self._npar:
+            raise ValueError ('names')
+
+        self._pinfoo[PI_O_NAME] = names
+        return self
+
+
+    def _checkParamConfig (self):
+        if self._npar is None:
+            raise ValueError ('No npar yet.')
+
+        p = self._pinfof
+
+        if N.any (N.isinf (p[PI_F_VALUE])):
+            raise ValueError ('Some specified initial values infinite.')
+
+        if N.any (N.isinf (p[PI_F_STEP])):
+            raise ValueError ('Some specified parameter steps infinite.')
+
+        if N.any ((p[PI_F_STEP] > p[PI_F_MAXSTEP]) & ~self._getBits (PI_M_RELSTEP)):
+            raise ValueError ('Some specified steps bigger than specified maxsteps.')
+
+        if N.any (p[PI_F_LLIMIT] > p[PI_F_ULIMIT]):
+            raise ValueError ('Some param lower limits > upper limits.')
+
+        if N.any (p[PI_F_VALUE] < p[PI_F_LLIMIT]):
+            raise ValueError ('Some param values < lower limits.')
+
+        if N.any (p[PI_F_VALUE] > p[PI_F_ULIMIT]):
+            raise ValueError ('Some param values < lower limits.')
+
+        p = self._pinfoo
+
+        if not N.all ([x is None or callable (x) for x in p[PI_O_TIED]]):
+            raise ValueError ('Some tied values not None or callable.')
+
+        # And compute some useful arrays. A tied parameter counts as fixed.
+
+        tied = N.asarray ([x is not None for x in self._pinfoo[PI_O_TIED]])
+        self._anytied = N.any (tied)
+        self._ifree = N.where (-(self._getBits (PI_M_FIXED) | tied))[0]
+
+
+    def getNFree (self):
+        self._checkParamConfig ()
+        return self._ifree.size
+
+
+    # Now, the function and the constraint values
+
+    def setFunc (self, nout, yfunc, jfunc):
         try:
             nout = int (nout)
             assert nout > 0
@@ -787,41 +944,71 @@ class Problem (object):
         except:
             raise ValueError ('nout')
 
-        realloc = self._npar is None or self._npar != npar
+        if not callable (yfunc):
+            raise ValueError ('yfunc')
         
+        if jfunc is not None and not callable (jfunc):
+            raise ValueError ('jfunc')
+
+        self._nout = nout
         self._yfunc = yfunc
         self._jfunc = jfunc
-        self._npar = npar
-        self._nout = nout
         self.nfev = 0
-
-        # Initialize parameter info arrays. Avoid doing so if it seems
-        # that we've been called before and npar is the same, in case
-        # the problem is largely the same and the stored parameter
-        # info should be preserved.
-
-        if realloc:
-            self._pinfof = p = N.ndarray ((PI_NUM_F, npar), dtype=N.float)
-            p[PI_F_VALUE] = N.nan
-            p[PI_F_LLIMIT] = -N.inf
-            p[PI_F_ULIMIT] = N.inf
-            p[PI_F_STEP] = 0.
-            p[PI_F_MAXSTEP] = N.inf
-            
-            self._pinfob = p = N.ndarray (npar, dtype=N.int)
-            p[:] = 0
-        
-            self._pinfoo = p = N.ndarray ((PI_NUM_O, npar), dtype=N.object)
-            p[PI_O_NAME] = None
-            p[PI_O_TIED] = None
-
-        # Return self for easy chaining of calls.
         return self
-    
+
+
+    def setResidualFunc (self, yobs, err, yfunc, jfunc, reckless=False):
+        from numpy import subtract, multiply
+
+        self._checkParamConfig ()
+        npar = self._npar
+
+        errinv = 1. / err
+        if not N.all (N.isfinite (errinv)):
+            raise ValueError ('some uncertainties are zero or nonfinite')
+
+        # FIXME: handle yobs.ndim != 1 and/or yops being complex
+
+        if reckless:
+            def ywrap (pars, nresids):
+                yfunc (pars, nresids) # model Y values => nresids
+                subtract (yobs, nresids, nresids) # abs. residuals => nresids
+                multiply (nresids, errinv, nresids)
+            def jwrap (pars, jac):
+                jfunc (pars, jac)
+                multiply (jac, -1, jac)
+                for i in xrange (npar):
+                    multiply (jac[:,i], errinv, jac[:,i])
+        else:
+            def ywrap (pars, nresids):
+                yfunc (pars, nresids)
+                if not N.all (N.isfinite (nresids)):
+                    raise RuntimeError ('function returned nonfinite values')
+                subtract (yobs, nresids, nresids)
+                multiply (nresids, errinv, nresids)
+                #print 'N:', (nresids**2).sum ()
+            def jwrap (pars, jac):
+                jfunc (pars, jac)
+                if not N.all (N.isfinite (jac)):
+                    raise RuntimeError ('jacobian returned nonfinite values')
+                multiply (jac, -1, jac)
+                for i in xrange (npar):
+                    multiply (jac[:,i], errinv, jac[:,i])
+
+        if jfunc is None:
+            jwrap = None
+
+        return self.setFunc (yobs.size, ywrap, jwrap)
+
 
     def _fixupCheck (self):
-        if self._yfunc is None:
-            raise ValueError ('No function yet.')
+        self._checkParamConfig ()
+
+        if self._nout is None:
+            raise ValueError ('No nout yet.')
+
+        if self._nout < self._npar - self._ifree.size:
+            raise RuntimeError ('Too many free parameters.')
 
         # Coerce parameters to desired types
 
@@ -882,55 +1069,20 @@ class Problem (object):
             if N.any (self.diag <= 0.):
                 raise ValueError ('diag')
 
-        p = self._pinfof
 
-        if N.any (N.isinf (p[PI_F_VALUE])):
-            raise ValueError ('Some specified initial values infinite.')
-        
-        if N.any (N.isinf (p[PI_F_STEP])):
-            raise ValueError ('Some specified parameter steps infinite.')
-        
-        if N.any ((p[PI_F_STEP] > p[PI_F_MAXSTEP]) & ~self._getBits (PI_M_RELSTEP)):
-            raise ValueError ('Some specified steps bigger than specified maxsteps.')
-
-        if N.any (p[PI_F_LLIMIT] > p[PI_F_ULIMIT]):
-            raise ValueError ('Some param lower limits > upper limits.')
-
-        if N.any (p[PI_F_VALUE] < p[PI_F_LLIMIT]):
-            raise ValueError ('Some param values < lower limits.')
-
-        if N.any (p[PI_F_VALUE] > p[PI_F_ULIMIT]):
-            raise ValueError ('Some param values < lower limits.')
-
-        p = self._pinfoo
-
-        if not N.all ([x is None or callable (x) for x in p[PI_O_TIED]]):
-            raise ValueError ('Some tied values not None or callable.')
-
-        nfix = N.where (N.logical_or ([x is not None for x in p[PI_O_TIED]],
-                                      self._getBits (PI_M_FIXED)))[0].size
-
-        if self._nout < self._npar - nfix:
-            raise RuntimeError ('Too many free parameters.')
-
-        # Finally, compute useful arrays.
-
-        qtied = N.asarray ([x is not None for x in self._pinfoo[PI_O_TIED]])
-        self._qanytied = N.any (qtied)
-
-        # A tied parameter is effectively fixed.
-        qfixed = self._getBits (PI_M_FIXED) | qtied
-        self._ifree = N.where (-qfixed)[0]
+    def getNDOF (self):
+        self._fixupCheck ()
+        return self._nout - self._ifree.size
 
 
     def copy (self):
-        n = Problem (self._yfunc, self._jfunc, self._npar, self._nout,
+        n = Problem (self._npar, self._nout, self._yfunc, self._jfunc,
                      self.solclass)
 
         if self._pinfof is not None:
             n._pinfof = self._pinfof.copy ()
-            n._pinfob = self._pinfob.copy ()
             n._pinfoo = self._pinfoo.copy ()
+            n._pinfob = self._pinfob.copy ()
 
         if self.diag is not None:
             n.diag = self.diag.copy ()
@@ -953,98 +1105,10 @@ class Problem (object):
         return n
 
 
-    def _setBit (self, idx, mask, cond):
-        p = self._pinfob
-        p[idx] = (p[idx] & ~mask) | N.where (cond, mask, 0x0)
-
-
-    def _getBits (self, mask):
-        return N.where (self._pinfob & mask, True, False)
-
-
-    def pValue (self, idx, value, fixed=False):
-        if N.any (N.isinf (value)):
-            raise ValueError ('value')
-        
-        self._pinfof[PI_F_VALUE,idx] = value
-        self._setBit (idx, PI_M_FIXED, fixed)
-        return self
-
-
-    def pLimit (self, idx, lower=-N.inf, upper=N.inf):
-        if N.any (lower > upper):
-            raise ValueError ('lower/upper')
-
-        self._pinfof[PI_F_LLIMIT,idx] = lower
-        self._pinfof[PI_F_ULIMIT,idx] = upper
-
-        # Try to be clever here -- setting lower = upper
-        # markes the parameter as fixed.
-
-        w = N.where (lower == upper)
-        if len (w) > 0 and w[0].size > 0:
-            self.pValue (w, N.atleast_1d (lower)[w], True)
-
-        return self
-
-
-    def pStep (self, idx, step, maxstep=N.inf, isrel=False):
-        if N.any (N.isinf (step)):
-            raise ValueError ('step')
-        if N.any ((step > maxstep) & ~isrel):
-            raise ValueError ('step > maxstep')
-
-        self._pinfof[PI_F_STEP,idx] = step
-        self._pinfof[PI_F_MAXSTEP,idx] = maxstep
-        self._setBit (idx, PI_M_RELSTEP, isrel)
-        return self
-
-
-    def pSide (self, idx, mode):
-        if N.any (mode < 0 or mode > 3):
-            raise ValueError ('mode')
-    
-        p = self._pinfob
-        p[idx] = (p[idx] & ~PI_M_SIDE) | mode
-        return self
-        
-
-    def pPrint (self, idx, doprint):
-        self._setBit (idx, PI_M_PRINT, doprint)
-        return self
-
-
-    def pTie (self, idx, tiefunc):
-        t1 = N.atleast_1d (tiefunc)
-        if not N.all ([x is None or callable (x) for x in t1]):
-            raise ValueError ('tiefunc')
-
-        self._pinfoo[PI_O_TIED,idx] = tiefunc
-        return self
-
-
-    def pName (self, idx, name):
-        self._pinfoo[PI_O_NAME,idx] = name
-        return self
-
-
-    def pNames (self, *names):
-        if len (names) != self._npar:
-            raise ValueError ('names')
-
-        self._pinfoo[PI_O_NAME] = names
-        return self
-
-
-    def getNDOF (self):
-        if self._ifree is None:
-            self._fixupCheck ()
-
-        return self._nout - self._ifree.size
-
+    # Actual implementation code!
 
     def _ycall (self, x, vec):
-        if self._qanytied:
+        if self._anytied:
             self._doTies (x)
 
         self.nfev += 1
@@ -1060,7 +1124,7 @@ class Problem (object):
 
 
     def _jcall (self, x, jac):
-        if self._qanytied:
+        if self._anytied:
             self._doTies (x)
 
         self.nfev += 1
@@ -1137,7 +1201,7 @@ class Problem (object):
         while True:
             self.params[ifree] = x
 
-            if self._qanytied:
+            if self._anytied:
                 self._doTies (self.params)
 
             # Print out during this iteration?
@@ -1624,56 +1688,22 @@ class Problem (object):
         return r
 
 
-def checkDerivative (yfunc, jfunc, npar, nout, guess):
+def checkDerivative (npar, nout, yfunc, jfunc, guess):
     explicit = N.empty ((nout, npar))
     jfunc (guess, explicit)
 
-    p = Problem (yfunc, None, npar, nout)
+    p = Problem (npar, nout, yfunc, None)
     auto = p._manual_fdjac2 (guess)
 
     return explicit, auto
 
 
-def ResidualProblem (yfunc, jfunc, npar, yobs, err,
+def ResidualProblem (npar, yobs, err, yfunc, jfunc,
                      solclass=Solution, reckless=False):
-    from numpy import subtract, multiply
-
-    errinv = 1. / err
-    if not N.all (N.isfinite (errinv)):
-        raise ValueError ('some uncertainties are zero or nonfinite')
-
-    # FIXME: handle yobs.ndim != 1
-
-    if reckless:
-        def ywrap (pars, nresids):
-            yfunc (pars, nresids) # model Y values => nresids
-            subtract (yobs, nresids, nresids) # abs. residuals => nresids
-            multiply (nresids, errinv, nresids)
-        def jwrap (pars, jac):
-            jfunc (pars, jac)
-            multiply (jac, -1, jac)
-            for i in xrange (npar):
-                multiply (jac[:,i], errinv, jac[:,i])
-    else:
-        def ywrap (pars, nresids):
-            yfunc (pars, nresids)
-            if not N.all (N.isfinite (nresids)):
-                raise RuntimeError ('function returned nonfinite values')
-            subtract (yobs, nresids, nresids)
-            multiply (nresids, errinv, nresids)
-            #print 'N:', (nresids**2).sum ()
-        def jwrap (pars, jac):
-            jfunc (pars, jac)
-            if not N.all (N.isfinite (jac)):
-                raise RuntimeError ('jacobian returned nonfinite values')
-            multiply (jac, -1, jac)
-            for i in xrange (npar):
-                multiply (jac[:,i], errinv, jac[:,i])
-
-    if jfunc is None:
-        jwrap = None
-
-    return Problem (ywrap, jwrap, npar, yobs.size, solclass)
+    p = Problem (solclass=solclass)
+    p.setNPar (npar)
+    p.setResidualFunc (yobs, err, yfunc, jfunc, reckless=reckless)
+    return p
 
 
 # Test!
@@ -1690,7 +1720,7 @@ def _solve_linear ():
         multiply (x, pars[0], ymodel)
         add (ymodel, pars[1], ymodel)
 
-    p = ResidualProblem (f, None, 2, y, 0.01)
+    p = ResidualProblem (2, y, 0.01, f, None)
     return p.solve ([2.5, 1.5])
 
 @test
@@ -1698,13 +1728,13 @@ def _simple_automatic_jac ():
     def f (pars, vec):
         N.exp (pars, vec)
 
-    p = Problem (f, None, 1, 1)
+    p = Problem (1, 1, f, None)
     j = p._manual_fdjac2 (0) 
     Taaae (j, [[1.]])
     j = p._manual_fdjac2 (1) 
     Taaae (j, [[N.e]])
 
-    p = Problem (f, None, 3, 3)
+    p = Problem (3, 3, f, None)
     x = N.asarray ([0, 1, 2])
     j = p._manual_fdjac2 (x) 
     Taaae (j, N.diag (N.exp (x)))
@@ -1722,7 +1752,7 @@ def _jac_sidedness ():
         else:
             vec[:] = -p
 
-    p = Problem (f, None, 1, 1)
+    p = Problem (1, 1, f, None)
 
     # Default: positive unless against upper limit.
     Taaae (p._manual_fdjac2 (0), [[1.]])
@@ -1756,18 +1786,18 @@ def _jac_stepsizes ():
         vec[:] = 1
 
     # Fixed stepsize of 1.
-    p = Problem (lambda p, v: f (2., p, v), None, 1, 1)
+    p = Problem (1, 1, lambda p, v: f (2., p, v), None)
     p.pStep (0, 1.)
     p._manual_fdjac2 (1)
 
     # Relative stepsize of 0.1
-    p = Problem (lambda p, v: f (1.1, p, v), None, 1, 1)
+    p = Problem (1, 1, lambda p, v: f (1.1, p, v), None)
     p.pStep (0, 0.1, isrel=True)
     p._manual_fdjac2 (1)
 
     # Fixed stepsize must be less than max stepsize.
     try:
-        p = Problem (f, None, 2, 2)
+        p = Problem (2, 2, f, None)
         p.pStep ((0, 1), (1, 1), (1, 0.5))
         assert False, 'Invalid arguments accepted'
     except ValueError:
@@ -1775,12 +1805,12 @@ def _jac_stepsizes ():
 
     # Maximum stepsize, made extremely small to be enforced
     # in default circumstances.
-    p = Problem (lambda p, v: f (1 + 1e-11, p, v), None, 1, 1)
+    p = Problem (1, 1, lambda p, v: f (1 + 1e-11, p, v), None)
     p.pStep (0, 0.0, 1e-11)
     p._manual_fdjac2 (1)
 
     # Maximum stepsize and a relative stepsize
-    p = Problem (lambda p, v: f (1.1, p, v), None, 1, 1)
+    p = Problem (1, 1, lambda p, v: f (1.1, p, v), None)
     p.pStep (0, 0.5, 0.1, True)
     p._manual_fdjac2 (1)
 
