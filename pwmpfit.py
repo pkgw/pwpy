@@ -957,13 +957,12 @@ class Problem (object):
         return self
 
 
-    def setResidualFunc (self, yobs, err, yfunc, jfunc, reckless=False):
+    def setResidualFunc (self, yobs, errinv, yfunc, jfunc, reckless=False):
         from numpy import subtract, multiply
 
         self._checkParamConfig ()
         npar = self._npar
 
-        errinv = 1. / err
         if not N.all (N.isfinite (errinv)):
             raise ValueError ('some uncertainties are zero or nonfinite')
 
@@ -1698,11 +1697,11 @@ def checkDerivative (npar, nout, yfunc, jfunc, guess):
     return explicit, auto
 
 
-def ResidualProblem (npar, yobs, err, yfunc, jfunc,
+def ResidualProblem (npar, yobs, errinv, yfunc, jfunc,
                      solclass=Solution, reckless=False):
     p = Problem (solclass=solclass)
     p.setNPar (npar)
-    p.setResidualFunc (yobs, err, yfunc, jfunc, reckless=reckless)
+    p.setResidualFunc (yobs, errinv, yfunc, jfunc, reckless=reckless)
     return p
 
 
@@ -1720,7 +1719,7 @@ def _solve_linear ():
         multiply (x, pars[0], ymodel)
         add (ymodel, pars[1], ymodel)
 
-    p = ResidualProblem (2, y, 0.01, f, None)
+    p = ResidualProblem (2, y, 100, f, None)
     return p.solve ([2.5, 1.5])
 
 @test
