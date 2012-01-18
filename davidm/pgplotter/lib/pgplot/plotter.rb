@@ -230,11 +230,20 @@ module Pgplot
     #              number.
     #   :overlay => false
     #   :xrange => nil
+    #   :xscale => :linear
+    #              Other scales are:
+    #                :dhms - Label X axis as DD HH MM SS.s
+    #                :dhms_ - Same as :dhms plus superscript d/h/m/s
+    #                :hms, :dms  - Label X axis as HH MM SS.s (or DD MM SS.s)
+    #                :hms_ - Same as :hms plus superscript h/m/s
+    #                :dms_ - Same as :dms plus superscript o/'/"
+    #                :h24ms - Label X axis as HH MM SS.s, where HH is mod 24
+    #                :h24ms_ - Same as :h24ms plus superscript h/m/s
     #   :yrange => nil
     #   :yscale => :linear
     #              Other scales are:
     #                :log - Plot Y axis in logarithmic scale
-    #                :db  = Plot Y axis in dB scale
+    #                :db  - Plot Y axis in dB scale
     #   :log_floor => 1e-10
     #                 Y values below :log_floor will be plotted as :log_floor
     #                 when plotting in logarithic or dB scales.
@@ -256,6 +265,7 @@ module Pgplot
         :marker => nil,
         :overlay => false,
         :xrange => nil,
+        :xscale => :linear,
         :yrange => nil,
         :yscale => :linear,
         :log_floor => 1e-10,
@@ -332,19 +342,19 @@ module Pgplot
           pglab(opts[:xlabel], opts[:ylabel], opts[:title])
           pgmtxt('T',0.5,0.5,0.5,opts[:title2].to_s) if opts[:title2]
           # Draw bottom and top axes
-          pgaxis(xxmin,yymin,xxmax,yymin,xxmin,xxmax,:opt=>'N',:step=>0,
-                 :tickl=>0.5,:tickr=>0,:frac=>0.5,
-                 :disp=>0.5,:orient=>0)
-          pgaxis(xxmin,yymax,xxmax,yymax,xxmin,xxmax,:step=>0,
-                 :tickl=>0,:tickr=>0.5,:frac=>0.5,
-                 :disp=>0.5,:orient=>0)
-          # Draw y axis on left and right
-          pgaxis(xxmin,yymin,xxmin,yymax,yymin,yymax,:opt=>'N',:step=>0,
-                 :tickl=>0,:tickr=>0.5,:frac=>0.5,
-                 :disp=>-0.5,:orient=>0)
-          pgaxis(xxmax,yymin,xxmax,yymax,yymin,yymax,:step=>0,
-                 :tickl=>0.5,:tickr=>0,:frac=>0.5,
-                 :disp=>0.5,:orient=>0)
+          xopt = 'BCNTS'
+          case opts[:xscale]
+          when :dhms; xopt += 'Z'
+          when :dhms_; xopt += 'ZH'
+          when :hms, :dms; xopt += 'ZY'
+          when :hms_; xopt += 'ZYH'
+          when :dms_; xopt += 'ZYD'
+          when :h24ms; xopt += 'ZYX'
+          when :h24ms_; xopt += 'ZYXH'
+          when String
+            'ZYXHDFO'.each_char {|c| xopt += c if opts[:xscale].index(c)}
+          end
+          pgtbox(xopt, 0.0, 0, 'BCNTS', 0.0, 0)
           pgsls(ls)
         end
 
