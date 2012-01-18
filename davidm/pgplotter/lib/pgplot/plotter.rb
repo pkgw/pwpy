@@ -229,6 +229,7 @@ module Pgplot
     #              Can be any constant from Pgplot::Marker or any PGPLOT marker
     #              number.
     #   :overlay => false
+    #   :xgrid => false
     #   :xrange => nil
     #   :xscale => :linear
     #              Other scales are:
@@ -239,6 +240,7 @@ module Pgplot
     #                :dms_ - Same as :dms plus superscript o/'/"
     #                :h24ms - Label X axis as HH MM SS.s, where HH is mod 24
     #                :h24ms_ - Same as :h24ms plus superscript h/m/s
+    #   :ygrid => false
     #   :yrange => nil
     #   :yscale => :linear
     #              Other scales are:
@@ -264,8 +266,10 @@ module Pgplot
         :line => :line,
         :marker => nil,
         :overlay => false,
+        :xgrid => false,
         :xrange => nil,
         :xscale => :linear,
+        :ygrid => false,
         :yrange => nil,
         :yscale => :linear,
         :log_floor => 1e-10,
@@ -343,6 +347,7 @@ module Pgplot
           pgmtxt('T',0.5,0.5,0.5,opts[:title2].to_s) if opts[:title2]
           # Draw bottom and top axes
           xopt = 'BCNTS'
+          xopt += 'G' if opts[:xgrid]
           case opts[:xscale]
           when :dhms; xopt += 'Z'
           when :dhms_; xopt += 'ZH'
@@ -354,7 +359,9 @@ module Pgplot
           when String
             'ZYXHDFO'.each_char {|c| xopt += c if opts[:xscale].index(c)}
           end
-          pgtbox(xopt, 0.0, 0, 'BCNTS', 0.0, 0)
+          yopt = 'BCNTS'
+          yopt += 'G' if opts[:ygrid]
+          pgtbox(xopt, 0.0, 0, yopt, 0.0, 0)
           pgsls(ls)
         end
 
