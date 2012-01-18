@@ -56,7 +56,7 @@ module Pgplot
   class Plotter
     include Pgplot
 
-    VERSION = '0.1.0'
+    VERSION = '0.1.1'
 
     @@monitor = Monitor.new
     @@instances = {}
