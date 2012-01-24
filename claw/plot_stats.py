@@ -6,6 +6,7 @@
 import numpy as n
 import pylab as p
 import matplotlib.pyplot as plt
+import scipy.misc
 
 def compute():
     """Plots the computational demand of various interferometric transient detection techniques.
@@ -162,11 +163,11 @@ def plotfig(s=-1, num=-1, t=5):
     p.plot(num, sininarr, 'y-.', label='Incoherent Antenna Beamforming', linewidth=3)
 #    plt.plot(num, sininarr, 'y-.', label='Incoherent Beamforming', linewidth=3)
     p.text(5, 0.2, 'PoCo', rotation='vertical', horizontalalignment='center',verticalalignment='center',fontsize=14, fontweight="bold")
-    p.text(27, 0.2, 'EVLA', rotation='vertical', horizontalalignment='center',verticalalignment='center',fontsize=14, fontweight="bold")
+    p.text(27, 0.2, 'VLA', rotation='vertical', horizontalalignment='center',verticalalignment='center',fontsize=14, fontweight="bold")
     p.text(36, 0.2, 'ASKAP', rotation='vertical', horizontalalignment='center',verticalalignment='center',fontsize=14, fontweight="bold")
     p.text(48, 0.2, 'LOFAR', rotation='vertical', horizontalalignment='center',verticalalignment='center',fontsize=14, fontweight="bold")
     p.text(64, 0.2, 'MeerKAT', rotation='vertical', horizontalalignment='center',verticalalignment='center',fontsize=14, fontweight="bold")
-#    p.title('Flux limits in 10 ms for EVLA-like Array')
+#    p.title('Flux limits in 10 ms for VLA-like Array')
     ax1.set_xlim((num.min(), num.max()))
     ax1.set_ylim((tot.min(), tot.max()))
     ax1.spines['top'].set_visible(False)
@@ -178,4 +179,36 @@ def plotfig(s=-1, num=-1, t=5):
     p.legend(numpoints=1,loc=1)
     p.xlabel('Number of Antennas', fontsize=12, fontweight="bold")
     p.ylabel('Flux Limit (%d sigma; Jy)' % (t), fontsize=12, fontweight="bold")
+    p.show()
+
+
+def bispsim():
+    """Plots distributions...
+    """
+
+    import det_noise
+    gaussian = lambda sigma,x: 1/n.sqrt(2*n.pi*sigma**2) * n.exp(-1.*(x/(n.sqrt(2)*sigma))**2)
+    arr = n.arange(-500,501)/100.
+
+    h3 = det_noise.distribution(na=3)
+    h4 = det_noise.distribution(na=4)
+    h6 = det_noise.distribution(na=6)
+    gg = gaussian(1/2.4,arr)
+    ax1 = p.axes()
+
+    p.plot(n.array(h3[0]),n.log10(h3[1]/n.max(h3[1])),'b', label='n$_a$=3', linewidth=2)
+    p.plot(n.array(h4[0]),n.log10(h4[1]/n.max(h4[1])),'g', label='n$_a$=4', linewidth=2)
+    p.plot(n.array(h6[0]),n.log10(h6[1]/n.max(h6[1])),'r', label='n$_a$=6', linewidth=2)
+    p.plot(arr, n.log10(gg/n.max(gg)), 'k', label='Gaussian', linewidth=3)
+
+    ax1.spines['top'].set_visible(False)
+    ax1.spines['right'].set_visible(False)
+    ax1.spines['bottom'].set_position(('outward', 20))
+    ax1.spines['left'].set_position(('outward', 30))
+    ax1.yaxis.set_ticks_position('left')
+    ax1.xaxis.set_ticks_position('bottom')
+    p.legend()
+    p.xlabel('Mean Bispectrum', fontsize=12, fontweight="bold")
+    p.ylabel('log$_{10}$ of Relative Count', fontsize=12, fontweight="bold")
+
     p.show()

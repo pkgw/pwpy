@@ -14,10 +14,10 @@ class noise:
         self.len = len
 
         self.data = n.zeros(len, dtype='complex')
-        self.datat = n.zeros(len+2, dtype='complex')
-        for i in range(len):
+        self.datat = n.zeros(3*len, dtype='complex')
+        for i in xrange(len):
             self.data[i] = n.complex(random.gauss(0, std), random.gauss(0, std))
-        for i in range(len+2):
+        for i in xrange(3*len):
             self.datat[i] = n.complex(random.gauss(0, std), random.gauss(0, std))
 
     def add_source(self, flux=1+0j):
@@ -33,8 +33,8 @@ class noise:
 
     def trip(self):
         bisp = n.zeros(self.len, dtype='complex')
-        for i in range(self.len):
-            bisp[i] = self.datat[i] * self.datat[i+1] * self.datat[i+2]
+        for i in xrange(self.len):
+            bisp[i] = self.datat[3*i] * self.datat[3*i+1] * self.datat[3*i+2]
         self.bisp = bisp
 
     def show(self):
@@ -55,7 +55,7 @@ def repeat(num=100, source=0+0j, show=0):
     dmarr = []
     mdarr = []
     biarr = []
-    for i in range(bglen):
+    for i in xrange(bglen):
         nnoff = noise(len=num)
         nnoff.trip()
 #        mdarr.append(n.abs(nnoff.data.mean()))
@@ -140,3 +140,25 @@ def threshold(na=3,thresh=3):
             print "%.0f pct complete" % (float(i)/simlen * 100)
 
     return bfmean.min(), n.power(bimean.min(),1/3.)
+
+
+def distribution(na=3):
+    """Returns distribution of mean bispectrum from array of size na.
+    """
+
+    simlen = 100000
+    bins = 150
+    ntrip = na*(na-1)*(na-2)/6
+    bimean = n.zeros(simlen)
+
+    for i in xrange(simlen):
+        nn = noise(len=ntrip)
+        nn.trip()
+        bimean[i] = nn.bisp.real.mean()
+
+    hist = n.histogram(bimean,bins=bins,density=True)
+    binc = [(hist[1][i+1] + hist[1][i])/2. for i in xrange(len(hist[1])-1)]
+
+    return binc,hist[0]
+
+
