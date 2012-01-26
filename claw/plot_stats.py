@@ -112,7 +112,7 @@ def plotfig(s=-1, num=-1, t=5):
     ax1.yaxis.set_ticks_position('left')
     ax1.xaxis.set_ticks_position('bottom')
     p.xlabel('SNR per baseline', fontsize=12, fontweight="bold")
-    p.ylabel('SNR', fontsize=12, fontweight="bold")
+    p.ylabel('Apparent SNR', fontsize=12, fontweight="bold")
     p.yticks(n.array([0.01,0.03,0.1,0.3,1,3,10,30,100]))
     p.legend(loc=4, numpoints=1)
 
@@ -196,9 +196,9 @@ def bispsim():
     gg = gaussian(1/2.4,arr)
     ax1 = p.axes()
 
-    p.plot(n.array(h3[0]),n.log10(h3[1]/n.max(h3[1])),'b', label='n$_a$=3', linewidth=2)
-    p.plot(n.array(h4[0]),n.log10(h4[1]/n.max(h4[1])),'g', label='n$_a$=4', linewidth=2)
-    p.plot(n.array(h6[0]),n.log10(h6[1]/n.max(h6[1])),'r', label='n$_a$=6', linewidth=2)
+    p.plot(n.array(h3[0]),n.log10(h3[1]/n.max(h3[1])),'b', label='$n_a=3$', linewidth=2)
+    p.plot(n.array(h4[0]),n.log10(h4[1]/n.max(h4[1])),'g', label='$n_a=4$', linewidth=2)
+    p.plot(n.array(h6[0]),n.log10(h6[1]/n.max(h6[1])),'r', label='$n_a=6$', linewidth=2)
     p.plot(arr, n.log10(gg/n.max(gg)), 'k', label='Gaussian', linewidth=3)
 
     ax1.spines['top'].set_visible(False)
@@ -208,7 +208,8 @@ def bispsim():
     ax1.yaxis.set_ticks_position('left')
     ax1.xaxis.set_ticks_position('bottom')
     p.legend()
-    p.xlabel('Mean Bispectrum', fontsize=12, fontweight="bold")
-    p.ylabel('log$_{10}$ of Relative Count', fontsize=12, fontweight="bold")
+    p.xlabel('Apparent SNR', fontsize=12, fontweight="bold")
+    p.ylabel('log$_{10}$ of Relative Rate', fontsize=12, fontweight="bold")
+    p.axis([-5,5,-2,0.05])
 
     p.show()

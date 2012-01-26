@@ -147,16 +147,15 @@ def distribution(na=3):
     """
 
     simlen = 100000
-    bins = 150
     ntrip = na*(na-1)*(na-2)/6
     bimean = n.zeros(simlen)
 
     for i in xrange(simlen):
-        nn = noise(len=ntrip)
+        nn = noise(len=ntrip, std=1.)
         nn.trip()
         bimean[i] = nn.bisp.real.mean()
 
-    hist = n.histogram(bimean,bins=bins,density=True)
+    hist = n.histogram(bimean, bins=200, range=(-5.,5.),density=True)
     binc = [(hist[1][i+1] + hist[1][i])/2. for i in xrange(len(hist[1])-1)]
 
     return binc,hist[0]
