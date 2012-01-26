@@ -191,15 +191,16 @@ def bispsim():
     arr = n.arange(-500,501)/100.
 
     h3 = det_noise.distribution(na=3)
-    h4 = det_noise.distribution(na=4)
     h6 = det_noise.distribution(na=6)
-    gg = gaussian(1/2.4,arr)
-    ax1 = p.axes()
+    h12 = det_noise.distribution(na=12)
+    gg = gaussian(1,arr)
 
-    p.plot(n.array(h3[0]),n.log10(h3[1]/n.max(h3[1])),'b', label='$n_a=3$', linewidth=2)
-    p.plot(n.array(h4[0]),n.log10(h4[1]/n.max(h4[1])),'g', label='$n_a=4$', linewidth=2)
-    p.plot(n.array(h6[0]),n.log10(h6[1]/n.max(h6[1])),'r', label='$n_a=6$', linewidth=2)
-    p.plot(arr, n.log10(gg/n.max(gg)), 'k', label='Gaussian', linewidth=3)
+    p.figure(1)
+    ax1 = p.axes()
+    p.plot(n.array(h3[0]),n.log10(h3[1]),'b', label='$n_a=3$', linewidth=2)
+    p.plot(n.array(h6[0]),n.log10(h6[1]),'g', label='$n_a=6$', linewidth=2)
+    p.plot(n.array(h12[0]),n.log10(h12[1]),'r', label='$n_a=12$', linewidth=2)
+    p.plot(arr, n.log10(gg), 'k', label='Gaussian', linewidth=3)
 
     ax1.spines['top'].set_visible(False)
     ax1.spines['right'].set_visible(False)
@@ -210,6 +211,6 @@ def bispsim():
     p.legend()
     p.xlabel('Apparent SNR', fontsize=12, fontweight="bold")
     p.ylabel('log$_{10}$ of Relative Rate', fontsize=12, fontweight="bold")
-    p.axis([-5,5,-2,0.05])
+    p.axis([-5,5,-2.5,0.05])
 
     p.show()

@@ -9,6 +9,9 @@ import scipy.misc
 import random
 
 class noise:
+    """The wrong way... Simulates ntr independent values then the mean bispectrum.
+    """
+
     def __init__(self, len=100, std=1.):
         self.std = std
         self.len = len
@@ -40,6 +43,50 @@ class noise:
     def show(self):
         p.plot(self.bisp, '.')
         p.show()
+
+
+class noise2:
+    """The right way... Simulates na by na array of data (with complex conjugates), then calculates bispectra.
+    """
+    def __init__(self, na=3, std=1.):
+        self.std = std
+        self.na = na
+        self.nbl = na*(na-1)/2
+        self.ntr = na*(na-1)*(na-2)/6
+        nbl = self.nbl
+        ntr = self.ntr
+        self.data = n.zeros(shape=(na,na), dtype='complex')
+
+        for i in range(na):
+            for j in range(i+1,na):
+                re = n.random.normal()
+                im = n.random.normal()
+                self.data[i,j] = n.complex(re,im)
+                self.data[j,i] = n.complex(re,-im)
+
+    def trip(self):
+        na = self.na
+        nbl = self.nbl
+        ntr = self.ntr
+
+        self.bisp = n.zeros(ntr, dtype='complex')
+        tr = 0
+        for i in range(0,na-2):
+            for j in range(i+1,na-1):
+                for k in range(j+1,na):
+                    self.bisp[tr] = self.data[i,j] * self.data[j,k] * self.data[k,i]
+                    tr = tr+1
+
+    def beamform(self):
+        na = self.na
+
+        sum = 0.
+        for i in range(na):
+            for j in range(i+1,na):
+                sum = sum + self.data[i,j]
+
+        return sum.real/self.nbl
+
 
 def repeat(num=100, source=0+0j, show=0):
     bglen = 100000
@@ -100,12 +147,15 @@ def threshold(na=3,thresh=3):
 
     if thresh == 3:
         thresh = 1.3e-3  # 3sigma
+        sigma = 3
         simlen = 10000
     elif thresh == 4:
         thresh = 3.2e-5  # 4sigma
+        sigma = 4
         simlen = 1000000
     elif thresh == 5:
         thresh = 2.9e-7  # 5sigma
+        sigma = 5
         simlen = 100000000   # product of thresh*simlen must be much larger than 1
     else:
         print 'Not a standard sigma threshold'
@@ -119,17 +169,13 @@ def threshold(na=3,thresh=3):
     ntrip = na*(na-1)*(na-2)/6
     nbl = na*(na-1)/2
     print 'nbl=%d, ntrip=%d' % (nbl,ntrip)
-
-    if ntrip >= nbl:
-        nlong = ntrip
-    else:
-        nlong = nbl
+    print '*Theory* bf: %.3f, bisp: %.3f' % (float(sigma)/n.sqrt(nbl), n.power(2*float(sigma)/n.sqrt(ntrip), 1/3.))
 
     for i in xrange(simlen):
-        nn = noise(len=nlong)
+        nn = noise2(na=na)
         nn.trip()
-        bfm = nn.data[0:nbl].real.mean()
-        bim = nn.bisp[0:ntrip].real.mean()
+        bfm = nn.beamform()
+        bim = nn.bisp.real.mean()
         if n.any(bfm > bfmean):
             bfmean[0] = bfm
             bfmean.sort()
@@ -146,16 +192,16 @@ def distribution(na=3):
     """Returns distribution of mean bispectrum from array of size na.
     """
 
-    simlen = 100000
+    simlen = 300000
     ntrip = na*(na-1)*(na-2)/6
     bimean = n.zeros(simlen)
 
     for i in xrange(simlen):
-        nn = noise(len=ntrip, std=1.)
+        nn = noise2(na=na, std=1.)
         nn.trip()
         bimean[i] = nn.bisp.real.mean()
 
-    hist = n.histogram(bimean, bins=200, range=(-5.,5.),density=True)
+    hist = n.histogram(1/2. * n.sqrt(ntrip) * bimean, bins=200, range=(-5.,5.),density=True)
     binc = [(hist[1][i+1] + hist[1][i])/2. for i in xrange(len(hist[1])-1)]
 
     return binc,hist[0]
