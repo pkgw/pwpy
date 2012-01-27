@@ -56,13 +56,18 @@ class noise2:
         nbl = self.nbl
         ntr = self.ntr
         self.data = n.zeros(shape=(na,na), dtype='complex')
+        rands = n.random.normal(size=(nbl,2))
 
-        for i in range(na):
-            for j in range(i+1,na):
-                re = n.random.normal()
-                im = n.random.normal()
+        ind = 0
+        for i in xrange(na):
+            for j in xrange(i+1,na):
+                re = rands[ind,0]
+                im = rands[ind,1]
+#                re = n.random.normal()
+#                im = n.random.normal()
                 self.data[i,j] = n.complex(re,im)
                 self.data[j,i] = n.complex(re,-im)
+                ind = ind+1
 
     def trip(self):
         na = self.na
@@ -71,18 +76,18 @@ class noise2:
 
         self.bisp = n.zeros(ntr, dtype='complex')
         tr = 0
-        for i in range(0,na-2):
-            for j in range(i+1,na-1):
-                for k in range(j+1,na):
-                    self.bisp[tr] = self.data[i,j] * self.data[j,k] * self.data[k,i]
+        for i in xrange(0,na-2):
+            for j in xrange(i+1,na-1):
+                for k in xrange(j+1,na):
+                    self.bisp[tr] = self.data[i,j] * self.data[j,k] * self.data[k,i]   # data are conjugated in lower half (k,i)
                     tr = tr+1
 
     def beamform(self):
         na = self.na
 
         sum = 0.
-        for i in range(na):
-            for j in range(i+1,na):
+        for i in xrange(na):
+            for j in xrange(i+1,na):
                 sum = sum + self.data[i,j]
 
         return sum.real/self.nbl
@@ -182,8 +187,11 @@ def threshold(na=3,thresh=3):
         if n.any(bim > bimean):
             bimean[0] =  bim
             bimean.sort()
-        if not float(i)/simlen - n.round(float(i)/simlen,1):
-            print "%.0f pct complete" % (float(i)/simlen * 100)
+        ww = n.where(i==simlen/10*n.arange(10))
+        if len(ww[0] > 0): print '%d pct complete' % (10*ww[0][0])
+
+#        if not float(i)/simlen - n.round(float(i)/simlen,1):
+#            print "%.0f pct complete" % (float(i)/simlen * 100)
 
     return bfmean.min(), n.power(bimean.min(),1/3.)
 
