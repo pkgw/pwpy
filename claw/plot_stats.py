@@ -7,6 +7,7 @@ import numpy as n
 import pylab as p
 import matplotlib.pyplot as plt
 import scipy.misc
+import scipy.optimize as opt
 
 def compute():
     """Plots the computational demand of various interferometric transient detection techniques.
@@ -146,8 +147,10 @@ def plotfig(s=-1, num=-1, t=5):
     sininarr = sig_vla*n.array(sininarr)
     p.figure(2)
 
+    plaw = lambda amp, alpha, x: 1 + amp * (x/3.)**alpha
     gaussian = lambda amp,x,sigma: 1+amp * n.exp(-1.*(x/(n.log(2)*sigma))**2)  # function fit to sensitivity change from 5sigma theory and simulation
-    p1 = n.array([ 0.66264219,  8.7812165 ])  # best fit to params for na=3,4,5,6,7,10
+    p1 = n.array([ 0.66264219,  8.7812165 ])  # best fit to params for na=3,4,5,6,7,10 with wrong sim
+    p2 = n.array([ 0.52286653, -0.945686 ])  # best fit to params for na=3,4,5,6,7,8,9,10 with right sim
 
     ax1 = p.axes((0.18, 0.20, 0.55, 0.65))
 
@@ -157,7 +160,9 @@ def plotfig(s=-1, num=-1, t=5):
 #    p.plot(num, sin(num,t), label='Incoherent Beamforming')
     # computational...
     tot = n.array([scoarr,sinarr,sininarr])
-    p.plot(num, gaussian(p1[0],num,p1[1])*sbiarr, 'r', label='Bispectrum', linewidth=3)
+#    p.plot(num, gaussian(p1[0],num,p1[1])*sbiarr, 'r', label='Bispectrum', linewidth=3)
+    p.plot(num, plaw(p2[0],p2[1],num)*sbiarr, 'r', label='Bispectrum', linewidth=3)
+    print gaussian(p1[0],49,p1[1]),plaw(p2[0],p2[1],48),sbiarr[n.where(num == 48)]
     p.plot(num, scoarr, 'b--', label='Coherent Beamforming', linewidth=3)
     p.plot(num, sinarr, 'g.', label='Incoherent Baseline Beamforming', linewidth=3)
     p.plot(num, sininarr, 'y-.', label='Incoherent Antenna Beamforming', linewidth=3)
@@ -214,3 +219,105 @@ def bispsim():
     p.axis([-5,5,-2.5,0.05])
 
     p.show()
+
+
+def sim_results():
+    sim3_old = n.array( [ [3,4,5,7,9,10,11,15,20,22,25,27],[2.197,1.666,1.4011,1.0464,0.87,0.836,0.78,0.655,0.558,0.537,0.500,0.478] ] )
+    sim4_old = n.array( [ [4,8,12,15,17,20,22,25],[2.063,1.097,0.835,0.732,0.676,0.625,0.590,0.550] ] )
+    sim5_old = n.array( [ [3,4,5,6,7,8,10],[3.248,2.495,1.947,1.618,1.395,1.243,1.038] ] )
+
+    theory3 = n.array( [ [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,27],[1.817,1.442,1.238,1.103,1.005,0.929,0.868,0.818,0.776,0.740,0.708,0.680,0.655,0.633,0.613,0.594,0.578,0.562,0.548,0.535,0.522,0.511,0.500,0.481] ] )
+    theory4 = n.array( [ [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,27],[2.000,1.587,1.363,1.214,1.106,1.023,0.956,0.901,0.854,0.814,0.779,0.748,0.721,0.697,0.674,0.654,0.636,0.619,0.603,0.589,0.575,0.562,0.550,0.529] ] )
+    theory5 = n.array( [ [3,4,5,6,7,8,9,10],[2.15443469,  1.70997595,  1.46779927,  1.30766049,  1.1912109 ,  1.10145983,  1.02948523,  0.97007012] ] )
+#    theory5 = n.array( [ [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27],[2.15443469,  1.70997595,  1.46779927,  1.30766049,  1.1912109 ,  1.10145983,  1.02948523,  0.97007012,  0.91992554,  0.87685857,   0.83934208,  0.80627483,  0.77683974,  0.75041584,  0.72652157,   0.70477687,  0.68487719,  0.66657526,  0.64966788,  0.63398631,   0.61938912,  0.60575673,  0.59298726,  0.58099328,  0.5696993] ] )
+
+    sim3 = n.array( [ [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,27],[2.2341,1.7068, 1.350, 1.241, 1.102, 0.968, 0.909, 0.864, 0.816, 0.773, 0.725, 0.711, 0.688, 0.642, 0.619, 0.607, 0.593, 0.576, 0.557, 0.536, 0.532, 0.519, 0.500, 0.484] ] )
+    sim4 = n.array( [ [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,27],[2.7122, 2.0318, 1.6697, 1.4225, 1.267, 1.146, 1.065, 0.998, 0.916, 0.866, 0.8266, 0.789, 0.759, 0.72613, 0.702, 0.673, 0.664, 0.632, 0.616, 0.600, 0.587, 0.572, 0.560, 0.540] ] )
+    sim5 = n.array( [ [3,4,5,6,7,8,9,10],[3.2559,2.4193,1.9510,1.6867,1.4629, 1.320, 1.208, 1.120] ] )
+#    sim5 = n.array( [ [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27],[] ] )
+
+    bf3 = n.array( [ [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,27],[1.75208047926269, 1.19243808600164, 0.95824570274179, 0.77276647429923, 0.62327085251299, 0.56073721609684, 0.49224408566996, 0.47003752697561, 0.40726216607240, 0.36881832376607, 0.34271750148941, 0.32519903783076, 0.29386667402896, 0.28223612373069, 0.25392716314416, 0.24093327994493, 0.23780340805854, 0.22418922077704, 0.20389490916881, 0.20329503998755, 0.18871948307756, 0.18282973583140, 0.17747952133728, 0.15358594031471] ] )
+    bf3t = n.array( [ [3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,27],[1.73205081,  1.22474487,  0.9486833 ,  0.77459667,  0.65465367,        0.56694671,  0.5       ,  0.4472136 ,  0.40451992,  0.36927447,        0.33968311,  0.31448545,  0.29277002,  0.27386128,  0.25724788,        0.24253563,  0.22941573,  0.21764288,  0.20701967,  0.19738551,        0.18860838,  0.18057878,  0.17320508,  0.16012815] ] )
+
+    p.figure(1)
+    p.plot(sim3[0], sim3[1], 'r', label='s3')
+    p.plot(sim4[0], sim4[1], 'b', label='s4')
+    p.plot(sim5[0], sim5[1], 'g', label='s5o')
+    p.plot(theory3[0], theory3[1], 'r*', label='t3')
+    p.plot(theory4[0], theory4[1], 'b*', label='t4')
+    p.plot(theory5[0], theory5[1], 'g*', label='t5')
+    p.legend()
+    p.xlabel('$n_a$')
+    p.ylabel('s$_{lim}$')
+
+    r3 = []; r4 = []; r5 = []
+    for i in range(len(sim3_old[0])):
+        ww = n.where( sim3_old[0][i] == theory3[0] )[0]
+        r3.append( (sim3_old[1][i]/theory3[1][ww])[0] )
+    for i in range(len(sim4_old[0])):
+        ww = n.where( sim4_old[0][i] == theory4[0] )[0]
+        r4.append( (sim4_old[1][i]/theory4[1][ww])[0] )
+    for i in range(len(sim5_old[0])):
+        ww = n.where( sim5_old[0][i] == theory5[0] )[0]
+        r5.append( (sim5_old[1][i]/theory5[1][ww])[0] )
+
+    p.figure(2)
+    p.plot(sim3_old[0], r3, 'r--', label='r3o')
+    p.plot(sim4_old[0], r4, 'b--', label='r4o')
+    p.plot(sim5_old[0], r5, 'g--', label='r5o')
+    p.plot(sim3[0], sim3[1]/theory3[1], 'r', label='r3')
+    p.plot(sim4[0], sim4[1]/theory4[1], 'b', label='r4')
+    p.plot(sim5[0], sim5[1]/theory5[1], 'g', label='r5')
+    p.legend()
+    p.xlabel('$n_a$')
+    p.ylabel('Limit ratio')
+
+#    p.figure(3)
+#    p.plot(bf3[0], bf3[1], '--')
+#    p.plot(bf3t[0], bf3t[1], '.')
+
+    p.figure(4)
+    if 1:   # new simulation
+        narr3 = sim3[0]
+        narr4 = sim4[0]
+        narr5 = sim5[0]
+        ratio3 = sim3[1]/theory3[1]
+        ratio4 = sim4[1]/theory4[1]
+        ratio5 = sim5[1]/theory5[1]
+    else:    # old simulation
+        narr3 = sim3_old[0]
+        narr4 = sim4_old[0]
+        narr5 = sim5_old[0]
+        ratio3 = n.array(r3)
+        ratio4 = n.array(r4)
+        ratio5 = n.array(r5)
+
+    plaw = lambda amp, alpha, x: 1 + amp * (x/3.)**alpha
+    fitfunc = lambda p, x: plaw(p[0],p[1],x)
+    errfunc = lambda p, x, y: fitfunc(p, x)**2 - y**2
+    p0 = [0.5, -0.5]
+    p3, success = opt.leastsq(errfunc, p0[:], args = (narr3, ratio3))
+    p4, success = opt.leastsq(errfunc, p0[:], args = (narr4, ratio4))
+    p5, success = opt.leastsq(errfunc, p0[:], args = (narr5, ratio5))
+
+    p.plot(narr3, ratio3, 'b.', label='obs3')
+    p.plot(narr3, fitfunc(p3,narr3), 'b', label='fit3')
+    p.plot(narr4, ratio4, 'r.', label='obs4')
+    p.plot(narr4, fitfunc(p4,narr4), 'r', label='fit4')
+    p.plot(narr5, ratio5, 'g.', label='obs5')
+    p.plot(narr5, fitfunc(p5,narr5), 'g', label='fit5')
+    p.legend()
+    p.xlabel('$n_a$')
+    p.ylabel('Limit ratio')
+    print '**Best fits**'
+    print '3:', p3
+    print '4:', p4
+    print '5:', p5
+    print '**VLA limit**'
+    print '3:', plaw(p3[0],p3[1], 27)
+    print '4:', plaw(p4[0],p3[1], 27)
+    print '5:', plaw(p5[0],p5[1], 27)
+    print narr3, plaw(p5[0],p5[1], narr3)
+
+    p.show()
+
