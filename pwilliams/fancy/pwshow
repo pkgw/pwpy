@@ -32,17 +32,22 @@ for path in sys.argv[1:]:
         anyfailures = True
         continue
 
-    data = img.read (squeeze=True, flip=True)
-
-    if data.ndim != 2:
-        print >>sys.stderr, 'pwshow: can\'t make image at “%s” into 2D' % path
+    try:
+        img = img.simple ()
+    except Exception, e:
+        print >>sys.stderr, 'pwshow: can\'t treat path “%s” as simple 2D ' \
+            'image: %s' % (path, e)
         anyfailures = True
         continue
+        
+    data = img.read (flip=True)
+    toworld = img.toworld
 
     if fft:
         data = N.abs (N.fft.ifftshift (N.fft.fft2 (N.fft.fftshift (data))))
+        toworld = None
 
-    ndshow.view (data, title=path + ' — Array Viewer')
+    ndshow.view (data, title=path + ' — Array Viewer', toworld=toworld)
 
 if anyfailures:
     sys.exit (1)

@@ -21,24 +21,32 @@ from mirtask import util
 
 
 def load (path, fft, maxnorm):
-    img = astimage.open (path, 'r')
-    data = img.read (squeeze=True, flip=True)
+    img = astimage.open (path, 'r').simple ()
+    data = img.read (flip=True)
+    toworld = img.toworld
 
     if fft:
         data = N.abs (N.fft.ifftshift (N.fft.fft2 (N.fft.fftshift (data.filled (0)))))
-        #data = N.fft.ifftshift (N.fft.fft2 (N.fft.fftshift (data.filled (0)))).real
         data = N.ma.MaskedArray (data)
+        toworld = None
 
     if maxnorm:
         data /= N.ma.max (data)
 
-    return data
+    return data, toworld
 
 
 def blink (paths, fft, maxnorm):
     import ndshow
 
-    images = [load (p, fft, maxnorm) for p in paths]
+    images = []
+    toworlds = []
+
+    for p in paths:
+        image, toworld = load (p, fft, maxnorm)
+        images.append (image)
+        toworlds.append (toworld)
+
     if not len (images):
         return
 
@@ -63,7 +71,7 @@ def blink (paths, fft, maxnorm):
     for im in images:
         im.mask = jointmask
 
-    ndshow.cycle (images, paths)
+    ndshow.cycle (images, paths, toworlds=toworlds)
 
 
 def cmdline (argv):
