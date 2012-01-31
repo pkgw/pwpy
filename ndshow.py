@@ -1,3 +1,5 @@
+# -*- mode: python; coding: utf-8 -*-
+
 """
 UI features of the viewport:
 
@@ -217,6 +219,7 @@ class Viewport (gtk.DrawingArea):
     getshape = None
     settuning = None
     getsurface = None
+    onmotion = None
     hack_doubleshift = None
 
     centerx = 0
@@ -272,6 +275,13 @@ class Viewport (gtk.DrawingArea):
         if getsurface is not None and not callable (getsurface):
             raise ValueError ()
         self.getsurface = getsurface
+        return self
+
+
+    def setMotionHandler (self, onmotion):
+        if onmotion is not None and not callable (onmotion):
+            raise ValueError ()
+        self.onmotion = onmotion
         return self
 
 
@@ -347,6 +357,8 @@ class Viewport (gtk.DrawingArea):
     def getPointerDataCoords (self):
         if self.allocation is None:
             raise Exception ('Must be called after allocation')
+        if self.scale is None:
+            self.autoscale ()
 
         x, y = self.get_pointer ()
         dx = x - 0.5 * self.allocation.width
@@ -517,6 +529,13 @@ class Viewport (gtk.DrawingArea):
         return False
 
     def _on_motion_notify (self, alsoself, event):
+        if self.onmotion is not None:
+            dx = event.x - 0.5 * self.allocation.width
+            dy = event.y - 0.5 * self.allocation.height
+            datax = self.centerx + dx / self.scale
+            datay = self.centery + dy / self.scale
+            self.onmotion (datax, datay)
+
         if self.drag_type == DRAG_TYPE_NONE:
             return False
         elif self.drag_type == DRAG_TYPE_PAN:
@@ -542,8 +561,20 @@ class Viewer (object):
         self.win = gtk.Window (gtk.WINDOW_TOPLEVEL)
         self.win.set_title (title)
         self.win.set_default_size (default_width, default_height)
-        self.win.add (self.viewport)
         self.win.connect ('key-press-event', self._on_key_press)
+
+        vb = gtk.VBox ()
+        vb.pack_start (self.viewport, True, True, 2)
+        hb = gtk.HBox ()
+        vb.pack_start (hb, False, True, 2)
+
+        self.status_label = gtk.Label ()
+        self.status_label.set_alignment (0, 0.5)
+        hb.pack_start (self.status_label, True, True, 2)
+
+        self.status_label.set_markup ('Temp')
+
+        self.win.add (vb)
 
 
     def setShapeGetter (self, getshape):
@@ -558,6 +589,13 @@ class Viewer (object):
 
     def setSurfaceGetter (self, getsurface):
         self.viewport.setSurfaceGetter (getsurface)
+        return self
+
+
+    def setStatusFormatter (self, fmtstatus):
+        def onmotion (x, y):
+            self.status_label.set_markup (fmtstatus (x, y))
+        self.viewport.setMotionHandler (onmotion)
         return self
 
 
@@ -608,7 +646,7 @@ class Viewer (object):
         return False
 
 
-def view (array, title='Array Viewer', colormap='black_to_blue'):
+def view (array, title='Array Viewer', colormap='black_to_blue', toworld=None):
     clipper = Clipper ()
     clipper.allocBuffer (array)
     clipper.setTileSize ()
@@ -651,10 +689,28 @@ def view (array, title='Array Viewer', colormap='black_to_blue'):
 
         return imagesurface, xoffset, yoffset
 
+    if toworld is None:
+        def fmtstatus (x, y):
+            s = ''
+            if x >= 0 and y >= 0 and x < w and y < h:
+                s += '%g ' % array[y,x]
+            return s + 'x=%d y=%d' % (x, y)
+    else:
+        from astutil import fmthours, fmtdeglat
+        def fmtstatus (x, y):
+            s = ''
+            if x >= 0 and y >= 0 and x < w and y < h:
+                s += '%g ' % array[y,x]
+            lat, lon = toworld ([y, x])
+            s += 'x=%d y=%d lat=%s lon=%s' % (x, y, fmtdeglat (lat),
+                                              fmthours (lon))
+            return s
+
     viewer = Viewer (title=title)
     viewer.setShapeGetter (getshape)
     viewer.setTuningSetter (settuning)
     viewer.setSurfaceGetter (getsurface)
+    viewer.setStatusFormatter (fmtstatus)
     viewer.win.show_all ()
     viewer.win.connect ('destroy', gtk.main_quit)
     gtk.main ()
@@ -687,6 +743,9 @@ class Cycler (Viewer):
         vb.pack_start (self.viewport, True, True, 2)
         hb = gtk.HBox ()
         vb.pack_start (hb, False, True, 2)
+        self.status_label = gtk.Label ()
+        self.status_label.set_alignment (0, 0.5)
+        hb.pack_start (self.status_label, True, True, 2)
         self.plane_label = gtk.Label ()
         self.plane_label.set_alignment (0, 0.5)
         hb.pack_start (self.plane_label, True, True, 2)
@@ -759,6 +818,13 @@ class Cycler (Viewer):
         return self
 
 
+    def setStatusFormatter (self, fmtstatusi):
+        def onmotion (x, y):
+            self.status_label.set_markup (fmtstatusi (self.i, x, y))
+        self.viewport.setMotionHandler (onmotion)
+        return self
+
+
     def setCurrent (self, index):
         n = self.getn ()
         index = index % n
@@ -778,6 +844,11 @@ class Cycler (Viewer):
         self.plane_label.set_markup ('<b>Current plane:</b> %d of %d' %
                                      (self.i + 1, n))
         self.desc_label.set_text (self.getdesci (self.i))
+
+        if self.viewport.onmotion is not None:
+            datax, datay = self.viewport.getPointerDataCoords ()
+            self.viewport.onmotion (datax, datay)
+
         self.viewport.queue_draw ()
 
 
@@ -820,7 +891,7 @@ class Cycler (Viewer):
         return super (Cycler, self)._on_key_press (widget, event)
 
 
-def cycle (arrays, descs=None, cadence=0.6):
+def cycle (arrays, descs=None, cadence=0.6, toworlds=None):
     import time, glib
 
     n = len (arrays)
@@ -902,12 +973,32 @@ def cycle (arrays, descs=None, cadence=0.6):
     def getsurfacei (i, xoffset, yoffset, width, height):
         return surfaces[i], xoffset, yoffset
 
+    if toworlds is None:
+        def fmtstatusi (i, x, y):
+            s = ''
+            if x >= 0 and y >= 0 and x < w and y < h:
+                s += '%g ' % arrays[i][y,x]
+            return s + 'x=%d y=%d' % (x, y)
+    else:
+        from astutil import fmthours, fmtdeglat
+        def fmtstatusi (i, x, y):
+            s = ''
+            if x >= 0 and y >= 0 and x < w and y < h:
+                s += '%g ' % arrays[i][y,x]
+            s += 'x=%d y=%d' % (x, y)
+            if toworlds[i] is not None:
+                lat, lon = toworlds[i] ([y, x])
+                s += ' lat=%s lon=%s' % (fmtdeglat (lat),
+                                         fmthours (lon))
+            return s
+
     cycler = Cycler ()
     cycler.setNGetter (getn)
     cycler.setShapeGetter (getshapei)
     cycler.setDescGetter (getdesci)
     cycler.setTuningSetter (settuningi)
     cycler.setSurfaceGetter (getsurfacei)
+    cycler.setStatusFormatter (fmtstatusi)
     cycler.win.show_all ()
     cycler.win.connect ('destroy', gtk.main_quit)
 
