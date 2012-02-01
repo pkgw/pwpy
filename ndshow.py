@@ -646,7 +646,7 @@ class Viewer (object):
         return False
 
 
-def view (array, title='Array Viewer', colormap='black_to_blue', toworld=None):
+def view (array, title='Array Viewer', colormap='black_to_blue', toworld=None, yflip=False):
     clipper = Clipper ()
     clipper.allocBuffer (array)
     clipper.setTileSize ()
@@ -691,6 +691,8 @@ def view (array, title='Array Viewer', colormap='black_to_blue', toworld=None):
 
     if toworld is None:
         def fmtstatus (x, y):
+            if yflip:
+                y = h - 1 - y
             s = ''
             if x >= 0 and y >= 0 and x < w and y < h:
                 s += '%g ' % array[y,x]
@@ -698,6 +700,8 @@ def view (array, title='Array Viewer', colormap='black_to_blue', toworld=None):
     else:
         from astutil import fmthours, fmtdeglat
         def fmtstatus (x, y):
+            if yflip:
+                y = h - 1 - y
             s = ''
             if x >= 0 and y >= 0 and x < w and y < h:
                 s += '%g ' % array[y,x]
@@ -891,7 +895,7 @@ class Cycler (Viewer):
         return super (Cycler, self)._on_key_press (widget, event)
 
 
-def cycle (arrays, descs=None, cadence=0.6, toworlds=None):
+def cycle (arrays, descs=None, cadence=0.6, toworlds=None, yflip=False):
     import time, glib
 
     n = len (arrays)
@@ -975,6 +979,8 @@ def cycle (arrays, descs=None, cadence=0.6, toworlds=None):
 
     if toworlds is None:
         def fmtstatusi (i, x, y):
+            if yflip:
+                y = h - 1 - y
             s = ''
             if x >= 0 and y >= 0 and x < w and y < h:
                 s += '%g ' % arrays[i][y,x]
@@ -982,6 +988,8 @@ def cycle (arrays, descs=None, cadence=0.6, toworlds=None):
     else:
         from astutil import fmthours, fmtdeglat
         def fmtstatusi (i, x, y):
+            if yflip:
+                y = h - 1 - y
             s = ''
             if x >= 0 and y >= 0 and x < w and y < h:
                 s += '%g ' % arrays[i][y,x]
