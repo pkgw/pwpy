@@ -71,7 +71,8 @@ def blink (paths, fft, maxnorm):
     for im in images:
         im.mask = jointmask
 
-    ndshow.cycle (images, paths, toworlds=toworlds)
+    ndshow.cycle (images, paths,
+                  toworlds=toworlds, yflip=True)
 
 
 def cmdline (argv):

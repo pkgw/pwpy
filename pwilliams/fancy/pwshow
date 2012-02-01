@@ -47,7 +47,8 @@ for path in sys.argv[1:]:
         data = N.abs (N.fft.ifftshift (N.fft.fft2 (N.fft.fftshift (data))))
         toworld = None
 
-    ndshow.view (data, title=path + ' — Array Viewer', toworld=toworld)
+    ndshow.view (data, title=path + ' — Array Viewer',
+                 toworld=toworld, yflip=True)
 
 if anyfailures:
     sys.exit (1)
