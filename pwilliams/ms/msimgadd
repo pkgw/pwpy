@@ -6,8 +6,12 @@
 
 import sys, os.path, shutil, pyrap.tables
 
+mean = '-m' in sys.argv
+if mean:
+    sys.argv.remove ('-m')
+
 if len (sys.argv) < 2:
-    print >>sys.stderr, 'Usage: msimgadd <input images...> <output image>'
+    print >>sys.stderr, 'Usage: msimgadd [-m] <input images...> <output image>'
     sys.exit (1)
 
 inputs = sys.argv[1:-1]
@@ -36,6 +40,9 @@ try:
                 sys.exit (1)
 
             omap += imap
+
+        if mean:
+            omap /= len (inputs)
 
         outtab.putcell ('map', 0, omap)
     finally:
