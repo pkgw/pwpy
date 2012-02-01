@@ -60,6 +60,12 @@ class AstroImage (object):
     units = None
     "Lower-case string describing image units (e.g., jy/beam, jy/pixel)"
 
+    pclat = None
+    "Latitude of the pointing center in radians"
+
+    pclon = None
+    "Longitude of the pointing center in radians"
+
 
     def __init__ (self, path, mode):
         self.path = path
@@ -239,6 +245,13 @@ class MIRIADImage (AstroImage):
             self.bmin = h.getScalarItem ('bmin', self.bmaj)
             self.bpa = h.getScalarItem ('bpa', 0) * D2R
 
+        self.pclat = h.getScalarItem ('obsdec')
+        if self.pclat is not None:
+            self.pclon = h.getScalarItem ('obsra')
+        else:
+            # TODO: check for mosaic table, read a pointing center from there
+            pass
+
         self._wcscale = _get_wcs_scale (self._wcs, self.shape.size)
 
 
@@ -380,6 +393,14 @@ class CASAImage (AstroImage):
         allinfo = self._handle.info ()
         self.units = maybelower (allinfo.get ('unit'))
         self.shape = N.asarray (self._handle.shape (), dtype=N.int)
+
+        if 'coordinates' in allinfo:
+            pc = allinfo['coordinates'].get ('pointingcenter')
+            if pc is not None:
+                # This bit of info doesn't have any metadata about units or
+                # whatever; appears to be fixed as RA/Dec in radians.
+                self.pclat = pc['value'][1]
+                self.pclon = pc['value'][0]
 
         ii = self._handle.imageinfo ()
 
@@ -538,6 +559,9 @@ class FITSImage (AstroImage):
         self.bmin = maybescale (header.get ('bmin', self.bmaj * R2D), D2R)
         self.bpa = maybescale (header.get ('bpa', 0), D2R)
 
+        self.pclat = maybescale (header.get ('obsdec'), D2R)
+        self.pclon = maybescale (header.get ('obsra'), D2R)
+
         self._wcscale = _get_wcs_scale (self._wcs, self.shape.size)
 
 
@@ -639,6 +663,8 @@ class SimpleImage (AstroImage):
         self.bmin = parent.bmin
         self.bpa = parent.bpa
         self.units = parent.units
+        self.pclat = parent.pclat
+        self.pclon = parent.pclon
 
         self._pctmpl = N.zeros (parent.shape.size)
         self._wctmpl = parent.toworld (self._pctmpl)
