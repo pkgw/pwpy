@@ -44,7 +44,7 @@ class Holder (object):
 
 
 def warn (fmt, *args):
-    print >>sys.stderr, 'warning:', fmt % args
+    print >>sys.stderr, '# warning:', fmt % args
 
 
 def fortfloat (s):
@@ -178,6 +178,8 @@ def sfind_extract (inpath, keywords):
                 sfinfo['nused'] = int (l.split ()[-6])
             if l.startswith ('A total of'):
                 sfinfo['nrawsrc'] = int (l.split ()[3])
+            if l.startswith ('No FDR pixels'):
+                sfinfo['neededpvalue'] = fortfloat (l.split ()[6])
 
         print_sources (sfinfo, process_output (imageinfo, open ('sfind.log')))
     finally:
@@ -219,7 +221,7 @@ def process_output (ii, logstream):
 
         if info.raw_maj is None or info.raw_min is None or info.raw_pa is None:
             warn ('incomplete shape information for the following sfind '
-                  'source:\n   %s', line.strip ())
+                  'source: "%s"', line.strip ())
             continue
 
         if ii.bmaj is None:
@@ -233,8 +235,9 @@ def process_output (ii, logstream):
 
         if status == 'fail':
             warn ('failed to deconvolve shape of the following sfind '
-                  'source:\n   %s', line.strip ())
-            continue
+                  'source: "%s"', line.strip ())
+            # Hope that it's pointlike.
+            extra = []
         elif status == 'pointlike':
             extra = []
         elif status == 'ok':
