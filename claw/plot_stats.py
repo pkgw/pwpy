@@ -162,7 +162,7 @@ def plotfig(s=-1, num=-1, t=5):
     tot = n.array([scoarr,sinarr,sininarr])
 #    p.plot(num, gaussian(p1[0],num,p1[1])*sbiarr, 'r', label='Bispectrum', linewidth=3)
     p.plot(num, plaw(p2[0],p2[1],num)*sbiarr, 'r', label='Bispectrum', linewidth=3)
-    print gaussian(p1[0],49,p1[1]),plaw(p2[0],p2[1],48),sbiarr[n.where(num == 48)]
+    print gaussian(p1[0],48,p1[1]),plaw(p2[0],p2[1],48),sbiarr[n.where(num == 48)]
     p.plot(num, scoarr, 'b--', label='Coherent Beamforming', linewidth=3)
     p.plot(num, sinarr, 'g.', label='Incoherent Baseline Beamforming', linewidth=3)
     p.plot(num, sininarr, 'y-.', label='Incoherent Antenna Beamforming', linewidth=3)

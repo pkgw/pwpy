@@ -171,6 +171,41 @@ class poco:
             p.show()
             
 
+    def spec2(self, save=0):
+        chans = self.chans
+        reltime = self.reltime
+
+        mean = self.dataph.mean()
+        std = self.dataph.std()
+#        abs = (self.dataph - mean)/std
+        abs = self.dataph
+        print 'Data mean, std: %f, %f' % (mean, std)
+
+        p.figure(1)
+#        ax = p.imshow(n.rot90(abs), aspect='auto', origin='upper', interpolation='nearest', extent=(min(reltime),max(reltime),0,len(chans)), vmin=-4, vmax=4)
+        ax = p.imshow(n.rot90(abs), aspect='auto', origin='upper', interpolation='nearest', extent=(0,len(reltime),0,len(chans)))
+        cb = p.colorbar(ax)
+        cb.set_label('Flux Density (Jy)',fontsize=12,fontweight="bold")
+        ax = p.axes()
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['bottom'].set_position(('outward', 20))
+        ax.spines['left'].set_position(('outward', 30))
+        ax.yaxis.set_ticks_position('left')
+        ax.xaxis.set_ticks_position('bottom')
+        p.yticks(n.arange(0,len(self.chans),4), (self.chans[(n.arange(0,len(self.chans), 4))]))
+        p.xlabel('Time (integration number)',fontsize=12,fontweight="bold")
+        p.ylabel('Channel (flagged data removed)',fontsize=12,fontweight="bold")
+        if save:
+            savename = self.file.split('.')[:-1]
+            savename.append(str(self.nskip/self.nbl) + '.spec.png')
+            savename = string.join(savename,'.')
+            print 'Saving file as ', savename
+            p.savefig(savename)
+        else:
+            p.show()
+            
+
     def fitspec(self, obsrms=0, save=0):
         """
         Fits a powerlaw to the mean spectrum at the phase center.
