@@ -173,6 +173,35 @@ class evla:
             p.show()
             
 
+    def drops(self, show=1):
+        """Displays info on missing baselines.
+        """
+
+        bls = self.preamble[:,4]
+        nints = float(len(self.reltime))
+
+        blarr = []
+        bllen = []
+        for bl in n.unique(bls):
+            blarr.append(util.decodeBaseline (bl))
+            bllen.append(n.shape(n.where(bls == bl))[1])
+
+        blarr = n.array(blarr); bllen = n.array(bllen)
+        if show:
+#            p.scatter(blarr[:,0],blarr[:,1],s=(150*((bllen/float(max(bllen))))**20))
+            for i in range(len(blarr)):
+                p.text(blarr[i,0], blarr[i,1], s=str(100*(bllen[i]/nints - 1)), horizontalalignment='center', verticalalignment='center')
+            p.axis((0,29,0,29))
+            p.plot([0,29],[0,29],'b--')
+            p.xticks(blarr[:,0], blarr[:,0])
+            p.yticks(blarr[:,1], blarr[:,1])
+            p.xlabel('Ant 1')
+            p.ylabel('Ant 2')
+            p.show()
+
+        return blarr,bllen
+
+
     def fitspec(self, obsrms=0, save=0):
         """
         Fits a powerlaw to the mean spectrum at the phase center.
