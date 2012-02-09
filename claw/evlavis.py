@@ -28,34 +28,15 @@ import scipy.stats.morestats as morestats
 class evla:
     def __init__(self, file, nints=1000, nskip=0, nocal=False, nopass=False):
         # initialize
-        self.nchan = 64
-        nchan = self.nchan
-        li = range(nchan)
-        self.chans = n.array(li)
-        self.nants = 7
-        self.nbl = 16
-        nbl = self.nbl
-        initsize = nints*self.nbl   # number of integrations to read in a single chunk
-#        self.sfreq = 1.284  # freq for first channel in GHz
-#        self.sfreq = 1.796  # freq for first channel in GHz
-#        self.sdf = 0.128/self.nchan   # dfreq per channel in GHz
         self.approxuvw = True      # flag to make template visibility file to speed up writing of dm track data
-        self.pulsewidth = 0.006 * n.ones(len(self.chans)) # pulse width of crab and m31 candidates
         self.dmarr = [56.8]  # crab
-#        self.dmarr = [0.0]
-        self.nskip = int(nskip*self.nbl)    # number of iterations to skip (for reading in different parts of buffer)
-        nskip = int(self.nskip)
+        self.pulsewidth = 0.006  # pulse width of crab and m31 candidates. later turned into array of len(chans)
         self.file = file
-
-        # load data
         vis = miriad.VisData(file,)
-        da = n.zeros((initsize,nchan),dtype='complex64')
-        fl = n.zeros((initsize,nchan),dtype='bool')
-        pr = n.zeros((initsize,5),dtype='float64')
 
         # read data into python arrays
         i = 0
-        for inp, preamble, data, flags in vis.readLowlevel ('dsl3', False, nocal=nocal, nopass=nopass):
+        for inp, preamble, data, flags in vis.readLowlevel ('dsl3', False, nocal=False, nopass=False):
             # Loop to skip some data and read shifted data into original data arrays
             if i == 0:
                 # get few general variables
@@ -72,70 +53,83 @@ class evla:
 
                 self.sfreq = self.sfreq0
                 self.sdf = self.sdf0
+                self.nchan = len(data)
+                print 'Initializing nchan:', self.nchan
+                bls = []
+
+            # build complete list of baselines
+            bls.append(preamble[4])
+
+            # end here. assume at least one instance of each bl occurs before ~three integrations
+            if len(bls) == 3*len(n.unique(bls)):
+                blarr = []
+                for bl in n.unique(bls):
+                    blarr.append(util.decodeBaseline (bl))
+                self.blarr = n.array(blarr)
+                bldict = dict( zip(n.unique(bls), n.arange(len(blarr))) )
+                break
+
+            i = i+1
+
+        # Initialize more stuff...
+        # good channels
+        li = range(self.nchan)
+        self.chans = n.array(li)
+        self.pulsewidth = self.pulsewidth * n.ones(len(self.chans)) # pulse width of crab and m31 candidates
+
+        # good baselines
+        self.nbl = len(self.blarr)
+        print 'Initializing nbl:', self.nbl
+        self.ants = n.unique(self.blarr)
+        self.nants = len(self.ants)
+        print 'Initializing nants:', self.nants
+        self.nskip = int(nskip*self.nbl)    # number of iterations to skip (for reading in different parts of buffer)
+        nskip = int(self.nskip)
+
+        # define data arrays
+        da = n.zeros((nints,self.nbl,self.nchan),dtype='complex64')
+        fl = n.zeros((nints,self.nbl,self.nchan),dtype='bool')
+        pr = n.zeros((nints*self.nbl,5),dtype='float64')
+
+        print
+        # go back and read data into arrays
+        i = 0
+        for inp, preamble, data, flags in vis.readLowlevel ('dsl3', False, nocal=nocal, nopass=nopass):
+            # Loop to skip some data and read shifted data into original data arrays
 
             if i < nskip:
                 i = i+1
                 continue 
 
-            if (i-nskip) < initsize:
-                da[i-nskip] = data
-                fl[i-nskip] = flags
+            # assumes ints in order, but may skip. after nbl iterations, it fills next row, regardless of number filled.
+            if (i-nskip) < nints*self.nbl:
+                da[(i-nskip)//self.nbl,bldict[preamble[4]]] = data
+                fl[(i-nskip)//self.nbl,bldict[preamble[4]]] = flags
                 pr[i-nskip] = preamble
             else:
-                break     # stop at initsize
+                break     # stop at nints
 
-            if not (i % (nbl*50)):
-                print 'Read integration ', str(i/nbl)
-                if i == nbl*50:
-                    print pr[:nbl,4]
-#                if i > 0:
-#                    if pr[:nbl,4][0] != pr[i-nbl:i,4][0]:
-#                        print "Whoops! dropped one..."
+            if not (i % (self.nbl*100)):
+                print 'Read spectrum ', str(i)
+
             i = i+1
 
-        if i < initsize:
-            print 'Array smaller than initialized array.  Trimming.'
-            da = da[0:i-nskip]
-            fl = fl[0:i-nskip]
-            pr = pr[0:i-nskip]
-
-        try:
-            self.rawdata = da.reshape((i-nskip)/nbl,nbl,nchan)
-            self.flags = fl.reshape((i-nskip)/nbl,nbl,nchan)
-            self.preamble = pr
-            time = self.preamble[::nbl,3]
-            self.reltime = 24*3600*(time - time[0])      # relative time array in seconds. evla times change...?
-            print
-            print 'Data read!'
-            print 'Shape of raw data, flags, time:'
-            print self.rawdata.shape, self.flags.shape, self.reltime.shape
-            print 'First time (s from day): ', (time[0]-int(time[0]))*24*3600
-            print 
-        except ValueError:
-            print 'Could not reshape data arrays. Incomplete read?'
-
-
-    def prep(self):
-        """
-        Reshapes data for usage by other functions.
-        Note that it assumes that any integration with bad data has an entire baseline flagged.
-        """
-        rawdata = self.rawdata
-        flags = self.flags
-
-#        data = (rawdata * flags)[:,:,self.chans]
-#        totallen = data[flags[:,:,self.chans]].shape[0]
-#        tlen = data.shape[0]
-#        chlen = len(self.chans)
-#        self.data = n.reshape(data[flags[:,:,self.chans]], (tlen, totallen/(tlen*chlen), chlen)) # data is what is typically needed
-#        self.rawdata = (rawdata * flags)
-        self.data = rawdata
-        self.rawdata = rawdata
+        # build final data structures
+        self.rawdata = da
+        self.data = da
+        self.flags = fl
+        self.preamble = pr
         self.dataph = (self.data.mean(axis=1)).real  #dataph is summed and detected to form TP beam at phase center
+        time = self.preamble[::self.nbl,3]
+        self.reltime = 24*3600*(time - time[0])      # relative time array in seconds. evla times change...?
 
-        print 'Data flagged, trimmed in channels, and averaged across baselines.'
-        print 'New rawdata, data, dataph shapes:'
-        print self.rawdata.shape, self.data.shape, self.dataph.shape
+        # print summary info
+        print
+        print 'Data read!\n'
+        print 'Shape of raw data, flags, time:'
+        print self.rawdata.shape, self.flags.shape, self.reltime.shape
+        print 'Dataph min, max:'
+        print self.dataph.min(), self.dataph.max()
 
 
     def spec(self, save=0):
@@ -180,26 +174,23 @@ class evla:
         bls = self.preamble[:,4]
         nints = float(len(self.reltime))
 
-        blarr = []
         bllen = []
         for bl in n.unique(bls):
-            blarr.append(util.decodeBaseline (bl))
             bllen.append(n.shape(n.where(bls == bl))[1])
 
-        blarr = n.array(blarr); bllen = n.array(bllen)
+        bllen = n.array(bllen)
         if show:
-#            p.scatter(blarr[:,0],blarr[:,1],s=(150*((bllen/float(max(bllen))))**20))
-            for i in range(len(blarr)):
-                p.text(blarr[i,0], blarr[i,1], s=str(100*(bllen[i]/nints - 1)), horizontalalignment='center', verticalalignment='center')
+            for i in range(self.nbl):
+                p.text(self.blarr[i,0], self.blarr[i,1], s=str(100*(bllen[i]/nints - 1)), horizontalalignment='center', verticalalignment='center', fontsize=9)
             p.axis((0,29,0,29))
             p.plot([0,29],[0,29],'b--')
-            p.xticks(blarr[:,0], blarr[:,0])
-            p.yticks(blarr[:,1], blarr[:,1])
+            p.xticks(self.blarr[:,0], self.blarr[:,0])
+            p.yticks(self.blarr[:,1], self.blarr[:,1])
             p.xlabel('Ant 1')
             p.ylabel('Ant 2')
             p.show()
 
-        return blarr,bllen
+        return self.blarr,bllen
 
 
     def fitspec(self, obsrms=0, save=0):
@@ -261,7 +252,7 @@ class evla:
 
         reltime = self.reltime
         chans = self.chans
-        tint = self.reltime[1] - self.reltime[0]
+        tint = 2.*(self.reltime[1] - self.reltime[0])   # hack *2!
 #        tint = self.inttime0  # could do this instead...?
 
         freq = self.sfreq + chans * self.sdf             # freq array in GHz
@@ -299,7 +290,7 @@ class evla:
 
         trackon = self.dmtrack(dm=self.dmarr[dmbin], t0=self.reltime[tbin], show=0)
         if ((trackon[1][0] != 0) | (trackon[1][len(trackon[1])-1] != len(self.chans)-1)):
-#            print 'Track does not span all channels. Skipping.'
+            print 'Track does not span all channels. Skipping.'
             return [0]
 
         dataon = data[trackon[0], :, trackon[1]]
@@ -936,30 +927,21 @@ class evla:
             p.show()
 
 
-    def tripgen(self, a1=0):
+    def tripgen(self, amin=0, amax=0):
         """Calculates and returns data indexes (i,j,k) for all closed triples.
-        a1 defines first antenna in triple. only uses that antenna if nonzero.
+        amin and amax define range of antennas (with index, in order). only used if nonzero.
         """
 
-        if a1 == 0:
-            amin = 1
-            amax = self.nants+1
-        else:
-            amin = a1
-            amax = a1+1
-
-        blarr = []
-        for bl in self.preamble [0:self.nbl,4]:
-            blarr.append(util.decodeBaseline (bl))
-        blarr = n.array(blarr)
+        if amax == 0:
+            amax = self.nants
+        blarr = self.blarr
 
         # first make triples indexes in antenna numbering
         anttrips = []
 
-#        for i in range(1,self.nants+1):
-        for i in [5,12,13,22,23,24,28]:
-            for j in [12,13,22,23,24,28]:
-                for k in [13,22,23,24,28]:
+        for i in self.ants[amin:amax+1]:
+            for j in self.ants[list(self.ants).index(i)+1:amax+1]:
+                for k in self.ants[list(self.ants).index(j)+1:amax+1]:
                     anttrips.append([i,j,k])
 
         # next return data indexes for triples
@@ -976,9 +958,8 @@ class evla:
         return n.array(bltrips)
 
 
-    def bisplc(self, chan=-1, dmbin=0, bgwindow=2, a1=0, save=0):
+    def bisplc(self, chan=-1, dmbin=0, bgwindow=3, save=0):
         """Generate lightcurve of all bispectra.
-        Use a1 to use subset of triples starting with antenna a1.
         """
 
         if chan == -1:
@@ -995,7 +976,7 @@ class evla:
         sigt = lambda S, Q, num: sigb(S,Q) * n.sqrt( (1 + 3*(num-3)*mu(S/Q)) / (num*(num-1)*(num-2)/6.))
         sigt0toQ = lambda sigt0, num: (sigt0*n.sqrt(num*(num-1)*(num-2)/(6.*4)))**(1/3.)
 
-        triples = self.tripgen(a1=a1)
+        triples = self.tripgen()
 
         dibi = n.zeros((len(self.data)-bgwindow, len(triples)), dtype='complex')
         for ii in range(bgwindow+1, len(self.data)-(bgwindow+1)):
