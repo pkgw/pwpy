@@ -1,6 +1,0 @@
-# Downloads latest version of scripts and localises them
-# Does not perform complete install including cfitsio and NVSSlist
-svn up
-echo "Localising installation"
-perl -i -pe "s|INSTALLDIR|${cwd}|g" *.pl
-echo "Done"
