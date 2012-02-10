@@ -162,7 +162,7 @@ end
 class DateTime
 
   # The J2000 epoch
-  J2000 = civil(2000,1,1,12)
+  J2000 = civil(2000,1,1,12) unless const_defined? :J2000
 
   # Create a +DateTime+ object from a numeric Astronomical Julian Date.
   # If +n+ is given and d is an Integer, the Astronomical Julian Date is taken
@@ -217,6 +217,7 @@ class DateTime
   # (TAI - UTC) table (in days).
   TAI_UTC_TABLE = [
     # Add new leap seconds here
+    [DateTime.civil(2012,7,1), Rational(35, 86400)],
     [DateTime.civil(2009,1,1), Rational(34, 86400)],
     [DateTime.civil(2006,1,1), Rational(33, 86400)],
     [DateTime.civil(1999,1,1), Rational(32, 86400)],
