@@ -132,6 +132,76 @@ class evla:
         print self.dataph.min(), self.dataph.max()
 
 
+    def casa_init(self, file, nints=1000, nskip=0):
+        """Function that reads in data using CASA.
+        Reads in based on number of minutes for now...
+        Ultimately would like to swap this with original __init__.
+        """
+        
+        # ** this is raw casapy. need to import casa here **
+
+        self.approxuvw = True      # flag to make template visibility file to speed up writing of dm track data
+        self.dmarr = [56.8]  # crab
+        self.pulsewidth = 0.006  # pulse width of crab and m31 candidates. later turned into array of len(chans)
+        self.file = file
+
+        # open file and define times
+        ms.open(file)
+        summary = ms.summary()
+        starttime_mjd = summary['header']['BeginTime']
+        nbl = 16 # ** how to set early? and correctly? **
+        inttime = summary['header']['IntegrationTime']/summary['header']['numrecords'] * nbl
+        timeskip = inttime*nskip
+        print 'Start time:'
+        print qa.time(qa.quantity(starttime_mjd,'d'),form=['ymd'],prec=9)
+        print 'Integration time (s):'
+        print inttime
+        starttime = qa.getvalue(qa.convert(qa.time(qa.quantity(starttime_mjd+timeskip/(24.*60*60),'d'),form=['ymd'], prec=9), 's'))
+        stoptime = qa.getvalue(qa.convert(qa.time(qa.quantity(starttime_mjd+(timeskip+nints*inttime)/(24.*60*60), 'd'), form=['ymd'], prec=9), 's'))
+        ms.select(items = {'time': [starttime, stoptime]})
+
+        # get data and time
+        da = ms.getdata(['data','axis_info'], ifraxis=True)
+        newda = n.reshape(da['data'][0], newshape=[da['data'][0].shape[2],da['data'][0].shape[1],da['data'][0].shape[0]])
+        self.rawdata = newda
+        self.data = newda
+        self.dataph = (self.newda.mean(axis=1)).real  #dataph is summed and detected to form TP beam at phase center
+        ti = da['axis_info']['time_axis']['MJDseconds']
+        self.reltime = ti - ti[0]
+
+        # Initialize more stuff...
+        # good channels
+        self.nchan = len(self.data)
+        print 'Initializing nchan:', self.nchan
+        li = range(self.nchan)
+        self.chans = n.array(li)
+        self.pulsewidth = self.pulsewidth * n.ones(len(self.chans)) # pulse width of crab and m31 candidates
+
+        # good baselines
+        bls = da['axis_info']['ifr_axis']['ifr_name']
+        self.blarr = n.array([[int(bls[i].split('-')[0]),int(bls[i].split('-')[1])] for i in range(len(bls))])
+        self.nbl = len(self.blarr)
+        print 'Initializing nbl:', self.nbl
+        self.ants = n.unique(self.blarr)
+        self.nants = len(self.ants)
+        print 'Initializing nants:', self.nants
+        self.nskip = int(nskip*self.nbl)    # number of iterations to skip (for reading in different parts of buffer)
+
+        # ** set variables for later writing data **
+        self.nants0 = inp.getScalar ('nants', 0)
+        self.inttime0 = inp.getScalar ('inttime', 10.0)
+        self.nspect0 = inp.getScalar ('nspect', 0)
+        self.nwide0 = inp.getScalar ('nwide', 0)
+        self.sdf0 = inp.getScalar ('sdf', self.nspect0)
+        self.nschan0 = inp.getScalar ('nschan', self.nspect0)
+        self.ischan0 = inp.getScalar ('ischan', self.nspect0)
+        self.sfreq0 = inp.getScalar ('sfreq', self.nspect0)
+        self.restfreq0 = inp.getScalar ('restfreq', self.nspect0)
+        self.pol0 = inp.getScalar ('pol')
+        self.sfreq = self.sfreq0
+        self.sdf = self.sdf0
+
+
     def spec(self, save=0):
         chans = self.chans
         reltime = self.reltime
