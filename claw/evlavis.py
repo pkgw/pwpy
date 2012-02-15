@@ -11,11 +11,7 @@
 import sys, string, os, shutil
 #import cProfile
 from os.path import join
-#import mirtask
-#from mirtask import uvdat, keys, util
-from mirtask import util
-from mirexec import TaskInvert, TaskClean, TaskRestore, TaskImFit, TaskCgDisp, TaskImStat, TaskUVFit
-import miriad, pickle
+import pickle
 import numpy as n
 import pylab as p
 import scipy.optimize as opt
@@ -27,6 +23,26 @@ import scipy.stats.morestats as morestats
 
 class evla:
     def __init__(self, file, nints=1000, nskip=0, nocal=False, nopass=False):
+        """Initializes the class according to the file type. Miriad or Measurement Set?
+        Note that CASA stuff only works if this is run from within casapy.
+        """
+
+        if file.split('.')[-1] == 'mir':
+            self.miriad_init(file, nints=nints, nskip=nskip, nocal=nocal, nopass=nopass)
+        elif file.split('.')[-1] == 'ms':
+            self.casa_init(file, nints=nints, nskip=nskip)
+
+
+    def miriad_init(self, file, nints, nskip, nocal, nopass):
+        """Reads in Miriad data using miriad-python.
+        Seems to have some small time (~1 integration) errors in light curves and spectrograms, 
+        as compared to CASA-read data.
+        """
+
+        from mirtask import util
+        from mirexec import TaskInvert, TaskClean, TaskRestore, TaskImFit, TaskCgDisp, TaskImStat, TaskUVFit
+        import miriad
+
         # initialize
         self.approxuvw = True      # flag to make template visibility file to speed up writing of dm track data
         self.dmarr = [56.8]  # crab
@@ -133,48 +149,58 @@ class evla:
 
 
     def casa_init(self, file, nints=1000, nskip=0):
-        """Function that reads in data using CASA.
-        Reads in based on number of minutes for now...
-        Ultimately would like to swap this with original __init__.
+        """Reads in Measurement Set data using CASA.
         """
-        
-        # ** this is raw casapy. need to import casa here **
+
+        import casac
+        ms = casac.homefinder.find_home_by_name('msHome').create()
+        qa = casac.homefinder.find_home_by_name('quantaHome').create()
 
         self.approxuvw = True      # flag to make template visibility file to speed up writing of dm track data
         self.dmarr = [56.8]  # crab
         self.pulsewidth = 0.006  # pulse width of crab and m31 candidates. later turned into array of len(chans)
         self.file = file
+        nbl = 16 # ** how to set early? and correctly? **
 
         # open file and define times
         ms.open(file)
         summary = ms.summary()
         starttime_mjd = summary['header']['BeginTime']
-        nbl = 16 # ** how to set early? and correctly? **
-        inttime = summary['header']['IntegrationTime']/summary['header']['numrecords'] * nbl
-        timeskip = inttime*nskip
-        print 'Start time:'
+        self.inttime = summary['header']['IntegrationTime']/summary['header']['numrecords'] * nbl
+        self.inttime0 = self.inttime
+        timeskip = self.inttime*nskip
+        print 'First integration:'
         print qa.time(qa.quantity(starttime_mjd,'d'),form=['ymd'],prec=9)
-        print 'Integration time (s):'
-        print inttime
+        print 'Mean itegration time (s):'
+        print self.inttime
+        print
         starttime = qa.getvalue(qa.convert(qa.time(qa.quantity(starttime_mjd+timeskip/(24.*60*60),'d'),form=['ymd'], prec=9), 's'))
-        stoptime = qa.getvalue(qa.convert(qa.time(qa.quantity(starttime_mjd+(timeskip+nints*inttime)/(24.*60*60), 'd'), form=['ymd'], prec=9), 's'))
+        stoptime = qa.getvalue(qa.convert(qa.time(qa.quantity(starttime_mjd+(timeskip+nints*self.inttime)/(24.*60*60), 'd'), form=['ymd'], prec=9), 's'))
+        print 'Reading from', qa.time(qa.quantity(starttime_mjd+timeskip/(24.*60*60),'d'),form=['hms'], prec=9), 'to', qa.time(qa.quantity(starttime_mjd+(timeskip+nints*self.inttime)/(24.*60*60), 'd'), form=['hms'], prec=9)
         ms.select(items = {'time': [starttime, stoptime]})
 
         # get data and time
         da = ms.getdata(['data','axis_info'], ifraxis=True)
-        newda = n.reshape(da['data'][0], newshape=[da['data'][0].shape[2],da['data'][0].shape[1],da['data'][0].shape[0]])
+        ms.close()
+        shape = da['data'][0].shape # take only first pol (assuming 1 pol basically)
+#        newda = n.transpose(da['data'][0], newshape=(shape[2],shape[1],shape[0]))
+        newda = n.transpose(da['data'][0], axes=[2,1,0])
+        print 'Shape of data:',n.shape(newda)
         self.rawdata = newda
         self.data = newda
-        self.dataph = (self.newda.mean(axis=1)).real  #dataph is summed and detected to form TP beam at phase center
+        self.dataph = (self.rawdata.mean(axis=1)).real  #dataph is summed and detected to form TP beam at phase center
+        print 'Dataph min, max:'
+        print self.dataph.min(), self.dataph.max()
         ti = da['axis_info']['time_axis']['MJDseconds']
         self.reltime = ti - ti[0]
 
         # Initialize more stuff...
         # good channels
-        self.nchan = len(self.data)
+        self.nchan = n.shape(self.data)[2]
         print 'Initializing nchan:', self.nchan
         li = range(self.nchan)
         self.chans = n.array(li)
+        self.nschan0 = self.nchan
         self.pulsewidth = self.pulsewidth * n.ones(len(self.chans)) # pulse width of crab and m31 candidates
 
         # good baselines
@@ -184,22 +210,20 @@ class evla:
         print 'Initializing nbl:', self.nbl
         self.ants = n.unique(self.blarr)
         self.nants = len(self.ants)
+        self.nants0 = len(self.ants)
         print 'Initializing nants:', self.nants
         self.nskip = int(nskip*self.nbl)    # number of iterations to skip (for reading in different parts of buffer)
 
-        # ** set variables for later writing data **
-        self.nants0 = inp.getScalar ('nants', 0)
-        self.inttime0 = inp.getScalar ('inttime', 10.0)
-        self.nspect0 = inp.getScalar ('nspect', 0)
-        self.nwide0 = inp.getScalar ('nwide', 0)
-        self.sdf0 = inp.getScalar ('sdf', self.nspect0)
-        self.nschan0 = inp.getScalar ('nschan', self.nspect0)
-        self.ischan0 = inp.getScalar ('ischan', self.nspect0)
-        self.sfreq0 = inp.getScalar ('sfreq', self.nspect0)
-        self.restfreq0 = inp.getScalar ('restfreq', self.nspect0)
-        self.pol0 = inp.getScalar ('pol')
-        self.sfreq = self.sfreq0
+        # set variables for later writing data **some hacks here**
+        self.nspect0 = 1
+        self.nwide0 = 0
+        self.sdf0 = da['axis_info']['freq_axis']['resolution'][0][0] * 1e-9
         self.sdf = self.sdf0
+        self.ischan0 = 1
+        self.sfreq0 = da['axis_info']['freq_axis']['chan_freq'][0][0] * 1e-9
+        self.sfreq = self.sfreq0
+        self.restfreq0 = 0.0
+        self.pol0 = -1 # assumes single pol?
 
 
     def spec(self, save=0):
