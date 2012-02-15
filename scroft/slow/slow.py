@@ -149,6 +149,7 @@ if (args.coadd and imn > 1):
 		os.system("fits in=coadd.fits out=coadd.cm op=xyin")
 	else:
 		os.system("linmos in="+allimregs+" out=coadd.cm options=taper")
+                os.system("linmos in="+allimregs+" out=coadd.gain options=gain,taper")
 else:
 	if (not os.path.exists("coadd.cm")):
 		exit("Coadd file coadd.cm does not exist -- either set slow.py to create this automatically, or provide it\n\n")
