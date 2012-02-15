@@ -115,7 +115,10 @@ print "\n"
 #print allimrs
 
 for imr in allimrs:
-	inimreg = imr+".regrid"
+# if your images aren't all registered to the same reference, you may want to regrid if you want slow to generate a coadd
+#	inimreg = imr+".regrid"
+# but we'll assume here that they are:
+	inimreg = imr+".cm"
 	inim = imr+".cm"
         inimf = imr+".fits"
         allimf.append(inimf)
@@ -138,7 +141,7 @@ if (args.coadd and imn > 1):
     
 	shutil.rmtree("coadd.cm",ignore_errors=True)
 	shutil.rmtree("coadd_tmp????.fits",ignore_errors=True)
-	if (swarp):
+	if (args.swarp):
         ## SWARP method
         #   # copy the SWarp config file
 		shutil.copytree("/o/scroft/h/scripts/slow/default.swarp",".")
