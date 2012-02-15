@@ -38,14 +38,14 @@ sfopt2 = "xrms=5 rmsbox=107 options=auto,old"
 if (args.newsfind):
 # note pbcorr doesn't work properly for linmos - we are now correcting in software
 # xrms has no effect in newsfind
-    sfopt2 = "rmsbox=50 options=auto alpha="+args.alpha
+    sfopt2 = "rmsbox=50 options=auto alpha="+str(args.alpha)
 
 if (args.psfsize):
     sfopt2 = "xrms=5 rmsbox=107 options=auto,old,psfsize"
 
 if (args.psfsize and args.newsfind):
 # xrms has no effect in newsfind
-    sfopt2 = "rmsbox=50 options=auto,psfsize alpha="+args.alpha
+    sfopt2 = "rmsbox=50 options=auto,psfsize alpha="+str(args.alpha)
 
 print "SFIND options",sfopt2
 
