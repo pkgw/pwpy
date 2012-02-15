@@ -183,7 +183,7 @@ if (not args.nogencat):
         if (args.oldslowcat):
             os.system("/o/scroft/h/scripts/slow/slowcat_oldgain.py coadd.cm "+allims+" "+nsopt+" "+psopt)
         else:
-            os.system("/o/scroft/h/scripts/slow/slowcat.py coadd.cm "+allims+" "+nsopt+" "+psopt+" --alpha "+args.alpha)
+            os.system("/o/scroft/h/scripts/slow/slowcat.py coadd.cm "+allims+" "+nsopt+" "+psopt+" --alpha "+str(args.alpha))
 
 if (not args.nomkfits):
 	for imroot in allimrs:
