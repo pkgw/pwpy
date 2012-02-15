@@ -51,7 +51,8 @@ parser.add_argument('--notimesort',help='don\'t sort input images into time orde
 parser.add_argument('--nonvsscat',help='don\'t get NVSS catalog',action="store_true",default=False)
 parser.add_argument('--nogencat',help='don\'t generate SFIND culled catalogs',action="store_true",default=False)
 parser.add_argument('--oldslowcat',help='use old slowcat gain method (1 or 0)',action="store_true",default=False)
-parser.add_argument('--oldsfind',help='use old sfind',action="store_true",default=False)
+parser.add_argument('--oldsfind',help='use old SFIND',action="store_true",default=False)
+parser.add_argument('--alpha',help='alpha if using new SFIND (see mirhelp sfind)',type=float,default=2)
 parser.add_argument('--nopsfsize',help='don\'t use psfsize option in sfind',action="store_true",default=False)
 parser.add_argument('--matchrad',help='match radius',type=float,default=75.0)
 parser.add_argument('--fmin',help='NVSS minimum flux',type=float,default=0.0)
@@ -171,10 +172,10 @@ if (not args.nonvsscat):
 		exit("NVSS catalog creation failed")
 
 if (not args.nogencat):
-	psopt = "psfsize"
+	psopt = "--psfsize"
 	nsopt = ""
 	if (not args.oldsfind):
-		nsopt = "newsfind"
+		nsopt = "--newsfind"
         if (not args.nopsfsize):
 		psopt = ""
         print "\n*** Generating catalogs from ATA data ***\n\n"
@@ -182,7 +183,7 @@ if (not args.nogencat):
         if (args.oldslowcat):
             os.system("/o/scroft/h/scripts/slow/slowcat_oldgain.py coadd.cm "+allims+" "+nsopt+" "+psopt)
         else:
-            os.system("/o/scroft/h/scripts/slow/slowcat.py coadd.cm "+allims+" "+nsopt+" "+psopt)
+            os.system("/o/scroft/h/scripts/slow/slowcat.py coadd.cm "+allims+" "+nsopt+" "+psopt+" --alpha "+args.alpha)
 
 if (not args.nomkfits):
 	for imroot in allimrs:

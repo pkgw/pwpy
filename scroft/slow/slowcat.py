@@ -20,6 +20,14 @@ import astropysics as ap
 import astropysics.coords as ac
 import os
 import shutil
+import argparse 
+
+parser = argparse.ArgumentParser(description='Source Locater and Outburst Watcher Catalog Generator (SLOWcat)')
+parser.add_argument('images',help='input images - must be MIRIAD format with filenames starting with mos and ending with .cm',nargs="+")
+parser.add_argument('--newsfind',help='use new sfind',action="store_true",default=False)
+parser.add_argument('--psfsize',help='use sfind psfsize option',action="store_true",default=False)
+parser.add_argument('--alpha',help='alpha if using new SFIND (see mirhelp sfind)',type=float,default=2)
+args = parser.parse_args()
 
 # gains above this value are "good"
 gaincut = 0.2
@@ -27,17 +35,17 @@ gaincut = 0.2
 # SFIND optiosn
 sfopt2 = "xrms=5 rmsbox=107 options=auto,old"
 
-if "newsfind" in sys.argv:
+if (args.newsfind):
 # note pbcorr doesn't work properly for linmos - we are now correcting in software
 # xrms has no effect in newsfind
-    sfopt2 = "rmsbox=50 options=auto"
+    sfopt2 = "rmsbox=50 options=auto alpha="+args.alpha
 
-if "psfsize" in sys.argv:
+if (args.psfsize):
     sfopt2 = "xrms=5 rmsbox=107 options=auto,old,psfsize"
 
-if "newsfind" and "psfsize" in sys.argv:
+if (args.psfsize and args.newsfind):
 # xrms has no effect in newsfind
-    sfopt2 = "rmsbox=50 options=auto,psfsize"
+    sfopt2 = "rmsbox=50 options=auto,psfsize alpha="+args.alpha
 
 print "SFIND options",sfopt2
 
