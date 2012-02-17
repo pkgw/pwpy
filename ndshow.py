@@ -691,20 +691,22 @@ def view (array, title='Array Viewer', colormap='black_to_blue', toworld=None, y
 
     if toworld is None:
         def fmtstatus (x, y):
-            if yflip:
-                y = h - 1 - y
             s = ''
             if x >= 0 and y >= 0 and x < w and y < h:
-                s += '%g ' % array[y,x]
+                if not N.ma.is_masked (array) or not array.mask[y,x]:
+                    s += '%g ' % array[y,x]
+            if yflip:
+                y = h - 1 - y
             return s + 'x=%d y=%d' % (x, y)
     else:
         from astutil import fmthours, fmtdeglat
         def fmtstatus (x, y):
-            if yflip:
-                y = h - 1 - y
             s = ''
             if x >= 0 and y >= 0 and x < w and y < h:
-                s += '%g ' % array[y,x]
+                if not N.ma.is_masked (array) or not array.mask[y,x]:
+                    s += '%g ' % array[y,x]
+            if yflip:
+                y = h - 1 - y
             lat, lon = toworld ([y, x])
             s += 'x=%d y=%d lat=%s lon=%s' % (x, y, fmtdeglat (lat),
                                               fmthours (lon))
@@ -979,20 +981,22 @@ def cycle (arrays, descs=None, cadence=0.6, toworlds=None, yflip=False):
 
     if toworlds is None:
         def fmtstatusi (i, x, y):
-            if yflip:
-                y = h - 1 - y
             s = ''
             if x >= 0 and y >= 0 and x < w and y < h:
-                s += '%g ' % arrays[i][y,x]
+                if not N.ma.is_masked (arrays[i]) or not arrays[i].mask[y,x]:
+                    s += '%g ' % arrays[i][y,x]
+            if yflip:
+                y = h - 1 - y
             return s + 'x=%d y=%d' % (x, y)
     else:
         from astutil import fmthours, fmtdeglat
         def fmtstatusi (i, x, y):
-            if yflip:
-                y = h - 1 - y
             s = ''
             if x >= 0 and y >= 0 and x < w and y < h:
-                s += '%g ' % arrays[i][y,x]
+                if not N.ma.is_masked (arrays[i]) or not arrays[i].mask[y,x]:
+                    s += '%g ' % arrays[i][y,x]
+            if yflip:
+                y = h - 1 - y
             s += 'x=%d y=%d' % (x, y)
             if toworlds[i] is not None:
                 lat, lon = toworlds[i] ([y, x])
