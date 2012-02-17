@@ -66,6 +66,7 @@ fancy/gpmergepols
 fancy/gptext
 fancy/gpunity
 fancy/mdl-makeimage
+fancy/omegamap
 fancy/pwflux
 fancy/pwmodel
 fancy/pwshow

@@ -1,0 +1,225 @@
+#! /usr/bin/env python
+# -*- python -*-
+
+"""= omegamap - plot an attractive map
+& pkgw
+: analysis
++
+ Render an image attractively into vector or bitmap output.
+
+@ map
+ Path to the input image: FITS, MIRIAD, or CASA format
+
+@ out
+ Path of output image to create; image will be displayed
+ interactively if unspecified. Format guessed from the file
+ extension; legal ones include pdf, eps, ps, png, svg.
+
+@ fontsize
+ Size of the font to use (default: 10)
+
+@ dims
+ Width and height of the output image, in points or pixels;
+ ignored if displaying interactively. If only one value is
+ specified, it is used for both width and height
+ (default: 256,256)
+
+@ margin
+ Margin width, in points or pixels (default: 2)
+
+@ coloring
+ Name of the color scale to use (default: white_to_black)
+
+@ omstyle
+ Name of the OmegaPlot style class to use
+ (default: ColorOnWhiteVector)
+
+@ subshape
+ Width and height of the subregion of the input map to
+ image, in pixels, centered on the image center. No subregion 
+ is extracted if unspecified. If only one value is specified,
+ it is used for both the width and height of the subregion.
+
+@ range
+ Data values that anchor the minimum and maximum of the color
+ scale. The first range value must be smaller than the second.
+ If unspecified, the minimum and maximum data values are used.
+
+@ logfactor
+ If specified, the data are logarithmically scaled such that
+  newdata = log (data + logfactor * (1 - median(data)))
+ If unspecified, linear scaling is used. The range values used
+ above are taken relative to the _transformed_ data.
+
+@ aspect
+ Aspect ratio of the plot field (default: 1)
+
+@ xlabel
+ Label of the X axis (default: Right Ascension (J2000))
+
+@ ylabel
+ Label of the Y axis (default: Declination (J2000))
+"""
+
+import sys, numpy as np, omega as om, cairo
+import omega.pango, omega.pyrapimage, pyrap.images, colormaps, ndshow
+
+
+class Config (object):
+    map = None
+    out = None
+    dims = None
+    style = None
+    subshape = None
+    logfactor = None
+    fontsize = None
+    margins = None
+    coloring = None
+    range = None
+    aspect = None
+    xlabel = None
+    ylabel = None
+
+
+def plot (config):
+    im = pyrap.images.image (config.map)
+
+    if config.subshape is not None: # take a subset of the image?
+        s = np.asarray (im.shape ())
+        mid = 0.5 * (s - 1)
+
+        blc = mid.copy ()
+        blc[-1] -= 0.5 * config.subshape[0]
+        blc[-2] -= 0.5 * config.subshape[1]
+        blc = tuple (int (x) for x in blc)
+
+        trc = mid.copy ()
+        trc[-1] += 0.5 * config.subshape[0]
+        trc[-2] += 0.5 * config.subshape[1]
+        trc = tuple (int (x) for x in trc)
+
+        im = im.subimage (blc, trc)
+
+    data = np.flipud (im.getdata ().squeeze ())
+    print 'Raw data bounds:', data.min (), data.max ()
+
+    if config.logfactor is not None: # log scaling ?
+        q = config.logfactor * (1 - np.median (data))
+        print 'Magic q:', q
+        assert data.min () > -q, 'Can\'t logify it'
+        data = np.log (data + q)
+
+    # Render image into something Cairo likes
+
+    clipper = ndshow.Clipper ()
+    clipper.allocBuffer (data)
+    clipper.setTileSize ()
+    clipper.dmin = config.range[0]
+    clipper.dmax = config.range[1]
+
+    mapper = ndshow.ColorMapper (config.coloring)
+    mapper.allocBuffer (data)
+    mapper.setTileSize ()
+
+    clipper.ensureAllUpdated (data)
+    mapper.ensureAllUpdated (clipper.buffer)
+
+    # Draw!
+
+    p = om.quickImage (cairo.FORMAT_ARGB32, mapper.buffer)
+    coords = omega.pyrapimage.PyrapImageCoordinates (im, p)
+    p.paintCoordinates (coords)
+    p.setLabels (config.xlabel, config.ylabel)
+    p._toplevel_render_aspect = config.aspect
+
+    return p
+
+
+def doit (config):
+    om.pango.setFont (size=config.fontsize)
+    p = plot (config)
+
+    if config.out is None:
+        p.show (style=config.style)
+    else:
+        p.save (config.out, style=config.style, dims=config.dims,
+                margins=config.margins)
+
+
+def cmdline (args):
+    from mirtask import keys, util
+
+    util.checkusage (__doc__, ['omegamap'] + args,
+                     usageifnoargs=True)
+
+    ks = keys.KeySpec ()
+    ks.keyword ('map', 'f', ' ')
+    ks.keyword ('out', 'f', ' ')
+    ks.keyword ('fontsize', 'd', 10)
+    ks.mkeyword ('dims', 'd', 2)
+    ks.keyword ('margin', 'd', 2)
+    ks.keyword ('coloring', 'a', 'white_to_black')
+    ks.keyword ('omstyle', 'a', 'ColorOnWhiteVector')
+    ks.mkeyword ('subshape', 'i', 2)
+    ks.mkeyword ('range', 'd', 2)
+    ks.mkeyword ('logfactor', 'd', 1)
+    ks.keyword ('aspect', 'd', 1)
+    ks.keyword ('xlabel', 'a', 'Right Ascension (J2000)')
+    ks.keyword ('ylabel', 'a', 'Declination (J2000)')
+
+    vals = ks.process (args)
+    config = Config ()
+
+    if vals.map == ' ':
+        util.wrongusage (__doc__, 'must specify input image (map=)')
+
+    if len (vals.range) != 2:
+        util.wrongusage (__doc__, 'must specify data range (range=)')
+
+    if vals.range[0] >= vals.range[1]:
+        util.wrongusage (__doc__, 'data range must have min < max')
+
+    try:
+        config.style = getattr (om.styles, vals.omstyle) ()
+    except:
+        util.die ('can\'t load/instantiate OmegaPlot style "%s"', vals.omstyle)
+
+    if vals.out == ' ':
+        config.out = None
+    else:
+        config.out = vals.out
+
+    if len (vals.subshape) == 0:
+        config.subshape = None
+    elif len (vals.subshape) == 1:
+        config.subshape = vals.subshape * 2
+    else:
+        config.subshape = vals.subshape
+
+    if len (vals.dims) == 0:
+        config.dims = [256, 256]
+    elif len (vals.dims) == 1:
+        config.dims = vals.dims * 2
+    else:
+        config.dims = vals.dims
+
+    if len (vals.logfactor) == 0:
+        config.logfactor = None
+    else:
+        config.logfactor = vals.logfactor[0]
+
+    config.map = vals.map
+    config.fontsize = vals.fontsize
+    config.margin = [vals.margin] * 4
+    config.coloring = vals.coloring
+    config.range = vals.range
+    config.aspect = vals.aspect
+    config.xlabel = vals.xlabel
+    config.ylabel = vals.ylabel
+
+    doit (config)
+
+
+if __name__ == '__main__':
+    import mirtask.cliutil
+    cmdline (sys.argv[1:])
