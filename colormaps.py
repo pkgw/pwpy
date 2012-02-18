@@ -583,6 +583,16 @@ def showdemo (factoryname, **kwargs):
     gtk.main ()
 
 
+def printmaps ():
+    print 'Available color maps:'
+
+    for m in sorted (factory_map.iterkeys ()):
+        print '\t' + m
+
+
 if __name__ == '__main__':
     import sys
-    showdemo (sys.argv[1])
+    if len (sys.argv) < 2:
+        printmaps ()
+    else:
+        showdemo (sys.argv[1])
