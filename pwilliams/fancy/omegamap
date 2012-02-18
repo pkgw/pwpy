@@ -107,6 +107,7 @@ def plot (config):
 
     data = np.flipud (im.getdata ().squeeze ())
     print 'Raw data bounds:', data.min (), data.max ()
+    mask = np.flipud (im.getmask ().squeeze ())
 
     if config.logfactor is not None: # log scaling ?
         q = config.logfactor * (1 - np.median (data))
@@ -128,6 +129,8 @@ def plot (config):
 
     clipper.ensureAllUpdated (data)
     mapper.ensureAllUpdated (clipper.buffer)
+
+    mapper.buffer *= ~mask # honor the mask
 
     # Draw!
 
