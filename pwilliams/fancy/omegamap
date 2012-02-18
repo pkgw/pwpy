@@ -28,7 +28,9 @@
  Margin width, in points or pixels (default: 2)
 
 @ coloring
- Name of the color scale to use (default: white_to_black)
+ Name of the color scale to use. A list of possibilities can
+ be seen by running "python -m colormaps".
+ (default: white_to_black)
 
 @ omstyle
  Name of the OmegaPlot style class to use
