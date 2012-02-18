@@ -52,13 +52,18 @@
  above are taken relative to the _transformed_ data.
 
 @ aspect
- Aspect ratio of the plot field (default: 1)
+ Aspect ratio of the plot field. Ratio is unconstrained if
+ left unspecified.
 
 @ xlabel
- Label of the X axis (default: Right Ascension (J2000))
+ Label of the X axis. **Underscores are replaced with spaces**,
+ because MIRIAD arg parsing converts spaces to commas.
+ (default: Right_Ascension_(J2000))
 
 @ ylabel
- Label of the Y axis (default: Declination (J2000))
+ Label of the Y axis. **Underscores are replaced with spaces**,
+ because MIRIAD arg parsing converts spaces to commas.
+ (default: Declination_(J2000))
 """
 
 import sys, numpy as np, omega as om, cairo
@@ -130,7 +135,9 @@ def plot (config):
     coords = omega.pyrapimage.PyrapImageCoordinates (im, p)
     p.paintCoordinates (coords)
     p.setLabels (config.xlabel, config.ylabel)
-    p._toplevel_render_aspect = config.aspect
+
+    if config.aspect is not None:
+        p._toplevel_render_aspect = config.aspect
 
     return p
 
@@ -163,9 +170,9 @@ def cmdline (args):
     ks.mkeyword ('subshape', 'i', 2)
     ks.mkeyword ('range', 'd', 2)
     ks.mkeyword ('logfactor', 'd', 1)
-    ks.keyword ('aspect', 'd', 1)
-    ks.keyword ('xlabel', 'a', 'Right Ascension (J2000)')
-    ks.keyword ('ylabel', 'a', 'Declination (J2000)')
+    ks.keyword ('aspect', 'd', -1)
+    ks.keyword ('xlabel', 'a', 'Right_Ascension_(J2000)')
+    ks.keyword ('ylabel', 'a', 'Declination_(J2000)')
 
     vals = ks.process (args)
     config = Config ()
@@ -203,19 +210,19 @@ def cmdline (args):
     else:
         config.dims = vals.dims
 
-    if len (vals.logfactor) == 0:
-        config.logfactor = None
-    else:
+    if len (vals.logfactor):
         config.logfactor = vals.logfactor[0]
+
+    if vals.aspect > 0:
+        config.aspect = vals.aspect
 
     config.map = vals.map
     config.fontsize = vals.fontsize
     config.margin = [vals.margin] * 4
     config.coloring = vals.coloring
     config.range = vals.range
-    config.aspect = vals.aspect
-    config.xlabel = vals.xlabel
-    config.ylabel = vals.ylabel
+    config.xlabel = vals.xlabel.replace ('_', ' ')
+    config.ylabel = vals.ylabel.replace ('_', ' ')
 
     doit (config)
 
