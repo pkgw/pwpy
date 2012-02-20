@@ -9,8 +9,13 @@ endif
 set cal=$1
 set flux=$2
 
-newrfisweep.csh vis=$cal options=autoedge 'crange=(600,800)' device=/null
-newrfisweep.csh vis=$cal options=autoedge,rescan 'crange=(600,800)' device=/null
+uvflag vis=$cal flagval=flag line=chan,100,1
+uvflag vis=$cal flagval=flag line=chan,100,925
+
+#newrfisweep.csh vis=$cal options=autoedge,rescan 'crange=(600,800)' device=/null
+#newrfisweep.csh vis=$cal options=autoedge 'crange=(600,800)' device=/null
+newrfisweep.csh vis=$cal options=autoedge device=/null
+newrfisweep.csh vis=$cal options=autoedge,rescan  device=/null
 newcalcal.csh vis=$cal flux=$flux plim=15 sysflux=4 device=/null options=polsplit,outsource,sefd
 
 
