@@ -1,0 +1,22 @@
+#!/bin/tcsh
+
+set s=$1
+set s1=$s
+@ s1 = $s + 1
+
+rm casa-4200-xx/bandpass
+rm casa-4200-yy/bandpass
+pretty-picture casa-4200-xx,casa-4200-yy casa-${s}50-${s1}49 "niters=1000" "line=chan,1,${s}50,100"
+rm -r  casc.vla.${s}50-${s1}49
+restor beam=casa-${s}50-${s1}49.bm model=casc.vla.2048 out=casc.vla.${s}50-${s1}49 mode=convolve
+selfcal vis=casa-4200-xx select=-auto options=smooth,pha interval=200 model=casc.vla.${s}50-${s1}49 line=chan,1,${s}50,100
+selfcal vis=casa-4200-yy select=-auto options=smooth,pha interval=200 model=casc.vla.${s}50-${s1}49 line=chan,1,${s}50,100
+rm -r casa-4200-xx-cald casa-4200-yy-cald
+uvcat vis=casa-4200-xx out=casa-4200-xx-cald
+uvcat vis=casa-4200-yy out=casa-4200-yy-cald
+selfcal vis=casa-4200-xx-cald select=-auto options=smooth,amplitude interval=200 model=casc.vla.${s}50-${s1}49 line=chan,1,${s}50,100
+selfcal vis=casa-4200-yy-cald select=-auto options=smooth,amplitude interval=200 model=casc.vla.${s}50-${s1}49 line=chan,1,${s}50,100
+gpedit vis=casa-4200-xx-cald options=amp
+gpedit vis=casa-4200-yy-cald options=amp
+pretty-picture casa-4200-xx-cald,casa-4200-yy-cald casa-${s}50-${s1}49.lastamp "niters=1000" "line=chan,1,${s}50,100"
+

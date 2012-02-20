@@ -1,0 +1,14 @@
+#!/bin/tcsh
+
+set s=$1
+set s1=$s
+@ s1 = $s + 1
+
+mfcal vis=3c48-4200-xx refant=11 options=interpolate minants=4 flux=6.267 interval=30
+mfcal vis=3c48-4200-yy refant=11 options=interpolate minants=4 flux=6.267 interval=30
+gpcopy vis=3c48-4200-xx out=casa-4200-xx
+gpcopy vis=3c48-4200-yy out=casa-4200-yy
+rm -r casa-4200-xx-cald casa-4200-yy-cald
+uvcat vis=casa-4200-xx out=casa-4200-xx-cald
+uvcat vis=casa-4200-yy out=casa-4200-yy-cald
+pretty-picture casa-4200-xx-cald,casa-4200-yy-cald casa-${s}50-${s1}49.3c48 "niters=1000" "line=chan,1,${s}50,100"

@@ -1,0 +1,8 @@
+#!/bin/bash
+
+num=$1
+
+mv -i mosfx-3c286-1430-100 mosfx-3c286-1430-100_$num
+uvaver vis=mosfx-3c286-1430-100_$num out=3c286_aver_$num interval=999
+java jmir.miriad.UVFFT vis=3c286_aver_$num out=3c286_fft_$num
+uvspec interval=999 nxy=3,2 device=/xs select="-auto,pol(xx,yy)" axis=chan,amp line=chan,20,503 vis=3c286_fft_$num

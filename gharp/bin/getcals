@@ -1,0 +1,24 @@
+#!/bin/csh
+
+set freq=$1
+
+calinfo target=0744-064 freq=$freq
+calinfo target=0834+555 freq=$freq
+calinfo target=1130-148 freq=$freq
+calinfo target=1347+122 freq=$freq
+calinfo target=1733-130 freq=$freq
+calinfo target=2038+513 freq=$freq
+calinfo target=2206-185 freq=$freq
+calinfo target=3c119 freq=$freq
+calinfo target=3c123 freq=$freq
+calinfo target=3c138 freq=$freq
+calinfo target=3c147 freq=$freq
+calinfo target=3c279 freq=$freq
+calinfo target=3c279 freq=$freq
+calinfo target=3c286 freq=$freq
+calinfo target=3c345 freq=$freq
+calinfo target=3c380 freq=$freq
+calinfo target=3c395 freq=$freq
+calinfo target=3c48 freq=$freq
+calinfo target=3c84 freq=$freq
+calinfo target=bllac freq=$freq

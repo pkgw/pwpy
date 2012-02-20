@@ -1,0 +1,15 @@
+Fixing the calibrator values
+
+vladiff.csh mosfxa-3c48-1430-100 3c48 -- shows an offset!
+
+uvedit vis=mosfxa-3c48-1430-100 out=mosfxa-3c48-1430-100.uvedit ra=01,37,41.3 dec=33,09,35.132
+uvedit vis=mosfxc-3c48-4462-100 out=mosfxc-3c48-4462-100.uvedit ra=01,37,41.3 dec=33,09,35.132
+
+vladiff.csh mosfxa-3c48-1430-100 3c48 -- now it works!
+
+// check the catalog for the right number
+atalistcatalog -l --owner vla --convert | grep bllac
+
+// check the value in the file
+listobs vis=mosfxa-bllac-1430-100
+
