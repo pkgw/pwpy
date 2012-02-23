@@ -180,6 +180,8 @@ def sfind_extract (inpath, keywords):
                 sfinfo['nrawsrc'] = int (l.split ()[3])
             if l.startswith ('No FDR pixels'):
                 sfinfo['neededpvalue'] = fortfloat (l.split ()[6])
+            if l.startswith ('RMS of the interior RMS'):
+                sfinfo['typrms'] = fortfloat (l.split ()[6])
 
         print_sources (sfinfo, process_output (imageinfo, open ('sfind.log')))
     finally:
