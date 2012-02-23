@@ -25,8 +25,8 @@ for util in utils/*.py ; do
 	echo '(gen)' $util '->' "$d"
     fi
 
-    echo '## snippet:' $(basename $util) >"$d"
-    echo '## date:' $(date -r $util +'%Y %b %d') >>"$d"
-    echo '## SHA1:' $(sha1sum $util |cut -d' ' -f1) >>"$d"
+    echo '#- snippet:' $(basename $util) >"$d"
+    echo '#- date:' $(date -r $util +'%Y %b %d') >>"$d"
+    echo '#- SHA1:' $(sha1sum $util |cut -d' ' -f1) >>"$d"
     cat $util >>"$d"
 done
