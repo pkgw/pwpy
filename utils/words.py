@@ -22,8 +22,8 @@ def pathwords (path, noexistok=False, **kwargs):
 def pathtext (path, noexistok=False, **kwargs):
     try:
         with open (path, **kwargs) as f:
-            return f
+            for line in f:
+                yield line
     except IOError as e:
-        if e.errno == 2 and noexistok:
-            return ()
-        raise
+        if e.errno != 2 or not noexistok:
+            raise
