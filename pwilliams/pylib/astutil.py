@@ -212,7 +212,45 @@ def sphdist (lat1, lon1, lat2, lon2):
     b = s1 * s2 + c1 * c2 * cd
     return N.arctan2 (a, b)
 
-__all__ += 'sphdist'.split ()
+
+def sphofs (lat1, lon1, r, pa, tol=1e-2, rmax=None):
+    """Args are: lat1, lon1, r, pa -- consistent with
+    the usual coordinates in images, but note that this maps
+    to (Dec, RA) or (Y, X). PA is East from North. Returns
+    lat2, lon2.
+
+    Error checking can be done in two ways. If tol is not
+    None, sphdist() is used to calculate the actual distance
+    between the two locations, and if the magnitude of the
+    fractional difference between that and *r* is larger than
+    tol, an exception is raised. This will add an overhead
+    to the computation that may be significant if you're
+    going to be calling this function a whole lot.
+
+    If rmax is not None, magnitudes of *r* greater than that
+    value are rejected. For reference, an *r* of 0.2 (~11 deg)
+    gives a maximum fractional distance error of ~3%.
+    """
+
+    if rmax is not None and abs (r) > rmax:
+        raise ValueError ('sphofs radius value %f is too big for '
+                          'our approximation' % r)
+
+    lat2 = lat1 + r * N.cos (pa)
+    lon2 = lon1 + r * N.sin (pa) / N.cos (lat2)
+
+    if tol is not None:
+        s = sphdist (lat1, lon1, lat2, lon2)
+        if abs ((s - r) / s) > tol:
+            raise ValueError ('sphofs approximation broke down '
+                              '(%f %f %f %f %f %f %f)' % (lat1, lon1,
+                                                          lat2, lon2,
+                                                          r, s, pa))
+
+    return lat2, lon2
+
+
+__all__ += 'sphdist sphofs'.split ()
 
 
 # 2D Gaussian (de)convolution
