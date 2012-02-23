@@ -2,12 +2,13 @@
 # -*- python -*-
 
 """
-usage: quembed <--list|--help|[inpath] [outpath]>
+usage: quembed <--list|--help|--show <name>|[inpath] [outpath]>
 
 Embed utility Python snippets in a file.
 
 If given --help, print this help.
 If given --list, list available snippets.
+If given --show <name>, print the snippet <name>.
 If given no arguments, read from standard in and write to standard out.
 If given one nonoption argument, replace the file with utility code
   embedded.
@@ -108,6 +109,8 @@ def driver (args):
             print __doc__.strip ()
         elif len (args) == 0:
             embed (sys.stdin, sys.stdout, utilpath)
+        elif len (args) == 2 and args[0] == '--show':
+            insert (args[1], sys.stdout, utilpath)
         elif len (args) == 1:
             instream = open (args[0])
             p = args[0] + '.qunew'
