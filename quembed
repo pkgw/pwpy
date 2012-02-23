@@ -68,6 +68,11 @@ def embed (instream, outstream, utilpath):
             if line.startswith ('## end'):
                 print >>outstream, line,
                 outside = True
+            elif line.startswith ('## quickutil:'):
+                toembed = line[13:].strip ().split ()
+                print >>outstream, line,
+                for name in toembed:
+                    insert (name, outstream, utilpath)
             else:
                 pass # swallow preexisting util code
 
