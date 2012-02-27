@@ -1,0 +1,18 @@
+Here's a list of modules that I wrote but removed because they haven't
+been used for a while. Consult this file before writing a new module
+from scratch!
+
+Log the commits which removed the modules to aid in their potential
+future recovery.
+
+cosmology.py -- evaluate standard FRW cosmological integrals
+   removed 8861468037ea4db4dfb5939e4c3f118287557d19
+elcmp.py -- "Compare elevations of various sources over time"
+   removed 8861468037ea4db4dfb5939e4c3f118287557d19
+mpfit.py -- semi-customized version of Python port of Markwardt's
+   mpfit; deprecated in favor of pwmpfit.git
+   removed 8861468037ea4db4dfb5939e4c3f118287557d19
+numstd.py -- import a subset of numpy functions, popaarray(), and rms()
+   removed 8861468037ea4db4dfb5939e4c3f118287557d19
+tweaky.py -- plot a function with tunable parameters and see their effect
+   removed 8861468037ea4db4dfb5939e4c3f118287557d19
