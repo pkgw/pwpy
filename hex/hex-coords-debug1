@@ -1,7 +1,0 @@
-#! /bin/tcsh -f
-#
-# Creates a single-pointing "hex" observation, just pointing
-# at the central pointing. For quick debugging or testing of
-# the hex observing scripts.
-
-echo $2 $3

@@ -1,4 +1,0 @@
-= Ruby/Pgplot/Plotter
-
-The pgplotter gem adds a higher level plotting interface on top of the
-Ruby/PGPLOT gem.  This interface has been inspired by Matlab and Octave.

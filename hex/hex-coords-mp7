@@ -1,9 +1,0 @@
-#! /bin/tcsh -f
-#
-# Generates coordinates for a 7-point hexagonal pattern of
-# observations with the outer pointings at the "most-power"
-# point of the beam: the offset is half of the half-power
-# width. If someone had better terminology for this it would
-# be welcomed ...
-
-exec hex-lib-calchex7 0.5 $argv

@@ -1,2 +1,0 @@
-* Make keyini accept an optional block.  If given, the block will be called
-  (yielded to) and keyfin will be automatically called after the block ends.

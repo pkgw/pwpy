@@ -1,7 +1,0 @@
-#! /bin/tcsh -f
-#
-# Generates coordinates for a 17-point cross pattern of observations,
-# with the outer pointings at half of the half-power point of the
-# beam.
-
-exec hex-lib-calccross17 0.5 $argv
