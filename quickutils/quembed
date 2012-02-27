@@ -1,0 +1,142 @@
+#! /usr/bin/env python
+# -*- python -*-
+
+"""
+usage: quembed <--list|--help|--show <name>|[inpath] [outpath]>
+
+Embed utility Python snippets in a file.
+
+If given --help, print this help.
+If given --list, list available snippets.
+If given --show <name>, print the snippet <name>.
+If given no arguments, read from standard in and write to standard out.
+If given one nonoption argument, replace the file with utility code
+  embedded.
+If given two nonoption arguments, read from the first path and write to
+  the second path.
+"""
+
+import sys, os
+from os.path import join, dirname
+
+class QUError (Exception):
+    def __init__ (self, fmt, *args):
+        self.qumsg = fmt % args
+
+    def __str__ (self):
+        return self.qumsg
+
+
+def mycopystat (src, dst):
+    # Copied from shutil.copystat, but we skip the utime modification
+    import os, stat
+    st = os.stat (src)
+    mode = stat.S_IMODE (st.st_mode)
+    if hasattr (os, 'chmod'):
+        os.chmod (dst, mode)
+    if hasattr (os, 'chflags') and hasattr (st, 'st_flags'):
+        os.chflags (dst, st.st_flags)
+
+
+def insert (name, outstream, utilpath):
+    try:
+        f = open (join (utilpath, name + '.py'))
+    except IOError as e:
+        if e.errno == 2:
+            raise QUError ('no such snippet "%s" (no file %s)', name,
+                           join (utilpath, name + '.py'))
+
+    for line in f:
+        if line.startswith ('##'):
+            continue
+        print >>outstream, line,
+
+
+def embed (instream, outstream, utilpath):
+    outside = True
+
+    for line in instream:
+        if outside:
+            if line.startswith ('## quickutil:'):
+                toembed = line[13:].strip ().split ()
+                print >>outstream, line,
+                for name in toembed:
+                    insert (name, outstream, utilpath)
+                outside = False
+            else:
+                print >>outstream, line,
+        else:
+            if line.startswith ('## end'):
+                print >>outstream, line,
+                outside = True
+            elif line.startswith ('## quickutil:'):
+                toembed = line[13:].strip ().split ()
+                print >>outstream, line,
+                for name in toembed:
+                    insert (name, outstream, utilpath)
+            else:
+                pass # swallow preexisting util code
+
+    if not outside:
+        raise QUError ('ended processing inside a quickutil stanza; '
+                       'missing "## end" statement?')
+
+
+def listsnippets (utilpath):
+    a = sorted (x[:-3] for x in os.listdir (utilpath) if x.endswith ('.py'))
+
+    for x in a:
+        print x
+
+
+def driver (args):
+    p = join (dirname (__file__), 'utils')
+    if os.path.isdir (p):
+        utilpath = p
+    else:
+        utilpath = join (dirname (__file__), '..', 'share', 'quickutil')
+
+    try:
+        open (join (utilpath, 'die.py'))
+    except Exception as e:
+        print >>sys.stderr, 'error: snippets not found? sniff failed: %s' % e
+        sys.exit (1)
+
+    try:
+        if len (args) == 1 and args[0] == '--list':
+            listsnippets (utilpath)
+        elif len (args) == 1 and args[0] == '--help':
+            print __doc__.strip ()
+        elif len (args) == 0:
+            embed (sys.stdin, sys.stdout, utilpath)
+        elif len (args) == 2 and args[0] == '--show':
+            insert (args[1], sys.stdout, utilpath)
+        elif len (args) == 1:
+            instream = open (args[0])
+            p = args[0] + '.qunew'
+            outstream = open (p, 'w')
+            try:
+                embed (instream, outstream, utilpath)
+                mycopystat (args[0], p)
+                os.rename (p, args[0])
+            except Exception as e:
+                try:
+                    os.unlink (p)
+                except Exception as e:
+                    pass
+        elif len (args) == 2:
+            instream = open (args[0])
+            outstream = open (args[1], 'w')
+            embed (instream, outstream, utilpath)
+        else:
+            print >>sys.stderr, 'error: unexpected arguments'
+            print >>sys.stderr
+            print >>sys.stderr, __doc__.strip ()
+            sys.exit (1)
+    except QUError as e:
+        print >>sys.stderr, 'error:', e
+        sys.exit (1)
+
+
+if __name__ == '__main__':
+    driver (sys.argv[1:])
