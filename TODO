@@ -1,0 +1,6 @@
+update pg2eps to not have mir-specific commens
+exec bits on some pylibs
+rename ataglue
+remove uvasimg
+quickutilsify everything
+qu: mass git repo update script
