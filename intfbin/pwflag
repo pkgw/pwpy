@@ -1,0 +1,3 @@
+#! /bin/sh
+# Execute uvflag with some standard defaults
+exec mirargmerge uvflag flagval=f +noquery "$@"

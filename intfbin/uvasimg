@@ -1,0 +1,162 @@
+#! /usr/bin/env python
+# -*- python -*-
+
+"""= uvasimg - Render UV data as an image
+& pkgw
+: UV analysis
++
+ UVASIMG renders UV data as an image to the DS9 image viewer. When run,
+ it opens a small control window that allows you to display the complex
+ data in different ways (amplitude, phase, real part, imaginary part)
+
+< vis
+
+@ options
+ Multiple options can be specified, separated by commas. Minimum-match
+ is used.
+
+ 'notimes' Do not print out a table mapping row number to observation
+           time.
+--
+"""
+
+import sys
+import numpy as N
+from mirtask import keys, uvdat, util
+import numdisplay
+import gtk
+from numutils import ArrayGrower
+
+# Make sure this works before we bother with anything else
+
+numdisplay.open ()
+
+
+# Args
+
+ks = keys.KeySpec ()
+ks.uvdat ('dsl3', True)
+ks.option ('notimes')
+opts = ks.process ()
+
+
+# Read in the data
+
+prevn = None
+
+for dset, pream, data, flags in uvdat.read ():
+    t = pream[3]
+
+    if prevn is None:
+        prevn = flags.size
+        ag = ArrayGrower (flags.size, dtype=data.dtype)
+        accum = None
+        nacc = 0
+        times = []
+    else:
+        if flags.size != prevn:
+            print >>sys.stderr, 'Error: changing number of channels in selected data'
+            sys.exit (1)
+
+        if t < times[-1]:
+            print >>sys.stderr, 'Warning: time goes backwards in selected data'
+        elif t == times[-1]:
+            print >>sys.stderr, 'Warning: time repeated in selected data'
+
+    flags = flags.astype (N.bool)
+
+    # Could have options for what to do with this.
+    data[N.where (~flags)] = 0.0
+
+    ag.addLine (data)
+    times.append (t)
+
+data = ag.finish ()
+
+if data.size == 0:
+    print >>sys.stderr, 'Error: no data selected'
+    sys.exit (1)
+
+if not opts.notimes:
+    print 'Integration/Time conversion:'
+    for i, t in enumerate (times):
+        print '%10d :' % i, util.jdToFull (t)
+
+
+# Show control window
+
+S_LIN = 0
+S_LOG = 1
+
+class Controller (object):
+    def __init__ (self, data):
+        self.data = data
+        self.curarray = None
+        self.scale = S_LIN
+
+        self.win = win = gtk.Window ()
+
+        vbox = gtk.VBox ()
+        self.win.add (vbox)
+
+        def button (name, func):
+            b = gtk.Button (name)
+            b.connect ('clicked', func)
+            vbox.pack_start (b, True, True, 4)
+
+        button ('Amplitude', self.show_amp)
+        button ('Phase', self.show_pha)
+        button ('Real', self.show_real)
+        button ('Imaginary', self.show_imag)
+        button ('Linear', self.scale_linear)
+        button ('Logarithmic', self.scale_log)
+        button ('Quit', gtk.main_quit)
+
+        win.set_title ('UV Data Visualizer')
+        win.connect ('destroy', gtk.main_quit)
+        win.show_all ()
+
+        self.show_amp (None)
+
+
+    def _show (self, array):
+        if array is not None:
+            self.curarray = array
+        else:
+            array = self.curarray
+
+        if self.scale == S_LIN:
+            transform = lambda x: x
+            offset = 0
+        else:
+            transform = N.log
+            offset = 1
+
+        numdisplay.display (array, transform=transform, offset=offset)
+
+
+    def show_amp (self, button):
+        self._show (N.abs (self.data))
+
+    def show_pha (self, button):
+        self.scale = S_LIN
+        self._show (N.arctan2 (self.data.imag, self.data.real) * 180 / N.pi)
+
+    def show_real (self, button):
+        self.scale = S_LIN
+        self._show (self.data.real)
+
+    def show_imag (self, button):
+        self.scale = S_LIN
+        self._show (self.data.imag)
+
+    def scale_linear (self, button):
+        self.scale = S_LIN
+        self._show (None)
+
+    def scale_log (self, button):
+        self.scale = S_LOG
+        self._show (None)
+
+c = Controller (data)
+gtk.main ()

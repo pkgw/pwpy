@@ -1,0 +1,56 @@
+#! /usr/bin/env python
+# -*- mode: python; coding: utf-8 -*-
+
+# FIXME: no checking that the images are of the same field, etc!
+# Maybe use casac and tb.copy() instead of pyrap.tables and shutil.copytree?
+
+import sys, os.path, shutil, pyrap.tables
+
+mean = '-m' in sys.argv
+if mean:
+    sys.argv.remove ('-m')
+
+if len (sys.argv) < 2:
+    print >>sys.stderr, 'Usage: msimgadd [-m] <input images...> <output image>'
+    sys.exit (1)
+
+inputs = sys.argv[1:-1]
+output = sys.argv[-1]
+
+if os.path.exists (output):
+    print >>sys.stderr, 'msimgadd: error: output “%s” already exists' % output
+    sys.exit (1)
+
+shutil.copytree (inputs[0], output)
+outtab = pyrap.tables.table (output, readonly=False, ack=False)
+
+try:
+    try:
+        omap = outtab.getcell ('map', 0)
+
+        for input in inputs[1:]:
+            intab = pyrap.tables.table (input, ack=False)
+            imap = intab.getcell ('map', 0)
+            intab.close ()
+
+            if imap.shape != omap.shape:
+                print >>sys.stderr, ('msimgadd: error: shapes of maps in “%s” (%s) and in “%s” '
+                                     '(%s) disagree' % (output, '×'.join (str (x) for x in omap.shape),
+                                                        input, '×'.join (str (x) for x in imap.shape)))
+                sys.exit (1)
+
+            omap += imap
+
+        if mean:
+            omap /= len (inputs)
+
+        outtab.putcell ('map', 0, omap)
+    finally:
+        outtab.close ()
+except:
+    try:
+        shutil.rmtree (output)
+    except Exception, e:
+        print >>sys.stderr, 'msimgadd: error deleting output “%s”: %s' % (output, e)
+
+sys.exit (0)

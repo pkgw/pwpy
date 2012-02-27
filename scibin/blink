@@ -1,0 +1,97 @@
+#! /usr/bin/env python
+
+"""
+blink [-f] [-m] <image1> <image2> [...]
+
+Cycle between two or more images in an interactive graphical
+display. Each image must be of precisely the same dimensions, but the
+underlying coordinate systems are ignored. The masks of the images are
+unified; that is, only pixels that are unmasked in every single image
+are shown.
+
+-f -- display the amplitude of the FFT of each image, rather than
+  the raw values
+
+-m -- Normalize each image by its maximum value
+"""
+
+import sys, numpy as N
+import astimage
+from mirtask import util
+
+
+def load (path, fft, maxnorm):
+    img = astimage.open (path, 'r').simple ()
+    data = img.read (flip=True)
+    toworld = img.toworld
+
+    if fft:
+        data = N.abs (N.fft.ifftshift (N.fft.fft2 (N.fft.fftshift (data.filled (0)))))
+        data = N.ma.MaskedArray (data)
+        toworld = None
+
+    if maxnorm:
+        data /= N.ma.max (data)
+
+    return data, toworld
+
+
+def blink (paths, fft, maxnorm):
+    import ndshow
+
+    images = []
+    toworlds = []
+
+    for p in paths:
+        image, toworld = load (p, fft, maxnorm)
+        images.append (image)
+        toworlds.append (toworld)
+
+    if not len (images):
+        return
+
+    shape = images[0].shape
+    for i, im in enumerate (images[1:]):
+        if im.shape != shape:
+            util.die ('shape of "%s" does not agree with that '
+                      'of "%s"', paths[i+1], paths[0])
+
+    # Merge masks. This is more complicated than you might think
+    # since you can't "or" nomask with itself.
+
+    jointmask = N.ma.nomask
+
+    for i in xrange (len (images)):
+        if jointmask is N.ma.nomask:
+            if images[i].mask is not N.ma.nomask:
+                jointmask = images[i].mask
+        else:
+            N.logical_or (jointmask, images[i].mask, jointmask)
+
+    for im in images:
+        im.mask = jointmask
+
+    ndshow.cycle (images, paths,
+                  toworlds=toworlds, yflip=True)
+
+
+def cmdline (argv):
+    util.checkusage (__doc__, argv, usageifnoargs=True)
+
+    fft = '-f' in argv
+    if fft:
+        argv.remove ('-f')
+
+    maxnorm = '-m' in argv
+    if maxnorm:
+        argv.remove ('-m')
+
+    if len (argv) < 3:
+        util.wrongusage (__doc__, 'at least two image arguments are required')
+
+    blink (argv[1:], fft, maxnorm)
+
+
+if __name__ == '__main__':
+    import sys, mirtask.cliutil
+    cmdline (sys.argv)

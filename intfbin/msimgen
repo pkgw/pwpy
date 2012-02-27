@@ -1,0 +1,361 @@
+#! /usr/bin/env python
+# -*- python -*-
+
+"""
+msimgen [-c] [-tNN] [-mNN] <template image> <sourcelist file|-> <output image>
+
+Given a template CASA-format image, create an image using the source
+information specified in the sourcelist file. By default, the output
+image is a model image, in units if Jy/pixel with no convolution. If
+you want to create model UV data, you can skip the model image step by
+using the new component-list support in "mswpftsub".
+
+-c -- convolve the model source parameters with the restoring beam
+parameters in the template image, and create an output image in
+units of Jy/beam.
+
+-tNN -- initialize the output image to be the template scaled by the
+number NN. Default is 0, i.e., ignore the data in the template image.
+Use -t1 to effectively add or subtract the models from the template.
+
+-mNN -- scale the model values by the number NN when creating the
+output image. Default is 1, i.e., add in the models exactly as
+specified. Use -m-1 to subtract the models from the input.
+
+A source file of "-" indicates that the information should be read
+from standard input. See "mssfextract" or "msmkrandsrc" for ways to
+generate such source lists.
+"""
+
+# Programmer notes:
+"""
+We assume that RA is the last image axis and Dec is the
+second-to-last. There's probably a way to do this better (though not
+necessarily a very clean way).
+"""
+
+import sys, numpy as N
+from mirtask import util
+
+GAUSSMINFLUX = 1e-6 # see fill_gauss
+ASEC2RAD = N.pi / 180 / 3600
+FWHM2SIGMA = 1. / N.sqrt (8 * N.log (2))
+
+
+def raparse (rastr):
+    hr, mn, sec = rastr.split (':')
+    return (int (hr) + int (mn) / 60. + float (sec) / 3600.) * N.pi / 12
+
+
+def decparse (decstr):
+    if decstr[0] != '-':
+        sgn = 1
+    else:
+        sgn = -1
+        decstr = decstr[1:]
+
+    deg, mn, sec = decstr.split (':')
+    return sgn * (int (deg) + int (mn) / 60. +
+                  float (sec) / 3600.) * N.pi / 180
+
+
+def rad2perpix (pix2world, pixelcoords):
+    """Given pixel coordinates and a transform function, return the
+    angular area of a pixel at those coordinates in radians**2. This
+    can vary depending on the map projection."""
+
+    DELTA = 1e-4
+
+    pixelcoords = list (pixelcoords)
+    w1 = pix2world (pixelcoords)
+    pixelcoords[-1] += DELTA
+    pixelcoords[-2] += DELTA
+    w2 = pix2world (pixelcoords)
+
+    dra = w2[-1] - w1[-1]
+    ddec = w2[-2] - w1[-2]
+    return (dra**2 + ddec**2) / (2 * DELTA**2)
+
+
+def convolveGaussians (maj1, min1, pa1, maj2, min2, pa2):
+    # copied from miriad/src/subs/gaupar.for:gaufac()
+    c1 = N.cos (pa1)
+    s1 = N.sin (pa1)
+    c2 = N.cos (pa2)
+    s2 = N.sin (pa2)
+
+    a = (maj1*c1)**2 + (min1*s1)**2 + (maj2*c2)**2 + (min2*s2)**2
+    b = (maj1*s1)**2 + (min1*c1)**2 + (maj2*s2)**2 + (min2*c2)**2
+    g = 2 * ((min1**2 - maj1**2) * s1 * c1 + (min2**2 - maj2**2) * s2 * c2)
+
+    s = a + b
+    t = N.sqrt ((a - b)**2 + g**2)
+    maj3 = N.sqrt (0.5 * (s + t))
+    min3 = N.sqrt (0.5 * (s - t))
+
+    if abs (g) + abs (a - b) == 0:
+        pa3 = 0.
+    else:
+        pa3 = 0.5 * N.arctan2 (-g, a - b)
+
+    # Amplitude of the resulting Gaussian:
+    # f = N.pi / (4 * N.log (2)) * maj1 * min1 * maj2 * min2 \
+    #    / N.sqrt (a * b - 0.25 * g**2)
+
+    return maj3, min3, pa3
+
+
+def fill_point (image, worldcoords, pixelcoords, data, info):
+    # Because we're unresolved, our total flux T in Jy
+    # will be spread out over 1 pixel, so our flux in
+    # Jy/px is also T.
+
+    # Note: we don't do any bounds-checking
+
+    totflux = info[0]
+
+    c = N.floor (pixelcoords).astype (N.int)
+    d1 = pixelcoords[-1] - c[-1]
+    d2 = pixelcoords[-2] - c[-2]
+
+    data[tuple (c)] += totflux * (1 - d1) * (1 - d2)
+    c[-1] += 1
+    data[tuple (c)] += totflux * d1 * (1 - d2)
+    c[-2] += 1
+    data[tuple (c)] += totflux * d1 * d2
+    c[-1] -= 1
+    data[tuple (c)] += totflux * (1 - d1) * d2
+
+
+def fill_gauss (image, worldcoords, pixelcoords, data, info, beaminfo=None):
+    # From our total flux in units of Jy and dimensions in arcsec, we
+    # need to compute our peak flux in units of Jy/px or Jy/bm. The
+    # latter is pretty trivial. The former is also fairly
+    # straightforward because the image coordinate system lets us
+    # convert between pixels and angular units easily,
+
+    # We sidestep some tricky issues about rotation of ra/dec vs
+    # the pixel axis by computing equatorial coordinates for every
+    # pixel that we think is near the source.
+
+    from numpy import (array, ceil, cos, empty, exp, floor, log,
+                       maximum, ones, pi, sin, sqrt, zeros)
+
+    totflux = info[0]
+    smajor = info[1] * ASEC2RAD * FWHM2SIGMA
+    sminor = info[2] * ASEC2RAD * FWHM2SIGMA
+    pa = info[3] * pi / 180
+
+    if beaminfo is None:
+        # Work in units of Jy/pixel
+        srcvol = 2 * pi * smajor * sminor
+        volperpix = rad2perpix (image.toworld, pixelcoords)
+        pkflux = totflux * volperpix / srcvol
+    else:
+        # Work in Jy/bm
+        bmaj, bmin, bpa = beaminfo
+        pkflux = totflux * bmaj * bmin / (info[1] * info[2])
+
+    # Compute effective sigmas in RA and Dec directions, then
+    # figure out about how far out we need to image in pixel space
+    # to do a faithful job of representing the source. This is
+    # parametrized by GAUSSMINFLUX, the approximate minimum Jy/px
+    # flux value that we will compute.
+
+    sra = ((sin (pa) / smajor)**2 + (cos (pa) / sminor)**2)**-0.5
+    sdec = ((cos (pa) / smajor)**2 + (sin (pa) / sminor)**2)**-0.5
+    numsigmatotravel = sqrt (2 * log (abs (pkflux) / GAUSSMINFLUX))
+
+    dra = sra * numsigmatotravel
+    ddec = sdec * numsigmatotravel
+    deltapix = zeros (4) # minus x, minus y, plus x, plus y
+
+    for c1, c2 in zip ((-1, -1, 1, 1), (-1, 1, -1, 1)):
+        worldwork = array (worldcoords)
+        worldwork[-1] += c1 * dra
+        worldwork[-2] += c2 * ddec
+        delta = pixelcoords - array (image.topixel (worldwork))
+        deltapix[0] = min (deltapix[0], delta[-1])
+        deltapix[1] = min (deltapix[1], delta[-2])
+        deltapix[2] = max (deltapix[2], delta[-1])
+        deltapix[3] = max (deltapix[3], delta[-2])
+
+    # Pad out to at least 3 pixels each way
+    coeff = array ([-1, -1, 1, 1])
+    deltapix = coeff * maximum (coeff * deltapix, ones (4) * 3)
+
+    # Transform to absolute pixels and clip to bounds. abspix[2,3] are
+    # offset by one because they only come up in Python range-type
+    # situations.
+
+    abspix = empty (4, dtype=N.int)
+    abspix[0] = max (floor (deltapix[0] + pixelcoords[-1]), 0)
+    abspix[1] = max (floor (deltapix[1] + pixelcoords[-2]), 0)
+    abspix[2] = min (ceil (deltapix[2] + pixelcoords[-1]) + 1,
+                     image.shape ()[-1])
+    abspix[3] = min (ceil (deltapix[3] + pixelcoords[-2]) + 1,
+                     image.shape ()[-2])
+
+    # Compute the Gaussian values, precreating arrays of ra/dec values
+    # of pixels so we can do most of the math vectorially.
+
+    nx = abspix[2] - abspix[0]
+    ny = abspix[3] - abspix[1]
+    ras = empty ((ny, nx))
+    decs = empty ((ny, nx))
+
+    for ypix in xrange (abspix[1], abspix[3]):
+        dy = ypix - abspix[1]
+        pixelcoords[-2] = ypix
+
+        for xpix in xrange (abspix[0], abspix[2]):
+            dx = xpix - abspix[0]
+            pixelcoords[-1] = xpix
+            w = image.toworld (pixelcoords)
+            ras[dy,dx] = w[-1]
+            decs[dy,dx] = w[-2]
+
+    ras -= worldcoords[-1] # -> delta RA
+    decs -= worldcoords[-2] # -> delta dec
+    b = sin (-2 * pa) * (sminor**-2 - smajor**-2)
+    q = -0.5 * ((ras / sra)**2 + b * ras * decs + (decs / sdec)**2)
+    px = pkflux * exp (q)
+
+    # Finally done.
+    data[...,abspix[1]:abspix[3],abspix[0]:abspix[2]] += px
+
+
+def fill_image (srcstream, outpath, convolve=False, tmplscale=0,
+                modelscale=1):
+    import pyrap.images as PI
+
+    oi = PI.image (outpath)
+    # Fill in world coord values of axes we don't care about.
+    worldcoords = oi.toworld (N.zeros (len (oi.shape ())))
+    odata = oi.getdata ()
+    odata *= tmplscale
+
+    beaminfo = None
+
+    if convolve:
+        # Need restoring beam info to know what to convolve with
+        ii = oi.imageinfo ()
+        if 'restoringbeam' not in ii:
+            util.die ('requested to convolve model with restoring beam, '
+                      'but beam info not present in template')
+
+        beaminfo = [0, 0, 0]
+        beaminfo[0] = ii['restoringbeam']['major']['value']
+        beaminfo[1] = ii['restoringbeam']['minor']['value']
+        beaminfo[2] = ii['restoringbeam']['positionangle']['value']
+
+        if ii['restoringbeam']['major']['unit'] != 'arcsec':
+            util.die ('expect restoring beam major axis to be given in arcsec')
+        if ii['restoringbeam']['minor']['unit'] != 'arcsec':
+            util.die ('expect restoring beam minor axis to be given in arcsec')
+        if ii['restoringbeam']['positionangle']['unit'] != 'deg':
+            util.die ('expect restoring beam position angle to be given in degrees')
+
+    for line in srcstream:
+        if line[0] == '#':
+            continue
+
+        a = line.strip ().split ()
+        if not len (a):
+            continue
+
+        kind = a[0]
+
+        worldcoords[-1] = raparse (a[1])
+        worldcoords[-2] = decparse (a[2])
+        pixelcoords = N.asarray (oi.topixel (worldcoords))
+        info = map (float, a[3:])
+
+        info[0] *= modelscale # info[0] always the total flux
+
+        if convolve:
+            if kind == 'point':
+                kind = 'gaussian'
+                info = [info[0]] + beaminfo
+            elif kind == 'gaussian':
+                # major/minor can be arbitrary units as long as they're consistent;
+                # PA must be converted from degrees to radians, and back.
+                info[1:4] = convolveGaussians (info[1], info[2], info[3] * N.pi/180,
+                                               beaminfo[0], beaminfo[1],
+                                               beaminfo[2] * N.pi/180)
+                info[3] *= 180 / N.pi
+            else:
+                util.die ('unhandled source kind "%s"', kind)
+
+        if kind == 'point':
+            fill_point (oi, worldcoords, pixelcoords, odata, info)
+        elif kind == 'gaussian':
+            fill_gauss (oi, worldcoords, pixelcoords, odata, info,
+                        beaminfo=beaminfo)
+        else:
+            util.die ('unhandled source kind "%s"', kind)
+
+    oi.putdata (odata)
+    del oi # ??? how to close?
+
+
+def imgen (inpath, srcstream, outpath, convolve=False, tmplscale=0,
+           modelscale=1):
+    import pyrap.tables as PT, pyrap.images as PI
+
+    PT.tablecopy (inpath, outpath, deep=True)
+    ot = PT.table (outpath, readonly=False, ack=False)
+    if convolve:
+        ot.putkeyword ('units', 'Jy/beam')
+    else:
+        ot.putkeyword ('units', 'Jy/pixel')
+    ot.close ()
+
+    try:
+        fill_image (srcstream, outpath, convolve=convolve,
+                    tmplscale=tmplscale, modelscale=modelscale)
+    except:
+        t, v, tb = sys.exc_info ()
+        PT.tabledelete (outpath, ack=False)
+        raise t, v, tb
+
+
+def cmdline (argv):
+    from os.path import exists
+    util.checkusage (__doc__, argv, usageifnoargs=True)
+
+    convolve = False
+    tmplscale = 0
+    modelscale = 1
+    miscargs = []
+
+    for arg in argv[1:]:
+        if arg == '-c':
+            convolve = True
+        elif arg.startswith ('-t'):
+            tmplscale = float (arg[2:])
+        elif arg.startswith ('-m'):
+            modelscale = float (arg[2:])
+        else:
+            miscargs.append (arg)
+
+    if len (miscargs) != 3:
+        util.wrongusage (__doc__, 'exactly 3 nonoption arguments expected')
+
+    inpath, srcpath, outpath = miscargs
+
+    if exists (outpath):
+        util.die ('output "%s" already exists', outpath)
+
+    if srcpath == '-':
+        srcstream = sys.stdin
+    else:
+        srcstream = open (srcpath)
+
+    imgen (inpath, srcstream, outpath, convolve=convolve,
+           tmplscale=tmplscale, modelscale=modelscale)
+
+
+if __name__ == '__main__':
+    import mirtask.cliutil
+    cmdline (sys.argv)

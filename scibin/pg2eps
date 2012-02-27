@@ -1,0 +1,58 @@
+#! /bin/bash
+#
+# Execute a miriad task, performing correct voodoo to 
+# get its pgplot output to be recorded to an EPS file
+# with user-specified dimensions. Painful to do 
+# correctly, of course.
+
+if [ x"$4" = x ] ; then
+   echo "Usage: $0 output.eps widthPoints heightPoints command...." >&2
+   exit 1
+fi
+
+outfn="$1"
+shift
+width="$1"
+shift
+height="$1"
+shift
+
+wmil=`python -c "print int(round($width * 1000./72))"`
+hmil=`python -c "print int(round($height * 1000./72))"`
+
+if [ $? != 0 ] ; then
+    echo "Error: suspected argument mistake." >&2
+    echo "Usage: $0 output.eps widthPoints heightPoints command..." >&2
+    exit 1
+fi
+
+pstmp=`mktemp pg2eps.XXXXXXXXXX`
+epstmp=`mktemp pg2eps.XXXXXXXXXX`
+
+# Run the miriad command
+
+echo PGPLOT_PS_HOFFSET=0 PGPLOT_PS_VOFFSET=0 \
+PGPLOT_PS_WIDTH=$wmil PGPLOT_PS_HEIGHT=$hmil \
+PGPLOT_PS_BBOX=MAX
+
+PGPLOT_PS_HOFFSET=0 PGPLOT_PS_VOFFSET=0 \
+PGPLOT_PS_WIDTH=$wmil PGPLOT_PS_HEIGHT=$hmil \
+PGPLOT_PS_BBOX=MAX \
+"$@" device="$pstmp/vcps"
+
+# Convert PS to EPS with correct sizing
+
+gs -q -dNOPAUSE -dSAFER -dBATCH -sDEVICE=epswrite \
+ -dDEVICEWIDTHPOINTS=$width -dDEVICEHEIGHTPOINTS=$height \
+ -sOutputFile="$epstmp" -f "$pstmp"
+
+# Now finally rewrite the bounding box to be what we asked for,
+# since there is likely whitespace on the plot boundaries.
+
+sed -e "s/^%%\(.*\)BoundingBox:.*/%%\1BoundingBox: 0 0 $width $height/" \
+ <"$epstmp" >"$outfn"
+
+# Done.
+
+rm -f "$pstmp" "$epstmp"
+exit 0

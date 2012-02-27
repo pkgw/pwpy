@@ -1,0 +1,125 @@
+#! /usr/bin/env python
+# -*- python -*-
+
+"""= atanudgetime - Nudge similar timestamps to be equal
+& pkgw
+: u-v analysis
++
+ ATANUDGETIME adjusts the timestamps in a UV dataset so that
+ similar timestamps become exactly equal. "Similarity" is
+ specified by the "delta" keyword. This adjustment can be
+ useful for datasets that are nearly time-ordered but that
+ tasks such as MFCAL reject due to small-scale timestamp
+ jitter. This can happen in ATA datasets because the timestamps
+ can be derived from two computers whose system clocks may
+ disagree slightly.
+
+ The dataset is read in with optional application of the
+ standard MIRIAD preprocessing features. If two consecutive
+ records have timestamps that differ by less than delta, the
+ second record's timestamp will be set to be exactly equal
+ to the first record's timestamp.
+
+< vis
+ ATANUDGETIME supports multiple input datasets.
+
+@ delta
+ Adjacent timestamps that differ by less than delta will be adjusted
+ to be equal. Delta is measured in seconds. The default value is 0.1.
+ Due to the limitations of representing Julian dates with double-
+ precision floating point numbers, values smaller than ~0.1 ms are
+ not distinguishable. (This task does not use the "ut" UV variable.)
+
+@ out
+ The name of the output dataset. This is identical to the input
+ after application of any preprocessing stages and with timestamps
+ modified as described above.
+
+@ select
+ The standard MIRIAD UV-data selection keyword. For more information,
+ see "mirhelp select".
+
+@ line
+ The standard MIRIAD line selection keyword. For more information,
+ see "mirhelp line".
+
+@ stokes
+ The standard MIRIAD Stokes processing keyword. For more information,
+ see "mirhelp stokes".
+
+@ ref
+ The standard MIRIAD reference line keyword. For more information,
+ see "mirhelp ref".
+
+--
+"""
+
+import sys, numpy as N
+from miriad import *
+from mirtask import keys, util, uvdat, cliutil
+
+SVNID = '$Id$'
+
+banner = util.printBannerSvn ('atanudgetime',
+                              'nudge similar timestamps to be equal', SVNID)
+
+ks = keys.KeySpec ()
+ks.uvdat ('dlsr3')
+ks.keyword ('out', 'f', ' ')
+ks.keyword ('delta', 'd', 0.1)
+args = ks.process ()
+
+if args.out == ' ':
+    util.die ('no output dataset was specified')
+
+delta = args.delta / 86400.
+out = VisData (args.out)
+
+ohandle = out.open ('c')
+ohandle.setPreambleType ('uvw', 'time', 'baseline')
+tprev = None
+savedNPol = 0
+polsVaried = False
+nPol = 0
+doneNPol = False
+
+for ihandle, preamble, data, flags in uvdat.read ():
+    # FIXME: we won't quite correctly handle the case where
+    # multiple input datasets are specified.
+
+    if tprev is None:
+        ihandle.copyItem (ohandle, 'history')
+        linetype = ihandle.getLinetype (astext=True)
+        ihandle.initVarsAsInput (linetype)
+        ohandle.initVarsAsOutput (ihandle, linetype)
+        ohandle.openHistory ()
+        ohandle.writeHistory (banner)
+        ohandle.logInvocation ('ATANUDGETIME')
+        ohandle.closeHistory ()
+
+    time = preamble[3]
+    if tprev is not None:
+        if abs (time - tprev) < delta:
+            preamble[3] = time = tprev
+
+    if nPol == 0:
+        nPol = ihandle.getNPol ()
+        doneNPol = False
+
+    if not doneNPol:
+        if nPol != savedNPol:
+            ohandle.writeVarInt ('npol', nPol)
+            polsVaried = polsVaried or savedNPol != 0
+            savedNPol = nPol
+        doneNPol = True
+
+    ihandle.copyLineVars (ohandle)
+    ohandle.writeVarInt ('pol', ihandle.getPol ())
+    ohandle.write (preamble, data, flags)
+    tprev = time
+    nPol -= 1
+
+if not polsVaried:
+    ohandle.setScalarItem ('npol', N.int32, savedNPol)
+
+ohandle.close ()

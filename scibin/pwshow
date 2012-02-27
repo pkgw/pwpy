@@ -1,0 +1,54 @@
+#! /usr/bin/env python
+# -*- mode: python; coding: utf-8 -*-
+
+"""
+pwshow [-f] <image> [images ...]
+
+Display images interactively, in sequence.
+
+-f -- plot the amplitude of the FFT of the images instead
+"""
+
+import sys, os.path, miriad, ndshow, numpy as N
+import astimage
+from mirtask import util
+
+util.checkusage (__doc__, sys.argv, usageifnoargs=True)
+
+fft = '-f' in sys.argv
+if fft:
+    sys.argv.remove ('-f')
+
+if len (sys.argv) < 2:
+    util.wrongusage (__doc__, 'must provide at least one path')
+
+anyfailures = False
+
+for path in sys.argv[1:]:
+    try:
+        img = astimage.open (path, 'r')
+    except Exception, e:
+        print >>sys.stderr, 'pwshow: can\'t open path “%s”: %s' % (path, e)
+        anyfailures = True
+        continue
+
+    try:
+        img = img.simple ()
+    except Exception, e:
+        print >>sys.stderr, 'pwshow: can\'t treat path “%s” as simple 2D ' \
+            'image: %s' % (path, e)
+        anyfailures = True
+        continue
+        
+    data = img.read (flip=True)
+    toworld = img.toworld
+
+    if fft:
+        data = N.abs (N.fft.ifftshift (N.fft.fft2 (N.fft.fftshift (data))))
+        toworld = None
+
+    ndshow.view (data, title=path + ' — Array Viewer',
+                 toworld=toworld, yflip=True)
+
+if anyfailures:
+    sys.exit (1)

@@ -1,0 +1,204 @@
+#! /usr/bin/env python
+# -*- python -*-
+
+"""
+Compose default task arguments with user-specified
+task arguments and either print the commandline or
+execute the task.
+
+Options to this program (used before task name):
+
+-n - Print a commandline fit for execution but
+     do not execute the task itself.
+-m - If multiple "default" arguments given, execute
+     the task once for each argument, not once with
+     all of the arguments concatenated. Incompatible
+     with -n.
+-dNAME - The keyword to which "default" arguments
+     are assigned.
+-p - Implies "multi" (-m) mode. Prompt for the user
+     to hit enter between executions of the task.
+-r - Implies "multi" (-m) mode. If any keyword values
+     contain the character %, replace them with a number
+     starting at 1 and increasing for each input, and
+     do NOT prompt between inputs. If no keyword values
+     contain %, DO prompt between inputs. Intended for
+     "device=%/xs".
+"""
+
+import os
+from sys import argv, stderr, stdin, exit
+
+mergeOpts = frozenset (('select', 'region'))
+
+# Parse arguments specific to us
+
+if len (argv) == 1:
+    print 'Usage: %s [-n] [-m] [-p] [-r] [-dNAME] taskname [task args...]' % argv[0]
+    exit (1)
+
+printOnly = False
+defaultKW = None
+multi = False
+prompt = False
+replace = False
+
+while len (argv) > 1 and argv[1][0] == '-':
+    if argv[1] == '-n':
+        printOnly = True
+    elif argv[1] == '-m':
+        multi = True
+    elif argv[1] == '-p':
+        prompt = True
+    elif argv[1] == '-r':
+        replace = True
+    elif argv[1].startswith ('-d'):
+        defaultKW = argv[1][2:]
+    else:
+        print >>stderr, 'Error: unknown mirargmerge argument', argv[1]
+        exit (1)
+    del argv[1]
+
+if prompt or replace: multi = True
+
+if multi and printOnly:
+    print >>stderr, 'Error: cannot supply both -n and -m/-p.'
+    exit (1)
+
+# Pick up task name.
+
+task = argv[1]
+
+if '=' in task:
+    print >>stderr, 'Forgot to give task name?'
+    exit (1)
+
+if defaultKW is None:
+    if task.startswith ('uv'):
+        defaultKW = 'vis'
+    elif task.startswith ('smauv'):
+        defaultKW = 'vis'
+    elif task.startswith ('im'):
+        defaultKW = 'in'
+
+# Pick up keywords.
+
+options = {}
+args = {}
+defvals = []
+replaceargs = {}
+
+for arg in argv[2:]:
+    if arg[0] == '+':
+        opts = arg[1:].split (',')
+        for o in opts:
+            options[o] = True
+    elif arg[0] == '-':
+        opts = arg[1:].split (',')
+        for o in opts:
+            options[o] = False
+    elif arg.startswith ('options='):
+        opts = arg[8:].split (',')
+        for o in opts:
+            options[o] = True
+    elif '=' in arg:
+        aname, aval = arg.split ('=', 1)
+        if aname in mergeOpts and aname in args:
+            print >>stderr, 'Warning: not merging keyword', aname
+        if aval == '':
+            if aname in args: del args[aname]
+        elif replace and '%' in aval:
+            replaceargs[aname] = aval
+        else:
+            args[aname] = aval
+    else:
+        if defaultKW is None:
+            print >>stderr, 'Error: non-keyword argument', arg, 'and no assigned default'
+            exit (1)
+        defvals.append (arg)
+
+if multi:
+    if defaultKW in args:
+        defvals = args[defaultKW].split (',') + defvals
+else:
+    if defaultKW in args:
+        args[defaultKW] += ',' + ','.join (defvals)
+    else:
+        args[defaultKW] = ','.join (defvals)
+
+# Generate commandline
+
+cmd = [task]
+
+opts = [i[0] for i in options.iteritems () if i[1]]
+if len (opts) > 0:
+    cmd.append ('options=' + ','.join(opts))
+
+if printOnly: argTmpl = '%s=\'%s\''
+else: argTmpl = '%s=%s'
+
+for nv in args.iteritems ():
+    if multi and nv[0] == defaultKW:
+        continue
+    cmd.append (argTmpl % nv)
+
+# Do whatever.
+
+if printOnly:
+    print ' '.join (cmd)
+    exit (0)
+
+def myexec (cmd):
+    print >>stderr, '+', ' '.join (cmd)
+    try:
+        os.execvp (cmd[0], cmd)
+    except Exception, e:
+        if isinstance (e, OSError) and e.errno == 2:
+            print 'Error: program %s not found in $PATH' % cmd[0]
+        else:
+            print 'Error executing command: %s: %s' % (' '.join (cmd), str (e))
+        exit (1)
+    # Shouldn't be reached
+    exit (2)
+
+if not multi:
+    myexec (cmd)
+
+invocationNum = 1
+
+def makeReplaceArgs ():
+    return ['%s=%s' % (k, v.replace ('%', str (invocationNum))) \
+                for (k, v) in replaceargs.iteritems ()]
+
+
+if len (defvals) < 2:
+    # Got 0 or 1 default values, we can just execute the command.
+    cmd += makeReplaceArgs ()
+    if len (defvals) != 0:
+        cmd.append ('%s=%s' % (defaultKW, defvals[0]))
+    myexec (cmd)
+
+# Got multiple default values, we have to exec several commands.
+# This means we have to fork-n-exec.
+
+if len (replaceargs) > 0:
+    prompt = False
+
+first = True
+
+for dv in defvals:
+    thiscmd = cmd + ['%s=%s' % (defaultKW, dv)] + makeReplaceArgs ()
+    invocationNum += 1
+
+    if prompt and not first:
+        print 'Hit enter to continue: ',
+        stdin.readline ()
+
+    first = False
+
+    pid = os.fork ()
+
+    if pid == 0:
+        myexec (thiscmd)
+    else:
+        os.waitpid (pid, 0)

@@ -1,0 +1,283 @@
+#! /usr/bin/env python
+# -*- python -*-
+
+"""= showgains - show gains
+& pkgw
+: uv Analysis
++
+ showgains.
+
+ Gain values take you from instrument space to "true" space. So an
+ antenna with a large gain amplitude has a low efficiency, and isn't
+ very sensitive -- gain amplitude is inversely proportional to
+ antenna goodness. (Hence the inverseamp Y axis.)
+
+@ vis
+
+@ axis
+
+@ options.
+ Multiple options can be specified, separated by commas. Minimum-match
+ is used.
+
+ 'foo' Bar
+--
+"""
+
+# FIXME: X axis display when X axis is time
+# FIXME: hardcode X/Y as opposed to R/L pols
+
+import sys, numpy as N, omega as O, numutils
+from mirtask import util, readgains
+
+class Holder (object):
+    pass
+
+POL_UNDEF = 0
+POL_P = 1
+POL_Q = 2
+polnames = {POL_UNDEF: 'unknown',
+            POL_P: 'X',
+            POL_Q: 'Y',
+}
+
+# Data sources
+
+sources = {}
+
+def _gains_source (vis):
+    handle = vis.open ('rw')
+    gr = readgains.GainsReader (handle)
+    gr.prep ()
+    incr = gr.nfeeds + gr.ntau
+
+    h = Holder ()
+    h.freq = None
+
+    if gr.nfeeds == 1:
+        for time, gains in gr.readSeq ():
+            h.time = time
+
+            for ant0 in xrange (gr.nants):
+                h.ant = ant0 + 1
+                h.pol = POL_UNDEF
+                h.gain = gains[ant0 * incr]
+                if N.abs (h.gain) > 0.:
+                    yield h
+    elif gr.nfeeds == 2:
+        for time, gains in gr.readSeq ():
+            h.time = time
+
+            for ant0 in xrange (gr.nants):
+                h.ant = ant0 + 1
+                h.pol = POL_P
+                h.gain = gains[ant0 * incr]
+                if N.abs (h.gain) > 0.:
+                    yield h
+                h.pol = POL_Q
+                h.gain = gains[ant0 * incr + 1]
+                if N.abs (h.gain) > 0.:
+                    yield h
+    else:
+        util.die ('unexpected value for "nfeeds": %d', gr.nfeeds)
+
+    handle.close ()
+
+sources['gains'] = _gains_source
+
+def _bpass_source (vis):
+    # FIXME: this is gonna get stupid-slow with a lot of gains
+    handle = vis.open ('rw')
+    nschans, freqs, gains = readgains.readBandpass (handle)
+    handle.close ()
+    nspect = nschans.size
+    nants, nfeeds, nchan = gains.shape
+
+    h = Holder ()
+    h.time = None
+
+    if nfeeds == 1:
+        for ant0 in xrange (nants):
+            for chan in xrange (nchan):
+                h.ant = ant0 + 1
+                h.freq = freqs[chan]
+                h.gain = gains[ant0,0,chan]
+                if N.abs (h.gain) > 0.:
+                    yield h
+    else:
+        for ant0 in xrange (nants):
+            for chan in xrange (nchan):
+                h.ant = ant0 + 1
+                h.freq = freqs[chan]
+                h.pol = POL_P
+                h.gain = gains[ant0,0,chan]
+                if N.abs (h.gain) > 0.:
+                    yield h
+                h.pol = POL_Q
+                h.gain = gains[ant0,1,chan]
+                if N.abs (h.gain) > 0.:
+                    yield h
+
+sources['bpass'] = _bpass_source
+
+
+# X axes
+
+xaxes = {}
+
+xaxes['time'] = ('gains', 'Time',
+                 lambda h: h.time,
+                 lambda h: h.pol,
+                 polnames.__getitem__,
+                 lambda h: h.ant,
+                 lambda a: 'Ant %d' % a)
+xaxes['freq'] = ('bpass', 'Frequency (GHz)',
+                 lambda h: h.freq,
+                 lambda h: h.pol,
+                 polnames.__getitem__,
+                 lambda h: h.ant,
+                 lambda a: 'Ant %d' % a)
+xaxes['antenna'] = ('gains', 'Antenna Number',
+                    lambda h: h.ant,
+                    lambda h: h.pol,
+                    polnames.__getitem__,
+                    lambda h: 'All',
+                    lambda x: x)
+
+
+# Y axes
+
+yaxes = {}
+
+yaxes['real'] = ('Real', lambda h: h.gain.real)
+yaxes['imaginary'] = ('Imaginary', lambda h: h.gain.imag)
+yaxes['amplitude'] = ('Amplitude', lambda h: N.abs (h.gain))
+yaxes['inverseamp'] = ('Inverse Amplitude', lambda h: 1. / N.abs (h.gain))
+yaxes['phase'] = ('Phase (degrees)', lambda h: 180/N.pi * N.arctan2 (h.gain.imag, h.gain.real))
+
+
+# Task
+
+def task (args):
+    from miriad import CalData
+    from mirtask import keys, cliutil
+
+    # Handle arguments
+
+    ks = keys.KeySpec ()
+    ks.keyword ('vis', 'f', ' ')
+    ks.keymatch ('axis', 2, xaxes.keys () + yaxes.keys ())
+    opts = ks.process (args)
+
+    if len (opts.axis) < 1:
+        opts.axis.append ('time')
+    if len (opts.axis) < 2:
+        opts.axis.append ('amplitude')
+
+    xaxis, yaxis = opts.axis
+
+    if xaxis not in xaxes.keys ():
+        util.die ('Axis "%s" is not a valid X axis.')
+    if yaxis not in yaxes.keys ():
+        util.die ('Axis "%s" is not a valid Y axis.')
+
+    if opts.vis == ' ':
+        util.die ('the input dataset must be specified (vis=...)')
+    vis = CalData (opts.vis)
+    if not vis.exists:
+        util.die ('no such input dataset "%s"', vis)
+
+    # Read data
+
+    source, xlabel, xdatum, symkey, symstr, groupkey, groupstr = xaxes[xaxis]
+    ylabel, ydatum = yaxes[yaxis]
+
+    xmin, xmax, ymin, ymax = None, None, None, None
+    bygroup = {}
+    allsyms = set ()
+
+    for info in sources[source] (vis):
+        xval = xdatum (info)
+        yval = ydatum (info)
+        symbol = symkey (info)
+        group = groupkey (info)
+
+        if ymin is None:
+            xmin = xmax = xval
+            ymin = ymax = yval
+        else:
+            xmin = min (xval, xmin)
+            xmax = max (xval, xmax)
+            ymin = min (yval, ymin)
+            ymax = max (yval, ymax)
+
+        bysym = bygroup.get (group)
+        if bysym is None:
+            bysym = bygroup[group] = {}
+
+        allsyms.add (symbol)
+
+        ag = bysym.get (symbol)
+        if ag is None:
+            ag = bysym[symbol] = numutils.ArrayGrower (2)
+
+        ag.add (xval, yval)
+
+    allsyms = sorted (allsyms)
+
+    # Plot
+
+    pg = O.quickPager ([])
+    groups = sorted (bygroup.iterkeys ())
+
+    symdsn = {}
+    for index, symbol in enumerate (allsyms):
+        symdsn[symbol] = index
+
+    for group in groups:
+        bysym = bygroup[group]
+        symbols = sorted (bysym.iterkeys ())
+
+        p = O.RectPlot ()
+
+        for symbol in symbols:
+            ag = bysym[symbol]
+            x, y = ag.finish ().T
+            dsn = symdsn[symbol]
+
+            context = []
+            if len (groups) > 1:
+                context.append (groupstr (group))
+            if len (allsyms) > 1:
+                context.append (symstr (symbol))
+            if len (context) == 0:
+                keytext = None
+            else:
+                keytext = ', '.join (context)
+
+            p.addXY (x, y, keytext, lines=False, rebound=False)
+
+        p.magicAxisPainters ('ltrb')
+        p.rpainter.paintLabels = False
+        p.tpainter.paintLabels = False
+        p.rebound (False, False)
+        dx = N.abs (xmax - xmin) * 0.05
+        if dx == 0:
+            if xmax == 0:
+                dx = 1
+            else:
+                dx = 0.05 * xmax
+        dy = N.abs (ymax - ymin) * 0.05
+        if dy == 0:
+            if ymax == 0:
+                dy = 1
+            else:
+                dy = 0.05 * ymax
+        p.setBounds (xmin - dx, xmax + dx, ymin - dy, ymax + dy)
+        p.setLabels (xlabel, ylabel)
+        pg.send (p)
+
+    pg.done ()
+
+if __name__ == '__main__':
+    task (sys.argv[1:])

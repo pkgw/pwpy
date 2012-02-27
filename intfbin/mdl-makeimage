@@ -1,0 +1,76 @@
+#! /usr/bin/env python
+# -*- python -*-
+
+"""Create a CLEAN component image from a model description file and a
+template image."""
+
+import sys, hashlib, os.path
+import miriad, mirexec
+
+miriad.basicTrace ()
+
+if len (sys.argv) != 4:
+    print >>sys.stderr, 'Usage: %s <model desc file> <template image> <output image>' \
+        % sys.argv[0]
+    sys.exit (1)
+
+descfn = sys.argv[1]
+timg = miriad.ImData (sys.argv[2])
+out = miriad.ImData (sys.argv[3])
+
+if not os.path.exists (descfn):
+    print >>sys.stderr, 'Error: no such model description file', descfn
+    sys.exit (1)
+
+if not timg.exists:
+    print >>sys.stderr, 'Error: no such template image', timg
+    sys.exit (1)
+
+
+# We avoid pointless regeneration of the output dataset if the
+# description file and the template image are identical to what was
+# used to generate the output. This is done by taking the MD5 sum of
+# those inputs and storing it in the output dataset for future
+# reference.
+
+h = hashlib.md5 ()
+h.update (file (descfn).read ())
+h.update (file (timg.path ('header')).read ())
+h.update (file (timg.path ('image')).read ())
+curhash = h.hexdigest ()
+
+if out.exists:
+    try:
+        prevhash = file (out.path ('deschash')).readline ().strip ()
+
+        if prevhash == curhash:
+            sys.exit (0)
+    except StandardError:
+        pass
+
+    out.delete ()
+
+
+# Read in specification
+
+kinds = []
+params = []
+
+for enum, line in enumerate (file (descfn)):
+    a = line.split ('#', 1)[0].strip ().split ()
+    if len (a) == 0:
+        continue
+
+    kinds.append (a[0])
+    params.append (','.join (a[1:]))
+
+
+# Generate the model image and save the hash for the short-circuit
+# step.
+
+t = mirexec.TaskImGen (in_=timg, factor=0, out=out)
+t.object = ','.join (kinds)
+t.spar = ','.join (params)
+t.run () 
+
+print >>file (out.path ('deschash'), 'w'), curhash

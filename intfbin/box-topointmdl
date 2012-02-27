@@ -1,0 +1,60 @@
+#! /usr/bin/env python
+# -*- python -*-
+
+"""Output a textual model description from a "box" file, assuming each
+box corresponds to a point source and using a template image to derive
+fluxes."""
+
+import sys, os.path
+import miriad, mirexec
+
+if len (sys.argv) != 3:
+    print >>sys.stderr, 'Usage: %s <box file> <template image>' \
+        % sys.argv[0]
+    sys.exit (1)
+
+boxfn = sys.argv[1]
+timg = miriad.ImData (sys.argv[2])
+
+if not os.path.exists (boxfn):
+    print >>sys.stderr, 'Error: no such box file', boxfn
+    sys.exit (1)
+
+if not timg.exists:
+    print >>sys.stderr, 'Error: no such template image', timg
+    sys.exit (1)
+
+t = mirexec.TaskImFit (in_=timg, object='point')
+
+for bnum, line in enumerate (file (boxfn)):
+    a = line.split ('#', 1)[0].strip ().split ()
+    if len (a) == 0:
+        continue
+
+    cra, cdec, wra, wdec = map (float, a)
+
+    t.region = 'arcsec,b(%.0f,%.0f,%.0f,%.0f)' % (cra - wra, cdec - wdec, 
+                                                  cra + wra, cdec + wdec)
+    t.spar = '1,%.0f,%.0f' % (cra, cdec)
+    stdout, stderr = t.snarf ()
+    peak = cra = None
+
+    for line in stdout:
+        a = line.strip ().split ()
+
+        if len (a) < 2:
+            continue
+
+        if a[0] == 'Peak' and a[1] == 'value:':
+            peak = float (a[2])
+        elif a[0] == 'Offset' and a[1] == 'Position':
+            cra = float (a[3])
+            cdec = float (a[4])
+
+    if peak is None or cra is None:
+        print >>sys.stderr, 'Error: unable to fit point for box %d:' % (bnum + 1)
+        for l in stdout:
+            print >>sys.stderr, '   ', l
+        sys.exit (1)
+
+    print 'point %.4f %.1f %.1f' % (peak, cra, cdec)

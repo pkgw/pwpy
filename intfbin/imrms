@@ -1,0 +1,4 @@
+#! /bin/bash
+# -*- shell-script -*-
+exec imstat "$@" |tail -n1 |cut -c42-51 |sed -e 's/  *//g'
+

@@ -1,0 +1,113 @@
+#! /usr/bin/env python
+# -*- python -*-
+
+"""Revert datasets copied via "uvlwcp" to match their source datasets.
+
+FIXME: code cut&pasted from uvlwcp to avoid having to set up PYTHONPATH
+stuff.
+"""
+
+import sys, os, shutil, subprocess
+
+def die (fmt, *args):
+    print >>sys.stderr, 'Error:', fmt % args
+    sys.exit (1)
+
+
+def usage ():
+    print """
+Usage: ME <UVDATA> [... <UVDATA>]
+
+Revert datasets created with "uvlwcp" to match their source datasets.
+""".replace ('ME', sys.argv[0])[1:-1] # kill leading/trailing newline
+    sys.exit (1)
+
+
+try:
+    from os.path import relpath
+except ImportError:
+    die ('your Python is too old; no os.path.relpath')
+
+from os.path import isabs, join, exists, isdir, basename, islink
+
+def jexists (*args):
+    return exists (join (*args))
+
+
+def revert (dataset):
+    if not isdir (dataset):
+        die ('argument \"%s\" is not a directory', dataset)
+    if not jexists (dataset, 'visdata'):
+        die ('argument \"%s\" does not appear to be a UV dataset (no \"visdata\" item)', 
+             dataset)
+    if not jexists (dataset, 'lwsource'):
+        die ('dataset \"%s\" does not appear to have been created with '
+             'uvlwcp (no \"lwsource\" item)', dataset)
+
+    # Get location of origin dataset and check validity
+
+    try:
+        # Note that relsrc may be an absolute path here, but everything
+        # we do works regardless of whether relsrc is absolute or relative.
+        relsrc = file (join (dataset, 'lwsource')).read ()[:-1]
+        src = join (dataset, relsrc)
+    except Exception, e:
+        die ('cannot read \"%s\": %s', join (dataset, 'lwsource'), e)
+
+    if not isdir (src):
+        die ('origin dataset \"%s\" for argument \"%s\" does not exist',
+             src, dataset)
+    if not jexists (src, 'visdata'):
+        die ('origin \"%s\" for argument \"%s\" does not appear to be a UV dataset'
+             ' (no \"visdata\" item)', src, dataset)
+
+    # OK, good to go.
+
+    catit = not islink (join (dataset, 'visdata'))
+
+    try:
+        shutil.rmtree (dataset)
+    except Exception, e:
+        die ('cannot delete dataset \"%s\": %s', dataset, e)
+
+    if catit:
+        # It was uvcatted before, so do it again
+        cmd = ['uvcat', 'vis=' + src, 'out=' + dataset]
+        try:
+            subprocess.check_call (cmd)
+        except Exception, e:
+            die ('invocation \"%s\" failed: %s', ' '.join (cmd), e)
+    else:
+        # It was lightweight copied before, so do that.
+        try:
+            os.mkdir (dataset)
+        except Exception, e:
+            die ('creation of directory \"%s\" failed: %s', dataset, e)
+
+        for item in os.listdir (src):
+            if item == 'visdata':
+                try:
+                    os.symlink (join (relsrc, item), join (dataset, item))
+                except Exception, e:
+                    die ('symlink \"%s\" -> \"%s\" failed: %s', join (relsrc, item), 
+                         join (dataset, item), e)
+            else:
+                try:
+                    shutil.copy (join (src, item), join (dataset, item))
+                except Exception, e:
+                    die ('copy \"%s\" -> \"%s\" failed: %s', join (src, item), 
+                         join (dataset, item), e)
+
+        # History entry
+        print >>file (join (dataset, 'history'), 'a'), 'UVLWCP:', src, '->', dataset
+
+    # Reference back so we can revert
+    print >>file (join (dataset, 'lwsource'), 'a'), relsrc
+
+
+if __name__ == '__main__':
+    if len (sys.argv) == 1:
+        usage ()
+    for arg in sys.argv[1:]:
+        revert (arg)
+    sys.exit (0)

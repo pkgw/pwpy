@@ -1,0 +1,39 @@
+#! /usr/bin/env python
+
+"""Convert an sfind logfile into a format suitable for use
+as an overlay file with cgdisp using the olay keyword."""
+
+import sys
+
+if len (sys.argv) != 2:
+    print >>sys.stderr, 'Usage: sfind-to-olay <sfind logfile or ->'
+    sys.exit (1)
+
+if sys.argv[1] == '-':
+    stream = sys.stdin
+else:
+    stream = open (sys.argv[1])
+
+n = 1
+
+for line in stream:
+    if line[0] == '#':
+        continue
+
+    a = line.strip ().split ()
+
+    try:
+        q = a[0].split (':')
+        ra = int (q[0]), int (q[1]), float (q[2])
+        q = a[1].split (':')
+        dec = int (q[0]), int (q[1]), float (q[2])
+        bmaj, bmin, pa = [float (q) for q in a[7:10]]
+    except Exception, e:
+        print >>sys.stderr, 'Error parsing line \"%s\": %s' % (line, e)
+        sys.exit (1)
+
+    print 'oellipse hms dms', n, 'yes', \
+        ra[0], ra[1], ra[2], dec[0], dec[1], dec[2], \
+        bmaj, bmin, pa, \
+        0
+    n += 1

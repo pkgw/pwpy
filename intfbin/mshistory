@@ -1,0 +1,50 @@
+#! /usr/bin/env python
+# -*- mode: python; coding: utf-8 -*-
+
+# The MS HISTORY table definition is bad and specifies a bunch of
+# poorly-differentiated columns. Fortunately only a few of the columns
+# seem to be used in practice (surprise!) although their usage seems
+# to be a bit confused (surprise again!).
+
+import sys, os.path, time, pyrap.tables
+
+if len (sys.argv) == 1:
+    print >>sys.stderr, 'Usage: mshistory <mspath>'
+    sys.exit (1)
+
+path = sys.argv[1]
+t = pyrap.tables.table (os.path.join (path, 'HISTORY'), ack=False)
+
+for i in xrange (t.nrows ()):
+    timeval = t.getcell ('TIME', i)
+    msg = t.getcell ('MESSAGE', i)
+
+    try:
+        # This is a workaround for misimported history tables / CASA's
+        # bad architecture: if you don't set the CLI_COMMAND, you get
+        # an exception about missing arrays.
+        cmd = t.getcell ('CLI_COMMAND', i)
+    except RuntimeError:
+        cmd = []
+
+    if not len (cmd) or (len (cmd) == 1 and not len (cmd[0])):
+        # As another stupid part of the MS API, empty commands are
+        # returned as [''], not [].
+        entry = msg
+    elif not len (msg):
+        entry = ' '.join (cmd)
+    else:
+        entry = msg + '(' + ' '.join (cmd) + ')'
+
+    # Times are stored as seconds since MJD 0.0. The POSIX epoch is JD
+    # 2440587.5, and MJD = JD - 2400000.5, so the POSIX epoch in the
+    # MS standard is 3506716800. In at least some cases (MIRIAD
+    # exports), zero is used to express an unknown time.
+
+    if timeval == 0:
+        tstr = ' ' * 20
+    else:
+        ttup = time.gmtime (timeval - 3506716800)
+        tstr = time.strftime ('%Y-%m-%dT%H:%M:%SZ', ttup)
+        
+    print tstr, entry

@@ -1,0 +1,143 @@
+#! /usr/bin/env python
+
+"""= byant -- blah
+& pkgw
+: Tools
++
+
+--
+"""
+
+import sys
+import numpy as N
+import omega
+from numutils import ArrayGrower, AccDict
+from mirtask import uvdat, keys, util
+
+# The things we can plot. I believe that Python lambda functions
+# have smaller invocation overheads than full-fledged functions,
+# so use those whenever possible for speed.
+
+_uvd = lambda inp, preamble, datum: \
+    0.001 * N.sqrt (preamble[0]**2 + preamble[1]**2)
+
+_u = lambda a1, a2, inp, preamble, datum: 0.001 * preamble[0]
+_v = lambda a1, a2, inp, preamble, datum: 0.001 * preamble[1]
+_w = lambda inp, preamble, datum: 0.001 * preamble[2]
+
+_ti = lambda inp, preamble, datum: preamble[3]
+
+_dtime = lambda inp, preamble, datum: ((preamble[3] - 0.5) % 1.0) * 24
+
+_ph = lambda theant, otherant, inp, preamble, datum: \
+    N.arctan2 (datum.imag, datum.real) * 180 / N.pi
+
+_amp = lambda inp, preamble, datum: N.abs (datum)
+
+_re = lambda inp, preamble, datum: datum.real
+
+_im = lambda theant, otherant, inp, preamble, datum: datum.imag
+
+_partner = lambda theant, otherant, inp, preamble, datum: otherant
+
+funcs = { 'uvdistance': (_uvd, False),
+          'uu': (_u, True),
+          'vv': (_v, True),
+          'ww': (_w, False),
+          'phase': (_ph, True), # antdep because BL ordering affects sign
+          'amplitude': (_amp, False),
+          'real': (_re, False),
+          'imaginary': (_im, True), # same as phase
+          'time': (_ti, False),
+          'dtime': (_dtime, False),
+          'partner': (_partner, True) }
+
+# Process args
+
+ks = keys.KeySpec ()
+ks.keyword ('only', 'i', -1)
+ks.keyword ('odest', 'a', ' ')
+ks.keymatch ('axis', 2, funcs.keys ())
+ks.uvdat ('dsl3', True)
+opts = ks.process ()
+
+if len (opts.axis) < 1:
+    opts.axis.append ('uvdistance')
+if len (opts.axis) < 2:
+    opts.axis.append ('phase')
+
+xaxis, yaxis = opts.axis
+xfunc, xantdep = funcs[xaxis]
+yfunc, yantdep = funcs[yaxis]
+
+only = opts.only
+
+# Load data
+
+def _cr ():
+    return ArrayGrower (2, N.float)
+
+def _acc (ga, tup):
+    ga.add (tup[0], tup[1])
+    
+byAp = AccDict (_cr, _acc)
+
+for dIn, p, d, f in uvdat.read ():
+    # Average down this visibility
+
+    w = N.where (f)
+    nok = len (w[0])
+    if nok == 0: continue
+
+    d = d[w].sum () / nok
+    
+    # Collect data
+    
+    bp = util.mir2bp (dIn, p)
+
+    if not xantdep: x = xfunc (dIn, p, d)
+    if not yantdep: y = yfunc (dIn, p, d)
+
+    if only > 0:
+        if only in bp:
+            if only == bp[0]: 
+                other = bp[1]
+            else:
+                other = bp[0]
+                d = d.conj ()
+            
+            if xantdep: x = xfunc (only, other, dIn, p, d)
+            if yantdep: y = yfunc (only, other, dIn, p, d)
+            byAp.accum (only, (x, y))
+    else:
+        if xantdep: x = xfunc (bp[0], bp[1], dIn, p, d)
+        if yantdep: y = yfunc (bp[0], bp[1], dIn, p, d)
+        byAp.accum (bp[0], (x, y))
+    
+        if bp[1] != bp[0]:
+            if xantdep: x = xfunc (bp[1], bp[0], dIn, p, d.conj ())
+            if yantdep: y = yfunc (bp[1], bp[0], dIn, p, d.conj ())
+            byAp.accum (bp[1], (x, y))
+    
+# Plot it
+
+saps = sorted (byAp.iterkeys ())
+
+if opts.odest == ' ':
+    pg = omega.makeDisplayPager ()
+else:
+    pg = omega.makePager (opts.odest, mustPage=True)
+
+for ap in saps:
+    arr = byAp[ap].finish ()
+
+    p = omega.quickXY (arr[:,0], arr[:,1], 'Antpol %s' % util.fmtAP (ap), lines=False,
+                       nudgex=False, nudgey=False)
+    p.setLabels (xaxis, yaxis)
+
+    try:
+        p.sendTo (pg)
+    except KeyboardInterrupt:
+        break
+
+pg.done ()

@@ -1,0 +1,312 @@
+#! /usr/bin/env python
+# -*- python -*-
+#
+# Quickly image UV datasets, deconvolving with CLEAN.
+
+'''
+qimage [keyword=|options=|filename|...]
+
+Each argument can be one of:
+
+  keyword=value1[,value2,...] Set a keyword
+  options=opt1[,opt2,...]     Turn on options. Minimum match allowed.
+  +opt1[,opt2,...]            Alternative syntax for the above
+  -opt1[,opt2,...]            Turn off options
+  filename                    Name an input visibility datasets
+                              (Limited to not starting with + or -
+                               and not containing an equals sign.)
+
+Running \'qimage file1 file2 ... fileN\' will execute:
+
+  invert vis=file1,file2,...,fileN map=file1.mp beam=file1.bm
+  clean map=file1.mp beam=file1.bm out=file1.cl
+  restor map=file1.mp beam=file1.bm model=file1.cl out=file1.rm
+  restor map=file1.mp beam=file1.bm model=file1.cl out=file1.rr mode=resid
+
+qimage pays attention to the modification times of its input and output
+files and by default will SKIP a step if all of the step\'s outputs are
+newer than its inputs. This can be overridden with the \'force\' option.
+
+Any keyword or option given to qimage will be sent to the appropriate
+task; one of INVERT, CLEAN, or RESTOR. qimage supports a few custom
+keywords and options:
+
+  outbase=BASE - Instead of creating file1.mp, etc, create BASE.mp, etc.
+  +force       - Run all imaging steps, ignoring modification times.
+'''
+
+import sys
+import miriad
+from miriad import VisData
+from mirexec import TaskInvert, TaskClean, TaskRestore, TaskFailError
+from mirtask.util import die, checkusage, wrongusage
+
+def _trace (cmd):
+    print '+ %s' % (' '.join (cmd))
+
+miriad.launchTrace = _trace
+
+# The actual stuff done by this program is extremely simple.
+# All of the complexity is in the nice argument handling.
+
+class ArgHandler (object):
+    def __init__ (self, task, arg):
+        self.task = task
+        self.arg = arg
+        self.tname = task._name
+
+    def format (self, exposed_name):
+        if exposed_name == self.arg:
+            return '%10s (%s)' % (self.arg, self.tname)
+
+        return '%10s (%s, %s)' % (exposed_name, self.tname, self.arg)
+
+    def __call__ (self, v):
+        raise NotImplementedError ()
+
+    
+class ArgSetter (ArgHandler):
+    def __call__ (self, values):
+        setattr (self.task, self.arg, values)
+
+
+class ArgAppender (ArgHandler):
+    def __call__ (self, values):
+        a = getattr (self.task, self.arg)
+        a += values
+
+
+class OptSetter (ArgHandler):
+    def __call__ (self, state):
+        setattr (self.task, self.arg, state)
+
+
+class QuickImager (object):
+    # Allows use of ArgSetter with self
+    _name = 'qimage'
+
+    def __init__ (self):
+        self.invert = TaskInvert ()
+        self.clean = TaskClean ()
+        self.restore = TaskRestore ()
+
+        self.argTable = {}
+        self.optTable = {}
+        self.minMatch = {}
+
+        self.force = False
+        self.outbase = None
+        self.vis = []
+
+
+    def _addArg (self, arg, setter):
+        if arg in self.argTable:
+            die ('internal bug: duplicated keyword %s', arg)
+
+        self.argTable[arg] = setter
+        
+
+    def _addOpt (self, opt, setter):
+        if opt in self.optTable:
+            die ('internal bug: duplicated option %s', opt)
+
+        self.optTable[opt] = setter
+
+
+    def initTables (self):
+        # Construct tables for directing arguments to their
+        # proper tasks.
+
+        skipArgs = set (('map', 'beam', 'model', 'out', 'vis', 'mode', 'fwhm'))
+
+        for task in (self.invert, self.clean, self.restore):
+            for arg in task._keywords:
+                if arg in skipArgs: continue
+                self._addArg (arg, ArgSetter (task, arg))
+
+            for opt in task._options or []:
+                self._addOpt (opt, OptSetter (task, opt))
+
+
+        self._addArg ('outbase', ArgSetter (self, 'outbase'))
+        self._addArg ('vis', ArgAppender (self, 'vis'))
+        self._addOpt ('force', OptSetter (self, 'force'))
+        # RESTOR has a mode option as well, but we set it internally
+        # so we don't expose it to the user
+        self._addArg ('imode', ArgSetter (self.invert, 'mode'))
+        self._addArg ('cmode', ArgSetter (self.clean, 'mode'))
+        self._addArg ('ifwhm', ArgSetter (self.invert, 'fwhm'))
+        self._addArg ('rfwhm', ArgSetter (self.restore, 'fwhm'))
+
+        # Now construct a minimum-match table for the option names
+
+        sopts = sorted (self.optTable.iterkeys ())
+
+        def minDistinguishIndex (s1, s2):
+            l1 = len (s1)
+            l2 = len (s2)
+
+            if l1 == 0 or l2 == 0:
+                return 1
+
+            lmin = min (l1, l2)
+
+            i = 0
+            for i in xrange (lmin):
+                if s1[i] != s2[i]:
+                    break
+
+            return i + 1
+
+        for i in xrange (len (sopts)):
+            opt = sopts[i]
+            
+            if i == 0:
+                imin = 1
+            else:
+                imin = minDistinguishIndex (opt, sopts[i-1])
+
+            if i < len (sopts) - 1:
+                imin = max (imin, minDistinguishIndex (opt, sopts[i+1]))
+
+            self.minMatch[opt[:imin]] = opt
+            
+
+    def _normalizeOpt (self, opt):
+        for minname, fullname in self.minMatch.iteritems ():
+            if opt.startswith (minname) and fullname.startswith (opt):
+                return fullname
+
+        wrongusage (__doc__, 'unknown option "%s"', opt)
+
+
+    def extrausage (self):
+        s = '\nAll of the supported keywords are:\n'
+
+        for arg in sorted (self.argTable.iterkeys ()):
+            s += '  ' + self.argTable[arg].format (arg) + '\n'
+
+        s += '\nAll of the supported options are:\n'
+
+        for opt in sorted (self.optTable.iterkeys ()):
+            s += '  ' + self.optTable[opt].format (opt) + '\n'
+
+        return s
+
+
+    def parseArgs (self, args):
+        for arg in args:
+            if arg[0] == '+':
+                for opt in arg[1:].split (','):
+                    opt = self._normalizeOpt (opt)
+                    self.optTable[opt] (True)
+            elif arg[0] == '-':
+                for opt in arg[1:].split (','):
+                    opt = self._normalizeOpt (opt)
+                    self.optTable[opt] (False)
+            elif arg.startswith ('options='):
+                for opt in arg[8:].split (','):
+                    opt = self._normalizeOpt (opt)
+                    self.optTable[opt] (True)
+            elif '=' in arg:
+                kw, vals = arg.split ('=', 1)
+                vals = vals.split (',')
+
+                if kw not in self.argTable:
+                    wrongusage (__doc__, 'unknown keyword "%s"', kw)
+
+                if len (vals) == 1:
+                    vals = vals[0]
+
+                self.argTable[kw] (vals)
+            else:
+                self.argTable['vis'] ([arg])
+
+        if len (self.vis) == 0:
+            wrongusage (__doc__, 'no input UV files specified')
+
+        if self.outbase is None:
+            self.outbase = self.vis[0]
+
+        for v in self.vis:
+            if not VisData (v).exists:
+                die ('input %s does not exist', v)
+
+
+    def run (self):
+        if isinstance (self.invert.stokes, basestring):
+            self.invert.stokes = [self.invert.stokes]
+
+        if self.invert.stokes is None or len (self.invert.stokes) == 0:
+            stokes = ['ii']
+        else:
+            stokes = self.invert.stokes
+
+        vis = [VisData (v) for v in self.vis]
+
+        vtime = 0
+        for v in vis:
+            vtime = max (vtime, v.mtime)
+
+        if len (stokes) == 1:
+            mapinfo = [(stokes[0], VisData (self.outbase + '.mp'))]
+        else:
+            mapinfo = [(p, VisData (self.outbase + '.%s.mp' % p)) for p in stokes]
+
+        maptime = 0
+        for pol, mp in mapinfo:
+            maptime = max (maptime, mp.umtime)
+
+        bm = VisData (self.outbase + '.bm')
+
+        if self.force or vtime > maptime or vtime > bm.umtime:
+            bm.delete ()
+            for pol, mp in mapinfo:
+                mp.delete ()
+
+            t = self.invert
+            t.set (vis=','.join (self.vis),
+                   map=','.join (str (t[1]) for t in mapinfo),
+                   beam=bm, xint=True).run ()
+
+        for pol, mp in mapinfo:
+            if len (stokes) == 1:
+                cl = VisData (self.outbase + '.cl')
+                rm = VisData (self.outbase + '.rm')
+                rr = VisData (self.outbase + '.rr')
+            else:
+                cl = VisData (self.outbase + '.%s.cl' % pol)
+                rm = VisData (self.outbase + '.%s.rm' % pol)
+                rr = VisData (self.outbase + '.%s.rr' % pol)
+
+            if self.force or mp.mtime > cl.umtime or bm.mtime > cl.umtime:
+                cl.delete ()
+
+                self.clean.set (map=mp, beam=bm, out=cl, xint=True).run ()
+
+            if self.force or (cl.mtime > rm.umtime or mp.mtime > rm.mtime or
+                              bm.mtime > rm.umtime):
+                rm.delete ()
+
+                self.restore.set (map=mp, beam=bm, model=cl, out=rm, 
+                                  mode='clean').run ()
+
+            if self.force or (cl.mtime > rr.umtime or mp.mtime > rr.mtime or
+                              bm.mtime > rr.umtime):
+                rr.delete ()
+
+                self.restore.set (map=mp, beam=bm, model=cl, out=rr,
+                                  mode='residual').run ()
+
+
+q = QuickImager ()
+q.initTables ()
+__doc__ += q.extrausage ()
+checkusage (__doc__, usageifnoargs=True)
+q.parseArgs (sys.argv[1:])
+
+try:
+    q.run ()
+except TaskFailError:
+    # Error message will have been printed by the task
+    sys.exit (1)

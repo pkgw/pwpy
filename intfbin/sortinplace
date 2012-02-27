@@ -1,0 +1,12 @@
+#! /bin/sh
+#
+# 'uvsort' datasest in-place, by moving their current incarnations
+# to {basename}.presort
+
+set -e
+set -x
+
+for vis in "$@" ; do
+    mv "$vis" "$vis".presort
+    uvsort vis="$vis".presort out="$vis"
+done

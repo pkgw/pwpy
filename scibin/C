@@ -1,0 +1,21 @@
+#! /bin/sh
+#
+# Utility that splices its arguments together into
+# one comma-separated string, for use with various
+# MIRIAD-related programs that like their arguments
+# in this format
+
+a=
+first=true
+
+while [ $# -gt 0 ] ; do
+    if $first ; then
+	a="$1"
+	first=false
+    else
+	a="$a,$1"
+    fi
+    shift
+done
+
+echo $a

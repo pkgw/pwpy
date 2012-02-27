@@ -1,0 +1,58 @@
+#! /usr/bin/env python
+# -*- python -*-
+
+"""Print out a region specification corresponding to a 'box file'.
+
+Usage: box-region <boxfile>
+
+A 'box file' specifies a list of rectangular regions on the sky.
+The coordinates of the regions are specified ONLY in relative terms;
+it is up to you to determine and keep track of the absolute coordinates
+of the boxes if you care about them.
+
+The point of a 'box file' is to store a definition of a complicated
+region for use with the CLEAN task. This script prints out a MIRIAD
+region specification that can be passed directly to CLEAN:
+
+  clean map=... ... region=$(box-region myfield.box)
+
+The script box-overlay can be used to visualize the boxes defined in
+a box file and the script box-fitpoint can be used to refine the position
+of a box near a pointlike source.
+
+A box file is a line-oriented text file. Any text after a '#' on a line
+is ignored. Any empty line is ignored. All other lines should consist of
+a sequence of four numbers (integer or floating point) defining a single
+box. The numbers are:
+
+  1. Box center RA offset from image center, in arcseconds
+  2. Box center dec offset from image center, in arcseconds
+  3. Box width, in arcseconds
+  4. Box height, in arcseconds
+
+The longitudinal offset and width are specified in coordinate terms, 
+so that:
+
+  - physical box offset = box RA offset * cos (dec)
+  - physical box width = box RA width * cos (dec)
+
+Boxes may overlap. MIRIAD will complain if a box you specify is off
+the edge of the image to which the box is being applied.
+"""
+
+import sys
+
+boxfn = sys.argv[1]
+boxes = ['arcsec']
+
+for line in file (boxfn):
+    a = line.split ('#', 1)[0].strip ().split ()
+    if len (a) == 0:
+        continue
+
+    a = map (float, a)
+    cra, cdec, wra, wdec = a
+    boxes.append ('b(%.0f,%.0f,%.0f,%.0f)' % (cra - wra/2, cdec - wdec/2,
+                                              cra + wra/2, cdec + wdec/2))
+
+print ','.join (boxes)

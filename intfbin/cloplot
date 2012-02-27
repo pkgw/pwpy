@@ -1,0 +1,206 @@
+#! /usr/bin/env python
+# -*- mode: python; coding: utf-8 -*-
+
+"""= cloplot - plot closure quantities
+& pkgw
+: u-v analysis
++
+ Unlike CLOSURE, this won't crash.
+
+< vis
+ CLOPLOT supports multiple input datasets.
+
+@ aps
+
+@ interval
+
+--
+"""
+
+from __future__ import division
+import sys, numpy as N, omega as O
+from miriad import *
+from mirtask import keys, util, uvdat, cliutil
+from numutils import ArrayGrower
+
+SVNID = '$Id$'
+
+banner = util.printBannerSvn ('cloplot',
+                              'plot closure quantities', SVNID)
+
+ks = keys.KeySpec ()
+ks.mkeyword ('aps', 'a', 3)
+ks.keyword ('interval', 'd', 1./60)
+ks.uvdat ('dlsr3')
+args = ks.process ()
+
+if len (args.aps) != 3:
+    util.die ('must specify exactly three antpols to plot (aps=...)')
+
+try:
+    theaps = [util.parseAP (ap) for ap in args.aps]
+except StandardError:
+    util.die ('cannot parse antpol names %s', ','.join (args.aps))
+
+qtydesc = '-'.join (util.fmtAP (ap) for ap in theaps)
+
+if args.interval <= 0:
+    util.die ('illegal averaging interval of %f', args.interval)
+
+interval = args.interval / 24 / 60
+
+magsq = lambda cmplx: cmplx.real**2 + cmplx.imag**2
+normph = lambda ph: ((ph + N.pi) % (2 * N.pi)) - N.pi
+
+class ClosureComputer (object):
+    """This closure computer computes the closure for each dump,
+    and averages those complex values over the integration interval."""
+
+    def __init__ (self, interval, aps):
+        self.interval = interval
+        self.aps = aps
+
+        self.totclowt = self.totwt = 0
+
+        if util.apAnt (aps[1]) < util.apAnt (aps[0]) or \
+                util.apAnt (aps[2]) < util.apAnt (aps[1]):
+            util.die ('for now, triple must be nondecreasing ant number order')
+
+
+    def _dump_done (self, nseen, closure, fracerrsq):
+        if nseen == 3:
+            weight = 1. / (magsq (closure) * fracerrsq) # = variance ** -2
+            self.totclowt += closure * weight
+            self.totwt += weight
+
+        self.startnewdump = True
+
+
+    def _integ_done (self, xval):
+        if self.totwt > 0:
+            closure = self.totclowt / self.totwt
+            err = self.totwt**-0.5
+            phase = N.arctan2 (closure.imag, closure.real)
+            self.ag.add (xval, phase, err / N.abs (closure))
+
+        self.totclowt = 0.
+        self.totwt = 0.
+
+
+    def uvdat (self):
+        interval = self.interval
+        ap1, ap2, ap3 = self.aps
+        bpmatch = frozenset (((ap1, ap2), (ap2, ap3), (ap1, ap3)))
+
+        self.ag = ArrayGrower (3)
+        sets = []
+
+        hprev = None
+        tprev = tmin = tmax = None
+        obsra = None
+        self.startnewdump = True
+
+        for ihandle, preamble, data, flags in uvdat.read ():
+            t = preamble[3]
+
+            if tprev is not None and abs (t - tprev) > 1./86400:
+                self._dump_done (nseen, closure, fracerrsq)
+
+            if tmin is not None and (t - tmin > self.interval or
+                                     tmax - t > self.interval):
+                obsra = ihandle.getVarDouble ('obsra')
+                ha = normph (0.5 * (lstmin + lstmax) - obsra)
+                self._integ_done (ha)
+                tmin = None
+
+            if hprev is None:
+                hprev = ihandle
+                curname = ihandle.path ()
+            elif ihandle is not hprev:
+                data = self.ag.finish ().T
+                if data.size == 0:
+                    print >>sys.stderr, 'Warning: no data collected for', curname
+                else:
+                    sets.append ((curname, data))
+                hprev = ihandle
+                curname = ihandle.path ()
+
+            if self.startnewdump:
+                nseen = fracerrsq = 0
+                closure = 1.
+                self.startnewdump = False
+
+            if tmin is None:
+                tmin = tmax = t
+                lstmin = lstmax = ihandle.getVarDouble ('lst')
+            else:
+                tmin = min (tmin, t)
+                tmax = max (tmax, t)
+                lst = ihandle.getVarDouble ('lst')
+                if lst < lstmin - N.pi:
+                    lst += 2 * N.pi # unwrap lst values so min/max/mean work right
+                lstmin = min (lstmin, lst)
+                lstmax = max (lstmax, lst)
+
+            tprev = t
+
+            bp = util.mir2bp (ihandle, preamble)
+            if bp not in bpmatch:
+                continue
+
+            w = N.where (flags)[0]
+            if w.size == 0:
+                continue
+
+            corr = data[w].mean ()
+            var = ihandle.getVariance () / w.size
+
+            if bp == (ap1, ap3):
+                corr = corr.conj ()
+
+            closure *= corr
+            fracerrsq += var / magsq (corr)
+            nseen += 1
+
+        if tprev is not None:
+            self._dump_done (nseen, closure, fracerrsq)
+            ha = normph (0.5 * (lstmin + lstmax) - obsra)
+            self._integ_done (ha)
+
+            data = self.ag.finish ().T
+            if data.size == 0:
+                print >>sys.stderr, 'Warning: no data collected for', curname
+            else:
+                sets.append ((curname, data))
+
+        return sets
+
+
+cc = ClosureComputer (interval, theaps)
+sets = cc.uvdat ()
+
+if len (sets) == 0:
+    util.die ('no data accumulated')
+
+p = O.RectPlot ()
+
+for fn, data in sets:
+    # high-uncert points can make the plots pretty useless, so filter.
+    # RMS phase of pure noise is about 100 degrees ~= 7/4 radians
+    w = N.where (data[2] < 1.75)[0]
+    if w.size < 1:
+        print >>sys.stderr, 'Warning: no valid data collected for', fn
+        continue
+
+    hangle, phases, uncerts = data[:,w]
+    hours = hangle * 12 / N.pi
+    phases *= 180 / N.pi
+    uncerts *= 180 / N.pi
+
+    print fn, '- RMS closure phase: %.2f° (only useful for pt src)' % \
+        N.sqrt ((phases**2).mean ())
+    print fn, '- median uncert: %.2f°' % N.median (uncerts)
+    p.addXYErr (hours, phases, uncerts, fn + ' - ' + qtydesc,
+                lines=False, nudgex=False)
+
+p.show ()

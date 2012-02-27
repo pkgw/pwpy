@@ -1,0 +1,80 @@
+#! /usr/bin/env python
+
+"""Attempt to check whether an antenna is subject to shadowing by
+plotting autocorrelation amplitude as a function of az and el."""
+
+import sys, numpy as N, omega as O, numutils, miriad
+
+try:
+    azrange = elrange = box = None
+    restargs = []
+    for arg in sys.argv[1:]:
+        if arg.startswith ('azrange='):
+            azrange = map (float, arg[8:].split (','))
+        elif arg.startswith ('elrange='):
+            elrange = map (float, arg[8:].split (','))
+        elif arg.startswith ('box='):
+            box = map (float, arg[4:].split (','))
+        else:
+            restargs.append (arg)
+    ant = int (restargs[0])
+    vises = [miriad.VisData (x) for x in restargs[1:]]
+    assert azrange is None or len (azrange) == 2
+    assert elrange is None or len (elrange) == 2
+    assert box is None or len (box) == 4
+    assert len (vises)
+except Exception:
+    print >>sys.stderr, \
+        'Usage: checkshadow [azrange=min,max] [elrange=min,max] [box=azmin,azmax,elmin,elmax] <antnum> <vises...>'
+    sys.exit (1)
+
+d = numutils.ArrayGrower (3)
+sel = 'ant(%d)(%d),pol(xx,yy)' % (ant, ant)
+
+for vis in vises:
+    nants = None
+    for inp, pream, data, flags in vis.readLowlevel ('3', False, select=sel):
+        if nants is None:
+            nants = inp.getScalar ('nants', 0) # assume this doesn't change
+        az = inp.getVarFloat ('antaz', nants)[ant-1]
+        el = inp.getVarFloat ('antel', nants)[ant-1]
+
+        w = N.where (flags)[0]
+        if not w.size:
+            continue
+
+        am = N.abs (data[w].mean ())
+        if am < 1e-3:
+            continue
+
+        d.add (az, el, am)
+
+az, el, am = d.finish ().T
+
+g = O.layout.Grid (2, 1)
+
+if box is None:
+    g[0] = O.quickXY (az, am, lines=False)
+    g[1] = O.quickXY (el, am, lines=False)
+else:
+    inbox = (az >= box[0]) & (az <= box[1]) & (el >= box[2]) & (el <= box[3])
+    w = N.where (inbox)[0]
+    g[0] = O.quickXY (az[w], am[w], 'In box', lines=False)
+    g[1] = O.quickXY (el[w], am[w], 'In box', lines=False)
+    w = N.where (~inbox)[0]
+    g[0].addXY (az[w], am[w], 'Out of box', lines=False)
+    g[1].addXY (el[w], am[w], 'Out of box', lines=False)
+
+g[0].magicAxisPainters ('ltbr')
+g[0].rpainter.paintLabels = g[0].tpainter.paintLabels = False
+g[0].setLabels ('Azimuth (deg)', 'Amplitude (arb.)')
+if azrange is not None:
+    g[0].setBounds (xmin=azrange[0], xmax=azrange[1])
+
+g[1].magicAxisPainters ('ltbr')
+g[1].rpainter.paintLabels = g[1].tpainter.paintLabels = False
+g[1].setXLabel ('Elevation (deg)')
+if elrange is not None:
+    g[1].setBounds (xmin=elrange[0], xmax=elrange[1])
+
+g.show ()

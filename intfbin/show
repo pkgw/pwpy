@@ -1,0 +1,5 @@
+#! /bin/sh
+#
+# Display an image
+
+exec mirargmerge -p -r -din cgdisp device=1/xs +wedge,full beamtyp=b,l labtyp=arcsec,arcsec "$@"
