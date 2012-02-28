@@ -13,7 +13,6 @@ import sys, os.path
 import cPickle
 import numpy as N
 import scipy.optimize
-import numutils
 from miriad import *
 from mirtask import util, uvdat
 
@@ -22,6 +21,117 @@ __all__ = ('NoiseCal loadNoiseCalExport').split ()
 
 TTOL = 1./1440 # 1 minute
 
+## quickutil: arraygrower vectorgrower
+#- snippet: arraygrower.py
+#- date: 2012 Feb 27
+#- SHA1: 8ae43ac24e7ea0fb6ee2cc1047cab1588433a7ec
+class ArrayGrower (object):
+    __slots__ = 'dtype ncols chunkSize _nextIdx _arr'.split ()
+
+    def __init__ (self, ncols, dtype=None, chunkSize=128):
+        if dtype is None:
+            import numpy as np
+            dtype = np.float
+
+        self.dtype = dtype
+        self.ncols = ncols
+        self.chunkSize = chunkSize
+        self.clear ()
+
+
+    def clear (self):
+        self._nextIdx = 0
+        self._arr = None
+        return self
+
+
+    def __len__ (self):
+        return self._nextIdx
+
+
+    def addLine (self, line):
+        from numpy import asarray, ndarray
+
+        line = asarray (line, dtype=self.dtype)
+        if line.size != self.ncols:
+            raise ValueError ('line is wrong size')
+
+        if self._arr is None:
+            self._arr = ndarray ((self.chunkSize, self.ncols),
+                                 dtype=self.dtype)
+        elif self._arr.shape[0] <= self._nextIdx:
+            self._arr.resize ((self._arr.shape[0] + self.chunkSize,
+                               self.ncols))
+
+        self._arr[self._nextIdx] = line
+        self._nextIdx += 1
+        return self
+
+
+    def add (self, *args):
+        self.addLine (args)
+        return self
+
+
+    def finish (self):
+        if self._arr is None:
+            from numpy import ndarray
+            ret = ndarray ((0, self.ncols), dtype=self.dtype)
+        else:
+            self._arr.resize ((self._nextIdx, self.ncols))
+            ret = self._arr
+
+        self.clear ()
+        return ret
+#- snippet: vectorgrower.py
+#- date: 2012 Feb 27
+#- SHA1: 87dc19e32d84ade4a740dc856d9692fa9be186f7
+class VectorGrower (object):
+    __slots__ = 'dtype chunkSize _nextIdx _vec'.split ()
+
+    def __init__ (self, dtype=None, chunkSize=128):
+        if dtype is None:
+            import numpy
+            dtype = numpy.float
+
+        self.dtype = dtype
+        self.chunkSize = chunkSize
+        self.clear ()
+
+
+    def clear (self):
+        self._nextIdx = 0
+        self._vec = None
+        return self
+
+
+    def __len__ (self):
+        return self._nextIdx
+
+
+    def add (self, val):
+        if self._vec is None:
+            from numpy import ndarray
+            self._vec = ndarray ((self.chunkSize, ), dtype=self.dtype)
+        elif self._vec.size <= self._nextIdx:
+            self._vec.resize ((self._vec.size + self.chunkSize, ))
+
+        self._vec[self._nextIdx] = val
+        self._nextIdx += 1
+        return self
+
+
+    def finish (self):
+        if self._vec is None:
+            from numpy import ndarray
+            ret = ndarray ((0, ), dtype=self.dtype)
+        else:
+            self._vec.resize ((self._nextIdx, ))
+            ret = self._vec
+
+        self.clear ()
+        return ret
+## end
 
 class NoiseCal (object):
     instr = None # the ARF instrument used to take the data
@@ -206,7 +316,7 @@ class NoiseCal (object):
             seenaps.add (ap)
             ag = rarawork.get (ap)
             if ag is None:
-                ag = rarawork[ap] = numutils.ArrayGrower (3)
+                ag = rarawork[ap] = ArrayGrower (3)
 
             # We record w.size as a weight for the RARA measurement,
             # but it's essentially noise-free.
@@ -227,8 +337,8 @@ class NoiseCal (object):
         raras = self.raras
         apidxs = dict ((t[1], t[0]) for t in enumerate (self.saps))
 
-        sqbps = numutils.ArrayGrower (2, dtype=N.int)
-        bpdata = numutils.ArrayGrower (5)
+        sqbps = ArrayGrower (2, dtype=N.int)
+        bpdata = ArrayGrower (5)
         
         nnorara = 0
         seenidxs = set ()
@@ -777,7 +887,7 @@ def tui_checkcal (args):
     if len (toread) < 1:
         util.die ('usage: <vis1> [... visn] [uvdat options]')
 
-    samples = numutils.VectorGrower ()
+    samples = VectorGrower ()
     gen = uvdat.setupAndRead (toread, 'x3', False, **uvdatoptions)
 
     for inp, pream, data, flags in gen:

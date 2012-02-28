@@ -287,12 +287,136 @@ FIXME:
 """
 
 import sys, numpy as N
-from numutils import *
 from miriad import *
 from mirtask import keys, util
 
 __version_info__ = (1, 0)
 SVNID = '$Id$'
+
+## quickutil: arraygrower statsacc
+#- snippet: arraygrower.py
+#- date: 2012 Feb 27
+#- SHA1: 8ae43ac24e7ea0fb6ee2cc1047cab1588433a7ec
+class ArrayGrower (object):
+    __slots__ = 'dtype ncols chunkSize _nextIdx _arr'.split ()
+
+    def __init__ (self, ncols, dtype=None, chunkSize=128):
+        if dtype is None:
+            import numpy as np
+            dtype = np.float
+
+        self.dtype = dtype
+        self.ncols = ncols
+        self.chunkSize = chunkSize
+        self.clear ()
+
+
+    def clear (self):
+        self._nextIdx = 0
+        self._arr = None
+        return self
+
+
+    def __len__ (self):
+        return self._nextIdx
+
+
+    def addLine (self, line):
+        from numpy import asarray, ndarray
+
+        line = asarray (line, dtype=self.dtype)
+        if line.size != self.ncols:
+            raise ValueError ('line is wrong size')
+
+        if self._arr is None:
+            self._arr = ndarray ((self.chunkSize, self.ncols),
+                                 dtype=self.dtype)
+        elif self._arr.shape[0] <= self._nextIdx:
+            self._arr.resize ((self._arr.shape[0] + self.chunkSize,
+                               self.ncols))
+
+        self._arr[self._nextIdx] = line
+        self._nextIdx += 1
+        return self
+
+
+    def add (self, *args):
+        self.addLine (args)
+        return self
+
+
+    def finish (self):
+        if self._arr is None:
+            from numpy import ndarray
+            ret = ndarray ((0, self.ncols), dtype=self.dtype)
+        else:
+            self._arr.resize ((self._nextIdx, self.ncols))
+            ret = self._arr
+
+        self.clear ()
+        return ret
+#- snippet: statsacc.py
+#- date: 2012 Feb 27
+#- SHA1: 37d74dcad853c14a76e2fb627c8f9063d19e9d0c
+class StatsAccumulator (object):
+    # FIXME: I worry about loss of precision when n gets very large:
+    # we'll be adding a tiny number to a large number.  We could
+    # periodically rebalance or something. I'll think about it more if
+    # it's ever actually a problem.
+
+    __slots__ = 'xtot xsqtot n _shape'.split ()
+
+    def __init__ (self, shape=None):
+        self._shape = shape
+        self.clear ()
+
+    def clear (self):
+        if self._shape is None:
+            self.xtot = 0.
+            self.xsqtot = 0.
+        else:
+            from numpy import zeros
+            self.xtot = zeros (self.shape)
+            self.xsqtot = zeros (self.shape)
+
+        self.n = 0
+        return self
+
+    def add (self, x):
+        if self._shape is not None:
+            from numpy import asarray
+            x = asarray (x)
+            if x.shape != self._shape:
+                raise ValueError ('x has wrong shape')
+
+        self.xtot += x
+        self.xsqtot += x**2
+        self.n += 1
+        return self
+
+    def num (self):
+        return self.n
+
+    def mean (self):
+        return self.xtot / self.n
+
+    def rms (self):
+        if self._shape is None:
+            from math import sqrt
+        else:
+            from numpy import sqrt
+        return sqrt (self.xsqtot / self.n)
+
+    def std (self):
+        if self._shape is None:
+            from math import sqrt
+        else:
+            from numpy import sqrt
+        return sqrt (self.var ())
+
+    def var (self):
+        return self.xsqtot/self.n - (self.xtot/self.n)**2
+## end
 
 # Tables
 

@@ -86,11 +86,272 @@
 
 import numpy as N
 from mirtask import keys, util, uvdat
-from numutils import *
 import sys
 
 SVNID = '$Id$'
 SECOND = 1.0 / 3600. / 24.
+
+## quickutil: accdict arraygrower vectorgrower statsacc weightacc
+#- snippet: accdict.py
+#- date: 2012 Feb 27
+#- SHA1: 8864021336ff2d87be433823cc9cca04657862ae
+class AccDict (dict):
+    """An accumulating dictionary.
+
+create = lambda: <new accumulator object>
+accum = lambda a, v: <accumulate v into accumulator a>
+
+e.g.: create = list, accum = lambda l, v: l.append (v)
+"""
+
+    __slots__ = '_create _accum'.split ()
+
+    def __init__ (self, create, accum):
+        self._create = create
+        self._accum = accum
+
+    def accum (self, key, val):
+        entry = self.get (key)
+        if entry is None:
+            self[key] = entry = self._create ()
+
+        self._accum (entry, val)
+        return self
+#- snippet: arraygrower.py
+#- date: 2012 Feb 27
+#- SHA1: 8ae43ac24e7ea0fb6ee2cc1047cab1588433a7ec
+class ArrayGrower (object):
+    __slots__ = 'dtype ncols chunkSize _nextIdx _arr'.split ()
+
+    def __init__ (self, ncols, dtype=None, chunkSize=128):
+        if dtype is None:
+            import numpy as np
+            dtype = np.float
+
+        self.dtype = dtype
+        self.ncols = ncols
+        self.chunkSize = chunkSize
+        self.clear ()
+
+
+    def clear (self):
+        self._nextIdx = 0
+        self._arr = None
+        return self
+
+
+    def __len__ (self):
+        return self._nextIdx
+
+
+    def addLine (self, line):
+        from numpy import asarray, ndarray
+
+        line = asarray (line, dtype=self.dtype)
+        if line.size != self.ncols:
+            raise ValueError ('line is wrong size')
+
+        if self._arr is None:
+            self._arr = ndarray ((self.chunkSize, self.ncols),
+                                 dtype=self.dtype)
+        elif self._arr.shape[0] <= self._nextIdx:
+            self._arr.resize ((self._arr.shape[0] + self.chunkSize,
+                               self.ncols))
+
+        self._arr[self._nextIdx] = line
+        self._nextIdx += 1
+        return self
+
+
+    def add (self, *args):
+        self.addLine (args)
+        return self
+
+
+    def finish (self):
+        if self._arr is None:
+            from numpy import ndarray
+            ret = ndarray ((0, self.ncols), dtype=self.dtype)
+        else:
+            self._arr.resize ((self._nextIdx, self.ncols))
+            ret = self._arr
+
+        self.clear ()
+        return ret
+#- snippet: vectorgrower.py
+#- date: 2012 Feb 27
+#- SHA1: 87dc19e32d84ade4a740dc856d9692fa9be186f7
+class VectorGrower (object):
+    __slots__ = 'dtype chunkSize _nextIdx _vec'.split ()
+
+    def __init__ (self, dtype=None, chunkSize=128):
+        if dtype is None:
+            import numpy
+            dtype = numpy.float
+
+        self.dtype = dtype
+        self.chunkSize = chunkSize
+        self.clear ()
+
+
+    def clear (self):
+        self._nextIdx = 0
+        self._vec = None
+        return self
+
+
+    def __len__ (self):
+        return self._nextIdx
+
+
+    def add (self, val):
+        if self._vec is None:
+            from numpy import ndarray
+            self._vec = ndarray ((self.chunkSize, ), dtype=self.dtype)
+        elif self._vec.size <= self._nextIdx:
+            self._vec.resize ((self._vec.size + self.chunkSize, ))
+
+        self._vec[self._nextIdx] = val
+        self._nextIdx += 1
+        return self
+
+
+    def finish (self):
+        if self._vec is None:
+            from numpy import ndarray
+            ret = ndarray ((0, ), dtype=self.dtype)
+        else:
+            self._vec.resize ((self._nextIdx, ))
+            ret = self._vec
+
+        self.clear ()
+        return ret
+#- snippet: statsacc.py
+#- date: 2012 Feb 27
+#- SHA1: 37d74dcad853c14a76e2fb627c8f9063d19e9d0c
+class StatsAccumulator (object):
+    # FIXME: I worry about loss of precision when n gets very large:
+    # we'll be adding a tiny number to a large number.  We could
+    # periodically rebalance or something. I'll think about it more if
+    # it's ever actually a problem.
+
+    __slots__ = 'xtot xsqtot n _shape'.split ()
+
+    def __init__ (self, shape=None):
+        self._shape = shape
+        self.clear ()
+
+    def clear (self):
+        if self._shape is None:
+            self.xtot = 0.
+            self.xsqtot = 0.
+        else:
+            from numpy import zeros
+            self.xtot = zeros (self.shape)
+            self.xsqtot = zeros (self.shape)
+
+        self.n = 0
+        return self
+
+    def add (self, x):
+        if self._shape is not None:
+            from numpy import asarray
+            x = asarray (x)
+            if x.shape != self._shape:
+                raise ValueError ('x has wrong shape')
+
+        self.xtot += x
+        self.xsqtot += x**2
+        self.n += 1
+        return self
+
+    def num (self):
+        return self.n
+
+    def mean (self):
+        return self.xtot / self.n
+
+    def rms (self):
+        if self._shape is None:
+            from math import sqrt
+        else:
+            from numpy import sqrt
+        return sqrt (self.xsqtot / self.n)
+
+    def std (self):
+        if self._shape is None:
+            from math import sqrt
+        else:
+            from numpy import sqrt
+        return sqrt (self.var ())
+
+    def var (self):
+        return self.xsqtot/self.n - (self.xtot/self.n)**2
+#- snippet: weightacc.py
+#- date: 2012 Feb 27
+#- SHA1: 47853621ac1518fe8529d3233df4a9124ecb4f1a
+class WeightAccumulator (object):
+    """Standard statistical weighting is wt_i = sigma_i**-2. We don't
+need the 'n' variable to do any stats, but it can be nice to have that
+information."""
+
+    __slots__ = 'xwtot wtot n _shape'.split ()
+
+    def __init__ (self, shape=None):
+        self._shape = shape
+        self.clear ()
+
+    def clear (self):
+        if self._shape is None:
+            self.xwtot = 0.
+            self.wtot = 0.
+        else:
+            from numpy import zeros
+            self.xwtot = zeros (self._shape)
+            self.wtot = zeros (self._shape)
+
+        self.n = 0
+        return self
+
+    def add (self, x, wt):
+        self.xwtot += x * wt
+        self.wtot += wt
+        self.n += 1
+        return self
+
+    def num (self):
+        return self.n
+
+    def wtavg (self, nullval):
+        if self._shape is None:
+            if self.wtot == 0:
+                return nullval
+            return self.xwtot / self.wtot
+
+        # Vectorized case. Trickier.
+        zerowt = (self.wtot == 0)
+        if not zerowt.any ():
+            return self.xwtot / self.wtot
+
+        from numpy import putmask
+        weff = self.wtot.copy ()
+        putmask (weff, zerowt, 1)
+        result = self.xwtot / weff
+        putmask (result, zerowt, nullval)
+        return result
+
+    def var (self):
+        """Assumes wt_i = sigma_i**-2"""
+        return 1. / self.wtot
+
+    def std (self):
+        """Uncertainty of the mean (i.e., scales as ~1/sqrt(n_vals))"""
+        if self._shape is None:
+            from math import sqrt
+        else:
+            from numpy import sqrt
+        return sqrt (self.var ())
+## end
 
 p2p = lambda ap1, ap2: util.bpToPBP32 ((ap1, ap2))
 
@@ -400,7 +661,7 @@ class TripleComputer (ClosureComputer):
 
         if self.relative:
             key = lambda t: t[1] / t[2]
-            tval = lambda t: (t[0], t[1].wtavg (), t[1].std (),
+            tval = lambda t: (t[0], t[1].wtavg (0), t[1].std (),
                               t[1].num ())
         else:
             key = lambda t: t[1]

@@ -11,8 +11,96 @@
 import sys
 import numpy as N
 import omega
-from numutils import ArrayGrower, AccDict
 from mirtask import uvdat, keys, util
+
+## quickutil: arraygrower accdict
+#- snippet: arraygrower.py
+#- date: 2012 Feb 27
+#- SHA1: 8ae43ac24e7ea0fb6ee2cc1047cab1588433a7ec
+class ArrayGrower (object):
+    __slots__ = 'dtype ncols chunkSize _nextIdx _arr'.split ()
+
+    def __init__ (self, ncols, dtype=None, chunkSize=128):
+        if dtype is None:
+            import numpy as np
+            dtype = np.float
+
+        self.dtype = dtype
+        self.ncols = ncols
+        self.chunkSize = chunkSize
+        self.clear ()
+
+
+    def clear (self):
+        self._nextIdx = 0
+        self._arr = None
+        return self
+
+
+    def __len__ (self):
+        return self._nextIdx
+
+
+    def addLine (self, line):
+        from numpy import asarray, ndarray
+
+        line = asarray (line, dtype=self.dtype)
+        if line.size != self.ncols:
+            raise ValueError ('line is wrong size')
+
+        if self._arr is None:
+            self._arr = ndarray ((self.chunkSize, self.ncols),
+                                 dtype=self.dtype)
+        elif self._arr.shape[0] <= self._nextIdx:
+            self._arr.resize ((self._arr.shape[0] + self.chunkSize,
+                               self.ncols))
+
+        self._arr[self._nextIdx] = line
+        self._nextIdx += 1
+        return self
+
+
+    def add (self, *args):
+        self.addLine (args)
+        return self
+
+
+    def finish (self):
+        if self._arr is None:
+            from numpy import ndarray
+            ret = ndarray ((0, self.ncols), dtype=self.dtype)
+        else:
+            self._arr.resize ((self._nextIdx, self.ncols))
+            ret = self._arr
+
+        self.clear ()
+        return ret
+#- snippet: accdict.py
+#- date: 2012 Feb 27
+#- SHA1: 8864021336ff2d87be433823cc9cca04657862ae
+class AccDict (dict):
+    """An accumulating dictionary.
+
+create = lambda: <new accumulator object>
+accum = lambda a, v: <accumulate v into accumulator a>
+
+e.g.: create = list, accum = lambda l, v: l.append (v)
+"""
+
+    __slots__ = '_create _accum'.split ()
+
+    def __init__ (self, create, accum):
+        self._create = create
+        self._accum = accum
+
+    def accum (self, key, val):
+        entry = self.get (key)
+        if entry is None:
+            self[key] = entry = self._create ()
+
+        self._accum (entry, val)
+        return self
+## end
 
 # The things we can plot. I believe that Python lambda functions
 # have smaller invocation overheads than full-fledged functions,
