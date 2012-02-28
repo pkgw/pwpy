@@ -53,7 +53,7 @@ from mirtask import util
 import numpy as N
 from gpmergepols import merge, DEFAULT_TTOL
 
-SVNID = '$Id$'
+IDENT = '$Id$'
 __version_info__ = (1, 0)
 __all__ = 'dualSelfCal task'.split ()
 
@@ -169,7 +169,7 @@ else:
 # Command-line task interface
 
 def task (args):
-    banner = util.printBannerSvn ('dualscal', 'selfcal polarizations separately', SVNID)
+    banner = util.printBannerGit ('dualscal', 'selfcal polarizations separately', IDENT)
     basicTrace ()
 
     # Define all the arguments 

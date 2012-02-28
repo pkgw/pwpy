@@ -22,7 +22,7 @@ import sys, numpy as N, omega as O
 from miriad import *
 from mirtask import keys, util, uvdat, cliutil
 
-SVNID = '$Id$'
+IDENT = '$Id$'
 
 ## quickutil: arraygrower
 #- snippet: arraygrower.py
@@ -88,8 +88,8 @@ class ArrayGrower (object):
         return ret
 ## end
 
-banner = util.printBannerSvn ('cloplot',
-                              'plot closure quantities', SVNID)
+banner = util.printBannerGit ('cloplot',
+                              'plot closure quantities', IDENT)
 
 ks = keys.KeySpec ()
 ks.mkeyword ('aps', 'a', 3)

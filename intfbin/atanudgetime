@@ -58,10 +58,10 @@ import sys, numpy as N
 from miriad import *
 from mirtask import keys, util, uvdat, cliutil
 
-SVNID = '$Id$'
+IDENT = '$Id$'
 
-banner = util.printBannerSvn ('atanudgetime',
-                              'nudge similar timestamps to be equal', SVNID)
+banner = util.printBannerGit ('atanudgetime',
+                              'nudge similar timestamps to be equal', IDENT)
 
 ks = keys.KeySpec ()
 ks.uvdat ('dlsr3')

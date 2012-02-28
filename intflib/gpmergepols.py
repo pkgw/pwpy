@@ -44,9 +44,9 @@
 import sys, miriad
 import numpy as N
 from mirtask import keys, readgains
-from mirtask.util import printBannerSvn
+from mirtask.util import printBannerGit
 
-SVNID = '$Id$'
+IDENT = '$Id$'
 
 
 class FormatError (StandardError):
@@ -138,8 +138,8 @@ def merge (name1, ds1, name2, ds2, outset, banner, ttol):
 
 
 def task (args):
-    banner = printBannerSvn ('gpmergepols', 'merge gains table for multi-pol data',
-                             SVNID)
+    banner = printBannerGit ('gpmergepols', 'merge gains table for multi-pol data',
+                             IDENT)
 
     # Args
     ks = keys.KeySpec ()

@@ -69,7 +69,7 @@ FIXME: compute weighted center times / time bounds via inttime, etc
 import sys, numpy as N, miriad
 from mirtask import keys, uvdat, util, cliutil
 
-SVNID = '$Id$'
+IDENT = '$Id$'
 __all__ = ['Fluxer']
 
 
@@ -278,7 +278,7 @@ def flushPrint (tMin, tMax, poldata):
 
 
 def task (args=None):
-    banner = util.printBannerSvn ('pwflux', 'calculate flux from UV data', SVNID)
+    banner = util.printBannerGit ('pwflux', 'calculate flux from UV data', IDENT)
 
     ks = keys.KeySpec ()
     ks.keyword ('interval', 'd', 1)

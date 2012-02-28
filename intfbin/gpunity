@@ -15,11 +15,11 @@
 
 import sys, miriad
 from mirtask import keys, readgains
-from mirtask.util import printBannerSvn, checkusage, wrongusage, die
+from mirtask.util import printBannerGit, checkusage, wrongusage, die
 
 checkusage (__doc__)
-SVNID = '$Id$'
-banner = printBannerSvn ('gpunity', 'keep delays but set gains to 1+0j', SVNID)
+IDENT = '$Id$'
+banner = printBannerGit ('gpunity', 'keep delays but set gains to 1+0j', IDENT)
 
 # Get args and check for consistency.
 

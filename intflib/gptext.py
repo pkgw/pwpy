@@ -22,10 +22,10 @@ import numpy as N
 from mirtask import util
 
 
-__all__ = ('SVNID DEFAULT_BANNER BadInfoError GainsInfo task').split ()
+__all__ = ('IDENT DEFAULT_BANNER BadInfoError GainsInfo task').split ()
 
 __version_info__ = (1, 0)
-SVNID = '$Id$'
+IDENT = '$Id$'
 DEFAULT_BANNER = 'PYTHON gptext - foo'
 
 
@@ -254,8 +254,8 @@ def task (args):
     from miriad import CalData
     from mirtask import cliutil, keys
 
-    banner = util.printBannerSvn ('gptext', 'convert gains to and from text',
-                                  SVNID)
+    banner = util.printBannerGit ('gptext', 'convert gains to and from text',
+                                  IDENT)
 
     ks = keys.KeySpec ()
     ks.keyword ('vis', 'f', ' ')

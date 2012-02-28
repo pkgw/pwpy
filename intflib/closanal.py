@@ -88,7 +88,7 @@ import numpy as N
 from mirtask import keys, util, uvdat
 import sys
 
-SVNID = '$Id$'
+IDENT = '$Id$'
 SECOND = 1.0 / 3600. / 24.
 
 ## quickutil: accdict arraygrower vectorgrower statsacc weightacc
@@ -888,8 +888,8 @@ class ClosureProcessor (object):
 # Task functionality
 
 def task (args):
-    banner = util.printBannerSvn ('closanal', 'attempt to identify bad baselines based on '
-                                  'closure quantities', SVNID)
+    banner = util.printBannerGit ('closanal', 'attempt to identify bad baselines based on '
+                                  'closure quantities', IDENT)
 
     ks = keys.KeySpec ()
     ks.keyword ('interval', 'd', 10.)

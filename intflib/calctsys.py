@@ -291,7 +291,7 @@ from miriad import *
 from mirtask import keys, util
 
 __version_info__ = (1, 0)
-SVNID = '$Id$'
+IDENT = '$Id$'
 
 ## quickutil: arraygrower statsacc
 #- snippet: arraygrower.py
@@ -1350,8 +1350,8 @@ def die (s):
 
 
 def taskCalc (args):
-    banner = util.printBannerSvn ('calctsys',
-                                  'compute TSys values from data noise properties', SVNID)
+    banner = util.printBannerGit ('calctsys',
+                                  'compute TSys values from data noise properties', IDENT)
     
     # Keywords and argument checking
 
@@ -1512,8 +1512,8 @@ def taskCalc (args):
 
 
 def taskApply (args):
-    banner = util.printBannerSvn ('applytsys',
-                                  'insert TSys information into UV data', SVNID)
+    banner = util.printBannerGit ('applytsys',
+                                  'insert TSys information into UV data', IDENT)
 
     ks = keys.KeySpec ()
     ks.keyword ('vis', 'f', ' ')

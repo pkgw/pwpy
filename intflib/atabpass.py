@@ -31,7 +31,7 @@ import sys, numpy as N, miriad
 from mirtask import keys, util, uvdat
 from os.path import dirname, join
 
-SVNID = '$Id$'
+IDENT = '$Id$'
 
 
 def getData ():
@@ -56,7 +56,7 @@ def getData ():
 
 
 def task (args):
-    banner = util.printBannerSvn ('atabpass', 'correct for ATA digital filter bandpass', SVNID)
+    banner = util.printBannerGit ('atabpass', 'correct for ATA digital filter bandpass', IDENT)
 
     ks = keys.KeySpec ()
     ks.keyword ('out', 'f', ' ')
