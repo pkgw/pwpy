@@ -1,0 +1,219 @@
+#! /usr/bin/env python
+# -*- mode: python; coding: utf-8 -*-
+
+"""
+iminfo <paths...>
+
+Print basic information about images. Like MIRIAD "imhead" but the
+output is more concise and it works on MIRIAD, FITS, or CASA images.
+
+When multiple images are specified, the information for each image
+will be separated by a blank line, and an extra "path" item will be
+printed out indicating which image the information applies to.
+"""
+
+import sys, astimage, numpy as np
+from astutil import *
+
+def printinfo (path):
+    try:
+        im = astimage.open (path, 'r')
+    except Exception as e:
+        print >>sys.stderr, 'error: can\'t open "%s": %s' % (path, e)
+        return True
+
+    print 'kind     =', im.__class__.__name__
+
+    latcell = loncell = None
+
+    if im.toworld is not None:
+        latax, lonax = im._latlonaxes ()
+        delta = 1e-6
+        p = 0.5 * (np.asfarray (im.shape) - 1)
+        w1 = im.toworld (p)
+        p[latax] += delta
+        w2 = im.toworld (p)
+        latcell = (w2[latax] - w1[latax]) / delta
+        p[latax] -= delta
+        p[lonax] += delta
+        w2 = im.toworld (p)
+        loncell = (w2[lonax] - w1[lonax]) / delta * np.cos (w2[latax])
+
+    if im.pclat is not None:
+        print 'center   =', fmtradec (im.pclon, im.pclat)
+
+    if im.shape is not None:
+        print 'shape    =', ' '.join (str (x) for x in im.shape)
+        npix = 1
+        for x in im.shape:
+            npix *= x
+        print 'npix     =', npix
+
+    if im.axdescs is not None:
+        print 'axdescs  =', ' '.join (x for x in im.axdescs)
+
+    if latcell is not None:
+        print 'ctrcell  = %fʺ × %fʺ # lat, lon' % (latcell * R2A,
+                                                   loncell * R2A)
+
+    if im.bmaj is not None:
+        print 'beam     = %fʺ × %fʺ @ %f°' % (im.bmaj * R2A,
+                                              im.bmin * R2A,
+                                              im.bpa * R2D)
+
+        if latcell is not None:
+            bmrad2 = 2 * np.pi * im.bmaj * im.bmin / (8 * np.log (2))
+            cellrad2 = latcell * loncell
+            print 'ctrbmvol = %f px' % np.abs (bmrad2 / cellrad2)
+
+    if im.units is not None:
+        print 'units    =', im.units
+
+
+def cmdline (argv):
+    checkusage (__doc__, argv, usageifnoargs=True)
+
+    if len (argv) == 2:
+        printinfo (argv[1])
+    else:
+        for i, path in enumerate (argv[1:]):
+            if i > 0:
+                print
+            print 'path     =', path
+            printinfo (path)
+
+
+## quickutil: usage
+#- snippet: usage.py
+#- date: 2012 Feb 27
+#- SHA1: 998596af497009015e3bbda6be6694b9869abaa4
+def showusage (docstring):
+    """Print program usage information and exit.
+
+:arg str docstring: the program help text
+
+This function just prints *docstring* and exits. In most cases, the
+function :func:`checkusage` should be used: it automatically checks
+:data:`sys.argv` for a sole "-h" or "--help" argument and invokes this
+function.
+
+This function is provided in case there are instances where the user
+should get a friendly usage message that :func:`checkusage` doesn't
+catch. It can be contrasted with :func:`wrongusage`, which prints a
+terser usage message and exits with an error code.
+"""
+    print docstring.strip ()
+    raise SystemExit (0)
+
+
+def checkusage (docstring, argv=None, usageifnoargs=False):
+    """Check if the program has been run with a --help argument; if so,
+print usage information and exit.
+
+:arg str docstring: the program help text
+:arg argv: the program arguments; taken as :data:`sys.argv` if
+  given as :const:`None` (the default). (Note that this implies
+  ``argv[0]`` should be the program name and not the first option.)
+:arg bool usageifnoargs: if :const:`True`, usage information will be
+  printed and the program will exit if no command-line arguments are
+  passed. Default is :const:`False`.
+
+This function is intended for small programs launched from the command
+line. The intention is for the program help information to be written
+in its docstring, and then for the preamble to contain something
+like::
+
+  \"\"\"myprogram - this is all the usage help you get\"\"\"
+  import sys
+  ... # other setup
+  checkusage (__doc__)
+  ... # go on with business
+
+If it is determined that usage information should be shown,
+:func:`showusage` is called and the program exits.
+
+See also :func:`wrongusage`.
+"""
+
+    if argv is None:
+        from sys import argv
+
+    if len (argv) == 1 and usageifnoargs:
+        showusage (docstring)
+
+    if len (argv) == 2 and argv[1] in ('-h', '--help'):
+        showusage (docstring)
+
+
+def wrongusage (docstring, *rest):
+    """Print a message indicating invalid command-line arguments and
+exit with an error code.
+
+:arg str docstring: the program help text
+:arg rest: an optional specific error message
+
+This function is intended for small programs launched from the command
+line. The intention is for the program help information to be written
+in its docstring, and then for argument checking to look something
+like this::
+
+  \"\"\"mytask <input> <output>
+
+  Do something to the input to create the output.
+  \"\"\"
+  ...
+  import sys
+  ... # other setup
+  checkusage (__doc__)
+  ... # more setup
+  if len (sys.argv) != 3:
+     wrongusage (__doc__, "expect exactly 2 arguments, not %d",
+                 len (sys.argv))
+
+When called, an error message is printed along with the *first stanza*
+of *docstring*. The program then exits with an error code and a
+suggestion to run the program with a --help argument to see more
+detailed usage information. The "first stanza" of *docstring* is
+defined as everything up until the first blank line, ignoring any
+leading blank lines.
+
+The optional message in *rest* is treated as follows. If *rest* is
+empty, the error message "invalid command-line arguments" is
+printed. If it is a single item, the stringification of that item is
+printed. If it is more than one item, the first item is treated as a
+format string, and it is percent-formatted with the remaining
+values. See the above example.
+
+See also :func:`checkusage` and :func:`showusage`.
+"""
+
+    import sys
+    intext = False
+
+    if len (rest) == 0:
+        detail = 'invalid command-line arguments'
+    elif len (rest) == 1:
+        detail = rest[0]
+    else:
+        detail = rest[0] % tuple (rest[1:])
+
+    print >>sys.stderr, 'error:', detail
+    print >>sys.stderr
+
+    for l in docstring.splitlines ():
+        if intext:
+            if not len (l):
+                break
+            print >>sys.stderr, l
+        elif len (l):
+            intext = True
+            print >>sys.stderr, 'Usage:', l
+    print >>sys.stderr
+
+    print >>sys.stderr, \
+        'Run with a sole argument --help for more detailed usage information.'
+    raise SystemExit (1)
+## end
+
+if __name__ == '__main__':
+    cmdline (sys.argv)

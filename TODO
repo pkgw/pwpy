@@ -1,3 +1,2 @@
 qu: mass git repo update script
-iminfo: switch to astimage
 switch from numpy as N to numpy as np
