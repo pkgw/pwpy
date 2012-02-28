@@ -1,12 +1,15 @@
 #! /bin/bash
 #
-# Execute a miriad task, performing correct voodoo to 
-# get its pgplot output to be recorded to an EPS file
-# with user-specified dimensions. Painful to do 
-# correctly, of course.
+# Execute a MIRIAD task, performing correct voodoo to get its pgplot
+# output to be recorded to an EPS file with user-specified
+# dimensions. Painful to do correctly, of course.
+#
+# The only thing MIRIAD-specific about this is the device=file/vcps
+# argument that's appended to the command to be run.
 
 if [ x"$4" = x ] ; then
-   echo "Usage: $0 output.eps widthPoints heightPoints command...." >&2
+   echo >&2 "Usage: $0 output.eps widthPoints heightPoints command...."
+   echo >&2 "An argument 'device={tmpfile}/vcps' is appended to the command line."
    exit 1
 fi
 
@@ -21,8 +24,8 @@ wmil=`python -c "print int(round($width * 1000./72))"`
 hmil=`python -c "print int(round($height * 1000./72))"`
 
 if [ $? != 0 ] ; then
-    echo "Error: suspected argument mistake." >&2
-    echo "Usage: $0 output.eps widthPoints heightPoints command..." >&2
+    echo >&2 "error: suspected argument mistake."
+    echo >&2 "Usage: $0 output.eps widthPoints heightPoints command..."
     exit 1
 fi
 
@@ -45,14 +48,6 @@ PGPLOT_PS_BBOX=MAX \
 gs -q -dNOPAUSE -dSAFER -dBATCH -sDEVICE=epswrite \
  -dDEVICEWIDTHPOINTS=$width -dDEVICEHEIGHTPOINTS=$height \
  -sOutputFile="$epstmp" -f "$pstmp"
-
-# Now finally rewrite the bounding box to be what we asked for,
-# since there is likely whitespace on the plot boundaries.
-
 sed -e "s/^%%\(.*\)BoundingBox:.*/%%\1BoundingBox: 0 0 $width $height/" \
  <"$epstmp" >"$outfn"
-
-# Done.
-
 rm -f "$pstmp" "$epstmp"
-exit 0
