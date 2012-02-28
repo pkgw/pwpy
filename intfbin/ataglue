@@ -1,5 +1,5 @@
 #! /usr/bin/env python
-"""= ataglue.py - Merge together two ATA half-datasets, accounting for single-item errors.
+"""= ataglue - Merge together two ATA half-datasets, accounting for single-item errors.
 & pkgw
 : Tools
 +
@@ -49,7 +49,7 @@
  integration windows of the two halves are out of phase in this
  situation. It is up to you to decide whether it is appropriate to
  glue together your datasets with a large value of "tol".
- 
+
  ATAGLUE is fairly strict about its inputs and tries to ensure that
  it will never create bad datasets. Running ATAGLUE on raw ATA data
  should always work if it is valid to do so; running it on somewhat-
@@ -60,7 +60,7 @@
  relative to the sky frequency and hence should agree between the two
  datasets. This may indicate a bug in the current datacatcher. The
  coordinates from the half-1 dataset are used in the merged dataset.
- 
+
 @ vis
  Should specify exactly two input sets, with the first being the
  lower-frequency set (fx64a-SRC-FREQ_1) and the second being the
@@ -75,13 +75,13 @@
  seconds. Defaults to 0.1 ms. You may wish to set this to a higher
  value if the system clocks on the two X hosts were not sufficiently
  synchronized. See the discussion above.
- 
+
 @ options
 
  Task enrichment options. Minimum match of names is used.
- 
+
  'flagdc'  Flag the DC channel in all output records.
- 
+
  'badc1'   Flag channels 513 - 769 of antpols 1X, 16X, 19X, 23X,
            and 37X. In some array hookups, these were the antpols
            and channels that were affected by bad C board hardware.
@@ -183,7 +183,7 @@ def write (src, pream):
     dOut.writeVarInt ('pol', pol)
     dOut.writeVarInt ('npol', src.getVarInt ('npol'))
     dOut.writeVarInt ('nspect', 1)
-    dOut.writeVarInt ('nschan', 1024)        
+    dOut.writeVarInt ('nschan', 1024)
     dOut.writeVarInt ('ischan', 1)
     dOut.writeVarDouble ('sfreq', sfreq)
     dOut.writeVarDouble ('sdf', sdf)
@@ -198,7 +198,7 @@ def write (src, pream):
         if bl[0] in badCAnts or bl[1] in badCAnts:
             mFlags[512:768] = 0
             mData[512:768] = 0
-    
+
     dOut.write (pream, mData, mFlags, 1024)
 
 def aligned (first, t1, t2):
@@ -207,7 +207,7 @@ def aligned (first, t1, t2):
         if not first and sanity1.updated () and getConfig (in1) != config1:
             print >>sys.stderr, 'Error: correlator configuration changed in input 1!'
             sys.exit (1)
-                
+
         if not first and sanity2.updated () and getConfig (in2) != config2:
             print >>sys.stderr, 'Error: correlator configuration changed in input 2!'
             sys.exit (1)
@@ -223,7 +223,7 @@ def aligned (first, t1, t2):
         writes[1] += 1
         writes[2] += 1
         write (in1, pream1)
-            
+
         n1 = in1.lowlevelRead (pream1, mData[:512], mFlags[:512], 512)
         n2 = in2.lowlevelRead (pream2, mData[512:], mFlags[512:], 512)
 
@@ -244,7 +244,7 @@ def aligned (first, t1, t2):
         else:
             reads[1] += 1
             reads[2] += 1
-        
+
         t1 = pream1[3]
         t2 = pream2[3]
 
@@ -269,13 +269,13 @@ def catchup (leftIsAhead, expectFinish, first, t1, t2):
     # Scan in the ahead half, write it out half-flagged
     t = ta
     #print 'Catchup starting with', util.jdToFull (t)
-    
+
     while abs (t - ta) < TOL:
         # No important variables changed?
         if not first and sanitya.updated () and getConfig (ahead) != configa:
             print >>sys.stderr, 'Error: correlator configuration changed in ahead input!'
             sys.exit (1)
-                
+
         if leftIsAhead: mFlags[512:].fill (0)
         else: mFlags[:512].fill (0)
 
@@ -289,7 +289,7 @@ def catchup (leftIsAhead, expectFinish, first, t1, t2):
             na = ahead.lowlevelRead (preama, mData[512:], mFlags[512:], 512)
 
         #if expectFinish: print 'Read half-record, got', na
-        
+
         if na == 0:
             if expectFinish:
                 print 'Expected to finish and did'
@@ -308,7 +308,7 @@ def catchup (leftIsAhead, expectFinish, first, t1, t2):
     if expectFinish:
         print >>sys.stderr, 'Error: should have finished but time changed instead!'
         sys.exit (1)
-    
+
     #print 'Exited because got to new timestamp'
     return False
 
@@ -324,21 +324,21 @@ while True:
         assert n1 == 512
         assert n2 == 512
         reads[1] = reads[2] = 1
-        
+
         corrType, corrLen, corrUpd = in1.probeVar ('corr')
         dOut.setCorrelationType (corrType)
 
         sfreq = in1.getVarDouble ('sfreq')
         sdf = in1.getVarDouble ('sdf')
         restfreq = in1.getVarDouble ('restfreq')
-        
+
         config1 = getConfig (in1)
         config2 = getConfig (in2)
 
     t1 = pream1[3]
     t2 = pream2[3]
     print '%s %s:' % (util.jdToFull (t1), util.jdToFull (t2)),
-    
+
     if abs (t1 - t2) < TOL:
         #if prevState == PS_1AHEAD:
         # The two sets are aligned for this chunk. Nice!
@@ -370,7 +370,7 @@ while True:
         print 'Timestamps differ by %g seconds' % ((t1 - t2) * 86400)
         nRight += 1
         catchup (False, False, first, t1, t2)
-    
+
     # We now have the first items for the next pair of runs read in,
     # and are ready to start again.
     first = False

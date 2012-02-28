@@ -1,5 +1,4 @@
 exec bits on some pylibs
-rename ataglue
 remove uvasimg
 quickutilsify everything
 qu: mass git repo update script
