@@ -16,3 +16,14 @@ numstd.py -- import a subset of numpy functions, popaarray(), and rms()
    removed 8861468037ea4db4dfb5939e4c3f118287557d19
 tweaky.py -- plot a function with tunable parameters and see their effect
    removed 8861468037ea4db4dfb5939e4c3f118287557d19
+uvasimg -- view UV data as image; superseded by arf scanalyzer
+  removed 175015f8a340ab04d12e1d9612b137807769c2f7
+gpcat, rtft, varcat, chanaver.py -- superseded by copies in miriad-python/examples
+  4afdf621baa78c7c211e3497ace16d7fb95eaa8b
+BBS -- ATA broadband spectra observing tools
+  353ef5cd65ee03e2fb2f9a17cafddcdb2c4fecec
+pyata -- ATA python observing scripts
+  353ef5cd65ee03e2fb2f9a17cafddcdb2c4fecec
+attenlogcmp.py, pyscan.py, walsh-flags.py, walsh_adc_conflict.sh
+-- various ATA observing helpers I haven't used for a while
+  353ef5cd65ee03e2fb2f9a17cafddcdb2c4fecec
