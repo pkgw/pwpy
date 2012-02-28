@@ -9,7 +9,7 @@ Display images interactively, in sequence.
 -f -- plot the amplitude of the FFT of the images instead
 """
 
-import sys, ndshow, numpy as N, astimage
+import sys, ndshow, numpy as np, astimage
 
 ## quickutil: usage
 #- snippet: usage.py
@@ -174,7 +174,8 @@ for path in sys.argv[1:]:
     toworld = img.toworld
 
     if fft:
-        data = N.abs (N.fft.ifftshift (N.fft.fft2 (N.fft.fftshift (data))))
+        from numpy.fft import ifftshift, fft2, fftshift
+        data = np.abs (ifftshift (fft2 (fftshift (data))))
         toworld = None
 
     ndshow.view (data, title=path + ' — Array Viewer',

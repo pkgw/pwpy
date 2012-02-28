@@ -15,7 +15,7 @@ are shown.
 -m -- Normalize each image by its maximum value
 """
 
-import sys, numpy as N, astimage
+import sys, numpy as np, astimage
 
 ## quickutil: die usage
 #- snippet: die.py
@@ -178,12 +178,13 @@ def load (path, fft, maxnorm):
     toworld = img.toworld
 
     if fft:
-        data = N.abs (N.fft.ifftshift (N.fft.fft2 (N.fft.fftshift (data.filled (0)))))
-        data = N.ma.MaskedArray (data)
+        from numpy.fft import ifftshift, fft2, fftshift
+        data = np.abs (ifftshift (fft2 (fftshift (data.filled (0)))))
+        data = np.ma.MaskedArray (data)
         toworld = None
 
     if maxnorm:
-        data /= N.ma.max (data)
+        data /= np.ma.max (data)
 
     return data, toworld
 
@@ -211,14 +212,14 @@ def blink (paths, fft, maxnorm):
     # Merge masks. This is more complicated than you might think
     # since you can't "or" nomask with itself.
 
-    jointmask = N.ma.nomask
+    jointmask = np.ma.nomask
 
     for i in xrange (len (images)):
-        if jointmask is N.ma.nomask:
-            if images[i].mask is not N.ma.nomask:
+        if jointmask is np.ma.nomask:
+            if images[i].mask is not np.ma.nomask:
                 jointmask = images[i].mask
         else:
-            N.logical_or (jointmask, images[i].mask, jointmask)
+            np.logical_or (jointmask, images[i].mask, jointmask)
 
     for im in images:
         im.mask = jointmask
