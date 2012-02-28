@@ -293,7 +293,7 @@ from mirtask import keys, util
 __version_info__ = (1, 0)
 IDENT = '$Id$'
 
-## quickutil: arraygrower statsacc
+## quickutil: arraygrower statsacc words
 #- snippet: arraygrower.py
 #- date: 2012 Feb 27
 #- SHA1: 8ae43ac24e7ea0fb6ee2cc1047cab1588433a7ec
@@ -416,6 +416,38 @@ class StatsAccumulator (object):
 
     def var (self):
         return self.xsqtot/self.n - (self.xtot/self.n)**2
+#- snippet: words.py
+#- date: 2012 Feb 27
+#- SHA1: c571563028e9cc559c27d6acd98d4d35defe7d4e
+def words (linegen):
+    for line in linegen:
+        a = line.split ('#', 1)[0].strip ().split ()
+        if not len (a):
+            continue
+        yield a
+
+
+def pathwords (path, noexistok=False, **kwargs):
+    try:
+        with open (path, **kwargs) as f:
+            for line in f:
+                a = line.split ('#', 1)[0].strip ().split ()
+                if not len (a):
+                    continue
+                yield a
+    except IOError as e:
+        if e.errno != 2 or not noexistok:
+            raise
+
+
+def pathtext (path, noexistok=False, **kwargs):
+    try:
+        with open (path, **kwargs) as f:
+            for line in f:
+                yield line
+    except IOError as e:
+        if e.errno != 2 or not noexistok:
+            raise
 ## end
 
 # Tables
@@ -979,18 +1011,18 @@ class TextFormatError (StandardError):
 def loadText (fn):
     """Load solution data from the simple textual file format."""
 
-    f = open (fn)
-    a = f.readline ().strip ().split ()
+    first = True
 
-    if a[0] != 'nsol' or len (a) != 2:
-        raise TextFormatError ('file', fn, 'does not appear to contain TSys information')
+    for a in pathwords (fn):
+        if first:
+            if a[0] != 'nsol' or len (a) != 2:
+                raise TextFormatError ('file', fn, 'does not appear to contain TSys information')
 
-    nsol_expected = int (a[1])
-    in_soln = False
-    solutions = []
-
-    for ln in f:
-        a = ln.strip ().split ()
+            nsol_expected = int (a[1])
+            in_soln = False
+            solutions = []
+            first = False
+            continue
 
         if not in_soln:
             if a[0] == 'startsolution':

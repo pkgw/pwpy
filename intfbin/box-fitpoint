@@ -16,6 +16,41 @@ import miriad, mirexec
 
 miriad.basicTrace ()
 
+## quickutil: words
+#- snippet: words.py
+#- date: 2012 Feb 27
+#- SHA1: c571563028e9cc559c27d6acd98d4d35defe7d4e
+def words (linegen):
+    for line in linegen:
+        a = line.split ('#', 1)[0].strip ().split ()
+        if not len (a):
+            continue
+        yield a
+
+
+def pathwords (path, noexistok=False, **kwargs):
+    try:
+        with open (path, **kwargs) as f:
+            for line in f:
+                a = line.split ('#', 1)[0].strip ().split ()
+                if not len (a):
+                    continue
+                yield a
+    except IOError as e:
+        if e.errno != 2 or not noexistok:
+            raise
+
+
+def pathtext (path, noexistok=False, **kwargs):
+    try:
+        with open (path, **kwargs) as f:
+            for line in f:
+                yield line
+    except IOError as e:
+        if e.errno != 2 or not noexistok:
+            raise
+## end
+
 if len (sys.argv) != 4:
     print >>sys.stderr, 'Usage: box-fitpoint <boxfile> <image> <boxnum>'
     sys.exit (1)
@@ -31,11 +66,7 @@ if not img.exists:
 boxi = 1
 boxinfo = None
 
-for line in file (boxfn):
-    a = line.split ('#', 1)[0].strip ().split ()
-    if len (a) == 0:
-        continue
-
+for a in pathwords (boxfn):
     a = map (float, a)
 
     if boxi == boxnum:

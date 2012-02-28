@@ -21,7 +21,7 @@ __all__ = ('NoiseCal loadNoiseCalExport').split ()
 
 TTOL = 1./1440 # 1 minute
 
-## quickutil: arraygrower vectorgrower
+## quickutil: arraygrower vectorgrower words
 #- snippet: arraygrower.py
 #- date: 2012 Feb 27
 #- SHA1: 8ae43ac24e7ea0fb6ee2cc1047cab1588433a7ec
@@ -131,6 +131,38 @@ class VectorGrower (object):
 
         self.clear ()
         return ret
+#- snippet: words.py
+#- date: 2012 Feb 27
+#- SHA1: c571563028e9cc559c27d6acd98d4d35defe7d4e
+def words (linegen):
+    for line in linegen:
+        a = line.split ('#', 1)[0].strip ().split ()
+        if not len (a):
+            continue
+        yield a
+
+
+def pathwords (path, noexistok=False, **kwargs):
+    try:
+        with open (path, **kwargs) as f:
+            for line in f:
+                a = line.split ('#', 1)[0].strip ().split ()
+                if not len (a):
+                    continue
+                yield a
+    except IOError as e:
+        if e.errno != 2 or not noexistok:
+            raise
+
+
+def pathtext (path, noexistok=False, **kwargs):
+    try:
+        with open (path, **kwargs) as f:
+            for line in f:
+                yield line
+    except IOError as e:
+        if e.errno != 2 or not noexistok:
+            raise
 ## end
 
 class NoiseCal (object):
@@ -510,11 +542,7 @@ class NoiseCal (object):
 def loadNoiseCalExport (path):
     byinstr = {}
 
-    for line in open (path):
-        a = line.split ('#', 1)[0].strip ().split ()
-        if len (a) == 0:
-            continue
-
+    for a in pathwords (path):
         instr = a[0]
         ap = util.parseAP (a[1])
         value = float (a[2])

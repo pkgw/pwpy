@@ -29,6 +29,42 @@ IDENT = '$Id$'
 DEFAULT_BANNER = 'PYTHON gptext - foo'
 
 
+## quickutil: words
+#- snippet: words.py
+#- date: 2012 Feb 27
+#- SHA1: c571563028e9cc559c27d6acd98d4d35defe7d4e
+def words (linegen):
+    for line in linegen:
+        a = line.split ('#', 1)[0].strip ().split ()
+        if not len (a):
+            continue
+        yield a
+
+
+def pathwords (path, noexistok=False, **kwargs):
+    try:
+        with open (path, **kwargs) as f:
+            for line in f:
+                a = line.split ('#', 1)[0].strip ().split ()
+                if not len (a):
+                    continue
+                yield a
+    except IOError as e:
+        if e.errno != 2 or not noexistok:
+            raise
+
+
+def pathtext (path, noexistok=False, **kwargs):
+    try:
+        with open (path, **kwargs) as f:
+            for line in f:
+                yield line
+    except IOError as e:
+        if e.errno != 2 or not noexistok:
+            raise
+## end
+
+
 class BadInfoError (Exception):
     def __init__ (self, fmt, *rest):
         self.msg = fmt % rest
@@ -106,11 +142,7 @@ class GainsInfo (object):
         data = []
         curdata = None
 
-        for line in stream:
-            a = line.split ('#', 1)[0].strip ().split ()
-            if not len (a):
-                continue
-
+        for a in words (stream)
             if curdata is None:
                 if a[0] == 'interval':
                     interval = float (a[1])
