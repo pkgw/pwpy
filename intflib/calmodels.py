@@ -1,5 +1,23 @@
 #! /usr/bin/env python
 
+"""
+Usage: python -m calmodels [-f] <source> <freq[mhz]>
+       python -m calmodels [-f] CasA     <freq[mhz]> <year>
+
+Print the flux in Jy of the specified calibrator at the specified
+frequency.
+
+Arguments:
+
+<source> is the source name (e.g., 3c348)
+<freq>   is the observing frequency in MHz (e.g., 1420)
+<year>   is the decimal year of the observation (e.g., 2007.8).
+         Only needed if <source> is CasA.
+-f       activates "flux" mode, where a three-item string is
+         printed that can be passed to MIRIAD tasks that accept a
+         model flux and spectral index argument.
+"""
+
 models = {}
 spindexes = {}
 
@@ -198,36 +216,175 @@ addFromVLAObs ('3c84', 23.9, 23.3)
 # If we're executed as a program, print out a flux given a source
 # name
 
-def _usage ():
-    from sys import stderr, argv
-    
-    print >>stderr, """Usage: %s [-f] <source> <freq> [year]
+## quickutil: usage popoption
+#- snippet: usage.py
+#- date: 2012 Feb 27
+#- SHA1: 998596af497009015e3bbda6be6694b9869abaa4
+def showusage (docstring):
+    """Print program usage information and exit.
 
-Where:
-  <source> is the source name (e.g., 3c348)
-  <freq> is the observing frequency in MHz (e.g., 1420)
-  [year] is the decimal year of the observation (e.g., 2007.8).
-     Only needed if <source> is CasA.
-  [-f] is "flux" mode, which prints out a three-item string
-     that can be passed to MIRIAD tasks that accept a model flux
-     and spectral index argument.
+:arg str docstring: the program help text
 
-Prints the flux in Jy of the specified calibrator at the
-specified frequency.""" % argv[0]
-    return 0
+This function just prints *docstring* and exits. In most cases, the
+function :func:`checkusage` should be used: it automatically checks
+:data:`sys.argv` for a sole "-h" or "--help" argument and invokes this
+function.
+
+This function is provided in case there are instances where the user
+should get a friendly usage message that :func:`checkusage` doesn't
+catch. It can be contrasted with :func:`wrongusage`, which prints a
+terser usage message and exits with an error code.
+"""
+    print docstring.strip ()
+    raise SystemExit (0)
+
+
+def checkusage (docstring, argv=None, usageifnoargs=False):
+    """Check if the program has been run with a --help argument; if so,
+print usage information and exit.
+
+:arg str docstring: the program help text
+:arg argv: the program arguments; taken as :data:`sys.argv` if
+  given as :const:`None` (the default). (Note that this implies
+  ``argv[0]`` should be the program name and not the first option.)
+:arg bool usageifnoargs: if :const:`True`, usage information will be
+  printed and the program will exit if no command-line arguments are
+  passed. Default is :const:`False`.
+
+This function is intended for small programs launched from the command
+line. The intention is for the program help information to be written
+in its docstring, and then for the preamble to contain something
+like::
+
+  \"\"\"myprogram - this is all the usage help you get\"\"\"
+  import sys
+  ... # other setup
+  checkusage (__doc__)
+  ... # go on with business
+
+If it is determined that usage information should be shown,
+:func:`showusage` is called and the program exits.
+
+See also :func:`wrongusage`.
+"""
+
+    if argv is None:
+        from sys import argv
+
+    if len (argv) == 1 and usageifnoargs:
+        showusage (docstring)
+
+    if len (argv) == 2 and argv[1] in ('-h', '--help'):
+        showusage (docstring)
+
+
+def wrongusage (docstring, *rest):
+    """Print a message indicating invalid command-line arguments and
+exit with an error code.
+
+:arg str docstring: the program help text
+:arg rest: an optional specific error message
+
+This function is intended for small programs launched from the command
+line. The intention is for the program help information to be written
+in its docstring, and then for argument checking to look something
+like this::
+
+  \"\"\"mytask <input> <output>
+
+  Do something to the input to create the output.
+  \"\"\"
+  ...
+  import sys
+  ... # other setup
+  checkusage (__doc__)
+  ... # more setup
+  if len (sys.argv) != 3:
+     wrongusage (__doc__, "expect exactly 2 arguments, not %d",
+                 len (sys.argv))
+
+When called, an error message is printed along with the *first stanza*
+of *docstring*. The program then exits with an error code and a
+suggestion to run the program with a --help argument to see more
+detailed usage information. The "first stanza" of *docstring* is
+defined as everything up until the first blank line, ignoring any
+leading blank lines.
+
+The optional message in *rest* is treated as follows. If *rest* is
+empty, the error message "invalid command-line arguments" is
+printed. If it is a single item, the stringification of that item is
+printed. If it is more than one item, the first item is treated as a
+format string, and it is percent-formatted with the remaining
+values. See the above example.
+
+See also :func:`checkusage` and :func:`showusage`.
+"""
+
+    import sys
+    intext = False
+
+    if len (rest) == 0:
+        detail = 'invalid command-line arguments'
+    elif len (rest) == 1:
+        detail = rest[0]
+    else:
+        detail = rest[0] % tuple (rest[1:])
+
+    print >>sys.stderr, 'error:', detail
+    print >>sys.stderr
+
+    for l in docstring.splitlines ():
+        if intext:
+            if not len (l):
+                break
+            print >>sys.stderr, l
+        elif len (l):
+            intext = True
+            print >>sys.stderr, 'Usage:', l
+    print >>sys.stderr
+
+    print >>sys.stderr, \
+        'Run with a sole argument --help for more detailed usage information.'
+    raise SystemExit (1)
+#- snippet: popoption.py
+#- date: 2012 Feb 27
+#- SHA1: 646341fb7ad8cf6db6af7b7e1b4f87dfca153238
+def popoption (ident, args=None):
+    """A lame routine for grabbing command-line arguments. Returns a
+    boolean indicating whether the option was present. If it was, it's
+    removed from the argument string. Because of the lame behavior,
+    options can't be combined, and non-boolean options aren't
+    supported. Operates on sys.argv by default.
+
+    Note that this will proceed merrily if argv[0] matches your option.
+    """
+
+    if args is None:
+        args = sys.argv
+
+    if len (ident) == 1:
+        ident = '-' + ident
+    else:
+        ident = '--' + ident
+
+    found = ident in args
+
+    if found:
+        args.remove (ident)
+
+    return found
+## end
     
 def _interactive (args):
     from sys import stderr
 
-    if len (args) < 1: return _usage ()
-
-    fluxMode = (args[0] == '-f')
-    if fluxMode: del args[0]
-
+    checkusage (__doc__, ['t'] + args, usageifnoargs=True)
+    fluxMode = popoption ('f', args)
     source = args[0]
 
     if source == 'CasA':
-        if len (args) != 3: return _usage ()
+        if len (args) != 3:
+            wrongusage (__doc__, 'must give exactly three arguments when modeling Cas A')
 
         try:
             year = float (args[2])
@@ -235,7 +392,8 @@ def _interactive (args):
         except Exception, e:
             print >>stderr, 'Unable to parse year \"%s\":' % args[2], e
             return 1
-    elif len (args) != 2: return _usage ()
+    elif len (args) != 2:
+        wrongusage (__doc__, 'must give exactly two arguments unless modeling Cas A')
 
     try:
         freq = float (args[1])

@@ -1,37 +1,28 @@
 #! /usr/bin/env python
 # -*- python -*-
 
-"""Make a copy of a dataset, applying calibration tables if there are
-any, but making a quick lightweight copy if there aren't. (Lightweight
-copies are always made if the "-n" option is supplied.)
+"""
+Usage: uvlwcp [-n] SRC DEST
+       uvlwcp [-n] SRC1 ... SRCN DESTDIR
+       uvlwcp [-n] -t DESTDIR SRC1 [... SRCN]
 
-Rationale:
+Create a lightweight copy of MIRIAD UV data. The visibility data
+files are symlinked if 1) the "-n" option is given or 2) the
+dataset has no calibration tables; otherwise the data are
+copied and calibrations applied with "uvcat".
 
-For nice repeatable pipeline operation, one wants to modify successive
-copies of MIRIAD UV datasets rather than accumulation operations onto
-one single dataset. However, UV data files can be very large but are
-often unmodified during pipeline operation. The optimized case of
-this program makes copying UV data much faster and less demanding of
-disk space.
+The same multi-input semantics as "cp" apply to "uvlwcp". The
+"-t DESTDIR" option allows the destination directory to be
+specified as the first argument, allowing easier interaction with
+tools such as "xargs".
 
-However, a certain subset of MIRIAD tasks will only operate
-successfully on UV datasets without calibration tables:
-
-- calibration tasks, since they typically overwrite calibration
-  tables and so might destroy existing information.
-- Tasks using the "model" subsystem, which is unaware of 
-  calibration tables
-
-If you want to apply one of these tasks on a copy of a dataset, there
-are certain cases when a lightweight copy will suffice (i.e., no
-calibration tables present), and certain cases when a full copy is
-necessary (all other situations). This script allows one to exploit
-the speed gains of the first approach when possible without planning
-having advance knowledge of which copy method is needed."""
+Datasets created with "uvlwcp" can be resynced to their source
+datasets with "uvlwrevert".
+"""
 
 import sys, os, shutil, subprocess
 
-## quickutil: die
+## quickutil: die usage
 #- snippet: die.py
 #- date: 2012 Feb 27
 #- SHA1: 1bb64c8c018023854995c0f8954a2bdc625a7ee0
@@ -55,29 +46,136 @@ Example::
     if not len (args):
         raise SystemExit ('error: ' + str (fmt))
     raise SystemExit ('error: ' + (fmt % args))
+#- snippet: usage.py
+#- date: 2012 Feb 27
+#- SHA1: 998596af497009015e3bbda6be6694b9869abaa4
+def showusage (docstring):
+    """Print program usage information and exit.
+
+:arg str docstring: the program help text
+
+This function just prints *docstring* and exits. In most cases, the
+function :func:`checkusage` should be used: it automatically checks
+:data:`sys.argv` for a sole "-h" or "--help" argument and invokes this
+function.
+
+This function is provided in case there are instances where the user
+should get a friendly usage message that :func:`checkusage` doesn't
+catch. It can be contrasted with :func:`wrongusage`, which prints a
+terser usage message and exits with an error code.
+"""
+    print docstring.strip ()
+    raise SystemExit (0)
+
+
+def checkusage (docstring, argv=None, usageifnoargs=False):
+    """Check if the program has been run with a --help argument; if so,
+print usage information and exit.
+
+:arg str docstring: the program help text
+:arg argv: the program arguments; taken as :data:`sys.argv` if
+  given as :const:`None` (the default). (Note that this implies
+  ``argv[0]`` should be the program name and not the first option.)
+:arg bool usageifnoargs: if :const:`True`, usage information will be
+  printed and the program will exit if no command-line arguments are
+  passed. Default is :const:`False`.
+
+This function is intended for small programs launched from the command
+line. The intention is for the program help information to be written
+in its docstring, and then for the preamble to contain something
+like::
+
+  \"\"\"myprogram - this is all the usage help you get\"\"\"
+  import sys
+  ... # other setup
+  checkusage (__doc__)
+  ... # go on with business
+
+If it is determined that usage information should be shown,
+:func:`showusage` is called and the program exits.
+
+See also :func:`wrongusage`.
+"""
+
+    if argv is None:
+        from sys import argv
+
+    if len (argv) == 1 and usageifnoargs:
+        showusage (docstring)
+
+    if len (argv) == 2 and argv[1] in ('-h', '--help'):
+        showusage (docstring)
+
+
+def wrongusage (docstring, *rest):
+    """Print a message indicating invalid command-line arguments and
+exit with an error code.
+
+:arg str docstring: the program help text
+:arg rest: an optional specific error message
+
+This function is intended for small programs launched from the command
+line. The intention is for the program help information to be written
+in its docstring, and then for argument checking to look something
+like this::
+
+  \"\"\"mytask <input> <output>
+
+  Do something to the input to create the output.
+  \"\"\"
+  ...
+  import sys
+  ... # other setup
+  checkusage (__doc__)
+  ... # more setup
+  if len (sys.argv) != 3:
+     wrongusage (__doc__, "expect exactly 2 arguments, not %d",
+                 len (sys.argv))
+
+When called, an error message is printed along with the *first stanza*
+of *docstring*. The program then exits with an error code and a
+suggestion to run the program with a --help argument to see more
+detailed usage information. The "first stanza" of *docstring* is
+defined as everything up until the first blank line, ignoring any
+leading blank lines.
+
+The optional message in *rest* is treated as follows. If *rest* is
+empty, the error message "invalid command-line arguments" is
+printed. If it is a single item, the stringification of that item is
+printed. If it is more than one item, the first item is treated as a
+format string, and it is percent-formatted with the remaining
+values. See the above example.
+
+See also :func:`checkusage` and :func:`showusage`.
+"""
+
+    import sys
+    intext = False
+
+    if len (rest) == 0:
+        detail = 'invalid command-line arguments'
+    elif len (rest) == 1:
+        detail = rest[0]
+    else:
+        detail = rest[0] % tuple (rest[1:])
+
+    print >>sys.stderr, 'error:', detail
+    print >>sys.stderr
+
+    for l in docstring.splitlines ():
+        if intext:
+            if not len (l):
+                break
+            print >>sys.stderr, l
+        elif len (l):
+            intext = True
+            print >>sys.stderr, 'Usage:', l
+    print >>sys.stderr
+
+    print >>sys.stderr, \
+        'Run with a sole argument --help for more detailed usage information.'
+    raise SystemExit (1)
 ## end
-
-
-def usage ():
-    print """
-Usage: ME [-n] SRC DEST
-       ME [-n] SRC1 ... SRCN DESTDIR
-       ME [-n] -t DESTDIR SRC1 [... SRCN]
-
-Create a lightweight copy of MIRIAD UV data. The visibility data
-files are symlinked if 1) the "-n" option is given or 2) the
-dataset has no calibration tables; otherwise the data are
-copied and calibrations applied with "uvcat".
-
-The same multi-input semantics as "cp" apply to "uvlwcp". The
-"-t DESTDIR" option allows the destination directory to be
-specified as the first argument, allowing easier interaction with
-tools such as "xargs".
-
-Datasets created with "uvlwcp" can be resynced to their source
-datasets with "uvlwrevert".
-""".replace ('ME', sys.argv[0])[1:-1] # kill leading/trailing newline
-    sys.exit (1)
 
 
 try:
@@ -155,12 +253,11 @@ def doone (src, dest, doapply):
 def program (args):
     doapply = True
 
+    checkusage (__doc__, ['tmp'] + args, usageifnoargs=True)
+
     if args[0] == '-n':
         doapply = False
         del args[0]
-
-    if len (args) < 2:
-        usage ()
 
     if args[0] == '-t':
         dest = args[1]
@@ -181,7 +278,5 @@ def program (args):
 
 
 if __name__ == '__main__':
-    if len (sys.argv) < 2:
-        usage ()
     program (sys.argv[1:])
     sys.exit (0)
