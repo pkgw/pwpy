@@ -10,7 +10,8 @@ regardless of its file format.
 Note that pyrap.images allegedly supports casacore, HDF5, FITS, and
 MIRIAD format images transparently. Frankly, I don't trust it, I don't
 like the pyrap.images API, and I'd rather not require that casacore
-and pyrap be installed.
+and pyrap be installed. pyrap.images doesn't support masks in MIRIAD
+images.
 
 TODO: for iminfo, need: axis types, ref freq
 
@@ -66,6 +67,9 @@ class AstroImage (object):
     pclon = None
     "Longitude of the pointing center in radians"
 
+    axdescs = None
+    """If not None, list of strings describing the axis types;
+    no standard format."""
 
     def __init__ (self, path, mode):
         self.path = path
@@ -236,9 +240,12 @@ class MIRIADImage (AstroImage):
 
         naxis = h.getScalarItem ('naxis', 0)
         self.shape = N.empty (naxis, dtype=N.int)
+        self.axdescs = []
+
         for i in xrange (naxis):
             q = naxis - i
             self.shape[i] = h.getScalarItem ('naxis%d' % q, 1)
+            self.axdescs.append (h.getScalarItem ('ctype%d' % q, '???'))
 
         self.units = maybelower (h.getScalarItem ('bunit'))
 
@@ -395,6 +402,7 @@ class CASAImage (AstroImage):
         allinfo = self._handle.info ()
         self.units = maybelower (allinfo.get ('unit'))
         self.shape = N.asarray (self._handle.shape (), dtype=N.int)
+        self.axdescs = []
 
         if 'coordinates' in allinfo:
             pc = allinfo['coordinates'].get ('pointingcenter')
@@ -418,6 +426,13 @@ class CASAImage (AstroImage):
         self._wcscale = wcscale = N.ones (self.shape.size)
         c = self._handle.coordinates ()
         radian = quantity (1., 'rad')
+
+        for item in c.get_axes ():
+            if isinstance (item, basestring):
+                self.axdescs.append (item.replace (' ', '_'))
+            else:
+                for subitem in item:
+                    self.axdescs.append (subitem.replace (' ', '_'))
 
         def getconversion (text):
             q = quantity (1., text)
@@ -553,9 +568,12 @@ class FITSImage (AstroImage):
 
         naxis = header.get ('naxis', 0)
         self.shape = N.empty (naxis, dtype=N.int)
+        self.axdescs = []
+
         for i in xrange (naxis):
             q = naxis - i
             self.shape[i] = header.get ('naxis%d' % q, 1)
+            self.axdescs.append (header.get ('ctype%d' % q, '???'))
 
         self.bmaj = maybescale (header.get ('bmaj'), D2R)
         self.bmin = maybescale (header.get ('bmin', self.bmaj * R2D), D2R)
@@ -661,6 +679,7 @@ class SimpleImage (AstroImage):
 
         self.path = '<subimage of %s>' % parent.path
         self.shape = N.asarray ([parent.shape[latax], parent.shape[lonax]])
+        self.axdescs = [parent.axdescs[latax], parent.axdescs[lonax]]
         self.bmaj = parent.bmaj
         self.bmin = parent.bmin
         self.bpa = parent.bpa
