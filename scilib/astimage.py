@@ -19,7 +19,7 @@ TODO: standardized celestial axis types for proper generic formatting
 of RA/Dec ; glat/glon etc
 """
 
-import numpy as N
+import numpy as np
 
 from numpy import pi
 D2R = pi / 180 # if end up needing more of these, start using astutil.py
@@ -164,7 +164,7 @@ def maybelower (x):
 
 def _get_wcs_scale (wcs, naxis):
     import pywcs
-    wcscale = N.ones (naxis)
+    wcscale = np.ones (naxis)
 
     for i in xrange (naxis):
         q = wcscale.size - 1 - i
@@ -186,7 +186,7 @@ def _wcs_toworld (wcs, pixel, wcscale, naxis):
     # transformations, let alone a concatenation of these, because
     # they're not invertible.
 
-    pixel = N.asarray (pixel)
+    pixel = np.asarray (pixel)
     if pixel.shape != (naxis, ):
         raise ValueError ('pixel coordinate must be a %d-element vector', naxis)
 
@@ -196,7 +196,7 @@ def _wcs_toworld (wcs, pixel, wcscale, naxis):
 
 
 def _wcs_topixel (wcs, world, wcscale, naxis):
-    world = N.asarray (world)
+    world = np.asarray (world)
     if world.shape != (naxis, ):
         raise ValueError ('world coordinate must be a %d-element vector', naxis)
 
@@ -239,7 +239,7 @@ class MIRIADImage (AstroImage):
             print >>sys.stderr, 'irregularity in coordinates of "%s": %s' % (self.path, w)
 
         naxis = h.getScalarItem ('naxis', 0)
-        self.shape = N.empty (naxis, dtype=N.int)
+        self.shape = np.empty (naxis, dtype=np.int)
         self.axdescs = []
 
         for i in xrange (naxis):
@@ -275,13 +275,13 @@ class MIRIADImage (AstroImage):
         if nonplane.size == 0:
             data = self._handle.readPlane ([], topIsZero=flip)
         else:
-            data = N.ma.empty (self.shape, dtype=N.float32)
-            data.mask = N.zeros (self.shape, dtype=N.bool)
-            n = N.prod (nonplane)
+            data = np.ma.empty (self.shape, dtype=np.float32)
+            data.mask = np.zeros (self.shape, dtype=np.bool)
+            n = np.prod (nonplane)
             fdata = data.reshape ((n, self.shape[-2], self.shape[-1]))
 
             for i in xrange (n):
-                axes = N.unravel_index (i, nonplane)
+                axes = np.unravel_index (i, nonplane)
                 self._handle.readPlane (axes, fdata[i], topIsZero=flip)
 
         if squeeze:
@@ -291,7 +291,7 @@ class MIRIADImage (AstroImage):
 
 
     def write (self, data):
-        data = N.ma.asarray (data)
+        data = np.ma.asarray (data)
 
         if data.shape != tuple (self.shape):
             raise ValueError ('data is wrong shape: got %s, want %s' \
@@ -304,11 +304,11 @@ class MIRIADImage (AstroImage):
         if nonplane.size == 0:
             self._handle.writePlane (data, [])
         else:
-            n = N.prod (nonplane)
+            n = np.prod (nonplane)
             fdata = data.reshape ((n, self.shape[-2], self.shape[-1]))
 
             for i in xrange (n):
-                axes = N.unravel_index (i, nonplane)
+                axes = np.unravel_index (i, nonplane)
                 self._handle.writePlane (fdata[i], axes)
 
         return self
@@ -401,7 +401,7 @@ class CASAImage (AstroImage):
 
         allinfo = self._handle.info ()
         self.units = maybelower (allinfo.get ('unit'))
-        self.shape = N.asarray (self._handle.shape (), dtype=N.int)
+        self.shape = np.asarray (self._handle.shape (), dtype=np.int)
         self.axdescs = []
 
         if 'coordinates' in allinfo:
@@ -423,7 +423,7 @@ class CASAImage (AstroImage):
         # because anything else is ridiculous.
 
         from pyrap.quanta import quantity
-        self._wcscale = wcscale = N.ones (self.shape.size)
+        self._wcscale = wcscale = np.ones (self.shape.size)
         c = self._handle.coordinates ()
         radian = quantity (1., 'rad')
 
@@ -472,7 +472,7 @@ class CASAImage (AstroImage):
 
 
     def write (self, data):
-        data = N.ma.asarray (data)
+        data = np.ma.asarray (data)
 
         if data.shape != tuple (self.shape):
             raise ValueError ('data is wrong shape: got %s, want %s' \
@@ -486,14 +486,14 @@ class CASAImage (AstroImage):
 
     def toworld (self, pixel):
         self._checkOpen ()
-        pixel = N.asarray (pixel)
-        return self._wcscale * N.asarray (self._handle.toworld (pixel))
+        pixel = np.asarray (pixel)
+        return self._wcscale * np.asarray (self._handle.toworld (pixel))
 
 
     def topixel (self, world):
         self._checkOpen ()
-        world = N.asarray (world)
-        return N.asarray (self._handle.topixel (world / self._wcscale))
+        world = np.asarray (world)
+        return np.asarray (self._handle.topixel (world / self._wcscale))
 
 
     def _latlonaxes (self):
@@ -567,7 +567,7 @@ class FITSImage (AstroImage):
         self.units = maybelower (header.get ('bunit'))
 
         naxis = header.get ('naxis', 0)
-        self.shape = N.empty (naxis, dtype=N.int)
+        self.shape = np.empty (naxis, dtype=np.int)
         self.axdescs = []
 
         for i in xrange (naxis):
@@ -591,9 +591,9 @@ class FITSImage (AstroImage):
 
     def read (self, squeeze=False, flip=False):
         self._checkOpen ()
-        data = N.ma.asarray (self._handle[0].data)
+        data = np.ma.asarray (self._handle[0].data)
         # Are there other standards for expressing masking in FITS?
-        data.mask = -N.isfinite (data.data)
+        data.mask = -np.isfinite (data.data)
 
         if flip:
             data = data[...,::-1,:]
@@ -603,7 +603,7 @@ class FITSImage (AstroImage):
 
 
     def write (self, data):
-        data = N.ma.asarray (data)
+        data = np.ma.asarray (data)
 
         if data.shape != tuple (self.shape):
             raise ValueError ('data is wrong shape: got %s, want %s' \
@@ -674,11 +674,11 @@ class SimpleImage (AstroImage):
             if parent.shape[i] != 1:
                 raise UnsupportedError ('cannot simplify an image with '
                                         'nondegenerate nonspatial axes')
-            if N.abs (1 - checkworld1[i] / checkworld2[i]) > 1e-6:
+            if np.abs (1 - checkworld1[i] / checkworld2[i]) > 1e-6:
                 self._topixelok = False
 
         self.path = '<subimage of %s>' % parent.path
-        self.shape = N.asarray ([parent.shape[latax], parent.shape[lonax]])
+        self.shape = np.asarray ([parent.shape[latax], parent.shape[lonax]])
         self.axdescs = [parent.axdescs[latax], parent.axdescs[lonax]]
         self.bmaj = parent.bmaj
         self.bmin = parent.bmin
@@ -687,7 +687,7 @@ class SimpleImage (AstroImage):
         self.pclat = parent.pclat
         self.pclon = parent.pclon
 
-        self._pctmpl = N.zeros (parent.shape.size)
+        self._pctmpl = np.zeros (parent.shape.size)
         self._wctmpl = parent.toworld (self._pctmpl)
 
 
@@ -715,7 +715,7 @@ class SimpleImage (AstroImage):
 
 
     def write (self, data):
-        data = N.ma.asarray (data)
+        data = np.ma.asarray (data)
 
         if data.shape != tuple (self.shape):
             raise ValueError ('data is wrong shape: got %s, want %s' \
@@ -724,7 +724,7 @@ class SimpleImage (AstroImage):
         self._checkOpen ()
         self._checkWriteable ()
 
-        fulldata = N.ma.empty (self._handle.shape, dtype=data.dtype)
+        fulldata = np.ma.empty (self._handle.shape, dtype=data.dtype)
         idx = list (self._pctmpl)
         idx[self._latax] = slice (None)
         idx[self._lonax] = slice (None)
@@ -744,7 +744,7 @@ class SimpleImage (AstroImage):
         p[self._latax] = pixel[0]
         p[self._lonax] = pixel[1]
         w = self._handle.toworld (p)
-        world = N.empty (2)
+        world = np.empty (2)
         world[0] = w[self._latax]
         world[1] = w[self._lonax]
         return world
@@ -761,7 +761,7 @@ class SimpleImage (AstroImage):
         w[self._latax] = world[0]
         w[self._lonax] = world[1]
         p = self._handle.topixel (w)
-        pixel = N.empty (2)
+        pixel = np.empty (2)
         pixel[0] = p[self._latax]
         pixel[1] = p[self._lonax]
         return pixel

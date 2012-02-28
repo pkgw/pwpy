@@ -7,11 +7,11 @@ well with poorly-behaved ones.
 
 # TODO: allow boundaries on X and Y.
 
-import numpy as N
+import numpy as np
 
 def cont2da (f, df, x0, y0, maxiters=5000, defeta=0.05, netastep=12,
              vtol1=1e-3, vtol2=1e-8, maxnewt=20, dorder=7, goright=False,
-             hackxbounds=[-N.inf, N.inf], hackybounds=[-N.inf, N.inf]):
+             hackxbounds=[-np.inf, np.inf], hackybounds=[-np.inf, np.inf]):
     """Required arguments:
     
 f  - a function, mapping (x, y) -> z
@@ -98,13 +98,13 @@ goright - If True, trace the contour rightward (as looking uphill),
                 return [dx, dy]
     
     # Init eta progression
-    rez = N.finfo (N.double).resolution
+    rez = np.finfo (np.double).resolution
     if rez > defeta: raise ValueError ('defeta below resolution!')
-    eta_scale = N.exp ((N.log (rez) - N.log (defeta)) / netastep)
+    eta_scale = np.exp ((np.log (rez) - np.log (defeta)) / netastep)
 
     # Init data storage
     n = 1
-    pts = N.empty ((maxiters, 2))
+    pts = np.empty ((maxiters, 2))
     pts[0] = (x0, y0)
     x = x0
     y = y0

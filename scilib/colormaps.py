@@ -68,7 +68,7 @@ http://adsabs.harvard.edu/abs/2011BASI...39..289G
 I made up the pkgw map myself (who'd have guessed?).
 """
 
-import numpy as N
+import numpy as np
 
 base_factory_names = ('moreland_bluered cubehelix_dagreen cubehelix_blue '
                       'pkgw black_to_white black_to_red '
@@ -89,18 +89,17 @@ TRANSFORM_SQRT = 'sqrt'
 
 # I don't quite understand where this value comes from, given the
 # various Wikipedia values for D65, but this works.
-CIELAB_D65 = N.asarray ([0.9505, 1., 1.0890])
+CIELAB_D65 = np.asarray ([0.9505, 1., 1.0890])
 
 # from Moreland:
-_linsrgb_to_xyz = N.asarray ([[0.4124, 0.2126, 0.0193],
-                              [0.3576, 0.7152, 0.1192],
-                              [0.1805, 0.0722, 0.9505]])
+_linsrgb_to_xyz = np.asarray ([[0.4124, 0.2126, 0.0193],
+                               [0.3576, 0.7152, 0.1192],
+                               [0.1805, 0.0722, 0.9505]])
 
 # from Wikipedia, SRGB:
-_xyz_to_linsrgb = N.asarray ([[3.2406, -0.9689, 0.0557],
-                              [-1.5372, 1.8758, -0.2040],
-                              [-0.4986, 0.0415, 1.0570]])
-
+_xyz_to_linsrgb = np.asarray ([[3.2406, -0.9689, 0.0557],
+                               [-1.5372, 1.8758, -0.2040],
+                               [-0.4986, 0.0415, 1.0570]])
 
 
 # Interpolation utilities. Given a colormap sampled at various values,
@@ -133,7 +132,7 @@ from the sampled values.
     elif transform == TRANSFORM_REVERSE:
         samples = samples[:,::-1]
     elif transform == TRANSFORM_SQRT:
-        values = N.sqrt (values)
+        values = np.sqrt (values)
     else:
         raise ValueError ('unknown transformation: ' + str (transform))
 
@@ -143,8 +142,8 @@ from the sampled values.
     bspline = SI.splrep (values, samples[B+1], s=fitfactor/nsamp)
 
     def colormap (values):
-        values = N.asarray (values)
-        mapped = N.empty (values.shape + (3,))
+        values = np.asarray (values)
+        mapped = np.empty (values.shape + (3,))
 
         flatvalues = values.flatten ()
         flatmapped = mapped.reshape (flatvalues.shape + (3,))
@@ -170,7 +169,7 @@ ones. The transformation is uniform in RGB, so
 
     gamma = ((srgb + 0.055) / 1.055)**2.4
     scale = srgb / 12.92
-    return N.where (srgb > 0.04045, gamma, scale)
+    return np.where (srgb > 0.04045, gamma, scale)
 
 
 def linsrgb_to_srgb (linsrgb):
@@ -184,7 +183,7 @@ so *linsrgb* can be of any shape.
     # From Wikipedia, but easy analogue to the above.
     gamma = 1.055 * linsrgb**(1./2.4) - 0.055
     scale = linsrgb * 12.92
-    return N.where (linsrgb > 0.0031308, gamma, scale)
+    return np.where (linsrgb > 0.0031308, gamma, scale)
 
 
 def linsrgb_to_xyz (linsrgb):
@@ -199,7 +198,7 @@ Returned XYZ values range between [0, 0, 0] and
 [0.9505, 1., 1.089].
 """
 
-    return N.dot (linsrgb, _linsrgb_to_xyz)
+    return np.dot (linsrgb, _linsrgb_to_xyz)
 
 
 def xyz_to_linsrgb (xyz):
@@ -209,7 +208,7 @@ srgb_to_linsrgb).
 *xyz* should be of shape (*, 3)
 Return value will be of same shape."""
 
-    return N.dot (xyz, _xyz_to_linsrgb)
+    return np.dot (xyz, _xyz_to_linsrgb)
 
 
 def xyz_to_cielab (xyz, refwhite):
@@ -224,9 +223,9 @@ in CIE L*a*b* coordinates.
     norm = xyz / refwhite
     pow = norm**0.333333333333333
     scale = 7.787037 * norm + 16./116
-    mapped = N.where (norm > 0.008856, pow, scale)
+    mapped = np.where (norm > 0.008856, pow, scale)
 
-    cielab = N.empty_like (xyz)
+    cielab = np.empty_like (xyz)
     cielab[...,L] = 116 * mapped[...,Y] - 16
     cielab[...,A] = 500 * (mapped[...,X] - mapped[...,Y])
     cielab[...,B] = 200 * (mapped[...,Y] - mapped[...,Z])
@@ -245,9 +244,9 @@ Return value has same shape as *cielab*
     def func (t):
         pow = t**3
         scale = 0.128419 * t - 0.0177129
-        return N.where (t > 0.206897, pow, scale)
+        return np.where (t > 0.206897, pow, scale)
 
-    xyz = N.empty_like (cielab)
+    xyz = np.empty_like (cielab)
     lscale = 1./116 * (cielab[...,L] + 16)
     xyz[...,X] = func (lscale + 0.002 * cielab[...,A])
     xyz[...,Y] = func (lscale)
@@ -262,10 +261,10 @@ def cielab_to_msh (cielab):
 *cielab* should be of shape (*, 3)
 Return value will have same shape.
 """
-    msh = N.empty_like (cielab)
-    msh[...,M] = N.sqrt ((cielab**2).sum (axis=-1))
-    msh[...,S] = N.arccos (cielab[...,L] / msh[...,M])
-    msh[...,H] = N.arctan2 (cielab[...,B], cielab[...,A])
+    msh = np.empty_like (cielab)
+    msh[...,M] = np.sqrt ((cielab**2).sum (axis=-1))
+    msh[...,S] = np.arccos (cielab[...,L] / msh[...,M])
+    msh[...,H] = np.arctan2 (cielab[...,B], cielab[...,A])
     return msh
 
 
@@ -275,10 +274,10 @@ def msh_to_cielab (msh):
 *msh* should be of shape (*, 3)
 Return value will have same shape.
 """
-    cielab = N.empty_like (msh)
-    cielab[...,L] = msh[...,M] * N.cos (msh[...,S])
-    cielab[...,A] = msh[...,M] * N.sin (msh[...,S]) * N.cos (msh[...,H])
-    cielab[...,B] = msh[...,M] * N.sin (msh[...,S]) * N.sin (msh[...,H])
+    cielab = np.empty_like (msh)
+    cielab[...,L] = msh[...,M] * np.cos (msh[...,S])
+    cielab[...,A] = msh[...,M] * np.sin (msh[...,S]) * np.cos (msh[...,H])
+    cielab[...,B] = msh[...,M] * np.sin (msh[...,S]) * np.sin (msh[...,H])
     return cielab
 
 
@@ -320,10 +319,10 @@ Return value is the adjusted h (hue) value
     if msh[M] >= m_unsat:
         return msh[H] # "Best we can do"
 
-    hspin = (msh[S] * N.sqrt (m_unsat**2 - msh[M]**2) /
-             (msh[M] * N.sin (msh[S])))
+    hspin = (msh[S] * np.sqrt (m_unsat**2 - msh[M]**2) /
+             (msh[M] * np.sin (msh[S])))
 
-    if msh[H] > -N.pi / 3: # "Spin away from purple"
+    if msh[H] > -np.pi / 3: # "Spin away from purple"
         return msh[H] + hspin
     return msh[H] - hspin
 
@@ -334,20 +333,20 @@ def moreland_interpolate_sampled (srgb1, srgb2, refwhite=CIELAB_D65,
     # full transformations to compute a color mapping at a set
     # of sampled points.
 
-    msh1, msh2 = srgb_to_msh (N.asarray ([srgb1, srgb2],
-                                         dtype=N.float), refwhite)
+    msh1, msh2 = srgb_to_msh (np.asarray ([srgb1, srgb2],
+                                         dtype=np.float), refwhite)
 
     raddiff = msh1[H] - msh2[H]
-    while raddiff > N.pi:
-        raddiff -= 2 * N.pi
-    while raddiff < -N.pi:
-        raddiff += 2 * N.pi
-    raddiff = N.abs (raddiff)
+    while raddiff > np.pi:
+        raddiff -= 2 * np.pi
+    while raddiff < -np.pi:
+        raddiff += 2 * np.pi
+    raddiff = np.abs (raddiff)
 
-    x = N.linspace (0, 1, nsamples).reshape ((nsamples, 1))
-    x = N.repeat (x, 3, 1)
+    x = np.linspace (0, 1, nsamples).reshape ((nsamples, 1))
+    x = np.repeat (x, 3, 1)
 
-    if msh1[S] <= 0.05 or msh2[S] <= 0.05 or raddiff < N.pi/3:
+    if msh1[S] <= 0.05 or msh2[S] <= 0.05 or raddiff < np.pi/3:
         # Colors are too close together to comfortably put white in
         # between. Our interpolation won't have a control point, and
         # won't actually be divergent.
@@ -357,7 +356,7 @@ def moreland_interpolate_sampled (srgb1, srgb2, refwhite=CIELAB_D65,
         elif msh2[S] < 0.05 and msh1[S] > 0.05:
             msh2[H] = moreland_adjusthue (msh2, msh2[M])
 
-        samples = N.empty ((4, nsamples))
+        samples = np.empty ((4, nsamples))
 
         msh = (1 - x) * msh1 + x * msh2
         samples[0] = x[:,0]
@@ -369,7 +368,7 @@ def moreland_interpolate_sampled (srgb1, srgb2, refwhite=CIELAB_D65,
         # nsamples -- shhh) samples for the spline fit
 
         msh3 = msh2
-        msh2a = N.asarray ([N.max ([msh1[M], msh3[M], 88]), 0, 0])
+        msh2a = np.asarray ([np.max ([msh1[M], msh3[M], 88]), 0, 0])
         msh2b = msh2a.copy ()
 
         if msh1[S] < 0.05 and msh2a[S] > 0.05:
@@ -382,7 +381,7 @@ def moreland_interpolate_sampled (srgb1, srgb2, refwhite=CIELAB_D65,
         elif msh3[S] < 0.05 and msh2b[S] > 0.05:
             msh3[H] = moreland_adjusthue (msh2b, msh3[M])
 
-        samples = N.empty ((4, 2*nsamples-1))
+        samples = np.empty ((4, 2*nsamples-1))
 
         msh = (1 - x) * msh1 + x * msh2a
         samples[0,:nsamples] = 0.5 * x[:,0]
@@ -405,17 +404,17 @@ def moreland_bluered (transform=TRANSFORM_NONE):
 
 def cubehelix_create (start, rotations, hue, gamma):
     def colormap (values):
-        values = N.asarray (values)
-        mapped = N.empty (values.shape + (3,))
+        values = np.asarray (values)
+        mapped = np.empty (values.shape + (3,))
 
         flatvalues = values.flatten ()
         flatmapped = mapped.reshape (flatvalues.shape + (3,))
 
         gv = flatvalues ** gamma
         a = 0.5 * hue * gv * (1 - gv)
-        phi = 2 * N.pi * (0.3333333 * start + rotations * flatvalues)
-        c = N.cos (phi)
-        s = N.sin (phi)
+        phi = 2 * np.pi * (0.3333333 * start + rotations * flatvalues)
+        c = np.cos (phi)
+        s = np.sin (phi)
 
         flatmapped[:,R] = gv + a * (-0.14861 * c + 1.78277 * s)
         flatmapped[:,G] = gv + a * (-0.29227 * c - 0.90649 * s)
@@ -427,8 +426,8 @@ def cubehelix_create (start, rotations, hue, gamma):
 
 def cubehelix_sample (start, rotations, hue, gamma,
                       nsamples=DEFAULT_SAMPLE_POINTS):
-    samples = N.empty ((4, nsamples,))
-    samples[0] = N.linspace (0, 1, nsamples)
+    samples = np.empty ((4, nsamples,))
+    samples[0] = np.linspace (0, 1, nsamples)
     samples[1:] = cubehelix_create (start, rotations, hue, gamma) (samples[0]).T
     return samples
 
@@ -447,10 +446,10 @@ def cubehelix_blue (transform=TRANSFORM_NONE):
 # black to a bright-ish red.
 
 def pkgw (transform=TRANSFORM_NONE, nsamples=DEFAULT_SAMPLE_POINTS):
-    samples = N.empty ((4, nsamples))
-    samples[0] = N.linspace (0, 1, nsamples)
+    samples = np.empty ((4, nsamples))
+    samples[0] = np.linspace (0, 1, nsamples)
 
-    msh = N.empty ((nsamples, 3))
+    msh = np.empty ((nsamples, 3))
     msh[:,M] = 1. + 85 * samples[0]
     msh[:,S] = 0.3 * samples[0] + 0.7
     msh[:,H] = 2.9 * samples[0] - 2.1
@@ -470,13 +469,13 @@ def rgblinear_create (factor_r, factor_g, factor_b,
     elif transform == TRANSFORM_REVERSE:
         valmap = lambda x: 1 - x
     elif transform == TRANSFORM_SQRT:
-        valmap = N.sqrt
+        valmap = np.sqrt
     else:
         raise ValueError ('unknown transformation: ' + str (transform))
 
     def colormap (values):
-        values = valmap (N.asarray (values))
-        mapped = N.empty (values.shape + (3,))
+        values = valmap (np.asarray (values))
+        mapped = np.empty (values.shape + (3,))
         flatvalues = values.flatten ()
         flatmapped = mapped.reshape (flatvalues.shape + (3,))
         flatmapped[:,R] = flatvalues * factor_r + zero_r
@@ -548,16 +547,16 @@ def showdemo (factoryname, **kwargs):
 
     colormap = factory_map[factoryname] (**kwargs)
 
-    array = N.linspace (0, 1, W)
+    array = np.linspace (0, 1, W)
     array = array.reshape ((W, 1))
-    array = N.repeat (array, H, 1).T
+    array = np.repeat (array, H, 1).T
 
     mapped = colormap (array)
-    argb = N.empty ((H, W), dtype=N.uint32)
+    argb = np.empty ((H, W), dtype=np.uint32)
     argb.fill (0xFF000000)
-    argb |= (mapped[:,:,0] * 0xFF).astype (N.uint32) << 16
-    argb |= (mapped[:,:,1] * 0xFF).astype (N.uint32) << 8
-    argb |= (mapped[:,:,2] * 0xFF).astype (N.uint32)
+    argb |= (mapped[:,:,0] * 0xFF).astype (np.uint32) << 16
+    argb |= (mapped[:,:,1] * 0xFF).astype (np.uint32) << 8
+    argb |= (mapped[:,:,2] * 0xFF).astype (np.uint32)
 
     surf = cairo.ImageSurface.create_for_data (argb, cairo.FORMAT_ARGB32,
                                                W, H, W * 4)

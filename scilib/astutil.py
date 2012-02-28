@@ -4,20 +4,20 @@
 astutil - miscellaneous astronomical utilities
 """
 
-import numpy as N
+import numpy as np
 
-pi = N.pi
+pi = np.pi
 twopi = 2 * pi
 halfpi = 0.5 * pi
 
-R2A = 3600 * 180 / N.pi
-A2R = N.pi / (3600 * 180)
-R2D = 180 / N.pi
-D2R = N.pi / 180
-R2H = 12 / N.pi
-H2R = N.pi / 12
-F2S = 1 / N.sqrt (8 * N.log (2)) # FWHM to sigma
-S2F = N.sqrt (8 * N.log (2))
+R2A = 3600 * 180 / pi
+A2R = pi / (3600 * 180)
+R2D = 180 / pi
+D2R = pi / 180
+R2H = 12 / pi
+H2R = pi / 12
+F2S = 1 / np.sqrt (8 * np.log (2)) # FWHM to sigma
+S2F = np.sqrt (8 * np.log (2))
 
 __all__ = 'N pi twopi halfpi R2A A2R R2D D2R R2H H2R F2S S2F'.split ()
 
@@ -54,8 +54,8 @@ def _fmtsexagesimal (base, norm, basemax, precision=3):
 
     basewidth = len (str (basemax))
 
-    bs = int (N.floor (base))
-    min = int (N.floor ((base - bs) * 60))
+    bs = int (np.floor (base))
+    min = int (np.floor ((base - bs) * 60))
     sec = round (3600 * (base - bs - min / 60.), precision)
 
     if sec >= 60:
@@ -124,8 +124,8 @@ norm[alization] can be one of 'none', 'raise', or 'wrap'
         sgn = '-'
         degrees = -degrees
 
-    deg = int (N.floor (degrees))
-    amin = int (N.floor ((degrees - deg) * 60))
+    deg = int (np.floor (degrees))
+    amin = int (np.floor ((degrees - deg) * 60))
     asec = round (3600 * (degrees - deg - amin / 60.), precision)
 
     if asec >= 60:
@@ -163,7 +163,7 @@ def parsehours (hrstr):
     if hr < 0 or hr > 23 or mn < 0 or mn > 59 or sec < 0 or sec >= 60.:
         raise ValueError ('illegal hour specification: ' + hrstr)
 
-    return (hr + mn / 60. + sec / 3600.) * N.pi / 12
+    return (hr + mn / 60. + sec / 3600.) * H2R
 
 
 def parsedeglat (latstr):
@@ -184,7 +184,7 @@ def parsedeglat (latstr):
     if deg < 0 or deg > 90 or mn < 0 or mn > 59 or sec < 0 or sec >= 60.:
         raise ValueError ('illegal latitude specification: ' + latstr)
 
-    return sgn * (deg + mn / 60. + sec / 3600.) * N.pi / 180
+    return sgn * (deg + mn / 60. + sec / 3600.) * D2R
 
 
 __all__ += 'parsehours parsedeglat'.split ()
@@ -201,16 +201,16 @@ def sphdist (lat1, lon1, lat2, lon2):
     # faster but more error-prone formula are possible; see Wikipedia
     # on Great-circle Distance
 
-    cd = N.cos (lon2 - lon1)
-    sd = N.sin (lon2 - lon1)
-    c2 = N.cos (lat2)
-    c1 = N.cos (lat1)
-    s2 = N.sin (lat2)
-    s1 = N.sin (lat1)
+    cd = np.cos (lon2 - lon1)
+    sd = np.sin (lon2 - lon1)
+    c2 = np.cos (lat2)
+    c1 = np.cos (lat1)
+    s2 = np.sin (lat2)
+    s1 = np.sin (lat1)
 
-    a = N.sqrt ((c2 * sd)**2 + (c1 * s2 - s1 * c2 * cd)**2)
+    a = np.sqrt ((c2 * sd)**2 + (c1 * s2 - s1 * c2 * cd)**2)
     b = s1 * s2 + c1 * c2 * cd
-    return N.arctan2 (a, b)
+    return np.arctan2 (a, b)
 
 
 def sphofs (lat1, lon1, r, pa, tol=1e-2, rmax=None):
@@ -236,8 +236,8 @@ def sphofs (lat1, lon1, r, pa, tol=1e-2, rmax=None):
         raise ValueError ('sphofs radius value %f is too big for '
                           'our approximation' % r)
 
-    lat2 = lat1 + r * N.cos (pa)
-    lon2 = lon1 + r * N.sin (pa) / N.cos (lat2)
+    lat2 = lat1 + r * np.cos (pa)
+    lon2 = lon1 + r * np.sin (pa) / np.cos (lat2)
 
     if tol is not None:
         s = sphdist (lat1, lon1, lat2, lon2)
@@ -260,28 +260,28 @@ def gaussianConvolve (maj1, min1, pa1, maj2, min2, pa2):
 PAs are in radians, axes can be in anything so long as they're consistent.
 """
     # copied from miriad/src/subs/gaupar.for:gaufac()
-    c1 = N.cos (pa1)
-    s1 = N.sin (pa1)
-    c2 = N.cos (pa2)
-    s2 = N.sin (pa2)
+    c1 = np.cos (pa1)
+    s1 = np.sin (pa1)
+    c2 = np.cos (pa2)
+    s2 = np.sin (pa2)
 
     a = (maj1*c1)**2 + (min1*s1)**2 + (maj2*c2)**2 + (min2*s2)**2
     b = (maj1*s1)**2 + (min1*c1)**2 + (maj2*s2)**2 + (min2*c2)**2
     g = 2 * ((min1**2 - maj1**2) * s1 * c1 + (min2**2 - maj2**2) * s2 * c2)
 
     s = a + b
-    t = N.sqrt ((a - b)**2 + g**2)
-    maj3 = N.sqrt (0.5 * (s + t))
-    min3 = N.sqrt (0.5 * (s - t))
+    t = np.sqrt ((a - b)**2 + g**2)
+    maj3 = np.sqrt (0.5 * (s + t))
+    min3 = np.sqrt (0.5 * (s - t))
 
     if abs (g) + abs (a - b) == 0:
         pa3 = 0.
     else:
-        pa3 = 0.5 * N.arctan2 (-g, a - b)
+        pa3 = 0.5 * np.arctan2 (-g, a - b)
 
     # "Amplitude of the resulting Gaussian":
-    # f = N.pi / (4 * N.log (2)) * maj1 * min1 * maj2 * min2 \
-    #    / N.sqrt (a * b - 0.25 * g**2)
+    # f = pi / (4 * np.log (2)) * maj1 * min1 * maj2 * min2 \
+    #    / np.sqrt (a * b - 0.25 * g**2)
 
     return maj3, min3, pa3
 

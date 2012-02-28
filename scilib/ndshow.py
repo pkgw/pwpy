@@ -29,7 +29,7 @@ Ctrl-C to toggle automatic cycling
 
 """
 
-import numpy as N
+import numpy as np
 import cairo
 import glib, gtk
 
@@ -48,11 +48,11 @@ class LazyComputer (object):
 
 
     def allocBuffer (self, template):
-        if N.ma.is_masked (template):
-            self.buffer = N.ma.empty (template.shape)
+        if np.ma.is_masked (template):
+            self.buffer = np.ma.empty (template.shape)
             self.buffer.mask = template.mask
         else:
-            self.buffer = N.empty (template.shape)
+            self.buffer = np.empty (template.shape)
         return self
 
 
@@ -61,7 +61,7 @@ class LazyComputer (object):
         h, w = self.buffer.shape
         nxt = (w + tilesize - 1) // tilesize
         nyt = (h + tilesize - 1) // tilesize
-        self.valid = N.zeros ((nyt, nxt))
+        self.valid = np.zeros ((nyt, nxt))
         return self
 
 
@@ -69,7 +69,7 @@ class LazyComputer (object):
         ts = self.tilesize
         buf = self.buffer
         valid = self.valid
-        func = self._makeFunc (N.ma.is_masked (data))
+        func = self._makeFunc (np.ma.is_masked (data))
 
         tilej = xoffset // ts
         tilei = yoffset // ts
@@ -113,10 +113,10 @@ class Clipper (LazyComputer):
     def defaultBounds (self, data):
         dmin, dmax = data.min (), data.max ()
 
-        if not N.isfinite (dmin):
-            dmin = data[N.where (N.isfinite (data))].min ()
-        if not N.isfinite (dmax):
-            dmax = data[N.where (N.isfinite (data))].max ()
+        if not np.isfinite (dmin):
+            dmin = data[np.where (np.isfinite (data))].min ()
+        if not np.isfinite (dmax):
+            dmax = data[np.where (np.isfinite (data))].max ()
 
         self.dmin = dmin
         self.dmax = dmax
@@ -129,14 +129,14 @@ class Clipper (LazyComputer):
 
         if not ismasked:
             def func (src, dest):
-                N.subtract (src, dmin, dest)
-                N.multiply (dest, scale, dest)
-                N.clip (dest, 0, 1, dest)
+                np.subtract (src, dmin, dest)
+                np.multiply (dest, scale, dest)
+                np.clip (dest, 0, 1, dest)
         else:
             def func (src, dest):
-                N.subtract (src, dmin, dest)
-                N.multiply (dest, scale, dest)
-                N.clip (dest, 0, 1, dest)
+                np.subtract (src, dmin, dest)
+                np.multiply (dest, scale, dest)
+                np.clip (dest, 0, 1, dest)
                 dest.mask[:] = src.mask
 
         return func
@@ -149,7 +149,7 @@ class ColorMapper (LazyComputer):
 
 
     def allocBuffer (self, template):
-        self.buffer = N.empty (template.shape, dtype=N.uint32)
+        self.buffer = np.empty (template.shape, dtype=np.uint32)
         self.buffer.fill (0xFF000000)
         return self
 
@@ -157,9 +157,9 @@ class ColorMapper (LazyComputer):
     def _makeFunc (self, ismasked):
         mapper = self.mapper
         # I used to preallocate this scratch array, but doing
-        # "N.multiply (mapped[:,:,0], 0xFF, effscratch)" causes
+        # "np.multiply (mapped[:,:,0], 0xFF, effscratch)" causes
         # segfaults on Fedora 16. So, work around.
-        #scratch = N.zeros ((self.tilesize, self.tilesize), dtype=N.uint32)
+        #scratch = np.zeros ((self.tilesize, self.tilesize), dtype=np.uint32)
 
         if not ismasked:
             def func (src, dest):
@@ -167,20 +167,20 @@ class ColorMapper (LazyComputer):
                 mapped = mapper (src)
                 dest.fill (0xFF000000)
                 # New code:
-                effscratch = (mapped[:,:,0] * 0xFF).astype (N.uint32)
+                effscratch = (mapped[:,:,0] * 0xFF).astype (np.uint32)
                 # Old code:
-                #N.multiply (mapped[:,:,0], 0xFF, effscratch)
-                N.left_shift (effscratch, 16, effscratch)
-                N.bitwise_or (dest, effscratch, dest)
-                effscratch = (mapped[:,:,1] * 0xFF).astype (N.uint32)
-                #N.multiply (mapped[:,:,1], 0xFF, effscratch)
-                N.left_shift (effscratch, 8, effscratch)
-                N.bitwise_or (dest, effscratch, dest)
-                effscratch = (mapped[:,:,2] * 0xFF).astype (N.uint32)
-                #N.multiply (mapped[:,:,2], 0xFF, effscratch)
-                N.bitwise_or (dest, effscratch, dest)
+                #np.multiply (mapped[:,:,0], 0xFF, effscratch)
+                np.left_shift (effscratch, 16, effscratch)
+                np.bitwise_or (dest, effscratch, dest)
+                effscratch = (mapped[:,:,1] * 0xFF).astype (np.uint32)
+                #np.multiply (mapped[:,:,1], 0xFF, effscratch)
+                np.left_shift (effscratch, 8, effscratch)
+                np.bitwise_or (dest, effscratch, dest)
+                effscratch = (mapped[:,:,2] * 0xFF).astype (np.uint32)
+                #np.multiply (mapped[:,:,2], 0xFF, effscratch)
+                np.bitwise_or (dest, effscratch, dest)
         else:
-            scratch2 = N.zeros ((self.tilesize, self.tilesize), dtype=N.uint32)
+            scratch2 = np.zeros ((self.tilesize, self.tilesize), dtype=np.uint32)
 
             def func (src, dest):
                 #effscratch = scratch[:dest.shape[0],:dest.shape[1]]
@@ -189,21 +189,21 @@ class ColorMapper (LazyComputer):
 
                 dest.fill (0xFF000000)
                 # New code:
-                effscratch = (mapped[:,:,0] * 0xFF).astype (N.uint32)
+                effscratch = (mapped[:,:,0] * 0xFF).astype (np.uint32)
                 # Old code:
-                #N.multiply (mapped[:,:,0], 0xFF, effscratch)
-                N.left_shift (effscratch, 16, effscratch)
-                N.bitwise_or (dest, effscratch, dest)
-                effscratch = (mapped[:,:,1] * 0xFF).astype (N.uint32)
-                #N.multiply (mapped[:,:,1], 0xFF, effscratch)
-                N.left_shift (effscratch, 8, effscratch)
-                N.bitwise_or (dest, effscratch, dest)
-                effscratch = (mapped[:,:,2] * 0xFF).astype (N.uint32)
-                #N.multiply (mapped[:,:,2], 0xFF, effscratch)
-                N.bitwise_or (dest, effscratch, dest)
+                #np.multiply (mapped[:,:,0], 0xFF, effscratch)
+                np.left_shift (effscratch, 16, effscratch)
+                np.bitwise_or (dest, effscratch, dest)
+                effscratch = (mapped[:,:,1] * 0xFF).astype (np.uint32)
+                #np.multiply (mapped[:,:,1], 0xFF, effscratch)
+                np.left_shift (effscratch, 8, effscratch)
+                np.bitwise_or (dest, effscratch, dest)
+                effscratch = (mapped[:,:,2] * 0xFF).astype (np.uint32)
+                #np.multiply (mapped[:,:,2], 0xFF, effscratch)
+                np.bitwise_or (dest, effscratch, dest)
 
-                N.invert (src.mask, effscratch2)
-                N.multiply (dest, effscratch2, dest)
+                np.invert (src.mask, effscratch2)
+                np.multiply (dest, effscratch2, dest)
 
         return func
 
@@ -346,7 +346,7 @@ class Viewport (gtk.DrawingArea):
         stride = cairo.ImageSurface.format_stride_for_width (cairo.FORMAT_ARGB32,
                                                              width)
         assert stride % 4 == 0 # stride is in bytes
-        viewdata = N.empty ((height, stride // 4), dtype=N.uint32)
+        viewdata = np.empty ((height, stride // 4), dtype=np.uint32)
         viewsurface = cairo.ImageSurface.create_for_data (viewdata, cairo.FORMAT_ARGB32,
                                                           width, height, stride)
         ctxt = cairo.Context (viewsurface)
@@ -679,10 +679,10 @@ def view (array, title='Array Viewer', colormap='black_to_blue', toworld=None, y
         mapper.invalidate ()
 
     def getsurface (xoffset, yoffset, width, height):
-        pxofs = max (int (N.floor (-xoffset)), 0)
-        pyofs = max (int (N.floor (-yoffset)), 0)
-        pw = min (int (N.ceil (width)), w - pxofs)
-        ph = min (int (N.ceil (height)), h - pyofs)
+        pxofs = max (int (np.floor (-xoffset)), 0)
+        pyofs = max (int (np.floor (-yoffset)), 0)
+        pw = min (int (np.ceil (width)), w - pxofs)
+        ph = min (int (np.ceil (height)), h - pyofs)
 
         clipper.ensureRegionUpdated (array, pxofs, pyofs, pw, ph)
         mapper.ensureRegionUpdated (processed, pxofs, pyofs, pw, ph)
@@ -693,7 +693,7 @@ def view (array, title='Array Viewer', colormap='black_to_blue', toworld=None, y
         def fmtstatus (x, y):
             s = ''
             if x >= 0 and y >= 0 and x < w and y < h:
-                if not N.ma.is_masked (array) or not array.mask[y,x]:
+                if not np.ma.is_masked (array) or not array.mask[y,x]:
                     s += '%g ' % array[y,x]
             if yflip:
                 y = h - 1 - y
@@ -703,7 +703,7 @@ def view (array, title='Array Viewer', colormap='black_to_blue', toworld=None, y
         def fmtstatus (x, y):
             s = ''
             if x >= 0 and y >= 0 and x < w and y < h:
-                if not N.ma.is_masked (array) or not array.mask[y,x]:
+                if not np.ma.is_masked (array) or not array.mask[y,x]:
                     s += '%g ' % array[y,x]
             if yflip:
                 y = h - 1 - y
@@ -836,7 +836,7 @@ class Cycler (Viewer):
         index = index % n
 
         if self.needtune is None or self.needtune.size != n:
-            self.needtune = N.ones (n, dtype=N.bool_)
+            self.needtune = np.ones (n, dtype=np.bool_)
 
         if index == self.i:
             return
@@ -910,10 +910,10 @@ def cycle (arrays, descs=None, cadence=0.6, toworlds=None, yflip=False):
         thish, thisw = array.shape
         thismin, thismax = array.min (), array.max ()
 
-        if not N.isfinite (thismin):
-            thismin = array[N.where (N.isfinite (array))].min ()
-        if not N.isfinite (thismax):
-            thismax = array[N.where (N.isfinite (array))].max ()
+        if not np.isfinite (thismin):
+            thismin = array[np.where (np.isfinite (array))].min ()
+        if not np.isfinite (thismax):
+            thismax = array[np.where (np.isfinite (array))].max ()
 
         if amin is None:
             w, h, amin, amax = thisw, thish, thismin, thismax
@@ -929,9 +929,9 @@ def cycle (arrays, descs=None, cadence=0.6, toworlds=None, yflip=False):
     stride = cairo.ImageSurface.format_stride_for_width (cairo.FORMAT_ARGB32, w)
     # stride is in bytes:
     assert stride % 4 == 0
-    imgdata = N.empty ((n, h, stride // 4), dtype=N.uint32)
-    fixed = N.empty ((n, h, w), dtype=N.int32)
-    antimask = N.empty ((n, h, w), dtype=N.bool_)
+    imgdata = np.empty ((n, h, stride // 4), dtype=np.uint32)
+    fixed = np.empty ((n, h, w), dtype=np.int32)
+    antimask = np.empty ((n, h, w), dtype=np.bool_)
     surfaces = [None] * n
 
     imgdata.fill (0xFF000000)
@@ -940,7 +940,7 @@ def cycle (arrays, descs=None, cadence=0.6, toworlds=None, yflip=False):
         surfaces[i] = cairo.ImageSurface.create_for_data (imgdata[i], cairo.FORMAT_ARGB32,
                                                           w, h, stride)
 
-        if N.ma.is_masked (array):
+        if np.ma.is_masked (array):
             filled = array.filled (amin)
             antimask[i] = ~array.mask
         else:
@@ -958,23 +958,23 @@ def cycle (arrays, descs=None, cadence=0.6, toworlds=None, yflip=False):
     def getdesci (i):
         return descs[i]
 
-    clipped = N.zeros ((h, w), dtype=N.int32) # scratch array
+    clipped = np.zeros ((h, w), dtype=np.int32) # scratch array
 
     def settuningi (i, tunerx, tunery):
-        N.bitwise_and (imgdata[i], 0xFF000000, imgdata[i])
+        np.bitwise_and (imgdata[i], 0xFF000000, imgdata[i])
 
         fmin = int (0x0FFFFFF0 * tunerx)
         fmax = int (0x0FFFFFF0 * tunery)
 
         if fmin == fmax:
-            N.add (imgdata[i], 255 * (fixed[i] > fmin), imgdata[i])
+            np.add (imgdata[i], 255 * (fixed[i] > fmin), imgdata[i])
         else:
-            N.clip (fixed[i], fmin, fmax, clipped)
-            N.subtract (clipped, fmin, clipped)
-            N.multiply (clipped, 255. / (fmax - fmin), clipped)
-            N.add (imgdata[i], clipped, imgdata[i])
+            np.clip (fixed[i], fmin, fmax, clipped)
+            np.subtract (clipped, fmin, clipped)
+            np.multiply (clipped, 255. / (fmax - fmin), clipped)
+            np.add (imgdata[i], clipped, imgdata[i])
 
-        N.multiply (imgdata[i], antimask[i], imgdata[i])
+        np.multiply (imgdata[i], antimask[i], imgdata[i])
 
     def getsurfacei (i, xoffset, yoffset, width, height):
         return surfaces[i], xoffset, yoffset
@@ -983,7 +983,7 @@ def cycle (arrays, descs=None, cadence=0.6, toworlds=None, yflip=False):
         def fmtstatusi (i, x, y):
             s = ''
             if x >= 0 and y >= 0 and x < w and y < h:
-                if not N.ma.is_masked (arrays[i]) or not arrays[i].mask[y,x]:
+                if not np.ma.is_masked (arrays[i]) or not arrays[i].mask[y,x]:
                     s += '%g ' % arrays[i][y,x]
             if yflip:
                 y = h - 1 - y
@@ -993,7 +993,7 @@ def cycle (arrays, descs=None, cadence=0.6, toworlds=None, yflip=False):
         def fmtstatusi (i, x, y):
             s = ''
             if x >= 0 and y >= 0 and x < w and y < h:
-                if not N.ma.is_masked (arrays[i]) or not arrays[i].mask[y,x]:
+                if not np.ma.is_masked (arrays[i]) or not arrays[i].mask[y,x]:
                     s += '%g ' % arrays[i][y,x]
             if yflip:
                 y = h - 1 - y
