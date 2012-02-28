@@ -1344,9 +1344,31 @@ else:
 
 # Task implementation.
 
-def die (s):
-    print >>sys.stderr, 'Error:', s
-    return 1
+## quickutil: die
+#- snippet: die.py
+#- date: 2012 Feb 27
+#- SHA1: 1bb64c8c018023854995c0f8954a2bdc625a7ee0
+def die (fmt, *args):
+    """Raise a :exc:`SystemExit` exception with a formatted error message.
+
+:arg str format: a format string
+:arg args: arguments to the format string
+
+If *args* is empty, a :exc:`SystemExit` exception is raised with the
+argument ``'error: ' + str (fmt)``. Otherwise, the string component is
+``fmt % args``. If uncaught, the interpreter exits with an error code
+and prints the exception argument.
+
+Example::
+
+   if ndim != 3:
+      die ('require exactly 3 dimensions, not %d', ndim)
+"""
+
+    if not len (args):
+        raise SystemExit ('error: ' + str (fmt))
+    raise SystemExit ('error: ' + (fmt % args))
+## end
 
 
 def taskCalc (args):
