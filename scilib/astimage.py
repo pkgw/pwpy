@@ -169,8 +169,10 @@ def _get_wcs_scale (wcs, naxis):
         try:
             uc = pywcs.UnitConverter (text, 'rad')
             wcscale[i] = uc.scale
-        except SyntaxError: # !!
+        except SyntaxError: # !! pywcs 1.10
             pass # not an angle unit; don't futz.
+        except ValueError: # pywcs 1.11
+            pass
 
     return wcscale
 
