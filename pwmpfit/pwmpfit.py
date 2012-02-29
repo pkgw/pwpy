@@ -1,7 +1,7 @@
 """pwmpfit - Pythonic, Numpy-based port of MPFIT.
 """
 
-import numpy as N
+import numpy as np
 
 
 # Quickie testing infrastructure
@@ -58,7 +58,7 @@ PI_NUM_O = 2
 # calculator can be slow, while the "fast" version can be susceptible
 # to under- or overflows.
 
-_enorm_fast = lambda v, finfo: N.sqrt (N.dot (v, v))
+_enorm_fast = lambda v, finfo: np.sqrt (np.dot (v, v))
 
 def _enorm_careful (v, finfo):
     #if v.size == 0:
@@ -75,12 +75,12 @@ def _enorm_careful (v, finfo):
     
     if mx == 0:
         return v[0] * 0. # preserve type (?)
-    if not N.isfinite (mx):
+    if not np.isfinite (mx):
         raise ValueError ('computed nonfinite vector norm')
     if mx > agiant or mx < adwarf:
-        return mx * N.sqrt (N.dot (v / mx, v / mx))
+        return mx * np.sqrt (np.dot (v / mx, v / mx))
     
-    return N.sqrt (N.dot (v, v))
+    return np.sqrt (np.dot (v, v))
 
 
 # Q-R factorization.
@@ -104,7 +104,7 @@ Computes the Q-R factorization of the matrix 'a', with pivoting, in a
 packed form, in-place. The packed information can be used to construct
 matrices q and r such that
 
-  N.dot (q, r) = a[:,pmut]
+  np.dot (q, r) = a[:,pmut]
 
 where q is m-by-m and q q^T = ident and r is m-by-n and is upper
 triangular.  The function _qr_factor_full can compute these
@@ -151,14 +151,14 @@ appeared in Linpack."""
 
     # Initialize our various arrays.
 
-    acnorm = N.empty (n, finfo.dtype)
+    acnorm = np.empty (n, finfo.dtype)
     for j in xrange (n):
         acnorm[j] = enorm (a[:,j], finfo)
 
     rdiag = acnorm.copy ()
     wa = rdiag.copy ()
 
-    pmut = N.arange (n)
+    pmut = np.arange (n)
 
     # Start the computation.
 
@@ -201,11 +201,11 @@ appeared in Linpack."""
             aij = a[i:,lj] # modifying aij modifies a as well.
 
             if a[i,li] != 0:
-                aij -= aii * N.dot (aij, aii) / a[i,li]
+                aij -= aii * np.dot (aij, aii) / a[i,li]
 
             if rdiag[j] != 0:
                 temp = a[i,lj] / rdiag[j]
-                rdiag[j] *= N.sqrt (max (1 - temp**2, 0))
+                rdiag[j] *= np.sqrt (max (1 - temp**2, 0))
                 temp = rdiag[j] / wa[j]
 
                 if 0.05 * temp**2 <= machep:
@@ -217,22 +217,22 @@ appeared in Linpack."""
     return pmut, rdiag, acnorm
 
 
-def _manual_qr_factor_packed (a, dtype=N.float):
+def _manual_qr_factor_packed (a, dtype=np.float):
     # This testing function gives sensible defaults to _qr_factor_packed
     # and makes a copy of its input to make comparisons easier.
 
-    a = N.array (a, dtype)
-    pmut, rdiag, acnorm = _qr_factor_packed (a, _enorm_careful, N.finfo (dtype))
+    a = np.array (a, dtype)
+    pmut, rdiag, acnorm = _qr_factor_packed (a, _enorm_careful, np.finfo (dtype))
     return a, pmut, rdiag, acnorm
 
 
-def _qr_factor_full (a, dtype=N.float):
+def _qr_factor_full (a, dtype=np.float):
     """Compute the QR factorization of a matrix, with pivoting.
 
 Parameters:
 a     - An m-by-n arraylike, m >= n.
 dtype - (optional) The data type to use for computations.
-        Default is N.float.
+        Default is np.float.
 
 Returns:
 q    - An m-by-m orthogonal matrix (q q^T = ident)
@@ -241,7 +241,7 @@ pmut - An n-element permutation vector
 
 The returned values will satisfy the equation
 
-N.dot (q, r) = a[:,pmut]
+np.dot (q, r) = a[:,pmut]
 
 The outputs are computed indirectly via the function
 _qr_factor_packed. If you need to compute q and r matrices in
@@ -266,7 +266,7 @@ pmut[i]'th column of 'a' has the i'th biggest norm."""
     # we need to permute indices when accessing 'a', which is
     # in the "unpermuted" frame.
 
-    r = N.zeros ((m, n))
+    r = np.zeros ((m, n))
 
     for i in xrange (n):
         r[:i,i] = packed[:i,pmut[i]]
@@ -278,15 +278,15 @@ pmut[i]'th column of 'a' has the i'th biggest norm."""
     # vector, construct the matrix for the Householder transform,
     # and build up the Q matrix.
 
-    q = N.eye (m)
-    v = N.empty (m)
+    q = np.eye (m)
+    v = np.empty (m)
 
     for i in xrange (n):
         v[:] = packed[:,pmut[i]]
         v[0:i] = 0
         
-        hhm = N.eye (m) - 2 * N.outer (v, v) / N.dot (v, v)
-        q = N.dot (q, hhm)
+        hhm = np.eye (m) - 2 * np.outer (v, v) / np.dot (v, v)
+        q = np.dot (q, hhm)
 
     return q, r, pmut
 
@@ -298,7 +298,7 @@ def _qr_examples ():
     # use pivoting whereas his example didn't. But the results become
     # the same if you remove the pivoting bits.
 
-    a = N.asarray ([[9., 4], [2, 8], [6, 7]])
+    a = np.asarray ([[9., 4], [2, 8], [6, 7]])
     packed, pmut, rdiag, acnorm = _manual_qr_factor_packed (a)
     
     Taaae (packed, [[-8.27623852, 1.35218036],
@@ -310,15 +310,15 @@ def _qr_examples ():
     Taaae (acnorm, [11.0, 11.35781669])
 
     q, r, pmut = _qr_factor_full (a)
-    Taaae (N.dot (q, r), a[:,pmut])
+    Taaae (np.dot (q, r), a[:,pmut])
 
     # This is the sample given in Wikipedia. I know, shameful!  Once
     # again, the Wikipedia example doesn't include pivoting, but the
     # numbers work out.
 
-    a = N.asarray ([[12., -51, 4],
-                    [6, 167, -68],
-                    [-4, 24, -41]])
+    a = np.asarray ([[12., -51, 4],
+                     [6, 167, -68],
+                     [-4, 24, -41]])
     packed, pmut, rdiag, acnorm = _manual_qr_factor_packed (a)
     Taaae (packed, [[ 1.66803309,  1.28935268, -71.16941178],
                     [-2.18085468, -0.94748818,   1.36009392],
@@ -333,27 +333,27 @@ def _qr_examples ():
     # from rotation matrices and chose R pretty dumbly to get a
     # nice-ish matrix following the columnar norm constraint.
 
-    r3 = N.sqrt (3)
-    a = N.asarray ([[-3 * r3, 3 * r3],
-                    [7, 9],
-                    [-2, -6]])
+    r3 = np.sqrt (3)
+    a = np.asarray ([[-3 * r3, 3 * r3],
+                     [7, 9],
+                     [-2, -6]])
     q, r, pmut = _qr_factor_full (a)
 
-    r *= N.sign (q[0,0])
+    r *= np.sign (q[0,0])
     for i in xrange (3):
         # Normalize signs.
-        q[:,i] *= (-1)**i * N.sign (q[0,i])
+        q[:,i] *= (-1)**i * np.sign (q[0,i])
 
     assert pmut[0] == 1
     assert pmut[1] == 0
 
-    Taaae (q, 0.25 * N.asarray ([[r3, -2 * r3, 1],
-                                 [3, 2, r3], 
-                                 [-2, 0, 2 * r3]]))
-    Taaae (r, N.asarray ([[12, 4],
-                          [0, 8],
-                          [0, 0]]))
-    Taaae (N.dot (q, r), a[:,pmut])
+    Taaae (q, 0.25 * np.asarray ([[r3, -2 * r3, 1],
+                                  [3, 2, r3],
+                                  [-2, 0, 2 * r3]]))
+    Taaae (r, np.asarray ([[12, 4],
+                           [0, 8],
+                           [0, 0]]))
+    Taaae (np.dot (q, r), a[:,pmut])
 
 
 # QR solution.
@@ -444,11 +444,11 @@ P^T (A^T A + D D) P = S^T S.
 
             if abs (r[j,j]) < abs (sdiag[j]):
                 cot = r[j,j] / sdiag[j]
-                sin = 0.5 / N.sqrt (0.25 + 0.25 * cot**2)
+                sin = 0.5 / np.sqrt (0.25 + 0.25 * cot**2)
                 cos = sin * cot
             else:
                 tan = sdiag[j] / r[j,j]
-                cos = 0.5 / N.sqrt (0.25 + 0.25 * tan**2)
+                cos = 0.5 / np.sqrt (0.25 + 0.25 * tan**2)
                 sin = cos * tan
 
             # "Compute the modified diagonal element of r and the
@@ -484,7 +484,7 @@ P^T (A^T A + D D) P = S^T S.
         zwork[nsing-1] /= sdiag[nsing-1] # Degenerate case
         # "Reverse loop"
         for i in xrange (nsing - 2, -1, -1):
-            s = N.dot (r[i+1:nsing,i], zwork[i+1:nsing])
+            s = np.dot (r[i+1:nsing,i], zwork[i+1:nsing])
             zwork[i] = (zwork[i] - s) / sdiag[i]
 
     # "Permute the components of z back to components of x."
@@ -492,14 +492,14 @@ P^T (A^T A + D D) P = S^T S.
     return x
 
 
-def _manual_qrd_solve (r, pmut, ddiag, qtb, dtype=N.float, build_s=False):
-    r = N.asarray (r, dtype)
-    pmut = N.asarray (pmut, N.int)
-    ddiag = N.asarray (ddiag, dtype)
-    qtb = N.asarray (qtb, dtype)
+def _manual_qrd_solve (r, pmut, ddiag, qtb, dtype=np.float, build_s=False):
+    r = np.asarray (r, dtype)
+    pmut = np.asarray (pmut, np.int)
+    ddiag = np.asarray (ddiag, dtype)
+    qtb = np.asarray (qtb, dtype)
 
     swork = r.copy ()
-    sdiag = N.empty (r.shape[0], r.dtype)
+    sdiag = np.empty (r.shape[0], r.dtype)
 
     x = _qrd_solve (swork, pmut, ddiag, qtb, sdiag)
 
@@ -516,7 +516,7 @@ def _manual_qrd_solve (r, pmut, ddiag, qtb, dtype=N.float, build_s=False):
     return x, swork
 
 
-def _qrd_solve_full (a, b, ddiag, dtype=N.float):
+def _qrd_solve_full (a, b, ddiag, dtype=np.float):
     """Solve the equation A x = B, D x = 0.
 
 Parameters:
@@ -541,9 +541,9 @@ the columns of 'a' in order of nonincreasing rank, so that a[:,pmut]
 has its columns sorted that way.
 """
 
-    a = N.asarray (a, dtype)
-    b = N.asarray (b, dtype)
-    ddiag = N.asarray (ddiag, dtype)
+    a = np.asarray (a, dtype)
+    b = np.asarray (b, dtype)
+    ddiag = np.asarray (ddiag, dtype)
 
     m, n = a.shape
     assert m >= n
@@ -553,7 +553,7 @@ has its columns sorted that way.
     # The computation is straightforward.
 
     q, r, pmut = _qr_factor_full (a)
-    qtb = N.dot (q.T, b)
+    qtb = np.dot (q.T, b)
     x, s = _manual_qrd_solve (r[:n], pmut, ddiag, qtb, 
                               dtype=dtype, build_s=True)
 
@@ -566,29 +566,29 @@ def _qrd_solve_alone ():
     # also the QR factorization bits.
 
     # The very simplest case.
-    r = N.eye (2)
-    pmut = N.asarray ([0, 1])
-    diag = N.asarray ([0., 0])
-    qtb = N.asarray ([3., 5])
+    r = np.eye (2)
+    pmut = np.asarray ([0, 1])
+    diag = np.asarray ([0., 0])
+    qtb = np.asarray ([3., 5])
     x, s = _manual_qrd_solve (r, pmut, diag, qtb, build_s=True)
     Taaae (x, [3., 5])
-    Taaae (s, N.eye (2))
+    Taaae (s, np.eye (2))
 
     # Now throw in a diagonal matrix ...
-    diag = N.asarray ([2., 3.])
+    diag = np.asarray ([2., 3.])
     x, s = _manual_qrd_solve (r, pmut, diag, qtb, build_s=True)
     Taaae (x, [0.6, 0.5])
-    Taaae (s, N.sqrt (N.diag ([5, 10])))
+    Taaae (s, np.sqrt (np.diag ([5, 10])))
 
     # And a permutation. We permute A but maintain
     # B, effectively saying x1 = 5, x2 = 3, so
     # we need to permute diag as well to scale them
     # by the amounts that yield nice X values.
-    pmut = N.asarray ([1, 0])
-    diag = N.asarray ([3., 2.])
+    pmut = np.asarray ([1, 0])
+    diag = np.asarray ([3., 2.])
     x, s = _manual_qrd_solve (r, pmut, diag, qtb, build_s=True)
     Taaae (x, [0.5, 0.6])
-    Taaae (s, N.sqrt (N.diag ([5, 10])))
+    Taaae (s, np.sqrt (np.diag ([5, 10])))
 
 
 # Calculation of the Levenberg-Marquardt parameter
@@ -603,7 +603,7 @@ def _lmpar (r, ipvt, diag, qtb, delta, x, sdiag, par, enorm, finfo):
 
     nsing = n
     wa1 = qtb.copy ()
-    wh = N.where (r.diagonal () == 0)
+    wh = np.where (r.diagonal () == 0)
     if len (wh[0]) > 0:
         nsing = wh[0][0]
         wa1[wh[0][0]:] = 0
@@ -636,7 +636,7 @@ def _lmpar (r, ipvt, diag, qtb, delta, x, sdiag, par, enorm, finfo):
         wa1 = diag[ipvt] * wa2[ipvt] / dxnorm
         wa1[0] /= r[0,0] # Degenerate case 
         for j in xrange (1, n):
-            s = N.dot (r[:j,j], wa1[:j])
+            s = np.dot (r[:j,j], wa1[:j])
             wa1[j] = (wa1[j] - s) / r[j,j]
 
         temp = enorm (wa1, finfo)
@@ -645,14 +645,14 @@ def _lmpar (r, ipvt, diag, qtb, delta, x, sdiag, par, enorm, finfo):
     # "Calculate an upper bound, paru, for the zero of the function."
 
     for j in xrange (n):
-        s = N.dot (r[:j+1,j], qtb[:j+1])
+        s = np.dot (r[:j+1,j], qtb[:j+1])
         wa1[j] = s / diag[ipvt[j]]
     gnorm = enorm (wa1, finfo)
     paru = gnorm / delta
     if paru == 0:
         paru = dwarf / min (delta, 0.1)
 
-    par = N.clip (par, parl, paru)
+    par = np.clip (par, parl, paru)
     if par == 0:
         par = gnorm / dxnorm
 
@@ -664,7 +664,7 @@ def _lmpar (r, ipvt, diag, qtb, delta, x, sdiag, par, enorm, finfo):
         if par == 0:
             par = max (dwarf, paru * 0.001)
 
-        temp = N.sqrt (par)
+        temp = np.sqrt (par)
         wa1 = temp * diag
         x = _qrd_solve (r, ipvt, wa1, qtb, sdiag)
         wa2 = diag * x
@@ -780,18 +780,18 @@ class Problem (object):
         if self._npar is not None and self._npar == npar:
             return self
 
-        newinfof = p = N.ndarray ((PI_NUM_F, npar), dtype=N.float)
-        p[PI_F_VALUE] = N.nan
-        p[PI_F_LLIMIT] = -N.inf
-        p[PI_F_ULIMIT] = N.inf
+        newinfof = p = np.ndarray ((PI_NUM_F, npar), dtype=np.float)
+        p[PI_F_VALUE] = np.nan
+        p[PI_F_LLIMIT] = -np.inf
+        p[PI_F_ULIMIT] = np.inf
         p[PI_F_STEP] = 0.
-        p[PI_F_MAXSTEP] = N.inf
+        p[PI_F_MAXSTEP] = np.inf
 
-        newinfoo = p = N.ndarray ((PI_NUM_O, npar), dtype=N.object)
+        newinfoo = p = np.ndarray ((PI_NUM_O, npar), dtype=np.object)
         p[PI_O_NAME] = None
         p[PI_O_TIED] = None
 
-        newinfob = p = N.ndarray (npar, dtype=N.int)
+        newinfob = p = np.ndarray (npar, dtype=np.int)
         p[:] = 0
 
         if self._npar is not None:
@@ -810,15 +810,15 @@ class Problem (object):
 
     def _setBit (self, idx, mask, cond):
         p = self._pinfob
-        p[idx] = (p[idx] & ~mask) | N.where (cond, mask, 0x0)
+        p[idx] = (p[idx] & ~mask) | np.where (cond, mask, 0x0)
 
 
     def _getBits (self, mask):
-        return N.where (self._pinfob & mask, True, False)
+        return np.where (self._pinfob & mask, True, False)
 
 
     def pValue (self, idx, value, fixed=False):
-        if N.any (-N.isfinite (value)):
+        if np.any (-np.isfinite (value)):
             raise ValueError ('value')
 
         self._pinfof[PI_F_VALUE,idx] = value
@@ -826,8 +826,8 @@ class Problem (object):
         return self
 
 
-    def pLimit (self, idx, lower=-N.inf, upper=N.inf):
-        if N.any (lower > upper):
+    def pLimit (self, idx, lower=-np.inf, upper=np.inf):
+        if np.any (lower > upper):
             raise ValueError ('lower/upper')
 
         self._pinfof[PI_F_LLIMIT,idx] = lower
@@ -836,17 +836,17 @@ class Problem (object):
         # Try to be clever here -- setting lower = upper
         # marks the parameter as fixed.
 
-        w = N.where (lower == upper)
+        w = np.where (lower == upper)
         if len (w) > 0 and w[0].size > 0:
-            self.pValue (w, N.atleast_1d (lower)[w], True)
+            self.pValue (w, np.atleast_1d (lower)[w], True)
 
         return self
 
 
-    def pStep (self, idx, step, maxstep=N.inf, isrel=False):
-        if N.any (N.isinf (step)):
+    def pStep (self, idx, step, maxstep=np.inf, isrel=False):
+        if np.any (np.isinf (step)):
             raise ValueError ('step')
-        if N.any ((step > maxstep) & ~isrel):
+        if np.any ((step > maxstep) & ~isrel):
             raise ValueError ('step > maxstep')
 
         self._pinfof[PI_F_STEP,idx] = step
@@ -856,7 +856,7 @@ class Problem (object):
 
 
     def pSide (self, idx, mode):
-        if N.any (mode < 0 or mode > 3):
+        if np.any (mode < 0 or mode > 3):
             raise ValueError ('mode')
 
         p = self._pinfob
@@ -870,8 +870,8 @@ class Problem (object):
 
 
     def pTie (self, idx, tiefunc):
-        t1 = N.atleast_1d (tiefunc)
-        if not N.all ([x is None or callable (x) for x in t1]):
+        t1 = np.atleast_1d (tiefunc)
+        if not np.all ([x is None or callable (x) for x in t1]):
             raise ValueError ('tiefunc')
 
         self._pinfoo[PI_O_TIED,idx] = tiefunc
@@ -897,34 +897,34 @@ class Problem (object):
 
         p = self._pinfof
 
-        if N.any (N.isinf (p[PI_F_VALUE])):
+        if np.any (np.isinf (p[PI_F_VALUE])):
             raise ValueError ('Some specified initial values infinite.')
 
-        if N.any (N.isinf (p[PI_F_STEP])):
+        if np.any (np.isinf (p[PI_F_STEP])):
             raise ValueError ('Some specified parameter steps infinite.')
 
-        if N.any ((p[PI_F_STEP] > p[PI_F_MAXSTEP]) & ~self._getBits (PI_M_RELSTEP)):
+        if np.any ((p[PI_F_STEP] > p[PI_F_MAXSTEP]) & ~self._getBits (PI_M_RELSTEP)):
             raise ValueError ('Some specified steps bigger than specified maxsteps.')
 
-        if N.any (p[PI_F_LLIMIT] > p[PI_F_ULIMIT]):
+        if np.any (p[PI_F_LLIMIT] > p[PI_F_ULIMIT]):
             raise ValueError ('Some param lower limits > upper limits.')
 
-        if N.any (p[PI_F_VALUE] < p[PI_F_LLIMIT]):
+        if np.any (p[PI_F_VALUE] < p[PI_F_LLIMIT]):
             raise ValueError ('Some param values < lower limits.')
 
-        if N.any (p[PI_F_VALUE] > p[PI_F_ULIMIT]):
+        if np.any (p[PI_F_VALUE] > p[PI_F_ULIMIT]):
             raise ValueError ('Some param values < lower limits.')
 
         p = self._pinfoo
 
-        if not N.all ([x is None or callable (x) for x in p[PI_O_TIED]]):
+        if not np.all ([x is None or callable (x) for x in p[PI_O_TIED]]):
             raise ValueError ('Some tied values not None or callable.')
 
         # And compute some useful arrays. A tied parameter counts as fixed.
 
-        tied = N.asarray ([x is not None for x in self._pinfoo[PI_O_TIED]])
-        self._anytied = N.any (tied)
-        self._ifree = N.where (-(self._getBits (PI_M_FIXED) | tied))[0]
+        tied = np.asarray ([x is not None for x in self._pinfoo[PI_O_TIED]])
+        self._anytied = np.any (tied)
+        self._ifree = np.where (-(self._getBits (PI_M_FIXED) | tied))[0]
 
 
     def getNFree (self):
@@ -963,7 +963,7 @@ class Problem (object):
         self._checkParamConfig ()
         npar = self._npar
 
-        if not N.all (N.isfinite (errinv)):
+        if not np.all (np.isfinite (errinv)):
             raise ValueError ('some uncertainties are zero or nonfinite')
 
         # FIXME: handle yobs.ndim != 1 and/or yops being complex
@@ -981,14 +981,14 @@ class Problem (object):
         else:
             def ywrap (pars, nresids):
                 yfunc (pars, nresids)
-                if not N.all (N.isfinite (nresids)):
+                if not np.all (np.isfinite (nresids)):
                     raise RuntimeError ('function returned nonfinite values')
                 subtract (yobs, nresids, nresids)
                 multiply (nresids, errinv, nresids)
                 #print 'N:', (nresids**2).sum ()
             def jwrap (pars, jac):
                 jfunc (pars, jac)
-                if not N.all (N.isfinite (jac)):
+                if not np.all (np.isfinite (jac)):
                     raise RuntimeError ('jacobian returned nonfinite values')
                 multiply (jac, -1, jac)
                 for i in xrange (npar):
@@ -1031,7 +1031,7 @@ class Problem (object):
         self.debugJac = bool (self.debugJac)
 
         if self.diag is not None:
-            self.diag = N.asarray (self.diag, dtype=N.float)
+            self.diag = np.asarray (self.diag, dtype=np.float)
         
         # Bounds and type checks
 
@@ -1065,7 +1065,7 @@ class Problem (object):
         if self.rescale:
             if self.diag is None or self.diag.shape != (self._npar, ):
                 raise ValueError ('diag')
-            if N.any (self.diag <= 0.):
+            if np.any (self.diag <= 0.):
                 raise ValueError ('diag')
 
 
@@ -1119,7 +1119,7 @@ class Problem (object):
             print vec
 
         if self.damp > 0:
-            N.tanh (vec / self.damp, vec)
+            np.tanh (vec / self.damp, vec)
 
 
     def _jcall (self, x, jac):
@@ -1135,11 +1135,11 @@ class Problem (object):
             print jac
 
 
-    def solve (self, x0=None, dtype=N.float):
+    def solve (self, x0=None, dtype=np.float):
         if x0 is not None:
-            x0 = N.asarray (x0, dtype=dtype)
+            x0 = np.asarray (x0, dtype=dtype)
 
-        finfo = N.finfo (dtype)
+        finfo = np.finfo (dtype)
 
         self._fixupCheck ()
         ifree = self._ifree
@@ -1151,8 +1151,8 @@ class Problem (object):
         isrel = self._getBits (PI_M_RELSTEP)
         dside = self._pinfob & PI_M_SIDE
         maxstep = self._pinfof[PI_F_MAXSTEP]
-        qmax = N.isfinite (maxstep)
-        qminmax = N.any (qmax)
+        qmax = np.isfinite (maxstep)
+        qminmax = np.any (qmax)
 
         # Which parameters are actually free?
         nfree = ifree.size
@@ -1165,11 +1165,11 @@ class Problem (object):
 
         # Which parameters have limits?
 
-        qulim = N.isfinite (self._pinfof[PI_F_ULIMIT,ifree])
+        qulim = np.isfinite (self._pinfof[PI_F_ULIMIT,ifree])
         ulim = self._pinfof[PI_F_ULIMIT,ifree]
-        qllim = N.isfinite (self._pinfof[PI_F_LLIMIT,ifree])
+        qllim = np.isfinite (self._pinfof[PI_F_LLIMIT,ifree])
         llim = self._pinfof[PI_F_LLIMIT,ifree]
-        qanylim = N.any (qulim) or N.any (qllim)
+        qanylim = np.any (qulim) or np.any (qllim)
 
         # Init fnorm
 
@@ -1180,7 +1180,7 @@ class Problem (object):
 
         self._enorm = _enorm
         n = nfree
-        fvec = N.ndarray (self._nout, x0.dtype)
+        fvec = np.ndarray (self._nout, x0.dtype)
         ycall = self._ycall
 
         ycall (self.params, fvec)
@@ -1215,19 +1215,19 @@ class Problem (object):
 
             if qanylim:
                 # Check for parameters pegged at limits
-                whlpeg = N.where (qllim & (x == llim))
+                whlpeg = np.where (qllim & (x == llim))
                 nlpeg = len (whlpeg[0])
-                whupeg = N.where (qulim & (x == ulim))
+                whupeg = np.where (qulim & (x == ulim))
                 nupeg = len (whupeg[0])
 
                 if nlpeg > 0:
                     # Check total derivative of sum wrt lower-pegged params
                     for i in xrange (nlpeg):
-                        if N.dot (fvec, fjac[:,whlpeg[0][i]]) > 0:
+                        if np.dot (fvec, fjac[:,whlpeg[0][i]]) > 0:
                             fjac[:,whlpeg[i]] = 0
                 if nupeg > 0:
                     for i in xrange (nupeg):
-                        if N.dot (fvec, fjac[:,whupeg[0][i]]) < 0:
+                        if np.dot (fvec, fjac[:,whupeg[0][i]]) < 0:
                             fjac[:,whupeg[i]] = 0
 
             # Compute QR factorization of the Jacobian
@@ -1241,7 +1241,7 @@ class Problem (object):
                     diag = self.diag.copy ()
                 else:
                     diag = wa2.copy ()
-                    diag[N.where (diag == 0)] = 1.
+                    diag[np.where (diag == 0)] = 1.
 
                 # Calculate norm of scaled x, initialize step bound delta
                 xnorm = _enorm (diag * x, finfo)
@@ -1259,7 +1259,7 @@ class Problem (object):
                 if temp3 != 0:
                     fj = fjac[j:,lj]
                     wj = wa4[j:len (wa4)]
-                    wa4[j:len (wa4)] = wj - fj * N.dot (fj, wj) / temp3
+                    wa4[j:len (wa4)] = wj - fj * np.dot (fj, wj) / temp3
                 fjac[j,lj] = wa1[j]
                 qtf[j] = wa4[j]
 
@@ -1275,7 +1275,7 @@ class Problem (object):
             # "Check for overflow. This should be a cheap test here
             # since fjac has been reduced to a small square matrix."
 
-            if N.any (-N.isfinite (fjac)):
+            if np.any (-np.isfinite (fjac)):
                 raise RuntimeError ('Nonfinite terms in Jacobian matrix!')
 
             # Calculate the norm of the scaled gradient
@@ -1285,7 +1285,7 @@ class Problem (object):
                 for j in xrange (n):
                     l = ipvt[j]
                     if wa2[l] != 0:
-                        s = N.dot (fjac[:j+1,j], qtf[:j+1]) / self.fnorm
+                        s = np.dot (fjac[:j+1,j], qtf[:j+1]) / self.fnorm
                         gnorm = max (gnorm, abs (s / wa2[l]))
 
             # Test for convergence of gradient norm
@@ -1295,7 +1295,7 @@ class Problem (object):
                 break
 
             if not self.rescale:
-                diag = N.where (diag > wa2, diag, wa2)
+                diag = np.where (diag > wa2, diag, wa2)
 
             # Inner loop
             while True:
@@ -1315,18 +1315,18 @@ class Problem (object):
 
                     if qanylim:
                         if nlpeg > 0:
-                            wa1[whlpeg] = N.clip (wa1[whlpeg], 0., max (wa1))
+                            wa1[whlpeg] = np.clip (wa1[whlpeg], 0., max (wa1))
                         if nupeg > 0:
-                            wa1[whupeg] = N.clip (wa1[whupeg], min (wa1), 0.)
+                            wa1[whupeg] = np.clip (wa1[whupeg], min (wa1), 0.)
 
                         dwa1 = abs (wa1) > finfo.eps
-                        whl = N.where ((dwa1 != 0.) & qllim & ((x + wa1) < llim))
+                        whl = np.where ((dwa1 != 0.) & qllim & ((x + wa1) < llim))
 
                         if len (whl[0]) > 0:
                             t = (llim[whl] - x[whl]) / wa1[whl]
                             alpha = min (alpha, t.min ())
 
-                        whu = N.where ((dwa1 != 0.) & qulim & ((x + wa1) > ulim))
+                        whu = np.where ((dwa1 != 0.) & qulim & ((x + wa1) > ulim))
 
                         if len (whu[0]) > 0:
                             t = (ulim[whu] - x[whu]) / wa1[whu]
@@ -1335,7 +1335,7 @@ class Problem (object):
                     # Obey max step values
                     if qminmax:
                         nwa1 = wa1 * alpha
-                        whmax = N.where (qmax)
+                        whmax = np.where (qmax)
                         if len (whmax[0]) > 0:
                             mrat = (nwa1[whmax] / maxstep[whmax]).max ()
                             if mrat > 1:
@@ -1347,10 +1347,10 @@ class Problem (object):
 
                     # Adjust final output values: if we're supposed to be
                     # exactly on a boundary, make it exact.
-                    wh = N.where (qulim & (wa2 >= ulim * (1 - finfo.eps)))
+                    wh = np.where (qulim & (wa2 >= ulim * (1 - finfo.eps)))
                     if len (wh[0]) > 0:
                         wa2[wh] = ulim[wh]
-                    wh = N.where (qllim & (wa2 <= llim * (1 + finfo.eps)))
+                    wh = np.where (qllim & (wa2 <= llim * (1 + finfo.eps)))
                     if len (wh[0]) > 0:
                         wa2[wh] = llim[wh]
 
@@ -1386,7 +1386,7 @@ class Problem (object):
                 # taken."
 
                 temp1 = _enorm (alpha * wa3, finfo) / self.fnorm
-                temp2 = N.sqrt (alpha * par) * pnorm / self.fnorm
+                temp2 = np.sqrt (alpha * par) * pnorm / self.fnorm
                 prered = temp1**2 + 2 * temp2**2
                 dirder = -(temp1**2 + temp2**2)
 
@@ -1453,7 +1453,7 @@ class Problem (object):
                 break
 
             # Check for overflow
-            if N.any (-N.isfinite (wa1) | -N.isfinite (wa2) | -N.isfinite (x)):
+            if np.any (-np.isfinite (wa1) | -np.isfinite (wa2) | -np.isfinite (x)):
                 raise RuntimeError ('Overflow in wa1, wa2, or x!')
 
         # End outer loop.
@@ -1485,15 +1485,15 @@ class Problem (object):
                 nn = len (x0)
 
                 # Fill in actual matrix, accounting for fixed params
-                self.covar = N.zeros ((nn, nn), dtype)
+                self.covar = np.zeros ((nn, nn), dtype)
                 for i in xrange (n):
                     self.covar[ifree[i],ifree] = cv[i]
 
                 # Compute errors in parameters
-                self.perror = N.zeros (nn, dtype)
+                self.perror = np.zeros (nn, dtype)
                 d = self.covar.diagonal ()
-                wh = N.where (d >= 0)
-                self.perror[wh] = N.sqrt (d[wh])
+                wh = np.where (d >= 0)
+                self.perror[wh] = np.sqrt (d[wh])
 
         soln.ndof = self.getNDOF ()
         soln.status = status
@@ -1508,7 +1508,7 @@ class Problem (object):
         return soln
 
 
-    def moronsolve (self, x0=None, dtype=N.float, maxiter=20):
+    def moronsolve (self, x0=None, dtype=np.float, maxiter=20):
         soln = self.solve (x0, dtype)
         prevfnorm = soln.fnorm
         x0 = soln.params
@@ -1538,31 +1538,31 @@ class Problem (object):
             eps = machep
         else:
             eps = self.epsfunc
-        eps = N.sqrt (max (eps, machep))
+        eps = np.sqrt (max (eps, machep))
         m = len (fvec)
         n = len (x)
 
         if self._jfunc is not None:
             # Easy, analytic-derivative case.
-            fjac = N.zeros ((m, nall), finfo.dtype)
+            fjac = np.zeros ((m, nall), finfo.dtype)
             self._jcall (xall, fjac)
             if n < nall:
                 fjac = fjac[:,ifree]
             return fjac
 
-        fjac = N.zeros ((m, n), finfo.dtype)
-        h = eps * N.abs (x)
+        fjac = np.zeros ((m, n), finfo.dtype)
+        h = eps * np.abs (x)
 
         # Apply any fixed steps, absolute and relative.
         stepi = self._pinfof[PI_F_STEP,ifree]
-        wh = N.where (stepi > 0)
-        h[wh] = stepi[wh] * N.where (isrel[ifree[wh]], x[wh], 1.)
+        wh = np.where (stepi > 0)
+        h[wh] = stepi[wh] * np.where (isrel[ifree[wh]], x[wh], 1.)
 
         # Clamp stepsizes to maxstep.
-        N.minimum (h, maxstep[ifree], h)
+        np.minimum (h, maxstep[ifree], h)
 
         # Make sure no zero step values
-        h[N.where (h == 0)] = eps
+        h[np.where (h == 0)] = eps
 
         # Reverse sign of step if against a parameter limit or if
         # backwards-sided derivative
@@ -1570,7 +1570,7 @@ class Problem (object):
         mask = (dside == DSIDE_NEG)[ifree]
         if ulimit is not None:
             mask |= x > ulimit - h
-            wh = N.where (mask)
+            wh = np.where (mask)
             h[wh] = -h[wh]
 
         if debug:
@@ -1581,7 +1581,7 @@ class Problem (object):
         for j in xrange (n):
             xp = xall.copy ()
             xp[ifree[j]] += h[j]
-            fp = N.empty (self._nout, dtype=finfo.dtype)
+            fp = np.empty (self._nout, dtype=finfo.dtype)
             self._ycall (xp, fp)
 
             if dside[j] != DSIDE_TWO:
@@ -1590,7 +1590,7 @@ class Problem (object):
             else:
                 # Two-sided ... extra func call
                 xp[ifree[j]] = xall[ifree[j]] - h[j]
-                fm = N.empty (self._nout, dtype=finfo.dtype)
+                fm = np.empty (self._nout, dtype=finfo.dtype)
                 self._ycall (xp, fm)
                 fjac[:,j] = (fp - fm) / (2 * h[j])
 
@@ -1600,19 +1600,19 @@ class Problem (object):
         return fjac
 
 
-    def _manual_fdjac2 (self, xall, dtype=N.float):
+    def _manual_fdjac2 (self, xall, dtype=np.float):
         self._fixupCheck ()
 
         ifree = self._ifree
         
-        xall = N.atleast_1d (N.asarray (xall, dtype))
+        xall = np.atleast_1d (np.asarray (xall, dtype))
         x = xall[ifree]
-        fvec = N.empty (self._nout, dtype)
+        fvec = np.empty (self._nout, dtype)
         ulimit = self._pinfof[PI_F_ULIMIT,ifree]
         dside = self._pinfob & PI_M_SIDE
         maxstep = self._pinfof[PI_F_MAXSTEP]
         isrel = self._getBits (PI_M_RELSTEP)
-        finfo = N.finfo (dtype)
+        finfo = np.finfo (dtype)
 
         # Before we can evaluate the Jacobian, we need
         # to get the initial value of the function at
@@ -1665,7 +1665,7 @@ class Problem (object):
         # "For the full lower triangle of the covariance matrix
         # in the strict lower triangle or and in wa"
         
-        wa = N.repeat ([r[0,0]], n)
+        wa = np.repeat ([r[0,0]], n)
         
         for j in xrange (n):
             jj = ipvt[j]
@@ -1688,7 +1688,7 @@ class Problem (object):
 
 
 def checkDerivative (npar, nout, yfunc, jfunc, guess):
-    explicit = N.empty ((nout, npar))
+    explicit = np.empty ((nout, npar))
     jfunc (guess, explicit)
 
     p = Problem (npar, nout, yfunc, None)
@@ -1710,7 +1710,7 @@ def ResidualProblem (npar, yobs, errinv, yfunc, jfunc,
 
 @test
 def _solve_linear ():
-    x = N.asarray ([1, 2, 3])
+    x = np.asarray ([1, 2, 3])
     y = 2 * x + 1
 
     from numpy import multiply, add
@@ -1725,18 +1725,18 @@ def _solve_linear ():
 @test
 def _simple_automatic_jac ():
     def f (pars, vec):
-        N.exp (pars, vec)
+        np.exp (pars, vec)
 
     p = Problem (1, 1, f, None)
     j = p._manual_fdjac2 (0) 
     Taaae (j, [[1.]])
     j = p._manual_fdjac2 (1) 
-    Taaae (j, [[N.e]])
+    Taaae (j, [[np.e]])
 
     p = Problem (3, 3, f, None)
-    x = N.asarray ([0, 1, 2])
+    x = np.asarray ([0, 1, 2])
     j = p._manual_fdjac2 (x) 
-    Taaae (j, N.diag (N.exp (x)))
+    Taaae (j, np.diag (np.exp (x)))
 
 @test
 def _jac_sidedness ():
