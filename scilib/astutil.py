@@ -19,7 +19,7 @@ H2R = pi / 12
 F2S = 1 / np.sqrt (8 * np.log (2)) # FWHM to sigma
 S2F = np.sqrt (8 * np.log (2))
 
-__all__ = 'N pi twopi halfpi R2A A2R R2D D2R R2H H2R F2S S2F'.split ()
+__all__ = 'np pi twopi halfpi R2A A2R R2D D2R R2H H2R F2S S2F'.split ()
 
 
 # Angle and orientation (PA) normalization
