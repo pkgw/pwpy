@@ -689,11 +689,17 @@ def view (array, title='Array Viewer', colormap='black_to_blue', toworld=None, y
 
         return imagesurface, xoffset, yoffset
 
+    # I originally had the is_masked call inside fmtstatus and somehow
+    # it ended up causing large lags in the label updates. Can't be
+    # that CPU-intensive, right??
+
+    nomask = not np.ma.is_masked (array) or array.mask is np.ma.nomask
+
     if toworld is None:
         def fmtstatus (x, y):
             s = ''
             if x >= 0 and y >= 0 and x < w and y < h:
-                if not np.ma.is_masked (array) or not array.mask[y,x]:
+                if nomask or not array.mask[y,x]:
                     s += '%g ' % array[y,x]
             if yflip:
                 y = h - 1 - y
@@ -703,7 +709,7 @@ def view (array, title='Array Viewer', colormap='black_to_blue', toworld=None, y
         def fmtstatus (x, y):
             s = ''
             if x >= 0 and y >= 0 and x < w and y < h:
-                if not np.ma.is_masked (array) or not array.mask[y,x]:
+                if nomask or not array.mask[y,x]:
                     s += '%g ' % array[y,x]
             if yflip:
                 y = h - 1 - y
@@ -979,11 +985,15 @@ def cycle (arrays, descs=None, cadence=0.6, toworlds=None, yflip=False):
     def getsurfacei (i, xoffset, yoffset, width, height):
         return surfaces[i], xoffset, yoffset
 
+    # see comment in view()
+    nomasks = [not np.ma.is_masked (a) or a.mask is np.ma.nomask
+               for a in arrays]
+
     if toworlds is None:
         def fmtstatusi (i, x, y):
             s = ''
             if x >= 0 and y >= 0 and x < w and y < h:
-                if not np.ma.is_masked (arrays[i]) or not arrays[i].mask[y,x]:
+                if nomasks[i] or not arrays[i].mask[y,x]:
                     s += '%g ' % arrays[i][y,x]
             if yflip:
                 y = h - 1 - y
@@ -993,7 +1003,7 @@ def cycle (arrays, descs=None, cadence=0.6, toworlds=None, yflip=False):
         def fmtstatusi (i, x, y):
             s = ''
             if x >= 0 and y >= 0 and x < w and y < h:
-                if not np.ma.is_masked (arrays[i]) or not arrays[i].mask[y,x]:
+                if nomasks[i] or not arrays[i].mask[y,x]:
                     s += '%g ' % arrays[i][y,x]
             if yflip:
                 y = h - 1 - y
