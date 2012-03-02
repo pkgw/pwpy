@@ -1,0 +1,14 @@
+# This file is just -*- shell-script -*- so you can use environment
+# variables and things in the usual way.
+
+prefix=/opt/local # (required) main installation prefix
+casaprefix=/opt/casa # (optional) prefix where CASA is installed
+mirpysrc=../miriad-python # (optional) location of miriad-python source tree
+
+# casaprefix is used in the casa-python script, which makes it
+# possible to create standalone python programs that can be run using
+# CASA's builtin version of the python interpreter (see
+# e.g. intfbin/msconcat)
+
+# mirpysrc is used to install the examples from the miriad-python source
+# tree: gpcat, rtft, varcat, and chanaver.py.

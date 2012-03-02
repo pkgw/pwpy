@@ -1,13 +1,15 @@
 #! /bin/bash
 
-# Installation is configured with a shell script fragment called 'config.
+# Installation is configured with a shell script fragment called 'config'.
 # It should set these variables: prefix
 # It may set: 
 #  casaprefix - to install casa-python wrapper
 #  mirpysrc - to install example programs from miriad-python
+# See the file 'config.sample'.
 
 if [ ! -f config ] ; then
     echo >&2 "Create a file called 'config' with the install configuration."
+    echo >&2 "(See 'config.sample' for a template.)"
     exit 1
 fi
 
