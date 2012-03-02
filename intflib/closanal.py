@@ -84,7 +84,7 @@
 --
 """
 
-import numpy as N
+import numpy as np
 from mirtask import keys, util, uvdat
 import sys
 
@@ -363,10 +363,10 @@ def _format (aps):
 
 def _flagAnd (flags1, flags2, *rest):
     # Avoid allocation of many temporary arrays here.
-    isect = N.logical_and (flags1, flags2)
+    isect = np.logical_and (flags1, flags2)
 
     for f in rest:
-        N.logical_and (isect, f, isect)
+        np.logical_and (isect, f, isect)
 
     return isect
 
@@ -385,7 +385,7 @@ def _flushOneInteg3 (integData, accData, ap1, ap2, ap3):
 
     assert t12 == t13 and t12 == t23
     
-    w = N.where (_flagAnd (f12, f13, f23))
+    w = np.where (_flagAnd (f12, f13, f23))
     n = len (w[0])
 
     if n == 0: return
@@ -419,7 +419,7 @@ def _flushOneInteg4 (integData, accData, ap1, ap2, ap3, ap4):
     assert t12 == t13 and t12 == t24 and t12 == t34
 
     # Avoid div-by-zero
-    w = N.where (_flagAnd (f12, f13, f24, f34, d13 != 0, d24 != 0))
+    w = np.where (_flagAnd (f12, f13, f24, f34, d13 != 0, d24 != 0))
     n = len (w[0])
 
     if n == 0: return
@@ -451,9 +451,9 @@ def _flushOneAcc3 (accData, allData, ap1, ap2, ap3):
 
     # note! not dividing by time since that doesn't affect phase.
     # Does affect amp though.
-    ph = 180/N.pi * N.arctan2 (c.imag, c.real)
-    amp = N.abs (c) / time
-    thy = 180/N.pi * N.sqrt (v / time) / (amp ** (1./3))
+    ph = 180/np.pi * np.arctan2 (c.imag, c.real)
+    amp = np.abs (c) / time
+    thy = 180/np.pi * np.sqrt (v / time) / (amp ** (1./3))
 
     allData.accum (key, (ph, thy))
     #allData.accum (key, (time, ph, v / time))
@@ -466,8 +466,8 @@ def _flushOneAcc4 (accData, allData, ap1, ap2, ap3, ap4):
         return
 
     (time, c, v) = tup
-    amp = N.abs (c) / time
-    thy = N.sqrt (v) / time
+    amp = np.abs (c) / time
+    thy = np.sqrt (v) / time
     
     allData.accum (key, (amp, thy))
 
@@ -510,7 +510,7 @@ class ClosureComputer (object):
     def valHist (self):
         import omega
         rms = self.allrms.finish ()
-        n = int (N.ceil (N.log2 (rms.size) + 1))
+        n = int (np.ceil (np.log2 (rms.size) + 1))
         p = omega.quickHist (rms, n, keyText=self.datum)
         p.setLabels ('%s closure' % self.item, 'Number of %s' % self.datum)
         return p
@@ -518,7 +518,7 @@ class ClosureComputer (object):
 
     def bpHist (self):
         import omega
-        n = int (N.ceil (N.log2 (len (self.bpData)) + 1))
+        n = int (np.ceil (np.log2 (len (self.bpData)) + 1))
         values = [t[1] for t in self.bpData]
         p = omega.quickHist (values, n, keyText='Basepols')
         p.setLabels ('%s closure' % self.item, 'Number of basepols')
@@ -636,8 +636,8 @@ class TripleComputer (ClosureComputer):
             for (key, ag) in self.allData.iteritems ():
                 phs, thys = ag.finish ().T
                 (ap1, ap2, ap3) = key
-                rms = N.sqrt (N.mean (phs**2))
-                thy = N.sqrt (N.mean (thys**2))
+                rms = np.sqrt (np.mean (phs**2))
+                thy = np.sqrt (np.mean (thys**2))
 
                 if thy == 0.:
                     thy = -1
@@ -755,7 +755,7 @@ class QuadComputer (ClosureComputer):
 
                 # This quad is not redundant.
         
-                lrms = N.log (N.mean (amps**2)) / 2 # log of the rms
+                lrms = np.log (np.mean (amps**2)) / 2 # log of the rms
 
                 if self.rmshist:
                     self.allrms.add (lrms)
@@ -845,7 +845,7 @@ class ClosureProcessor (object):
 
             if self.uvdPlot:
                 self.uvdists.accum (util.pbp32ToBP (bp),
-                                    N.sqrt ((preamble[0:3]**2).sum ()))
+                                    np.sqrt ((preamble[0:3]**2).sum ()))
 
         # Clean up last interval
         

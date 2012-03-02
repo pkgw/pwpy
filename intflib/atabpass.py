@@ -27,7 +27,7 @@
 --
 """
 
-import sys, numpy as N, miriad
+import sys, numpy as np, miriad
 from mirtask import keys, util, uvdat
 from os.path import dirname, join
 
@@ -36,13 +36,13 @@ IDENT = '$Id$'
 
 def getData ():
     fn = join (dirname (__file__), 'hhaa.dat')
-    a = N.loadtxt (fn)
+    a = np.loadtxt (fn)
     assert a.size == 512
 
     # Mirror out the half-bandpass to the full
     # spectrum to make processing easier
     
-    biga = N.empty (1024)
+    biga = np.empty (1024)
     biga[512:] = a
 
     for i in xrange (0, 512):
@@ -50,7 +50,7 @@ def getData ():
 
     # Normalize to RMS = 1
 
-    biga /= N.sqrt ((biga**2).mean ())
+    biga /= np.sqrt ((biga**2).mean ())
     
     return biga
 
@@ -190,7 +190,7 @@ def task (args):
     if not polsVaried:
         # Number of pols never varied, so it's valid to write out
         # a single 'npol' item for the entire dataset.
-        dOut.setScalarItem ('npol', N.int32, saveNPol)
+        dOut.setScalarItem ('npol', np.int32, saveNPol)
 
     # All done. Write history entry and quit.
 

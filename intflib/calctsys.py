@@ -14,7 +14,7 @@
  The system temperatures are computed from the variance in the real
  and imaginary parts across the spectral window of a visibility --
  they are thus really expressions of the antenna system equivalent
- flux densities (SEFDs). The data for each baseline are averaged in 
+ flux densities (SEFDs). The data for each baseline are averaged in
  time (see the "interval" keyword) before the variances are computed.
  A smoothed version of the data may also be subtracted off before the
  variances are computed (see the "hann" keyword). The effective
@@ -100,10 +100,10 @@
  different "jyperk" value is written out, resulting in a correct
  SEFD for each baseline. This system is a slight abuse of the data
  format and is consumes a bit more disk space, but it works.
- 
+
  System temperature information can also be stored in a simple
- line-oriented text file via the "textout" keyword. This information 
- can then be applied to other datasets using the task APPLYTSYS. The 
+ line-oriented text file via the "textout" keyword. This information
+ can then be applied to other datasets using the task APPLYTSYS. The
  format of the text file is designed to be forward-compatible to
  allow the introduction of more data fields if necessary. The
  current format is:
@@ -113,7 +113,7 @@
  - Lines are ignored until a line starting with the string
    'startsolution' is encountered.
  - Information for the solution is read until a line starting with
-   the string 'endsolution' is encountered. 
+   the string 'endsolution' is encountered.
  - The file is read in this way to the end. It is an error if there
    are not the same number of solutions as specified in the first line.
  - Each solution section must contain a line starting with the string
@@ -123,7 +123,7 @@
    string 'duration', then giving a floating-point number giving the
    length of the solution interval in days.
  - Each solution may contain a line starting with the string 'prchisq',
-   then giving a floating-point number giving a pseudo reduced chi 
+   then giving a floating-point number giving a pseudo reduced chi
    squared value for the fit of per-antenna SEFDs to the per-baseline
    assessments. Because there is no way to bootstrap the uncertainties
    of the per-baseline measurements, the number is not a true reduced
@@ -160,7 +160,7 @@
  for example both 6X-6X and 6X-6Y. Non-intensity-type polarizations
  may be relatively more helpful for system temperature computations than
  intensity-type ones since they will generally have a much smaller
- signal (and for the purposes of this task any signal besides system 
+ signal (and for the purposes of this task any signal besides system
  noise is undesirable), but see the documentation for the "flux"
  keyword below.
 
@@ -169,13 +169,13 @@
  the input dataset are uncalibrated or are only relatively calibrated.
  Do not specify this keyword if the dataset has correct absolute
  antenna gains. See the discussion of the gain parameter G above. If
- this keyword is specified and the processed data include 
+ this keyword is specified and the processed data include
  non-intensity-type polarizations, a warning will be printed and
- those data will be ignored -- this keyword specifies the Stokes I 
+ those data will be ignored -- this keyword specifies the Stokes I
  intensity of the source, and there is no way to indicate the polarized
  flux of the source, so there's no way to correctly scale the
  non-intensity-type baselines in this case.
- 
+
 @ out
  The name of the output dataset. If given, the input dataset is
  copied with the computed TSys values inserted into it. If
@@ -227,7 +227,7 @@
  smoothing. Data means are calculated before subtraction of the
  smoothed component, so the "flux" keyword should behave identically
  regardless of the value of this parameter.
- 
+
 @ quant
  The nature of the quantization in the correlator. Two integer values
  can be given: the first is the number of quantization levels and
@@ -249,7 +249,7 @@
  multiplied by the absolute value of this argument. Thus -1, which is
  the default value, means that the value of jyperk embedded in the file
  will be used. If jyperk is set to a value significantly different than
- the physically-correct value for the data (especially jyperk=1), you 
+ the physically-correct value for the data (especially jyperk=1), you
  will likely need to specify non-default values for the "maxtsys" and
  "maxresid" keywords to prevent all the data from being flagged.
 
@@ -258,7 +258,7 @@
  is used.
 
  'dualpol'   Write varying 'jyperk' variables in the output data set
-             so that it may contain multiple-polarization data. See 
+             so that it may contain multiple-polarization data. See
              discussion in the main help text.
  'showpre'   Plot the baseline-based TSys values before a fit is
              attempted. One plot for each antenna is shown. Requires the
@@ -277,7 +277,7 @@
              or writing the data.
 --
 
-FIXME: 
+FIXME:
  - enable plotting of tsys results.
  - could enable flux keyword and non-intensity pols by allowing user
    to specify an approximate polarized flux?
@@ -286,7 +286,7 @@ FIXME:
  - loadText () is currently broken.
 """
 
-import sys, numpy as N
+import sys, numpy as np
 from miriad import *
 from mirtask import keys, util
 
@@ -486,7 +486,7 @@ class SysTemps (object):
             self.tmin = time
         else:
             self.tmin = min (self.tmin, time)
-        
+
         times = flags * inttime
         dt = data * times
 
@@ -503,15 +503,15 @@ class SysTemps (object):
         # Flatten out data into arrays of values we'll need
 
         seenAps = set ()
-        aginfo = ArrayGrower (6, N.double)
-        agants = ArrayGrower (2, N.int)
+        aginfo = ArrayGrower (6, np.double)
+        agants = ArrayGrower (2, np.int)
 
         doHann = self.hann > 1
         if doHann:
-            window = N.hanning (self.hann) * 2 / (self.hann - 1)
-        
+            window = np.hanning (self.hann) * 2 / (self.hann - 1)
+
         for bp, (dt, times) in self.integData.iteritems ():
-            w = N.where (times > 0)
+            w = np.where (times > 0)
             if len (w[0]) < self.hann + 2:
                 # if only 1 item after smoothing, can't calc meaningful std
                 continue
@@ -527,20 +527,20 @@ class SysTemps (object):
             if doHann:
                 r = r[self.hann / 2 : -self.hann / 2 + 1]
                 i = i[self.hann / 2 : -self.hann / 2 + 1]
-                r -= N.convolve (dt.real, window, mode='valid')
-                i -= N.convolve (dt.imag, window, mode='valid')
-                tw = N.convolve (tw, window, mode='valid')
-                
+                r -= np.convolve (dt.real, window, mode='valid')
+                i -= np.convolve (dt.imag, window, mode='valid')
+                tw = np.convolve (tw, window, mode='valid')
+
             sreal = r.std ()
             simag = i.std ()
-            
+
             agants.add (bp[0], bp[1])
             aginfo.add (mreal, sreal, mimag, simag, tw.mean (), 0.)
             seenAps.add (bp[0])
             seenAps.add (bp[1])
 
         del self.integData
-        
+
         self.aps = sorted (seenAps)
         self.info = aginfo.finish ()
         assert len (self.info) > 0, 'No data accepted!'
@@ -555,7 +555,7 @@ class SysTemps (object):
 
     def _flattenAps (self):
         index = self.aps.index
-        
+
         for i in self.idxs:
             row = self.ants[i]
             row[0] = index (row[0])
@@ -574,24 +574,24 @@ class SysTemps (object):
             if flux is None:
                 gain = 1
             else:
-                gain = flux / N.sqrt (mreal**2 + mimag**2)
-            
-            tsys = gain * s * etaQ * N.sqrt (2 * sdf * 1e9 * meantime) / jyperk
+                gain = flux / np.sqrt (mreal**2 + mimag**2)
 
-            #if tsys > 300: 
+            tsys = gain * s * etaQ * np.sqrt (2 * sdf * 1e9 * meantime) / jyperk
+
+            #if tsys > 300:
                 #    print '  Crappy %s: TSys = %g' % (util.fmtBP (bp), tsys)
                 #    print '    real: s, D, p:', sreal, Dr, pr
                 #    print '    imag: s, D, p:', simag, Di, pi
                 #    continue
-        
+
             tsyses[i] = tsys
 
     def _reflattenFiltered (self, skipAps, skipBps):
         # prefix: o = old, n = new
 
         seenAps = set ()
-        naginfo = ArrayGrower (6, N.double)
-        nagants = ArrayGrower (2, N.int)
+        naginfo = ArrayGrower (6, np.double)
+        nagants = ArrayGrower (2, np.int)
         oAnts = self.ants
         oAps = self.aps
 
@@ -612,7 +612,7 @@ class SysTemps (object):
         ants = nagants.finish ()
 
         assert len (info) > 0, 'Skipped all antpols!'
-        
+
         self.aps = aps = sorted (seenAps)
         self.nbp = len (info)
         self.nap = len (seenAps)
@@ -622,7 +622,7 @@ class SysTemps (object):
         self.tsyses = info[:,5]
 
         self._flattenAps ()
-    
+
     def _solve (self):
         from mirtask.util import linLeastSquares
 
@@ -636,36 +636,36 @@ class SysTemps (object):
         #
         # transform problem into log space and populate
         # the data matrices for the solver.
-        
-        coeffs = N.zeros ((self.nap, self.nbp))
-        
+
+        coeffs = np.zeros ((self.nap, self.nbp))
+
         for i in idxs:
             a1, a2 = ants[i]
             coeffs[a1,i] = 1
             coeffs[a2,i] = 1
 
-        vals = 2 * N.log (tsyses)
+        vals = 2 * np.log (tsyses)
 
         logTs = linLeastSquares (coeffs, vals)
-        
-        self.soln = soln = N.exp (logTs)
+
+        self.soln = soln = np.exp (logTs)
 
         # Populate useful arrays.
 
-        self.model = model = N.ndarray (self.nbp)
+        self.model = model = np.ndarray (self.nbp)
 
         for i in idxs:
             a1, a2 = ants[i]
             model[i] = soln[a1] * soln[a2]
 
-        N.sqrt (model, model)
+        np.sqrt (model, model)
 
         self.resid = tsyses - model
         self.rchisq = (self.resid**2).sum () / (self.nbp - self.nap)
         print '   Pseudo-RChiSq:', self.rchisq
 
-        self.rms = rms = N.ndarray (self.nap)
-        self.ncontrib = ncontrib = N.zeros (self.nap)
+        self.rms = rms = np.ndarray (self.nap)
+        self.ncontrib = ncontrib = np.zeros (self.nap)
 
         sa = StatsAccumulator ()
 
@@ -691,7 +691,7 @@ class SysTemps (object):
         print 'Solutions:'
 
         col = 0
-        
+
         for i in xrange (0, self.nap):
             if col == 0: print ' ',
             if col < 3:
@@ -705,15 +705,15 @@ class SysTemps (object):
         print
         print 'Worst residuals:'
 
-        idxs = N.abs (resid).argsort ()
+        idxs = np.abs (resid).argsort ()
         col = 0
         lb = max (-10, -len (idxs))
-        
+
         for i in xrange (lb, 0):
             idx = idxs[i]
             a1, a2 = ants[idx]
             bp = util.fmtBP ((aps[a1], aps[a2])).rjust (8)
-            
+
             if col == 0: print ' ',
             if col < 4:
                 print '%s % #6g' % (bp, resid[idx]),
@@ -734,7 +734,7 @@ class SysTemps (object):
             ant = util.apAnt (aps[i])
 
             if ant == lastant:
-                jtsyses[ant] = N.sqrt (lasttsys * soln[i])
+                jtsyses[ant] = np.sqrt (lasttsys * soln[i])
 
             lasttsys = soln[i]
             lastant = ant
@@ -750,7 +750,7 @@ class SysTemps (object):
 
     def _show (self, haveModel):
         import omega
-        
+
         aps = self.aps
         tsyses = self.tsyses
         ants = self.ants
@@ -765,10 +765,10 @@ class SysTemps (object):
             x = []
             yobs = []
             ymod = []
-            
+
             for j in self.idxs:
                 a1, a2 = ants[j]
-                
+
                 if a1 == i:
                     x.append (aps[a2])
                 elif a2 == i:
@@ -795,10 +795,10 @@ class SysTemps (object):
         self._computeBPSysTemps (jyperk, sdf)
 
         if self.showpre: self._show (False)
-        
+
         print 'Iteratively flagging ...'
         allBadBps = set ()
-        
+
         while True:
             #self._solve_miriad ()
             self._solve ()
@@ -813,7 +813,7 @@ class SysTemps (object):
 
             badBps = []
             badAps = []
-            
+
             for i in self.idxs:
                 if abs (self.resid[i]) > self.maxresid:
                     a1, a2 = self.ants[i]
@@ -833,7 +833,7 @@ class SysTemps (object):
             badBps = badBps[0:3]
             badAps.sort (key = lambda t: t[1], reverse=True)
             badAps = badAps[0:3]
-            
+
             for bp, resid in badBps:
                 print '      Flagging basepol %s: resid |%#4g| > %#4g' % \
                       (util.fmtBP (bp), resid, self.maxresid)
@@ -846,12 +846,12 @@ class SysTemps (object):
 
         print
         self._print ()
-        
+
         # If showall, we already showed this solution up above.
         if self.showfinal and not self.showall: self._show (True)
-        
+
         tmin = self.tmin
-        
+
         self.integData = {}
         self.tmin = None
 
@@ -865,7 +865,7 @@ class DataProcessor (object):
                   maxresid, showpre=False, showall=False, showfinal=False):
         self.interval = interval
         self.fjyperk = fjyperk
-        
+
         self.sts = SysTemps (flux, etaQ, hann, maxtsys, maxresid,
                              showpre, showall, showfinal)
         self.first = True
@@ -890,7 +890,7 @@ class DataProcessor (object):
         print 'Computing temps in Kelvin, using Jy/K =', v, \
               '(%g * "jyperk" in dataset)' % (-self.fjyperk)
         return v
-    
+
     def process (self, inp, preamble, data, flags):
         time = preamble[3]
 
@@ -900,7 +900,7 @@ class DataProcessor (object):
         else:
             self.first = False
 
-            toTrack = ['nants', 'jyperk', 'inttime']        
+            toTrack = ['nants', 'jyperk', 'inttime']
 
             nants = inp.getScalar ('nants', 0)
             assert nants > 0
@@ -912,18 +912,18 @@ class DataProcessor (object):
             assert jyperk > 0
             inttime = inp.getScalar ('inttime', 10.0)
             assert inttime > 0.
-        
+
             if nspect > 0:
                 sdf = inp.getVarDouble ('sdf', nspect)
                 toTrack.append ('sdf')
                 toTrack.append ('nspect')
             if nwide > 0:
                 toTrack.append ('nwide')
-        
+
             self.t = inp.makeVarTracker ()
             self.t.track (*toTrack)
             self.toTrack = toTrack
-            
+
             tmin = tmax = tprev = time
 
         if self.t.updated ():
@@ -941,7 +941,7 @@ class DataProcessor (object):
 
             if nspect > 0:
                 sdf = inp.getVarDouble ('sdf', nspect)
-        
+
         bp = util.mir2bp (inp, preamble)
         ants = util.decodeBaseline (preamble[4])
         fcpdiscard = (self.flux is not None) and (not util.bpIsInten (bp))
@@ -1098,7 +1098,7 @@ def rewriteData (banner, vis, out, solutions, varyJyPerK, **kwargs):
             assert nspect > 0 or nwide > 0
             inttime = inp.getScalar ('inttime', 10.0)
             assert inttime > 0.
-        
+
             if not varyJyPerK:
                 toTrack.append ('jyperk')
                 jyperk = inp.getScalar ('jyperk', 0.0)
@@ -1110,7 +1110,7 @@ def rewriteData (banner, vis, out, solutions, varyJyPerK, **kwargs):
                 toTrack.append ('nspect')
             if nwide > 0:
                 toTrack.append ('nwide')
-        
+
             t = inp.makeVarTracker ()
             t.track (*toTrack)
 
@@ -1124,7 +1124,7 @@ def rewriteData (banner, vis, out, solutions, varyJyPerK, **kwargs):
             inp.initVarsAsInput (' ') # ???
 
             if varyJyPerK:
-                systemps = N.zeros (nants, dtype=N.float32) + theSysTemp
+                systemps = np.zeros (nants, dtype=np.float32) + theSysTemp
                 dOut.writeVarFloat ('systemp', systemps)
 
             dOut.openHistory ()
@@ -1161,11 +1161,11 @@ def rewriteData (banner, vis, out, solutions, varyJyPerK, **kwargs):
                 dOut.writeVarDouble ('sdf', sdf)
                 dOut.writeVarDouble ('sfreq', inp.getVarDouble ('sfreq', nspect))
                 dOut.writeVarDouble ('restfreq', inp.getVarDouble ('restfreq', nspect))
-            
+
             if nwide > 0:
                 dOut.writeVarInt ('nwide', nwide)
                 dOut.writeVarDouble ('wfreq', inp.getVarDouble ('wfreq', nwide))
-                
+
             tup = inp.probeVar ('xyphase')
             if tup is not None:
                 dOut.writeVarFloat ('xyphase', inp.getVarFloat ('xyphase', tup[1]))
@@ -1178,7 +1178,7 @@ def rewriteData (banner, vis, out, solutions, varyJyPerK, **kwargs):
             thePol = pol
         elif pol != thePol and not varyJyPerK:
             raise Exception ('Can only write meaningful systemp values for one set of polarizations at time.')
-        
+
         # Write a new systemp entry?
 
         if time >= solutions[nextSolnIdx][0]:
@@ -1194,12 +1194,12 @@ def rewriteData (banner, vis, out, solutions, varyJyPerK, **kwargs):
                     dOut.writeHistory ('CALCTSYS:   flagged ' + util.fmtAP (ap))
 
 
-            systemps = N.zeros (nants, dtype=N.float32) + reallyBadTSys
+            systemps = np.zeros (nants, dtype=np.float32) + reallyBadTSys
             goodAps = set ()
 
             jd = util.jdToFull (solutions[nextSolnIdx][0])
             dOut.writeHistory ('CALCTSYS: soln %s: temps for %d antpols' % (jd, len (curSolns)))
-        
+
             for ap, tsys in sorted (curSolns.iteritems (), key=lambda x: x[0]):
                 goodAps.add (ap)
                 ant = util.apAnt (ap)
@@ -1219,7 +1219,7 @@ def rewriteData (banner, vis, out, solutions, varyJyPerK, **kwargs):
             flaggedAps = set ()
 
         bad = False
-        
+
         if bp[0] not in goodAps:
             # No TSys solution for one of the antpols. Flag the record.
             flaggedAps.add (bp[0])
@@ -1237,7 +1237,7 @@ def rewriteData (banner, vis, out, solutions, varyJyPerK, **kwargs):
             if bad:
                 jyperk = 1e-6
             else:
-                sefd = N.sqrt (curSolns[bp[0]] * curSolns[bp[1]]) * curDataJyPerK
+                sefd = np.sqrt (curSolns[bp[0]] * curSolns[bp[1]]) * curDataJyPerK
                 jyperk = sefd / theSysTemp
             dOut.writeVarFloat ('jyperk', jyperk)
 
@@ -1245,14 +1245,14 @@ def rewriteData (banner, vis, out, solutions, varyJyPerK, **kwargs):
         dOut.writeVarInt ('pol', pol)
         dOut.write (preamble, data, flags)
 
-    # All done. 
+    # All done.
 
     if flaggedAps is not None:
         dOut.writeHistory ('CALCTSYS: in previous solution, '
                            'flagged %d antpols' % len (flaggedAps))
         for ap in flaggedAps:
             dOut.writeHistory ('CALCTSYS:   flagged ' + util.fmtAP (ap))
-    
+
     dOut.closeHistory ()
     dOut.close ()
 
@@ -1368,8 +1368,8 @@ else:
                 state.flags.fill (0)
                 jyperk = 1e-6
             else:
-                jyperk = N.sqrt ((cursoln[bp[0]] * cursoln[bp[1]]) / 
-                                 (systemps[ant1 - 1] * systemps[ant2 - 1])) * curjyperk
+                jyperk = np.sqrt ((cursoln[bp[0]] * cursoln[bp[1]]) /
+                                  (systemps[ant1 - 1] * systemps[ant2 - 1])) * curjyperk
 
             state.jyperk = jyperk
 
@@ -1406,7 +1406,7 @@ Example::
 def taskCalc (args):
     banner = util.printBannerGit ('calctsys',
                                   'compute TSys values from data noise properties', IDENT)
-    
+
     # Keywords and argument checking
 
     ks = keys.KeySpec ()
@@ -1426,7 +1426,7 @@ def taskCalc (args):
     args = ks.process (args)
 
     # Verify arguments that can be invalid
-    
+
     if args.vis == ' ':
         print >>sys.stderr, 'Error: no UV input specified.'
         sys.exit (1)
@@ -1437,7 +1437,7 @@ def taskCalc (args):
             print >>sys.stderr, 'Unable to load module omega:', e
             print >>sys.stderr, 'Error: unable to plot solutions'
             sys.exit (1)
-    
+
     if args.maxtsys <= 0:
         print >>sys.stderr, 'Error: invalid maximum TSys', maxtsys
         sys.exit (1)
@@ -1474,7 +1474,7 @@ def taskCalc (args):
         inputArgs['select'] = args.select
 
     # Print out summary of config
-    
+
     print 'Configuration:'
     rewrite = args.out != ' '
     if not rewrite:
@@ -1557,7 +1557,7 @@ def taskCalc (args):
     if not rewrite:
         # All done in this case.
         return 0
-    
+
     # Now write the new dataset with TSys data embedded.
 
     out = VisData (args.out)

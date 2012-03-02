@@ -66,7 +66,7 @@ FIXME: assuming nspect=1 nwide=0, fixed corr. cfg, etc.
 FIXME: compute weighted center times / time bounds via inttime, etc
 """
 
-import sys, numpy as N, miriad
+import sys, numpy as np, miriad
 from mirtask import keys, uvdat, util, cliutil
 
 IDENT = '$Id$'
@@ -103,19 +103,19 @@ class Fluxer (object):
 
         ra0 = inp.getVarDouble ('ra')
         dec0 = inp.getVarDouble ('dec')
-        ra = ra0 + self.offset[0] / N.cos (dec0)
+        ra = ra0 + self.offset[0] / np.cos (dec0)
         dec = dec0 + self.offset[1]
 
-        l = N.sin (ra - ra0) * N.cos (dec)
-        m = N.sin (dec) * N.cos (dec0) - N.cos (ra - ra0) * N.cos (dec) * N.sin (dec0)
-        n = N.sin (dec) * N.sin (dec0) + N.cos (ra - ra0) * N.cos (dec) * N.cos (dec0)
+        l = np.sin (ra - ra0) * np.cos (dec)
+        m = np.sin (dec) * np.cos (dec0) - np.cos (ra - ra0) * np.cos (dec) * np.sin (dec0)
+        n = np.sin (dec) * np.sin (dec0) + np.cos (ra - ra0) * np.cos (dec) * np.cos (dec0)
         n -= 1 # makes the work below easier
-        self.lmn = N.asarray ([l, m, n])
+        self.lmn = np.asarray ([l, m, n])
 
         # FIXME: assuming nspect=1, nwide=0
         sdf = inp.getVarDouble ('sdf')
         sfreq = inp.getVarDouble ('sfreq')
-        self.phscale = 1 + N.arange (nchan) * sdf / sfreq
+        self.phscale = 1 + np.arange (nchan) * sdf / sfreq
 
     def process (self):
         byPol = {}
@@ -146,17 +146,17 @@ class Fluxer (object):
             if self.doOffset:
                 if self.lmn is None:
                     self.prepOffset (inp, data.size)
-                ph0 = (0-2j) * N.pi * N.dot (self.lmn, preamble[0:3])
-                data *= N.exp (ph0 * self.phscale)
+                ph0 = (0-2j) * np.pi * np.dot (self.lmn, preamble[0:3])
+                data *= np.exp (ph0 * self.phscale)
 
             if pol in byPol:
                 ddata, idata = byPol[pol]
             else:
-                ddata = N.zeros (5, dtype=N.double)
-                idata = N.zeros (1, dtype=N.int)
+                ddata = np.zeros (5, dtype=np.double)
+                idata = np.zeros (1, dtype=np.int)
                 byPol[pol] = ddata, idata
 
-            w = N.where (flags)[0]
+            w = np.where (flags)[0]
             ngood = w.size
             data = data[w]
 
@@ -183,14 +183,14 @@ class Fluxer (object):
         for pol, (ddata, idata) in byPol.iteritems ():
             mreal = ddata[D_REAL] / ddata[D_TOTWT]
             mimag = ddata[D_IMAG] / ddata[D_TOTWT]
-            u = 1. / N.sqrt (ddata[D_TOTWT])
-            amp = N.sqrt (mreal**2 + mimag**2)
+            u = 1. / np.sqrt (ddata[D_TOTWT])
+            amp = np.sqrt (mreal**2 + mimag**2)
             # if real and imag have same uncert, uncert on amp is
             # that same value, if mreal, mimag >> u.
-            ph = N.arctan2 (mimag, mreal)
-            uph = N.abs (mimag / mreal) / (1 + (mimag / mreal)**2)
-            phdeg = ph * 180 / N.pi
-            uphdeg = uph * 180 / N.pi
+            ph = np.arctan2 (mimag, mreal)
+            uph = np.abs (mimag / mreal) / (1 + (mimag / mreal)**2)
+            phdeg = ph * 180 / np.pi
+            uphdeg = uph * 180 / np.pi
 
             poldata[pol] = (mreal, mimag, amp, u, phdeg, uphdeg, idata[I_COUNT])
 
@@ -220,7 +220,7 @@ class TabularAppender (object):
             tweight += wt
 
         real = treal / tweight
-        uncert = 1 / N.sqrt (tweight)
+        uncert = 1 / np.sqrt (tweight)
 
         print >>self.f, '%.8f\t%.8f\t%.8f\t%.8f' % (tCenter, dur, real, uncert)
 
@@ -248,7 +248,7 @@ class PlotAccumulator (object):
         import omega as O
 
         p = O.RectPlot ()
-        dt = (N.asarray (self.times) - self.times[0]) * 24.
+        dt = (np.asarray (self.times) - self.times[0]) * 24.
         print 'Base time is', util.jdToFull (self.times[0])
 
         for pol, amps in self.amps.iteritems ():
@@ -295,9 +295,9 @@ def task (args=None):
         return 1
 
     if len (opts.offset) == 0:
-        offset = N.zeros (2)
+        offset = np.zeros (2)
     elif len (opts.offset) == 2:
-        offset = N.asarray (opts.offset) / 206265.
+        offset = np.asarray (opts.offset) / 206265.
     else:
         print >>sys.stderr, ('Error: zero or two values must be specified for source offset;'
                              ' got'), opts.offset

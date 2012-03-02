@@ -42,7 +42,7 @@
 """
 
 import sys, miriad
-import numpy as N
+import numpy as np
 from mirtask import keys, readgains
 from mirtask.util import printBannerGit
 
@@ -91,14 +91,14 @@ def merge (name1, ds1, name2, ds2, outset, banner, ttol):
     outset.writeHistory (banner)
     outset.logInvocation ('GPMERGEPOLS')
 
-    outset.setScalarItem ('nsols', N.int32, gr1.nsols)
-    outset.setScalarItem ('nfeeds', N.int32, 2)
-    outset.setScalarItem ('ntau', N.int32, 0)
-    outset.setScalarItem ('ngains', N.int32, nants * 2)
-    outset.setScalarItem ('interval', N.float64, int1)
+    outset.setScalarItem ('nsols', np.int32, gr1.nsols)
+    outset.setScalarItem ('nfeeds', np.int32, 2)
+    outset.setScalarItem ('ntau', np.int32, 0)
+    outset.setScalarItem ('ngains', np.int32, nants * 2)
+    outset.setScalarItem ('interval', np.float64, int1)
 
     gout = outset.getItem ('gains', 'w')
-    gbuf = N.empty (nants * 2, dtype=N.complex64)
+    gbuf = np.empty (nants * 2, dtype=np.complex64)
     gen1 = gr1.readSeq ()
     gen2 = gr2.readSeq ()
     offset = 8
@@ -128,9 +128,9 @@ def merge (name1, ds1, name2, ds2, outset, banner, ttol):
         gbuf[0::2] = g1
         gbuf[1::2] = g2
 
-        gout.write (offset, N.float64, [t1])
+        gout.write (offset, np.float64, [t1])
         offset += 8
-        gout.write (offset, N.complex64, gbuf)
+        gout.write (offset, np.complex64, gbuf)
         offset += 8 * 2 * nants
 
     del gout

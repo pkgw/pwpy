@@ -11,7 +11,7 @@ to insert appropriate TSys and Jy/K information.
 
 import sys, os.path
 import cPickle
-import numpy as N
+import numpy as np
 import scipy.optimize
 from miriad import *
 from mirtask import util, uvdat
@@ -200,14 +200,14 @@ class NoiseCal (object):
         f = open (path)
         self.instr = cPickle.load (f)
         self.saps = cPickle.load (f)
-        self.solution = N.load (f)
-        self.covar = N.load (f)
+        self.solution = np.load (f)
+        self.covar = np.load (f)
         if not partial:
             self.raras = cPickle.load (f)
-            self.sqbps = N.load (f)
-            self.bpdata = N.load (f)
-            self.svals = N.load (f)
-            self.suncerts = N.load (f)
+            self.sqbps = np.load (f)
+            self.bpdata = np.load (f)
+            self.svals = np.load (f)
+            self.suncerts = np.load (f)
         f.close ()
         
 
@@ -218,10 +218,10 @@ class NoiseCal (object):
         n = len (saps)
         maxant = util.apAnt (saps[-1]) + 1
 
-        msefds = N.empty (n)
-        pstds = N.empty (n)
-        antcounts = N.zeros (maxant)
-        antprods = N.ones (maxant)
+        msefds = np.empty (n)
+        pstds = np.empty (n)
+        antcounts = np.zeros (maxant)
+        antprods = np.ones (maxant)
 
         for i in xrange (n):
             info = raras[i]
@@ -235,17 +235,17 @@ class NoiseCal (object):
             antcounts[ant] += 1
             antprods[ant] *= msefds[i]
 
-        w = N.where (antcounts == 2)[0]
+        w = np.where (antcounts == 2)[0]
         if w.size == 0:
             bestant = -1
         else:
-            bestant = w[N.argmin (antprods[w])]
+            bestant = w[np.argmin (antprods[w])]
 
         mmarks = ['     |     '] * n
         smarks = ['     |     '] * n
 
-        sm = N.argsort (msefds)
-        ss = N.argsort (pstds)
+        sm = np.argsort (msefds)
+        ss = np.argsort (pstds)
 
         for i in xrange (5):
             mmarks[sm[i]] = ' ' * i + '*' + ' ' * (4 - i) + '|     '
@@ -263,8 +263,8 @@ class NoiseCal (object):
                 (util.fmtAP (saps[i]), msefds[i], pstds[i], mmarks[i], smarks[i])
 
         print
-        print 'Median (mean SEFD):', N.median (msefds)
-        print '       Equiv. TSys:', N.median (msefds) / 153.
+        print 'Median (mean SEFD):', np.median (msefds)
+        print '       Equiv. TSys:', np.median (msefds) / 153.
 
         if bestant < 0:
             print 'No dual-pol antennas'
@@ -338,12 +338,12 @@ class NoiseCal (object):
             ap = bp[0]
             t = preamble[3]
 
-            w = N.where (flags)[0]
+            w = np.where (flags)[0]
             if not w.size:
                 continue
 
             data = data[w]
-            rara = N.sqrt ((data.real**2).mean ())
+            rara = np.sqrt ((data.real**2).mean ())
 
             seenaps.add (ap)
             ag = rarawork.get (ap)
@@ -361,7 +361,7 @@ class NoiseCal (object):
         for ap in rarawork.keys ():
             raradata = rarawork[ap].finish ().T
             apidx = apidxs[ap]
-            sidx = N.argsort (raradata[0])
+            sidx = np.argsort (raradata[0])
             raras[apidx] = raradata[:,sidx]
 
 
@@ -369,7 +369,7 @@ class NoiseCal (object):
         raras = self.raras
         apidxs = dict ((t[1], t[0]) for t in enumerate (self.saps))
 
-        sqbps = ArrayGrower (2, dtype=N.int)
+        sqbps = ArrayGrower (2, dtype=np.int)
         bpdata = ArrayGrower (5)
         
         nnorara = 0
@@ -382,7 +382,7 @@ class NoiseCal (object):
             bp = util.mir2bp (inp, preamble)
             t = preamble[3]
 
-            w = N.where (flags)[0]
+            w = np.where (flags)[0]
             if not w.size:
                 continue
 
@@ -403,8 +403,8 @@ class NoiseCal (object):
 
             tr1, rara1, rwt1 = rdata1[:,tidx1]
             tr2, rara2, rwt2 = rdata2[:,tidx2]
-            dt1 = N.abs (tr1 - t)
-            dt2 = N.abs (tr2 - t)
+            dt1 = np.abs (tr1 - t)
+            dt2 = np.abs (tr2 - t)
 
             if max (dt1, dt2) > TTOL:
                 nnorara += 1
@@ -476,26 +476,26 @@ class NoiseCal (object):
         # Get approximate solution by using a linear least squares
         # solver on the log of our equation.
 
-        coeffs = N.zeros ((nap, nsamp))
-        values = N.empty (nsamp)
-        invsigmas = N.empty (nsamp)
+        coeffs = np.zeros ((nap, nsamp))
+        values = np.empty (nsamp)
+        invsigmas = np.empty (nsamp)
 
         for i in xrange (nsamp):
             idx1, idx2 = sqbps[i]
             var, wtvar, crara = bpdata[i,1:4]
 
             coeffs[idx1,i] = coeffs[idx2,i] = 1
-            values[i] = N.log (var / crara)
+            values[i] = np.log (var / crara)
             # Here we ignore the noise in crara.
-            invsigmas[i] = crara * N.sqrt (wtvar)
+            invsigmas[i] = crara * np.sqrt (wtvar)
 
         soln = util.linLeastSquares (coeffs, values)
 
         # Now refine and get uncertainties with a nonlinear solver.
 
-        soln = N.exp (soln)
-        values = N.exp (values)
-        modelvals = N.empty (nsamp)
+        soln = np.exp (soln)
+        values = np.exp (values)
+        modelvals = np.empty (nsamp)
 
         def nonlin (params):
             for i in xrange (nsamp):
@@ -523,15 +523,15 @@ class NoiseCal (object):
         print 'reduced chi squared: %.3f for %d DOF' % (rchisq, nsamp - nap)
 
         if cov is None:
-            cov = suncerts = N.empty (0)
+            cov = suncerts = np.empty (0)
         else:
             cov *= rchisq # copying scipy.optimize.curve_fit
-            suncerts = N.empty (nsamp)
+            suncerts = np.empty (nsamp)
 
             for i in xrange (nsamp):
                 idx1, idx2 = sqbps[i]
-                suncerts[i] = N.sqrt ((soln[idx1]**2 * cov[idx2,idx2] +
-                                       soln[idx2]**2 * cov[idx1,idx1]))
+                suncerts[i] = np.sqrt ((soln[idx1]**2 * cov[idx2,idx2] +
+                                        soln[idx2]**2 * cov[idx1,idx1]))
 
         self.solution = soln
         self.covar = cov
@@ -551,7 +551,7 @@ def loadNoiseCalExport (path):
         byap[ap] = value
 
     for instr, byap in byinstr.items ():
-        default = N.median (byap.values ())
+        default = np.median (byap.values ())
         byinstr[instr] = (byap, default)
 
     return byinstr
@@ -631,19 +631,19 @@ else:
                 prefactor = self.prefactor = 2 * inttime * sdf * 1e9
 
             if bpfactors is None or bpfactors.size != state.nbp:
-                bpfactors = self.bpfactors = N.empty (state.nbp)
-                bps = self.bps = N.empty ((state.nbp, 2), dtype=N.int)
+                bpfactors = self.bpfactors = np.empty (state.nbp)
+                bps = self.bps = np.empty ((state.nbp, 2), dtype=np.int)
 
             ap1, ap2 = mir2bp (inp, state.preamble)
 
             if ap1 == ap2:
                 # Autocorrelation! Get the RARA (raw autocorrelation
                 # RMS amplitude)
-                w = N.where (state.flags)[0]
+                w = np.where (state.flags)[0]
                 if w.size == 0:
                     self.raras.pop (ap1, 0)
                 else:
-                    self.raras[ap1] = N.sqrt ((state.data.real[w]**2).mean ())
+                    self.raras[ap1] = np.sqrt ((state.data.real[w]**2).mean ())
 
             # Get the factor that will go in front of the RARAs for
             # jyperk computations. Do this for autocorrs too because
@@ -674,7 +674,7 @@ else:
 
             jyperks.fill (0)
 
-            defaultrara = N.median (raras.values ())
+            defaultrara = np.median (raras.values ())
             get = lambda ap: raras.get (ap, defaultrara)
 
             for i in xrange (state.nbp):
@@ -682,7 +682,7 @@ else:
                     ap1, ap2 = bps[i]
                     jyperks[i] = bpfactors[i] * get (ap1) * get (ap2)
 
-            N.sqrt (jyperks, jyperks)
+            np.sqrt (jyperks, jyperks)
             raras.clear ()
 
     __all__ += ['CalNoise', 'InsertNoiseInfo']
@@ -732,14 +732,14 @@ def tui_checkfit (args):
     vals = nc.bpdata[:,1]
     modelvals = nc.bpdata[:,3] * nc.svals
     resids = vals - modelvals
-    runcerts = N.sqrt (1./nc.bpdata[:,2] + (nc.suncerts * nc.bpdata[:,3])**2)
+    runcerts = np.sqrt (1./nc.bpdata[:,2] + (nc.suncerts * nc.bpdata[:,3])**2)
     normresids = resids / runcerts
 
     n = normresids.size
     mn = normresids.mean ()
     s = normresids.std ()
-    md = N.median (normresids)
-    smadm = 1.4826 * N.median (N.abs (normresids - md)) # see comment below
+    md = np.median (normresids)
+    smadm = 1.4826 * np.median (np.abs (normresids - md)) # see comment below
 
     print '                 Number of samples:', n
     print '           Normalized mean residal:', mn
@@ -753,10 +753,10 @@ def tui_checkfit (args):
     sqbps = nc.sqbps
     nap = len (saps)
     dumbnbp = nap**2
-    apcounts = N.zeros (nap, dtype=N.int)
-    apsumsqresids = N.zeros (nap)
-    bpcounts = N.zeros (dumbnbp, dtype=N.int)
-    bpsumsqresids = N.zeros (dumbnbp)
+    apcounts = np.zeros (nap, dtype=np.int)
+    apsumsqresids = np.zeros (nap)
+    bpcounts = np.zeros (dumbnbp, dtype=np.int)
+    bpsumsqresids = np.zeros (dumbnbp)
 
     for i in xrange (n):
         idx1, idx2 = sqbps[i]
@@ -770,8 +770,8 @@ def tui_checkfit (args):
         bpcounts[bpidx] += 1
         bpsumsqresids[bpidx] += normresids[i]**2
 
-    aprmsresids = N.sqrt (apsumsqresids / apcounts)
-    sapresids = N.argsort (aprmsresids)
+    aprmsresids = np.sqrt (apsumsqresids / apcounts)
+    sapresids = np.argsort (aprmsresids)
 
     print
     print 'Extreme residual RMS by antpol:'
@@ -783,11 +783,11 @@ def tui_checkfit (args):
         idx = sapresids[i - 5]
         print ' %10s %8.2f' % (util.fmtAP (saps[idx]), aprmsresids[idx])
 
-    wbpgood = N.where (bpcounts)[0]
-    wbpbad = N.where (bpcounts == 0)[0]
+    wbpgood = np.where (bpcounts)[0]
+    wbpbad = np.where (bpcounts == 0)[0]
     bpcounts[wbpbad] = 1
     bprmsresids = bpsumsqresids / bpcounts
-    sbpresids = N.argsort (bprmsresids[wbpgood])
+    sbpresids = np.argsort (bprmsresids[wbpgood])
 
     print
     print 'Extreme residual RMS by basepol:'
@@ -808,9 +808,9 @@ def tui_checkfit (args):
     bins = 50
     rng = -5, 5
     p = O.quickHist (normresids, keyText='Residuals', bins=bins, range=rng)
-    x = N.linspace (-5, 5, 200)
+    x = np.linspace (-5, 5, 200)
     area = 10. / bins * n
-    y = area / N.sqrt (2 * N.pi) * N.exp (-0.5 * x**2)
+    y = area / np.sqrt (2 * np.pi) * np.exp (-0.5 * x**2)
     p.addXY (x, y, 'Ideal')
     p.rebound (False, False)
     p.show ()
@@ -837,17 +837,17 @@ def tui_checkap (args):
     modelvals = nc.bpdata[:,3] * nc.svals
     resids = vals - modelvals
 
-    runcerts = N.sqrt (1./nc.bpdata[:,2] + (nc.suncerts * nc.bpdata[:,3])**2)
+    runcerts = np.sqrt (1./nc.bpdata[:,2] + (nc.suncerts * nc.bpdata[:,3])**2)
     resids /= runcerts
 
-    w = N.where ((sqbps[:,0] == apidx) | (sqbps[:,1] == apidx))
+    w = np.where ((sqbps[:,0] == apidx) | (sqbps[:,1] == apidx))
     resids = resids[w]
 
     n = resids.size
     mn = resids.mean ()
     s = resids.std ()
-    md = N.median (resids)
-    smadm = 1.4826 * N.median (N.abs (resids - md)) # see comment below
+    md = np.median (resids)
+    smadm = 1.4826 * np.median (np.abs (resids - md)) # see comment below
 
     print '       Number of samples:', n
     print '      Norm. mean residal:', mn
@@ -860,9 +860,9 @@ def tui_checkap (args):
     rng = -5, 5
     p = O.quickHist (resids, keyText='%s Residuals' % util.fmtAP (ap),
                      bins=bins, range=rng)
-    x = N.linspace (-5, 5, 200)
+    x = np.linspace (-5, 5, 200)
     area = 10. / bins * n
-    y = area / N.sqrt (2 * N.pi) * N.exp (-0.5 * x**2)
+    y = area / np.sqrt (2 * np.pi) * np.exp (-0.5 * x**2)
     p.addXY (x, y, 'Ideal')
     p.rebound (False, False)
     p.show ()
@@ -889,7 +889,7 @@ def tui_checkabs (args):
     pg = O.quickPager ([])
 
     for idx in xrange (len (saps)):
-        w = N.where ((sqbps[:,0] == idx) | (sqbps[:,1] == idx))
+        w = np.where ((sqbps[:,0] == idx) | (sqbps[:,1] == idx))
 
         p = O.quickXYErr (vals[w], modelvals[w], muncerts[w], 
                           util.fmtAP (saps[idx]), lines=False)
@@ -919,13 +919,13 @@ def tui_checkcal (args):
     gen = uvdat.setupAndRead (toread, 'x3', False, **uvdatoptions)
 
     for inp, pream, data, flags in gen:
-        w = N.where (flags)[0]
+        w = np.where (flags)[0]
         if w.size == 0:
             continue
 
         data = data[w]
         var = 0.5 * (data.real.var (ddof=1) + data.imag.var (ddof=1))
-        uvar = N.sqrt (1. / (w.size - 1)) * var # uncert in variance msmt
+        uvar = np.sqrt (1. / (w.size - 1)) * var # uncert in variance msmt
         thy = inp.getVariance ()
         samples.add ((var - thy) / uvar)
 
@@ -933,8 +933,8 @@ def tui_checkcal (args):
     n = samples.size
     m = samples.mean ()
     s = samples.std ()
-    med = N.median (samples)
-    smadm = 1.4826 * N.median (N.abs (samples - med)) # see comment below
+    med = np.median (samples)
+    smadm = 1.4826 * np.median (np.abs (samples - med)) # see comment below
 
     print '                  Number of samples:', n
     print 'Mean normalized error (should be 0):', m
@@ -946,9 +946,9 @@ def tui_checkcal (args):
     bins = 50
     rng = -5, 5
     p = O.quickHist (samples, keyText='Samples', bins=bins, range=rng)
-    x = N.linspace (-5, 5, 200)
+    x = np.linspace (-5, 5, 200)
     area = 10. / bins * n
-    y = area / N.sqrt (2 * N.pi) * N.exp (-0.5 * x**2)
+    y = area / np.sqrt (2 * np.pi) * np.exp (-0.5 * x**2)
     p.addXY (x, y, 'Ideal')
     p.rebound (False, False)
     p.show ()

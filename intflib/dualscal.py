@@ -50,7 +50,7 @@
 from mirexec import TaskSelfCal, TaskMSelfCal
 from miriad import *
 from mirtask import util
-import numpy as N
+import numpy as np
 from gpmergepols import merge, DEFAULT_TTOL
 
 IDENT = '$Id$'
@@ -130,7 +130,7 @@ def dualSelfCal (vis, out, usemself=False, ttol=DEFAULT_TTOL, outexists=False,
         workset.delete ()
 
     if postinterval is not None:
-        dest.setScalarItem ('interval', N.float32, postinterval / (60. * 24))
+        dest.setScalarItem ('interval', np.float32, postinterval / (60. * 24))
 
 
 # AWFF/ARF workflow interface
@@ -180,11 +180,11 @@ def task (args):
     ks.mkeyword ('vis', 'f', 128)
     ks.keyword ('select', 'a', ' ')
     ks.keyword ('model', 'f', ' ')
-    ks.keyword ('clip', 'd', N.nan)
-    ks.keyword ('interval', 'd', N.nan)
+    ks.keyword ('clip', 'd', np.nan)
+    ks.keyword ('interval', 'd', np.nan)
     ks.keyword ('minants', 'i', -1)
     ks.keyword ('refant', 'i', -1)
-    ks.keyword ('flux', 'd', N.nan)
+    ks.keyword ('flux', 'd', np.nan)
     ks.mkeyword ('offset', 'd', 2)
     ks.mkeyword ('line', 'a', 5)
     ks.keyword ('out', 'f', ' ')
@@ -192,7 +192,7 @@ def task (args):
                'relax', 'apriori', 'noscale', 'mosaic', 'verbose')
     # Specific to this task:
     ks.keyword ('ttol', 'd', DEFAULT_TTOL * 86400)
-    ks.keyword ('postinterval', 'd', N.nan)
+    ks.keyword ('postinterval', 'd', np.nan)
     ks.option ('usemself', 'serial')
 
     kws = ks.process (args)
@@ -206,7 +206,7 @@ def task (args):
 
     kws.ttol /= 86400. # seconds -> days
 
-    if N.isnan (kws.postinterval):
+    if np.isnan (kws.postinterval):
         kws.postinterval = None
 
     if kws.out == ' ':
@@ -225,7 +225,7 @@ def task (args):
 
     for floatkw in ('clip', 'interval', 'flux'):
         v = getattr (kws, floatkw)
-        if not N.isnan (v):
+        if not np.isnan (v):
             rest[floatkw] = v
 
     for intkw in ('minants', 'refant'):

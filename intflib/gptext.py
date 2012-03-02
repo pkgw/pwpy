@@ -18,7 +18,7 @@
 --
 """
 
-import numpy as N
+import numpy as np
 from mirtask import util
 
 
@@ -104,19 +104,19 @@ class GainsInfo (object):
 
         ngains = self.nants * (self.nfeeds + int (self.havetau))
 
-        handle.setScalarItem ('nsols', N.int32, len (self.times))
-        handle.setScalarItem ('nfeeds', N.int32, self.nfeeds)
-        handle.setScalarItem ('ntau', N.int32, int (self.havetau))
-        handle.setScalarItem ('ngains', N.int32, ngains)
-        handle.setScalarItem ('interval', N.float64, self.interval)
+        handle.setScalarItem ('nsols', np.int32, len (self.times))
+        handle.setScalarItem ('nfeeds', np.int32, self.nfeeds)
+        handle.setScalarItem ('ntau', np.int32, int (self.havetau))
+        handle.setScalarItem ('ngains', np.int32, ngains)
+        handle.setScalarItem ('interval', np.float64, self.interval)
 
         gi = handle.getItem ('gains', 'w')
         offset = 8
 
         for i, time in enumerate (self.times):
-            gi.write (offset, N.float64, [time])
+            gi.write (offset, np.float64, [time])
             offset += 8
-            gi.write (offset, N.complex64, self.data[i])
+            gi.write (offset, np.complex64, self.data[i])
             offset += 8 * ngains
 
         gi.close ()
@@ -171,12 +171,12 @@ class GainsInfo (object):
 
                     q = nfeeds + int (havetau)
                     times.append (util.dateOrTimeToJD (a[1]))
-                    curdata = N.zeros (q * nants, dtype=N.complex64)
+                    curdata = np.zeros (q * nants, dtype=np.complex64)
                     data.append (curdata)
             else:
                 if a[0] == 'solution':
                     times.append (util.dateOrTimeToJD (a[1]))
-                    curdata = N.zeros (q * nants, dtype=N.complex64)
+                    curdata = np.zeros (q * nants, dtype=np.complex64)
                     data.append (curdata)
                 elif a[1].startswith ('g'):
                     ant = int (a[0]) - 1
@@ -199,8 +199,8 @@ class GainsInfo (object):
         self.nfeeds = nfeeds
         self.nants = nants
         self.havetau = havetau
-        self.times = N.asarray (times)
-        self.data = N.asarray (data)
+        self.times = np.asarray (times)
+        self.data = np.asarray (data)
         return self
 
 
