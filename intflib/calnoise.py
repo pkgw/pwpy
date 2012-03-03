@@ -721,7 +721,7 @@ def tui_compute (args):
 
 
 def tui_checkfit (args):
-    import omega as O
+    import omega as om
 
     if len (args) != 1:
         util.die ('usage: <datfile>')
@@ -807,7 +807,7 @@ def tui_checkfit (args):
 
     bins = 50
     rng = -5, 5
-    p = O.quickHist (normresids, keyText='Residuals', bins=bins, range=rng)
+    p = om.quickHist (normresids, keyText='Residuals', bins=bins, range=rng)
     x = np.linspace (-5, 5, 200)
     area = 10. / bins * n
     y = area / np.sqrt (2 * np.pi) * np.exp (-0.5 * x**2)
@@ -819,7 +819,7 @@ def tui_checkfit (args):
 
 
 def tui_checkap (args):
-    import omega as O
+    import omega as om
 
     if len (args) != 2:
         util.die ('usage: <datfile> <antpol>')
@@ -858,8 +858,8 @@ def tui_checkap (args):
 
     bins = 50
     rng = -5, 5
-    p = O.quickHist (resids, keyText='%s Residuals' % util.fmtAP (ap),
-                     bins=bins, range=rng)
+    p = om.quickHist (resids, keyText='%s Residuals' % util.fmtAP (ap),
+                      bins=bins, range=rng)
     x = np.linspace (-5, 5, 200)
     area = 10. / bins * n
     y = area / np.sqrt (2 * np.pi) * np.exp (-0.5 * x**2)
@@ -871,7 +871,7 @@ def tui_checkap (args):
 
 
 def tui_checkabs (args):
-    import omega as O
+    import omega as om
 
     if len (args) != 1:
         util.die ('usage: <datfile>')
@@ -886,13 +886,13 @@ def tui_checkabs (args):
     modelvals = nc.bpdata[:,3] * nc.svals
     muncerts = nc.suncerts * nc.bpdata[:,3]
 
-    pg = O.quickPager ([])
+    pg = om.quickPager ([])
 
     for idx in xrange (len (saps)):
         w = np.where ((sqbps[:,0] == idx) | (sqbps[:,1] == idx))
 
-        p = O.quickXYErr (vals[w], modelvals[w], muncerts[w], 
-                          util.fmtAP (saps[idx]), lines=False)
+        p = om.quickXYErr (vals[w], modelvals[w], muncerts[w],
+                           util.fmtAP (saps[idx]), lines=False)
         p.setLabels ('Measured variance (Jy²)', 'Modeled variance (Jy²)')
         pg.send (p)
 
@@ -901,7 +901,7 @@ def tui_checkabs (args):
 
 
 def tui_checkcal (args):
-    import omega as O, scipy.stats as SS
+    import omega as om, scipy.stats as SS
     toread = []
     uvdatoptions = {}
 
@@ -945,7 +945,7 @@ def tui_checkcal (args):
 
     bins = 50
     rng = -5, 5
-    p = O.quickHist (samples, keyText='Samples', bins=bins, range=rng)
+    p = om.quickHist (samples, keyText='Samples', bins=bins, range=rng)
     x = np.linspace (-5, 5, 200)
     area = 10. / bins * n
     y = area / np.sqrt (2 * np.pi) * np.exp (-0.5 * x**2)

@@ -27,7 +27,7 @@
 # FIXME: X axis display when X axis is time
 # FIXME: hardcode X/Y as opposed to R/L pols
 
-import sys, numpy as np, omega as O
+import sys, numpy as np, omega as om
 from mirtask import util, readgains
 
 ## quickutil: holder arraygrower
@@ -331,7 +331,7 @@ def task (args):
 
     # Plot
 
-    pg = O.quickPager ([])
+    pg = om.quickPager ([])
     groups = sorted (bygroup.iterkeys ())
 
     symdsn = {}
@@ -342,7 +342,7 @@ def task (args):
         bysym = bygroup[group]
         symbols = sorted (bysym.iterkeys ())
 
-        p = O.RectPlot ()
+        p = om.RectPlot ()
 
         for symbol in symbols:
             ag = bysym[symbol]

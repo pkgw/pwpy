@@ -245,9 +245,9 @@ class PlotAccumulator (object):
 
 
     def plot (self):
-        import omega as O
+        import omega as om
 
-        p = O.RectPlot ()
+        p = om.RectPlot ()
         dt = (np.asarray (self.times) - self.times[0]) * 24.
         print 'Base time is', util.jdToFull (self.times[0])
 

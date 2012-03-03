@@ -3,7 +3,7 @@
 """Attempt to check whether an antenna is subject to shadowing by
 plotting autocorrelation amplitude as a function of az and el."""
 
-import sys, numpy as np, omega as O, miriad
+import sys, numpy as np, omega as om, miriad
 
 ## quickutil: arraygrower
 #- snippet: arraygrower.py
@@ -115,16 +115,16 @@ for vis in vises:
 
 az, el, am = d.finish ().T
 
-g = O.layout.Grid (2, 1)
+g = om.layout.Grid (2, 1)
 
 if box is None:
-    g[0] = O.quickXY (az, am, lines=False)
-    g[1] = O.quickXY (el, am, lines=False)
+    g[0] = om.quickXY (az, am, lines=False)
+    g[1] = om.quickXY (el, am, lines=False)
 else:
     inbox = (az >= box[0]) & (az <= box[1]) & (el >= box[2]) & (el <= box[3])
     w = np.where (inbox)[0]
-    g[0] = O.quickXY (az[w], am[w], 'In box', lines=False)
-    g[1] = O.quickXY (el[w], am[w], 'In box', lines=False)
+    g[0] = om.quickXY (az[w], am[w], 'In box', lines=False)
+    g[1] = om.quickXY (el[w], am[w], 'In box', lines=False)
     w = np.where (~inbox)[0]
     g[0].addXY (az[w], am[w], 'Out of box', lines=False)
     g[1].addXY (el[w], am[w], 'Out of box', lines=False)

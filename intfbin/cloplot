@@ -18,7 +18,7 @@
 """
 
 from __future__ import division
-import sys, numpy as np, omega as O
+import sys, numpy as np, omega as om
 from miriad import *
 from mirtask import keys, util, uvdat, cliutil
 
@@ -245,7 +245,7 @@ sets = cc.uvdat ()
 if len (sets) == 0:
     util.die ('no data accumulated')
 
-p = O.RectPlot ()
+p = om.RectPlot ()
 
 for fn, data in sets:
     # high-uncert points can make the plots pretty useless, so filter.
