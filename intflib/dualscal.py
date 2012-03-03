@@ -7,7 +7,7 @@
 +
  DUALSCAL runs SELFCAL or MSELFCAL on the specified dataset(s) twice,
  selecting XX polarizations once and YY polarizations once. It then
- merges the XX and YY gains tables and saves them either in a 
+ merges the XX and YY gains tables and saves them either in a
  gains-only Miriad dataset (via the out= keyword) or writes the
  calibration tables into the source dataset (if no out= keyword is
  supplied and there is only a single visibility input file).
@@ -18,7 +18,7 @@
  being interleaved in an unpredictable manner. The tasks can be
  run serially via the "serial" option.
 
- DUALSCAL supports all of the options that SELFCAL and MSELFCAL do. 
+ DUALSCAL supports all of the options that SELFCAL and MSELFCAL do.
  This includes the option "verbose", which is only supported by
  MSELFCAL -- an error will be raised if you attempt to give SELFCAL
  this option. The following arguments are specific to DUALSCAL:
@@ -172,7 +172,7 @@ def task (args):
     banner = util.printBannerGit ('dualscal', 'selfcal polarizations separately', IDENT)
     basicTrace ()
 
-    # Define all the arguments 
+    # Define all the arguments
 
     from mirtask.keys import KeySpec
 

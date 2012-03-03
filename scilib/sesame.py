@@ -27,22 +27,22 @@ def _run (source):
     doc = xml.dom.minidom.parseString (stdout)
 
     radeg = decdeg = None
-    
+
     for n1 in doc.documentElement.childNodes:
         if n1.nodeType != doc.ELEMENT_NODE: continue
         if n1.localName != 'Target': continue
-        
+
         for n2 in n1.childNodes:
             if n2.nodeType != doc.ELEMENT_NODE: continue
             if n2.localName != 'Resolver': continue
-        
+
             for n3 in n2.childNodes:
                 if n3.nodeType != doc.ELEMENT_NODE: continue
                 if n3.localName == 'jradeg':
                     radeg = float (_nodeText (n3))
                 elif n3.localName == 'jdedeg':
                     decdeg = float (_nodeText (n3))
-                
+
     if radeg is None or decdeg is None:
         raise Exception ('Couldn\'t get info for ' + source)
 
@@ -62,7 +62,7 @@ def _get (source):
 def lookupdd (source):
     """Look up the ICRS J2000 location of a source, returning both RA
 and Dec in degrees."""
-    
+
     return _get (source)
 
 def lookuphd (source):
@@ -106,7 +106,7 @@ with the same argument return the same object."""
 def formathd (source):
     """Return a string giving the ICRS J2000 location of a source,
 formatted as sexagesimal with colons for separators."""
-    
+
     import ralp
     rah, decd = lookuphd (source)
     return ralp.fmtRaDec (rah, decd)

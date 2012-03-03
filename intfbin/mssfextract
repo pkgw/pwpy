@@ -265,7 +265,7 @@ def print_sources (sfinfo, sources):
             print 'point    %s %s %.5f' % (sinfo[0], sinfo[1], sinfo[2])
         elif len (sinfo) == 6:
             print 'gaussian %s %s %.5f %6.1f %6.1f %+6.1f' % \
-                (sinfo[0], sinfo[1], sinfo[2], 
+                (sinfo[0], sinfo[1], sinfo[2],
                  sinfo[3] * RAD2ASEC, sinfo[4] * RAD2ASEC, sinfo[5] * 180 / np.pi)
         else:
             util.die ('internal bug, unexpected source info %s', sinfo)

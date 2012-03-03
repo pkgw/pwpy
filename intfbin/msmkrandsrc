@@ -85,7 +85,7 @@ def make_random_sources (tmplpath, flux, radius, nsrc):
     radsq = radius**2
 
     for n in xrange (nsrc):
-        # There's probably a less-dumb way to get a 
+        # There's probably a less-dumb way to get a
         # uniform distribution on a disk.
         while True:
             dlat = np.random.uniform (-radius, radius) # arcsec

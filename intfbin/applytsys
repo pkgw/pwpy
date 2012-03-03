@@ -8,7 +8,7 @@
  APPLYTSYS inserts system temperature information into a UV dataset.
  The data come from a textual file created by CALCTSYS (see keyword
  "textin") or any other tool that generates such a file in a compatible
- format. 
+ format.
 
  The output dataset is created using the same code as that in CALCTSYS.
  See the documentation for that task for detailed information,
@@ -32,7 +32,7 @@
  is used.
 
  'dualpol'   Write varying 'jyperk' variables in the output data set
-             so that it may contain multiple-polarization data. See 
+             so that it may contain multiple-polarization data. See
              discussion in the main help text.
  'nocal'     Do not apply calibration corrections when reading or
              writing the data.

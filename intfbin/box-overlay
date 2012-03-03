@@ -32,7 +32,7 @@ for line in file (boxfn):
     a = map (float, a)
     cra, cdec, wra, wdec = a
 
-    s = ','.join (('box', 'arcsec', 'arcsec', str (boxnum), 'yes', 
+    s = ','.join (('box', 'arcsec', 'arcsec', str (boxnum), 'yes',
                    str (cra), str (cdec), str (wra/2), str (wdec/2), '0'))
     print >>olayfile, s
     boxnum += 1

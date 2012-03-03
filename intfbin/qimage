@@ -64,7 +64,7 @@ class ArgHandler (object):
     def __call__ (self, v):
         raise NotImplementedError ()
 
-    
+
 class ArgSetter (ArgHandler):
     def __call__ (self, values):
         setattr (self.task, self.arg, values)
@@ -104,7 +104,7 @@ class QuickImager (object):
             die ('internal bug: duplicated keyword %s', arg)
 
         self.argTable[arg] = setter
-        
+
 
     def _addOpt (self, opt, setter):
         if opt in self.optTable:
@@ -160,7 +160,7 @@ class QuickImager (object):
 
         for i in xrange (len (sopts)):
             opt = sopts[i]
-            
+
             if i == 0:
                 imin = 1
             else:
@@ -170,7 +170,7 @@ class QuickImager (object):
                 imin = max (imin, minDistinguishIndex (opt, sopts[i+1]))
 
             self.minMatch[opt[:imin]] = opt
-            
+
 
     def _normalizeOpt (self, opt):
         for minname, fullname in self.minMatch.iteritems ():
@@ -288,7 +288,7 @@ class QuickImager (object):
                               bm.mtime > rm.umtime):
                 rm.delete ()
 
-                self.restore.set (map=mp, beam=bm, model=cl, out=rm, 
+                self.restore.set (map=mp, beam=bm, model=cl, out=rm,
                                   mode='clean').run ()
 
             if self.force or (cl.mtime > rr.umtime or mp.mtime > rr.mtime or

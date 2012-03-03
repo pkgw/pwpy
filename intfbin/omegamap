@@ -38,7 +38,7 @@
 
 @ subshape
  Width and height of the subregion of the input map to
- image, in pixels, centered on the image center. No subregion 
+ image, in pixels, centered on the image center. No subregion
  is extracted if unspecified. If only one value is specified,
  it is used for both the width and height of the subregion.
 

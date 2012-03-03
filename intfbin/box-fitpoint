@@ -81,7 +81,7 @@ if boxinfo is None:
 cra, cdec, wra, wdec = boxinfo
 t = mirexec.TaskImFit (in_=img, object='point')
 # Note: double-sizing the box.
-t.region = 'arcsec,b(%.0f,%.0f,%.0f,%.0f)' % (cra - wra, cdec - wdec, 
+t.region = 'arcsec,b(%.0f,%.0f,%.0f,%.0f)' % (cra - wra, cdec - wdec,
                                               cra + wra, cdec + wdec)
 t.spar = '1,%.0f,%.0f' % (cra, cdec)
 t.run ()

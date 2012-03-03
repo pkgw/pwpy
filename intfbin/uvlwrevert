@@ -180,7 +180,7 @@ def revert (dataset):
     if not isdir (dataset):
         die ('argument \"%s\" is not a directory', dataset)
     if not jexists (dataset, 'visdata'):
-        die ('argument \"%s\" does not appear to be a UV dataset (no \"visdata\" item)', 
+        die ('argument \"%s\" does not appear to be a UV dataset (no \"visdata\" item)',
              dataset)
     if not jexists (dataset, 'lwsource'):
         die ('dataset \"%s\" does not appear to have been created with '
@@ -231,13 +231,13 @@ def revert (dataset):
                 try:
                     os.symlink (join (relsrc, item), join (dataset, item))
                 except Exception, e:
-                    die ('symlink \"%s\" -> \"%s\" failed: %s', join (relsrc, item), 
+                    die ('symlink \"%s\" -> \"%s\" failed: %s', join (relsrc, item),
                          join (dataset, item), e)
             else:
                 try:
                     shutil.copy (join (src, item), join (dataset, item))
                 except Exception, e:
-                    die ('copy \"%s\" -> \"%s\" failed: %s', join (src, item), 
+                    die ('copy \"%s\" -> \"%s\" failed: %s', join (src, item),
                          join (dataset, item), e)
 
         # History entry

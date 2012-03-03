@@ -30,7 +30,7 @@ box. The numbers are:
   3. Box width, in arcseconds
   4. Box height, in arcseconds
 
-The longitudinal offset and width are specified in coordinate terms, 
+The longitudinal offset and width are specified in coordinate terms,
 so that:
 
   - physical box offset = box RA offset * cos (dec)

@@ -13,7 +13,7 @@ def cont2da (f, df, x0, y0, maxiters=5000, defeta=0.05, netastep=12,
              vtol1=1e-3, vtol2=1e-8, maxnewt=20, dorder=7, goright=False,
              hackxbounds=[-np.inf, np.inf], hackybounds=[-np.inf, np.inf]):
     """Required arguments:
-    
+
 f  - a function, mapping (x, y) -> z
 df - the partial derivative: df (x, y) -> [dz/dx, dz/dy]. If None,
      the derivative of f is approximated numerically with
@@ -45,7 +45,7 @@ dorder - Number of function evaluations to perform when evaluating
 goright - If True, trace the contour rightward (as looking uphill),
   rather than leftward (the default).
 """
-    
+
     # Coerce argument types.
 
     if not callable (f): raise ValueError ('f')
@@ -66,7 +66,7 @@ goright - If True, trace the contour rightward (as looking uphill),
     if vtol2 >= vtol1: raise ValueError ('vtol2')
     maxnewt = int (maxnewt)
     if maxnewt < 1: raise ValueError ('maxnewt')
-    
+
     # What value are we contouring?
     v = f (x0, y0)
 
@@ -96,7 +96,7 @@ goright - If True, trace the contour rightward (as looking uphill),
                 dy = derivative (lambda y: f (x1, y), y1, derivy, order=dorder)
                 print '   -> %.20g %.20g' % (dx, dy)
                 return [dx, dy]
-    
+
     # Init eta progression
     rez = np.finfo (np.double).resolution
     if rez > defeta: raise ValueError ('defeta below resolution!')
@@ -118,12 +118,12 @@ goright - If True, trace the contour rightward (as looking uphill),
     # 3 if x > 0, y < 0
     # we invert these senses in the in-loop test to
     # make comparison easy.
-    
+
     quitflag = 0
     initquad = -1
-    
+
     # Start finding contours.
-    
+
     while n < maxiters:
         dfdx, dfdy = df (x, y)
 
@@ -150,7 +150,7 @@ goright - If True, trace the contour rightward (as looking uphill),
 
             if curquad == initquad:
                 quitflag = 2
-            
+
         # We will move perpendicular to [df/dx, df/dy], rotating to
         # the left (arbitrarily) from that direction. We need to
         # figure out how far we can safely move in this direction.
@@ -172,7 +172,7 @@ goright - If True, trace the contour rightward (as looking uphill),
             # we're aiming for?
 
             #print 'S1:', i, dx, dy, nx, ny, nv, abs (nv / v - 1)
-            
+
             if abs (nv / v - 1) < vtol1:
                 #print 'S1: good'
                 break
@@ -195,7 +195,7 @@ goright - If True, trace the contour rightward (as looking uphill),
         # suffice. This loop usually exits after one iteration.
 
         i = 0
-        
+
         while i < maxnewt:
             dfdx, dfdy = df (nx, ny)
             df2 = dfdx**2 + dfdy**2
@@ -213,7 +213,7 @@ goright - If True, trace the contour rightward (as looking uphill),
         else:
             # Did not break out of loop.
             raise RuntimeError ('Failed to converge with Newton\'s method!')
-        
+
         # Ok, we found our next value.
         pts[n] = (nx, ny)
         x = nx
@@ -226,10 +226,10 @@ goright - If True, trace the contour rightward (as looking uphill),
             break
         if y < hackybounds[0] or y > hackybounds[1]:
             break
-        
+
         # Time to stop? Make sure we've gone at least a half-turn so
         # that we don't just exit on the first iteration.
-        
+
         if quitflag == 2:
             dist2 = (x/x0 - 1)**2 + (y/y0 - 1)**2
             print 'proxcheck', dist2, 3 * (dx**2 + dy**2)

@@ -24,7 +24,7 @@ spindexes = {}
 def CasA (freqInMHz, year):
     """Return the flux of Cas A given a frequency and the year of
     observation. Based on the formula given in Baars et al., 1977.
-    
+
     Parameters:
 
     freq - Observation frequency in MHz.
@@ -36,7 +36,7 @@ def CasA (freqInMHz, year):
 
     # The snu rule is right out of Baars et al. The dnu is corrected
     # for the frequency being measured in MHz, not GHz.
-    
+
     snu = 10. ** (5.745 - 0.770 * log10 (freqInMHz)) # Jy
     dnu = 0.01 * (0.07 - 0.30 * log10 (freqInMHz)) # percent per yr.
     loss = (1 - dnu) ** (year - 1980.)
@@ -62,7 +62,7 @@ def _makeGenericBaars (a, b, c, fmin, fmax):
     def f (freqInMHz):
         if any (freqInMHz < fmin) or any (freqInMHz > fmax):
             raise Exception ('Going beyond frequency limits of model!')
-        
+
         lf = log10 (freqInMHz)
         return 10.**(a + b * lf + c * lf**2)
 
@@ -74,7 +74,7 @@ def _makeGenericBaarsSpindex (a, b, c, fmin, fmax):
     def f (freqInMHz):
         if any (freqInMHz < fmin) or any (freqInMHz > fmax):
             raise Exception ('Going beyond frequency limits of model!')
-        
+
         return b + 2 * c * log10 (freqInMHz)
 
     return f
@@ -115,7 +115,7 @@ def _makeVLAModel (a, b, c, d):
     def f (freqInMHz):
         if any (freqInMHz < 300) or any (freqInMHz > 50000):
             raise StandardError ('Going beyond frequency limits of model!')
-        
+
         lghz = log10 (freqInMHz) - 3
         return 10.**(a + b * lghz + c * lghz**2 + d * lghz**3)
 
@@ -127,7 +127,7 @@ def _makeVLASpindex (a, b, c, d):
     def f (freqInMHz):
         if any (freqInMHz < 300) or any (freqInMHz > 50000):
             raise StandardError ('Going beyond frequency limits of model!')
-        
+
         lghz = log10 (freqInMHz) - 3
         return b + 2 * c * lghz + 3 * d * lghz**2
 
@@ -171,7 +171,7 @@ def modelFromVLAObs (Lband, Cband):
 
     import cgs
     from math import log10
-    
+
     fL = log10 (1425)
     fC = log10 (4860)
 
@@ -185,7 +185,7 @@ def modelFromVLAObs (Lband, Cband):
 def funcFromVLAObs (Lband, Cband):
     A, B = modelFromVLAObs (Lband, Cband)
     from numpy import log10
-    
+
     def f (freqInMHz):
         return 10.**(A * log10 (freqInMHz) + B)
 
@@ -194,7 +194,7 @@ def funcFromVLAObs (Lband, Cband):
 
 def spindexFromVLAObs (Lband, Cband):
     A, B = modelFromVLAObs (Lband, Cband)
-    
+
     def f (freqInMHz):
         return A
 
@@ -374,7 +374,7 @@ def popoption (ident, args=None):
 
     return found
 ## end
-    
+
 def _interactive (args):
     from sys import stderr
 
@@ -400,7 +400,7 @@ def _interactive (args):
     except Exception, e:
         print >>stderr, 'Unable to parse frequency \"%s\":' % args[1], e
         return 1
-        
+
     if source not in models:
         print >>stderr, 'Unknown source \"%s\". Known sources are:' % source
         print >>stderr, '   ', ', '.join (sorted (models.keys ()))

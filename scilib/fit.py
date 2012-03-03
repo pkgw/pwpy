@@ -13,7 +13,7 @@ import numpy as _N
 #
 # Freedman-Diaconis: bin_width = 2 * IQR(data) / n^(1/3)
 # Here IQR is the interquartile range, IQR = 75th percentile - 25th percentile.
-# Freedman, D & Diaconis, P, 1981, "On the histogram as a density estimator: 
+# Freedman, D & Diaconis, P, 1981, "On the histogram as a density estimator:
 # L_2 theory", Zeitschrift fur Wahrscheinlichkeitstheorie und verwandte Gebiete
 # 57 (4) 453-476 doi:10.1007/BF01025868
 
@@ -79,7 +79,7 @@ def linearConstrained (x, y, x0, y0, weights = None):
     # FIXME: is there a function to upgrade something to at least
     # a float? If all the inputs are float32's, we should also
     # return a float32.
-    
+
     return _N.float64 (_N.dot (A, B)) / _N.dot (A, A)
 
 # This is all copied from the Scipy Cookbook page on "Fitting Data"
@@ -108,7 +108,7 @@ def guessGauss2dParams (data):
 
 def gauss2d (data, guess=None, getResid=False, **kwargs):
     """guess and return value take the form: (height, xctr, yctr, xwidth, ywidth)."""
-    
+
     from scipy import optimize
 
     if guess is None: guess = guessGauss2dParams (data)
@@ -145,7 +145,7 @@ class FitBase (object):
        rchisq (*) - The reduced chi squared of the fit.
 
     (An asterisk denotes values that are only available after fit() has been run.)
-    
+
     Methods are:
 
              setData      - Set the X, Y, and (optionally) sigma input data.
@@ -163,7 +163,7 @@ class FitBase (object):
 
     (One asterisk denotes that the function requires setData() to have been called,
     and two asterisks denote that the function requires fit () to have been called.)
-    
+
     Subclassers must implement:
 
       _paramNames - A list of textual names corresponding to the model parameters.
@@ -176,19 +176,19 @@ class FitBase (object):
        _fitExport - Set individual fields equivalent to the best-fit
                     parameters for ease of use.
     """
-    
+
     _paramNames = None
     _fitExport = None
 
     def __init__ (self):
         self.x = self.y = self.sigmas = None
-    
+
     def setData (self, x, y, sigmas=None):
         # Get the floating-point coercion of asfarray without doing a large
         # number of needless computations, and also making it so that if the
         # user provides a complex value don't crash. (By my reading of the docs
         # N.asfarray ([complex]) should succeed but it doesn't for numpy <= 1.3)
-        x[0] += 0.0 
+        x[0] += 0.0
         y[0] += 0.0
         self.x = _N.asarray (x)
         self.y = _N.asarray (y)
@@ -210,17 +210,17 @@ class FitBase (object):
         x[0] += 0.0
         self.x = _N.asarray (x)
         self.sigmas = _N.asfarray (sigmas)
-        
+
         mfunc = self.makeModel (*params)
         self.y = mfunc (self.x) + _N.random.standard_normal (self.y.shape) * self.sigmas
 
         return self
-        
+
     def fakeDataFrac (self, x, frac, *params):
         # See comment in setData
         x[0] += 0.0
         self.x = _N.asarray (x)
-        
+
         mfunc = self.makeModel (*params)
 
         y = mfunc (self.x)
@@ -232,7 +232,7 @@ class FitBase (object):
     def augmentSigmas (self, val):
         self.sigmas = _N.sqrt (self.sigmas**2 + val**2)
         return self
-    
+
     def guess (self):
         """Return a tuple of parameter guesses based on the X and Y data."""
         raise NotImplementedError ()
@@ -240,13 +240,13 @@ class FitBase (object):
     def makeModel (self, *params):
         """Return a function that maps X values into appropriate
         model values."""
-        
+
         raise NotImplementedError ()
 
     def _fitImpl (self, x, y, sig, guess, reckless):
         """Obtain a fit in some way, and set at least the following
         fields:
-        
+
           params - a tuple of best-fit parameters (compatible with the result of guess)
           uncerts - A tuple of uncertainties of the parameters.
 
@@ -255,13 +255,13 @@ class FitBase (object):
 
           mfunc - A function that evaluates the best-fit model at arbitrary X values
           mdata - mfunc evaluated at the given X values
-          resids - The differences (y - mdata) 
+          resids - The differences (y - mdata)
           rchisq - The reduced chi squared of the fit
 
         You should also set any other fields that may be of use to someone
         examining the fit results.
         """
-        
+
         raise NotImplementedError ()
 
     def fit (self, guess=None, reckless=False, **kwargs):
@@ -283,7 +283,7 @@ class FitBase (object):
             if self._fitExport is not None:
                 self._fitExport ()
             return self
-        
+
         if self.params is None:
             raise RuntimeError ('Failed to find best-fit parameters')
 
@@ -293,10 +293,10 @@ class FitBase (object):
         if len (self.params) != len (self._paramNames):
             raise RuntimeError ('Should fit %d parameters; got %d' % (len (self._paramNames),
                                                                       len (self.params)))
-        
+
         if len (self.params) != len (self.uncerts):
             raise RuntimeError ('Inconsistent params and uncerts fields')
-        
+
         if self.mfunc is None:
             self.mfunc = self.makeModel (*self.params)
 
@@ -334,13 +334,13 @@ class FitBase (object):
             self._fitExport ()
 
         return self
-    
+
     def printParams (self):
         lmax = len ('RChiSq')
 
         for pn in self._paramNames:
             if len (pn) > lmax: lmax = len (pn)
-                
+
         for (pn, val, uncert) in zip (self._paramNames, self.params, self.uncerts):
             frac = abs (100. * uncert / val)
             print '%s: %14g +/- %14g (%.2f%%)' % (pn.rjust (lmax), val, uncert, frac)
@@ -349,7 +349,7 @@ class FitBase (object):
         return self
 
     def plot (self, dlines=True, smoothModel=True, xmin=None, xmax=None,
-              ymin=None, ymax=None, mxmin=None, mxmax=None, 
+              ymin=None, ymax=None, mxmin=None, mxmax=None,
               xcomponent='real', ycomponent='real', **kwargs):
         import omega
 
@@ -393,7 +393,7 @@ class FitBase (object):
         vb[0].setYLabel ('Y')
         vb[0].rebound (False, True)
         vb[0].setBounds (xmin, xmax, ymin, ymax)
-        
+
         vb[1] = vb.pResid = omega.RectPlot ()
         vb[1].defaultField.xaxis = vb[1].defaultField.xaxis
         if self.sigmas is not None:
@@ -403,13 +403,13 @@ class FitBase (object):
         vb[1].setLabels ('X', 'Residuals')
         vb[1].rebound (False, True)
         vb[1].setBounds (xmin, xmax) # ignore Y values since residuals are on different scale
-        
+
         vb.setWeight (0, 3)
         return vb
-    
+
 class LinearFit (FitBase):
     _paramNames = ['a', 'b']
-    
+
     def guess (self):
         return (0, 0)
 
@@ -423,7 +423,7 @@ class LinearFit (FitBase):
 
         sm1 = sig ** -1
         sm2 = sm1 ** 2
-        
+
         S = sm2.sum ()
         Sx = _N.dot (x, sm2)
         Sy = _N.dot (y, sm2)
@@ -435,10 +435,10 @@ class LinearFit (FitBase):
 
         t = (x - Sx / S) * sm1
         Stt = (t**2).sum ()
-        
+
         b = _N.dot (t * y, sm1) / Stt
         a = (Sy - Sx * b) / S
-        
+
         sigma_a = _N.sqrt ((1 + Sx**2 / S / Stt) / S)
         sigma_b = _N.sqrt (Stt ** -1)
 
@@ -453,7 +453,7 @@ class LinearFit (FitBase):
 
 class SlopeFit (FitBase):
     _paramNames = ['m']
-    
+
     def guess (self):
         return (0, )
 
@@ -464,13 +464,13 @@ class SlopeFit (FitBase):
         # Ignore the guess since we can solve this exactly
 
         sm2 = sig ** -2
-        
+
         Sxx = _N.dot (x**2, sm2)
         Sxy = _N.dot (x * y, sm2)
 
         m = Sxy / Sxx
         sigma_m = 1. / _N.sqrt (Sxx)
-        
+
         self.params = _N.asarray ((m, ))
         self.uncerts = _N.asarray ((sigma_m, ))
 
@@ -492,11 +492,11 @@ class LeastSquaresFit (FitBase):
             guess - The function to guess initial parameters, given the data.
         makeModel - The function to return a model evaluator function.
     """
-    
+
     def _fitImpl (self, x, y, sig, guess, reckless, **kwargs):
         """Obtain a fit in some way, and set at least the following
         fields:
-        
+
         params - a tuple of best-fit parameters (compatible with the result of guess)
         uncerts - A tuple of uncertainties of the parameters.
         """
@@ -527,7 +527,7 @@ class LeastSquaresFit (FitBase):
             print 'Message:', msg
             print 'Success code:', success
             raise Exception ('No covariance matrix!')
-        
+
         self.params = _N.atleast_1d (pfit)
         self.uncerts = _N.sqrt (cov.diagonal ())
         self.cov = cov
@@ -621,16 +621,16 @@ class ConstrainedMinFit (FitBase):
             guess - The function to guess initial parameters, given the data.
         makeModel - The function to return a model evaluator function.
     """
-    
+
     makeModelDeriv = None
-    
+
     """Returns a function d(x) such that
-    
+
     d(x) = J
-    
+
     J.shape = (len (params), x.size)
     J[ip,ix] = dModel(x[ix])/dparams[ip]
-    
+
     """
 
     def __init__ (self):
@@ -658,13 +658,13 @@ class ConstrainedMinFit (FitBase):
         else:
             limitsmax = max
             limitedmax = True
-            
+
         t = self._info[pidx]
         t['limits'] = (limitsmin, limitsmax)
         t['limited'] = (limitedmin, limitedmax)
         t['fixed'] = False # this is implicitly called for
         return self
-    
+
     def fix (self, pidx, fixval):
         if pidx < 0 or pidx >= len (self._paramNames):
             raise ValueError ('pidx')
@@ -692,11 +692,11 @@ class ConstrainedMinFit (FitBase):
             t['tied'] = str (tieexpr)
 
         return self
-        
+
 
     def _fitImpl (self, x, y, sig, guess, reckless, **kwargs):
         from mpfit import mpfit
-        
+
         w = sig ** -1
         ndof = x.size - len (guess)
 
@@ -713,7 +713,7 @@ class ConstrainedMinFit (FitBase):
                 ndof += 1
                 continue
             self._info[i]['value'] = guess[i]
-                
+
         self.mpobj = o = mpfit (error, parinfo=self._info, quiet=True, **kwargs)
 
         if not reckless and (o.status < 0 or o.status == 5):
@@ -742,14 +742,14 @@ class MPFitTest (ConstrainedMinFit):
 
     def guess (self):
         return (0, 0)
-    
+
     def makeModel (self, a, b):
         return lambda x: a + b * x
 
     def _fitExport (self):
         self.a, self.b = self.params
         self.sigma_a, self.sigma_b = self.uncerts
-        
+
 class RealConstrainedMinFit (FitBase):
     """A Fit object that implements its fit via a generic constrained
     function minimization algorithm. Extra fields are:
@@ -762,16 +762,16 @@ class RealConstrainedMinFit (FitBase):
             guess - The function to guess initial parameters, given the data.
         makeModel - The function to return a model evaluator function.
     """
-    
+
     makeModelDeriv = None
-    
+
     """Returns a function d(x) such that
-    
+
     d(x) = J
-    
+
     J.shape = (len (params), x.size)
     J[ip,ix] = dModel(x[ix])/dparams[ip]
-    
+
     """
 
     def __init__ (self):
@@ -782,20 +782,20 @@ class RealConstrainedMinFit (FitBase):
     def setBounds (self, pidx, min=None, max=None):
         if pidx < 0 or pidx >= len (self._paramNames):
             raise ValueError ('pidx')
-        
+
         self._bounds[pidx] = (min, max)
         return self
-    
+
     def _fitImpl (self, x, y, sig, guess, reckless, **kwargs):
         """Obtain a fit in some way, and set at least the following
         fields:
-        
+
         params - a tuple of best-fit parameters (compatible with the result of guess)
         uncerts - A tuple of uncertainties of the parameters.
         """
 
         from scipy.optimize import fmin_l_bfgs_b
-        
+
         w2 = sig ** -2
         ndof = x.size - len (guess)
 
@@ -831,7 +831,7 @@ class RealConstrainedMinFit (FitBase):
 
 class GaussianFit (LeastSquaresFit):
     _paramNames = ['height', 'xmid', 'width']
-    
+
     def guess (self):
         height = self.y.max ()
 
@@ -854,11 +854,11 @@ class GaussianFit (LeastSquaresFit):
 
 class PowerLawFit (LeastSquaresFit):
     _paramNames = ['q', 'alpha']
-    
+
     def guess (self):
         lx = _N.log (self.x)
         ly = _N.log (self.y)
-        
+
         dlx = lx.max () - lx.min ()
         dly = ly.max () - ly.min ()
         alpha = dly / dlx
@@ -878,17 +878,17 @@ class PowerLawFit (LeastSquaresFit):
 
 class BiPowerLawFit (LeastSquaresFit):
     _paramNames = ['xbr', 'ybr', 'alpha1', 'alpha2']
-    
+
     def guess (self):
         l = _N.log
-        
+
         dlx = l (self.x.max ()) - l (self.x.min ())
         dly = l (self.y.max ()) - l (self.y.min ())
         alpha = dly / dlx
 
         mx = self.x.mean ()
         my = self.y.mean ()
-        
+
         return (mx, my, alpha, alpha)
 
     def makeModel (self, xbr, ybr, alpha1, alpha2):
@@ -905,7 +905,7 @@ class BiPowerLawFit (LeastSquaresFit):
 class LameQuadraticFit (LeastSquaresFit):
     """This is lame because it uses a least-squares fit when the
     problem can be solved analytically."""
-    
+
     _paramNames = ['a', 'b', 'c']
 
     def guess (self):

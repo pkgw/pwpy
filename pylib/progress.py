@@ -56,7 +56,7 @@ def progress (f, quiet=False):
     than this function."""
 
     import time, math
-    
+
     gen = f ()
 
     ntot, banner = gen.next ()
@@ -86,7 +86,7 @@ def progress (f, quiet=False):
             msg = ''
         else:
             msg = ': ' + str (msg)
-            
+
         print '  %*d (%3.0f%%, tot %s, ETA %s)%s' \
               % (w, n, 100. * n / ntot, _fmtSpan ((t - t0) * ntot / n),
                  _fmtSpan ((t - t0) * (ntot - n) / n), msg)

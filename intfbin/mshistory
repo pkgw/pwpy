@@ -46,5 +46,5 @@ for i in xrange (t.nrows ()):
     else:
         ttup = time.gmtime (timeval - 3506716800)
         tstr = time.strftime ('%Y-%m-%dT%H:%M:%SZ', ttup)
-        
+
     print tstr, entry

@@ -175,7 +175,7 @@ class NoiseCal (object):
     # RMS amplitudes, RARA msmt weight; apidx is an index into saps
 
     sqbps = None # squashed sample basepols: (n,2)-ndarray with two
-    # indexes into saps 
+    # indexes into saps
 
     bpdata = None # basepol sample data: (n,5)-ndarray where n is the
     # same as in sqbps. items are JD timestamp, spectrum variance,
@@ -209,7 +209,7 @@ class NoiseCal (object):
             self.svals = np.load (f)
             self.suncerts = np.load (f)
         f.close ()
-        
+
 
     def printsefdinfo (self):
         raras = self.raras
@@ -371,7 +371,7 @@ class NoiseCal (object):
 
         sqbps = ArrayGrower (2, dtype=np.int)
         bpdata = ArrayGrower (5)
-        
+
         nnorara = 0
         seenidxs = set ()
         gen = uvdat.setupAndRead (toread, 'x3', False,

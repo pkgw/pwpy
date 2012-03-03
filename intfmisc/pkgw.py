@@ -1,6 +1,6 @@
 # -*- python ; coding: utf-8 -*-
 #
-# Copyright 2011 Peter Williams, the MeqTree Foundation, 
+# Copyright 2011 Peter Williams, the MeqTree Foundation,
 # Netherlands Foundation for Research in Astronomy
 #
 # This program is free software; you can redistribute it and/or modify
@@ -40,7 +40,7 @@ def mssel_compile_options ():
                                 read_flags=True, write_flags=True,
                                 hanning=False, invert_phases=False)
     TDLCompileOptions (*mssel.compile_options ())
-    TDLRuntimeMenu ('Data selection & flag handling', 
+    TDLRuntimeMenu ('Data selection & flag handling',
                     *mssel.runtime_options ())
 
     Context.mssel = mssel
@@ -64,7 +64,7 @@ class CalAmplitudes (object):
     @staticmethod
     def apply (ifrs, lhs, rhs):
         for side in rhs, lhs:
-            for p, q in ifrs: 
+            for p, q in ifrs:
                 side ('ampl', p, q) << Meq.Abs (side (p,q))
 
         return lhs ('ampl'), rhs ('ampl'), None, None
@@ -76,7 +76,7 @@ class CalLogAmplitudes (object):
     @staticmethod
     def apply (ifrs, lhs, rhs):
         for side in rhs, lhs:
-            for p, q in ifrs: 
+            for p, q in ifrs:
                 side ('logampl', p, q) << Meq.Log (Meq.Abs (side (p,q)))
 
         return lhs ('logampl'), rhs ('logampl'), None, None
@@ -372,7 +372,7 @@ def _define_forest (ns, parent=None, **kw):
             ns.meanabsres << Meq.Mean (*[ns.absres(p,q) for p, q in array.ifrs()])
             ns.flagmeanres << Meq.ZeroFlagger (ns.meanabsres - flag_mean_res,
                                                oper='gt', flag_bit=MSUtils.FLAGMASK_OUTPUT)
-            Bookmarks.Page ('Mean residual amplitude flags').add (ns.flagmeanres, 
+            Bookmarks.Page ('Mean residual amplitude flags').add (ns.flagmeanres,
                                                                   viewer='Result Plotter')
             flaggers.append (lambda p, q: ns.flagmeanres)
 
@@ -395,7 +395,7 @@ def _define_forest (ns, parent=None, **kw):
                                 'Check your ifr specification (under calibration options).')
 
         lhs, rhs, weights, modulo = cal_quant.apply (solve_ifrs, predict, spigots)
-        solve_tree = StdTrees.SolveTree (ns, lhs, solve_ifrs=solve_ifrs, 
+        solve_tree = StdTrees.SolveTree (ns, lhs, solve_ifrs=solve_ifrs,
                                          weights=weights, modulo=modulo)
         outputs = solve_tree.sequencers (inputs=rhs, outputs=outputs)
 
@@ -414,7 +414,7 @@ def _define_forest (ns, parent=None, **kw):
         doc = """Input data are sliced by time, and processed in chunks (tiles) of
 the indicated size. Larger tiles are faster, but use more memory."""
 
-        TDLRuntimeMenu(name, TDLOption ('tile_size', 'Tile size, in timeslots', 
+        TDLRuntimeMenu(name, TDLOption ('tile_size', 'Tile size, in timeslots',
                                         [10, 60, 120, 240], more=int, doc=doc),
                        TDLJob (run_tree, name, job_id='generate_visibilities'))
 

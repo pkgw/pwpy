@@ -33,7 +33,7 @@ for bnum, line in enumerate (file (boxfn)):
 
     cra, cdec, wra, wdec = map (float, a)
 
-    t.region = 'arcsec,b(%.0f,%.0f,%.0f,%.0f)' % (cra - wra, cdec - wdec, 
+    t.region = 'arcsec,b(%.0f,%.0f,%.0f,%.0f)' % (cra - wra, cdec - wdec,
                                                   cra + wra, cdec + wdec)
     t.spar = '1,%.0f,%.0f' % (cra, cdec)
     stdout, stderr = t.snarf ()

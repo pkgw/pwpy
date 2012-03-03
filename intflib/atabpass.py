@@ -41,7 +41,7 @@ def getData ():
 
     # Mirror out the half-bandpass to the full
     # spectrum to make processing easier
-    
+
     biga = np.empty (1024)
     biga[512:] = a
 
@@ -51,7 +51,7 @@ def getData ():
     # Normalize to RMS = 1
 
     biga /= np.sqrt ((biga**2).mean ())
-    
+
     return biga
 
 
@@ -68,10 +68,10 @@ def task (args):
         sys.exit (1)
 
     bpass = getData ()
-    
+
     # Multifile UV copying algorithm copied from uvdat.for;
     # implementation copied from fxcal.py
-    
+
     dOut = miriad.VisData (opts.out).open ('c')
     dOut.setPreambleType ('uvw', 'time', 'baseline')
 
@@ -79,13 +79,13 @@ def task (args):
     curFile = None
     saveNPol = 0
     polsVaried = False
-    
+
     windowVars = ['ischan', 'nschan', 'nspect', 'restfreq',
                   'sdf', 'sfreq', 'systemp', 'xtsys', 'ytsys']
 
     for dIn, preamble, data, flags in uvdat.read ():
         anyChange = False
-    
+
         if dIn is not curFile:
             # Started reading a new file (or the first file)
             corrType, corrLen, corrUpd = dIn.probeVar ('corr')
@@ -97,10 +97,10 @@ def task (args):
                 # This is NOT a close approximation to uvcat.for
                 # We don't use an 'init' var since we assume dochan=True.
                 dOut.setCorrelationType (corrType)
-        
+
             dIn.initVarsAsInput (' ') # what does ' ' signify?
             dOut.initVarsAsOutput (dIn, ' ')
-            
+
             uvt = dIn.makeVarTracker ()
             uvt.track (*windowVars)
 
@@ -110,7 +110,7 @@ def task (args):
             doneNPol = False
             curFile = dIn
             anyChange = True
-        
+
         if first:
             # If very first file, copy the history entry.
             dIn.copyItem (dOut, 'history')
@@ -127,11 +127,11 @@ def task (args):
             nAnts = dIn.getVarInt ('nants')
 
             tbl = {}
-        
+
             dIn.probeVar ('nspect')
             nSpec = dIn.getVarInt ('nspect')
             tbl['nspect'] = ('i', nSpec)
-        
+
             for v in ['nschan', 'ischan']:
                 dIn.probeVar (v)
                 tbl[v] = ('i', dIn.getVarInt (v, nSpec))
@@ -165,7 +165,7 @@ def task (args):
             # 'npol' variable. If npol has changed, note
             # that so that we know not to write a
             # dataset-wide npol item.
-        
+
             if nPol != saveNPol:
                 dOut.writeVarInt ('npol', nPol)
                 polsVaried = polsVaried or saveNPol != 0
@@ -179,10 +179,10 @@ def task (args):
         data /= bpass
 
         # That was fast.
-        
+
         dOut.writeVarInt ('pol', pol)
         dOut.write (preamble, data, flags, flags.size)
-        
+
         # Count down the number of polarizations left for this baseline.
         # When we reach zero, we may reset the npol variable.
         nPol -= 1
@@ -199,7 +199,7 @@ def task (args):
     dOut.logInvocation ('ATABPASS')
     dOut.closeHistory ()
     dOut.close ()
-    
+
     return 0
 
 if __name__ == '__main__':

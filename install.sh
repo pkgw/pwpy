@@ -2,7 +2,7 @@
 
 # Installation is configured with a shell script fragment called 'config'.
 # It should set these variables: prefix
-# It may set: 
+# It may set:
 #  casaprefix - to install casa-python wrapper
 #  mirpysrc - to install example programs from miriad-python
 # See the file 'config.sample'.

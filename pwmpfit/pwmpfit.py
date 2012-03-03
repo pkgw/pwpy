@@ -70,16 +70,16 @@ def _enorm_careful (v, finfo):
     # "This is hopefully a compromise between speed and robustness.
     # Need to do this because of the possibility of over- or under-
     # flow.
-    
+
     mx = max (abs (v.max ()), abs (v.min ()))
-    
+
     if mx == 0:
         return v[0] * 0. # preserve type (?)
     if not np.isfinite (mx):
         raise ValueError ('computed nonfinite vector norm')
     if mx > agiant or mx < adwarf:
         return mx * np.sqrt (np.dot (v / mx, v / mx))
-    
+
     return np.sqrt (np.dot (v, v))
 
 
@@ -89,7 +89,7 @@ def _qr_factor_packed (a, enorm, finfo):
     """Compute the packed pivoting Q-R factorization of a matrix.
 
 Parameters:
-a     - An m-by-n matrix, m >= n. This will be *overwritten* 
+a     - An m-by-n matrix, m >= n. This will be *overwritten*
         by this function as described below!
 enorm - A Euclidian-norm-computing function.
 finfo - A Numpy finfo object.
@@ -284,7 +284,7 @@ pmut[i]'th column of 'a' has the i'th biggest norm."""
     for i in xrange (n):
         v[:] = packed[:,pmut[i]]
         v[0:i] = 0
-        
+
         hhm = np.eye (m) - 2 * np.outer (v, v) / np.dot (v, v)
         q = np.dot (q, hhm)
 
@@ -300,7 +300,7 @@ def _qr_examples ():
 
     a = np.asarray ([[9., 4], [2, 8], [6, 7]])
     packed, pmut, rdiag, acnorm = _manual_qr_factor_packed (a)
-    
+
     Taaae (packed, [[-8.27623852, 1.35218036],
                     [ 1.96596229, 0.70436073],
                     [ 0.25868293, 0.61631563]])
@@ -367,7 +367,7 @@ r     - n-by-n in-out array. The full upper triangle contains the full
         contains the transpose of the strict upper triangle of
         S.
 pmut  - n-vector describing the permutation matrix P.
-ddiag - n-vector containing the diagonal of the matrix D in the base 
+ddiag - n-vector containing the diagonal of the matrix D in the base
         problem (see below).
 qtb   - n-vector containing the first n elements of Q^T B.
 sdiag - output n-vector. It is filled with the diagonal of S. Should
@@ -415,7 +415,7 @@ P^T (A^T A + D D) P = S^T S.
     zwork = qtb.copy ()
 
     # "Eliminate the diagonal matrix d using a Givens rotation."
-    
+
     for i in xrange (n):
         # "Prepare the row of D to be eliminated, locating the
         # diagonal element using P from the QR factorization."
@@ -479,7 +479,7 @@ P^T (A^T A + D D) P = S^T S.
             nsing = i
             zwork[i:] = 0
             break
-            
+
     if nsing >= 1:
         zwork[nsing-1] /= sdiag[nsing-1] # Degenerate case
         # "Reverse loop"
@@ -554,7 +554,7 @@ has its columns sorted that way.
 
     q, r, pmut = _qr_factor_full (a)
     qtb = np.dot (q.T, b)
-    x, s = _manual_qrd_solve (r[:n], pmut, ddiag, qtb, 
+    x, s = _manual_qrd_solve (r[:n], pmut, ddiag, qtb,
                               dtype=dtype, build_s=True)
 
     return x, s, pmut
@@ -562,7 +562,7 @@ has its columns sorted that way.
 
 @test
 def _qrd_solve_alone ():
-    # Testing out just the QR solution function without 
+    # Testing out just the QR solution function without
     # also the QR factorization bits.
 
     # The very simplest case.
@@ -629,12 +629,12 @@ def _lmpar (r, ipvt, diag, qtb, delta, x, sdiag, par, enorm, finfo):
     # "If the Jacobian is not rank deficient, the Newton step provides a
     # lower bound, parl, for the zero of the function.  Otherwise set
     # this bound to zero."
-      
+
     parl = 0.
-        
+
     if nsing >= n:
         wa1 = diag[ipvt] * wa2[ipvt] / dxnorm
-        wa1[0] /= r[0,0] # Degenerate case 
+        wa1[0] /= r[0,0] # Degenerate case
         for j in xrange (1, n):
             s = np.dot (r[:j,j], wa1[:j])
             wa1[j] = (wa1[j] - s) / r[j,j]
@@ -711,7 +711,7 @@ class Solution (object):
     fnorm = None
     fvec = None
     fjac = None
-    
+
     def __init__ (self, prob):
         self.prob = prob
 
@@ -731,9 +731,9 @@ class Problem (object):
     _anytied = None
 
     # Public fields, settable by user at will
-    
+
     solclass = None
-    
+
     ftol = 1e-10
     xtol = 1e-10
     gtol = 1e-10
@@ -753,7 +753,7 @@ class Problem (object):
     debugCalls = False
     debugJac = False
 
-    
+
     def __init__ (self, npar=None, nout=None, yfunc=None, jfunc=None,
                   solclass=Solution):
         if npar is not None:
@@ -946,7 +946,7 @@ class Problem (object):
 
         if not callable (yfunc):
             raise ValueError ('yfunc')
-        
+
         if jfunc is not None and not callable (jfunc):
             raise ValueError ('jfunc')
 
@@ -1032,7 +1032,7 @@ class Problem (object):
 
         if self.diag is not None:
             self.diag = np.asarray (self.diag, dtype=np.float)
-        
+
         # Bounds and type checks
 
         if not issubclass (self.solclass, Solution):
@@ -1194,7 +1194,7 @@ class Problem (object):
         self.niter = 1
         qtf = x * 0.
         status = 0
-        
+
         # Outer loop top.
 
         while True:
@@ -1604,7 +1604,7 @@ class Problem (object):
         self._fixupCheck ()
 
         ifree = self._ifree
-        
+
         xall = np.atleast_1d (np.asarray (xall, dtype))
         x = xall[ifree]
         fvec = np.empty (self._nout, dtype)
@@ -1624,7 +1624,7 @@ class Problem (object):
 
     def _doTies (self, p):
         funcs = self._pinfoo[PI_O_TIED]
-        
+
         for i in xrange (self._npar):
             if funcs[i] is not None:
                 p[i] = funcs[i] (p)
@@ -1643,7 +1643,7 @@ class Problem (object):
             if abs (r[k,k]) <= tolr:
                 break
             r[k,k] = 1. / r[k,k]
-            
+
             for j in xrange (k):
                 temp = r[k,k] * r[j,k]
                 r[j,k] = 0.
@@ -1664,9 +1664,9 @@ class Problem (object):
 
         # "For the full lower triangle of the covariance matrix
         # in the strict lower triangle or and in wa"
-        
+
         wa = np.repeat ([r[0,0]], n)
-        
+
         for j in xrange (n):
             jj = ipvt[j]
             sing = j > l
@@ -1679,7 +1679,7 @@ class Problem (object):
             wa[jj] = r[j,j]
 
         # "Symmetrize the covariance matrix in r"
-        
+
         for j in xrange (n):
             r[:j+1,j] = r[j,:j+1]
             r[j,j] = wa[j]
@@ -1714,7 +1714,7 @@ def _solve_linear ():
     y = 2 * x + 1
 
     from numpy import multiply, add
-    
+
     def f (pars, ymodel):
         multiply (x, pars[0], ymodel)
         add (ymodel, pars[1], ymodel)
@@ -1728,14 +1728,14 @@ def _simple_automatic_jac ():
         np.exp (pars, vec)
 
     p = Problem (1, 1, f, None)
-    j = p._manual_fdjac2 (0) 
+    j = p._manual_fdjac2 (0)
     Taaae (j, [[1.]])
-    j = p._manual_fdjac2 (1) 
+    j = p._manual_fdjac2 (1)
     Taaae (j, [[np.e]])
 
     p = Problem (3, 3, f, None)
     x = np.asarray ([0, 1, 2])
-    j = p._manual_fdjac2 (x) 
+    j = p._manual_fdjac2 (x)
     Taaae (j, np.diag (np.exp (x)))
 
 @test

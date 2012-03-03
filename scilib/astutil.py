@@ -193,7 +193,7 @@ __all__ += 'parsehours parsedeglat'.split ()
 # Spherical trig
 
 def sphdist (lat1, lon1, lat2, lon2):
-    """Args are: lat1, lon1, lat2, lon2 -- consistent with 
+    """Args are: lat1, lon1, lat2, lon2 -- consistent with
     the usual coordinates in images, but note that this maps
     to (Dec, RA) or (Y, X), so be careful with this.
     """

@@ -303,7 +303,7 @@ def task (args):
 
     mode = opts.mode[0]
     gi = GainsInfo ()
-    
+
     if mode == 'totext':
         gi.fromDataset (CalData (opts.vis).open ('rw'))
 

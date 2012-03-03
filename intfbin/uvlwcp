@@ -234,13 +234,13 @@ def doone (src, dest, doapply):
                 try:
                     os.symlink (join (relsrc, item), join (dest, item))
                 except Exception, e:
-                    die ('symlink \"%s\" -> \"%s\" failed: %s', join (relsrc, item), 
+                    die ('symlink \"%s\" -> \"%s\" failed: %s', join (relsrc, item),
                          join (dest, item), e)
             else:
                 try:
                     shutil.copy (join (src, item), join (dest, item))
                 except Exception, e:
-                    die ('copy \"%s\" -> \"%s\" failed: %s', join (src, item), 
+                    die ('copy \"%s\" -> \"%s\" failed: %s', join (src, item),
                          join (dest, item), e)
 
         # History entry

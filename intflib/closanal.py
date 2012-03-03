@@ -26,7 +26,7 @@
  standard deviation of those values ("StdDev") and the number of
  closure quantities used in the computation ("nTrip" or "nQuad") are
  also printed.
- 
+
 < vis
 
 @ interval
@@ -384,16 +384,16 @@ def _flushOneInteg3 (integData, accData, ap1, ap2, ap3):
     (d23, f23, v23, t23) =  tup23
 
     assert t12 == t13 and t12 == t23
-    
+
     w = np.where (_flagAnd (f12, f13, f23))
     n = len (w[0])
 
     if n == 0: return
-    
+
     t = n * t12
     c = (d12[w].sum () * d23[w].sum () * d13[w].sum ().conj ()) * t
     v = (v12 + v13 + v23) * n**3 * t
-    
+
     accKey = (ap1, ap2, ap3)
     if accKey not in accData:
         accData[accKey] = (t, c, v)
@@ -423,7 +423,7 @@ def _flushOneInteg4 (integData, accData, ap1, ap2, ap3, ap4):
     n = len (w[0])
 
     if n == 0: return
-    
+
     t = n * t12
     c = (d12[w].sum () * d34[w].sum () / d13[w].sum () / d24[w].sum ().conj ()) * t
 
@@ -432,7 +432,7 @@ def _flushOneInteg4 (integData, accData, ap1, ap2, ap3, ap4):
     # but need to think through whether this is by channel or what.
 
     v = (v12 + v13 + v24 + v34) * t
-    
+
     accKey = (ap1, ap2, ap3, ap4)
     if accKey not in accData:
         accData[accKey] = (t, c, v)
@@ -468,7 +468,7 @@ def _flushOneAcc4 (accData, allData, ap1, ap2, ap3, ap4):
     (time, c, v) = tup
     amp = np.abs (c) / time
     thy = np.sqrt (v) / time
-    
+
     allData.accum (key, (amp, thy))
 
 
@@ -476,7 +476,7 @@ class ClosureComputer (object):
     def __init__ (self, rmshist, relative):
         self.rmshist = rmshist
         self.relative = relative
-        
+
         self.integData = {}
         self.accData = {}
         self.allData = AccDict (lambda: ArrayGrower (2), lambda o, v: o.addLine (v))
@@ -526,27 +526,27 @@ class ClosureComputer (object):
 
     def _printGeneric (self, data, capname, haveStats, n, best):
         if n == 0 or len (data) == 0: return
-        
+
         if best:
             adj = 'best'
             subset = data[0:n]
         else:
             adj = 'worst'
             subset = data[-n:]
-        
+
         print
         print '%s with %s %s closure values:' % (capname, adj, self.item)
-        
+
         if haveStats:
             if self.relative:
                 err = 'Th.Uncert.'
             else:
                 err = 'StdDev'
-                
+
             print '%15s  %14s (%10s, %5s) %14s' % (capname[:-1], self.manystat,
                                                    err, self.ndatum,
                                                    self.manystat + '/T.U.')
-            
+
             for ident, val, std, num in subset:
                 print '%15s: %14g (%10g, %5d) %14g' % (_format (ident), val,
                                                        std, num, val / std)
@@ -567,11 +567,11 @@ class ClosureComputer (object):
 
     def pBasepols (self, n, best):
         self._printGeneric (self.bpData, 'Basepols', True, n, best)
-        
+
 
     def pAntpols (self, n, best):
         self._printGeneric (self.apData, 'Antpols', True, n, best)
-    
+
 
 class TripleComputer (ClosureComputer):
     item = 'phase'
@@ -580,14 +580,14 @@ class TripleComputer (ClosureComputer):
     ndatum ='nTrip'
     onestat = 'RMS'
     manystat = 'Mean(RMS)'
-    
-    
+
+
     def flushInteg (self):
         id, ac = self.integData, self.accData
-        
+
         for pol in self.seenpols:
             aps = sorted (self.seenaps[pol])
-        
+
             for i in xrange (0, len (aps)):
                 ap3 = aps[i]
                 for j in xrange (0, i):
@@ -599,10 +599,10 @@ class TripleComputer (ClosureComputer):
 
         self.integData = {}
 
-    
+
     def flushAcc (self):
         acc, all = self.accData, self.allData
-        
+
         for pol in self.seenpols:
             aps = sorted (self.seenaps[pol])
 
@@ -614,7 +614,7 @@ class TripleComputer (ClosureComputer):
                         ap1 = aps[k]
 
                         _flushOneAcc3 (acc, all, ap1, ap2, ap3)
-                        
+
         self.accData = {}
         self.seenpols = set ()
         self.seenaps = {}
@@ -641,7 +641,7 @@ class TripleComputer (ClosureComputer):
 
                 if thy == 0.:
                     thy = -1
-                
+
                 if self.rmshist:
                     self.allrms.add (rms)
 
@@ -649,7 +649,7 @@ class TripleComputer (ClosureComputer):
                     q = (rms, thy**-2)
                 else:
                     q = rms
-                    
+
                 bpacc ((ap1, ap2), q)
                 bpacc ((ap1, ap3), q)
                 bpacc ((ap2, ap3), q)
@@ -667,16 +667,16 @@ class TripleComputer (ClosureComputer):
             key = lambda t: t[1]
             tval = lambda t: (t[0], t[1].mean (), t[1].std (),
                               t[1].num ())
-            
+
         self.qtyData = sorted (c (), key=key)
 
         g = (tval (t) for t in bpStats.iteritems ())
         self.bpData = sorted (g, key=key)
-        
+
         g = (tval (t) for t in apStats.iteritems ())
         self.apData = sorted (g, key=key)
 
-    
+
 class QuadComputer (ClosureComputer):
     item = 'amplitude'
     datum = 'quads'
@@ -684,7 +684,7 @@ class QuadComputer (ClosureComputer):
     ndatum = 'nQuad'
     onestat = 'log(RMS)'
     manystat = 'RMS(log(RMS))'
-    
+
     def flushInteg (self):
         id, ac = self.integData, self.accData
 
@@ -710,7 +710,7 @@ class QuadComputer (ClosureComputer):
 
         for pol in self.seenpols:
             aps = sorted (self.seenaps[pol])
-        
+
             for i in xrange (0, len (aps)):
                 ap4 = aps[i]
                 for j in xrange (0, i):
@@ -732,7 +732,7 @@ class QuadComputer (ClosureComputer):
 
         bpStats = AccDict (StatsAccumulator, lambda sa, rms: sa.add (rms))
         bpacc = bpStats.accum
-        
+
         apStats = AccDict (StatsAccumulator, lambda sa, rms: sa.add (rms))
         apacc = apStats.accum
 
@@ -746,7 +746,7 @@ class QuadComputer (ClosureComputer):
                 # then k-n-m-l adds no information
                 # here, 1=k, 2=n, 3=m, 4=l, so we need to check for
                 # 1-4-3-2 and 1-4-2-3
-        
+
                 if (ap1, ap4, ap3, ap2) in seenQuads and \
                        (ap1, ap2, ap2, ap3) in seenQuads:
                     continue
@@ -754,7 +754,7 @@ class QuadComputer (ClosureComputer):
                 seenQuads.add (key)
 
                 # This quad is not redundant.
-        
+
                 lrms = np.log (np.mean (amps**2)) / 2 # log of the rms
 
                 if self.rmshist:
@@ -772,29 +772,29 @@ class QuadComputer (ClosureComputer):
                 yield key, lrms, 0.
 
         self.qtyData = sorted (c (), key=lambda t: abs (t[1]))
-        
+
         g = ((t[0], t[1].rms (), t[1].std (), t[1].num ()) for t in bpStats.iteritems ())
         self.bpData = sorted (g, key=lambda t: abs (t[1]))
-        
+
         g = ((t[0], t[1].rms (), t[1].std (), t[1].num ()) for t in apStats.iteritems ())
         self.apData = sorted (g, key=lambda t: abs (t[1]))
 
-        
+
 class ClosureProcessor (object):
     def __init__ (self, interval, ccs, uvdPlot):
         self.interval = interval
         self.uvdPlot = uvdPlot
 
         self.ccs = ccs
-        
+
         if uvdPlot:
             self.uvdists = AccDict (StatsAccumulator, lambda sa, v: sa.add (v))
-        
+
     def _read (self, gen):
         ccs = self.ccs
         first = True
         interval = self.interval
-        
+
         # Try to avoid doing tests and member lookups
         # inside the inner loop. Probably totally
         # unneccessary ...
@@ -802,24 +802,24 @@ class ClosureProcessor (object):
         integs = [x.integrate for x in ccs]
         fis = [x.flushInteg for x in ccs]
         fas = [x.flushAcc for x in ccs]
-        
+
         # Go!
-        
+
         for inp, preamble, data, flags in gen:
             data = data.copy ()
             flags = flags.copy ()
 
             time = preamble[3]
             bp = util.mir2pbp32 (inp, preamble)
-    
+
             var = inp.getVariance ()
             inttime = inp.getVarFloat ('inttime')
-    
+
             # Some first checks.
-    
+
             if not util.pbp32IsInten (bp): continue
             if not flags.any (): continue
-    
+
             if first:
                 time0 = int (time - 0.5) + 0.5
                 tmin = time - time0
@@ -838,7 +838,7 @@ class ClosureProcessor (object):
                 tmin = tmax = t
 
             # Store info for this vis
-    
+
             tmin = min (tmin, t)
             tmax = max (tmax, t)
             for integ in integs: integ (bp, data, flags, var, inttime)
@@ -848,7 +848,7 @@ class ClosureProcessor (object):
                                     np.sqrt ((preamble[0:3]**2).sum ()))
 
         # Clean up last interval
-        
+
         for fi in fis: fi ()
         for fa in fas: fa ()
 
@@ -857,15 +857,15 @@ class ClosureProcessor (object):
 
     def readVis (self, vis):
         self._read (vis.readLowlevel ('w3', False))
-    
+
     def plotUVDs (self):
         import omega
         from bisect import bisect
-        
+
         d = ArrayGrower (2)
         bpd = self.ccs[0].bpData
         idxs = xrange (0, len (bpd))
-        
+
         for bp, uvdsa in self.uvdists.iteritems ():
             uvd = uvdsa.mean () * 0.001
 
@@ -875,7 +875,7 @@ class ClosureProcessor (object):
                     break
             else:
                 continue
-            
+
             val = bpd[i][1]
             d.add (uvd, val)
 
@@ -901,7 +901,7 @@ def task (args):
     args = ks.process (args)
 
     # Verify arguments
-    
+
     interval = args.interval / 60. / 24.
     if interval < 0:
         print >>sys.stderr, 'Error: averaging interval must be nonnegative'
@@ -913,7 +913,7 @@ def task (args):
         cc = QuadComputer (args.rmshist, args.relative)
     else:
         cc = TripleComputer (args.rmshist, args.relative)
-        
+
     print 'Configuration:'
     print '  Averaging interval: %g minutes' % (args.interval)
     print '  Calculating %s closure %s' % (cc.item, cc.datum)
@@ -922,11 +922,11 @@ def task (args):
         print '  Using relative (x/sigma_x) ranking'
     else:
         print '  Using absolute ranking'
-        
+
     # Read the info
 
     cp = ClosureProcessor (interval, [cc], args.uvdplot)
-        
+
     print 'Reading data ...',
     cp.readUVDat ()
     print 'done.'
@@ -958,7 +958,7 @@ def task (args):
         cc.bpHist ().show ()
 
     # All done!
-    
+
     return 0
 
 # Standalone task execution

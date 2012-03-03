@@ -47,7 +47,7 @@ ndata = gr.nfeeds + gr.ntau
 
 for j in xrange (gr.nants):
     o = j * ndata
-        
+
     for k in xrange (gr.nfeeds):
         gains[:,o + k] = 1.0
 

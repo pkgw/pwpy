@@ -5,19 +5,19 @@
 & pkgw
 : calibration
 +
- The tasks SELFCAL and MSELFCAL only operate on data of a single 
- polarization at a time. GPMERGEPOLS will take separate 
+ The tasks SELFCAL and MSELFCAL only operate on data of a single
+ polarization at a time. GPMERGEPOLS will take separate
  single-feed two gains solutions, such as those created by
  running SELFCAL on data split into XX and YY pols, and
  merge them together into one table that can be applied to
  multiple-polarization datasets.
 
- GPMERGEPOLS is fairly strict in ensuring that its inputs have 
+ GPMERGEPOLS is fairly strict in ensuring that its inputs have
  gains tables for the same number of antennas, the same times, and
  so on.
 
 @ vis
- Two input datasets. The first should contain a solution for the 
+ Two input datasets. The first should contain a solution for the
  X or L feeds only and the second should contain a solution for the
  Y or R feeds only.
 

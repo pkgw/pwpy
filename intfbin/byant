@@ -167,7 +167,7 @@ def _cr ():
 
 def _acc (ga, tup):
     ga.add (tup[0], tup[1])
-    
+
 byAp = AccDict (_cr, _acc)
 
 for dIn, p, d, f in uvdat.read ():
@@ -178,9 +178,9 @@ for dIn, p, d, f in uvdat.read ():
     if nok == 0: continue
 
     d = d[w].sum () / nok
-    
+
     # Collect data
-    
+
     bp = util.mir2bp (dIn, p)
 
     if not xantdep: x = xfunc (dIn, p, d)
@@ -188,12 +188,12 @@ for dIn, p, d, f in uvdat.read ():
 
     if only > 0:
         if only in bp:
-            if only == bp[0]: 
+            if only == bp[0]:
                 other = bp[1]
             else:
                 other = bp[0]
                 d = d.conj ()
-            
+
             if xantdep: x = xfunc (only, other, dIn, p, d)
             if yantdep: y = yfunc (only, other, dIn, p, d)
             byAp.accum (only, (x, y))
@@ -201,12 +201,12 @@ for dIn, p, d, f in uvdat.read ():
         if xantdep: x = xfunc (bp[0], bp[1], dIn, p, d)
         if yantdep: y = yfunc (bp[0], bp[1], dIn, p, d)
         byAp.accum (bp[0], (x, y))
-    
+
         if bp[1] != bp[0]:
             if xantdep: x = xfunc (bp[1], bp[0], dIn, p, d.conj ())
             if yantdep: y = yfunc (bp[1], bp[0], dIn, p, d.conj ())
             byAp.accum (bp[1], (x, y))
-    
+
 # Plot it
 
 saps = sorted (byAp.iterkeys ())

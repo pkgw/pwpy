@@ -40,11 +40,11 @@
  coordinates of the point source).
 
 @ select
- The standard UV-data selection keyword. For more help, see 
+ The standard UV-data selection keyword. For more help, see
  "mirhelp select".
 
 @ line
- The standard channel selection keyword. For more help, see 
+ The standard channel selection keyword. For more help, see
  "mirhelp line".
 
 @ stokes

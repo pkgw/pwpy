@@ -13,7 +13,7 @@ magics:
 import IPython.ipapi
 init_ip = IPython.ipapi.get()
 
-import ipy_defaults    
+import ipy_defaults
 
 # Options
 
@@ -38,21 +38,21 @@ def magic_slurp (shell, argstr):
     'from module import *' had been run.
 
     Options:
-    
+
     -q   Suppress an informational message giving the names of the
     modules and names imported.
     """
-        
+
     import sys
 
     ip = shell.getapi ()
     opts, args = shell.parse_options (argstr, 'q', mode='list')
-        
+
     quiet = opts.has_key ('q')
 
     for modname in args:
         need_reload = modname in sys.modules
-        
+
         try:
             module = __import__ (modname)
             if need_reload: module = reload (module)
@@ -71,7 +71,7 @@ def magic_slurp (shell, argstr):
         if not quiet:
             if need_reload: verb = 'Reloaded'
             else: verb = 'Loaded'
-        
+
             print ' * %s \'%s\' and imported: ' % (verb, modname), ', '.join (list)
 
 init_ip.expose_magic ('slurp', magic_slurp)
@@ -86,7 +86,7 @@ def magic_reload (shell, argstr):
 
     for modname in argstr.split (' '):
         need_reload = modname in sys.modules
-        
+
         try:
             module = __import__ (modname)
             if need_reload: module = reload (module)
@@ -102,38 +102,38 @@ init_ip.expose_magic ('reload', magic_reload)
 
 import os, inspect, textwrap
 from IPython.FakeModule import FakeModule
-    
+
 def get_local_key ():
     # Figure out our canonical PWD. HOME stuff copied from
     # os.path.expanduser from python 2.4.
-        
+
     pwd = os.path.realpath (os.path.curdir)
-        
+
     homedir = os.environ.get ('HOME')
     if homedir is None:
         import pwd
         homedir = pwd.getpwuid (os.getuid ()).pw_dir
     homedir = os.path.realpath (homedir)
-        
+
     if pwd.startswith (homedir):
         pwd = '~' + pwd[len(homedir):]
 
     dbprefix = 'lstore/' + pwd
 
     if dbprefix[-1] != '/': dbprefix += '/'
-        
+
     return pwd, dbprefix
-    
+
 def reload_local_vars (ip, db, verbose=False):
     import sys
 
     pwd, dbprefix = get_local_key ()
     skeys = []
-        
+
     for key in db.keys (dbprefix + '*'):
         k = key[key.rindex ('/') + 1:]
         skeys.append (k)
-            
+
         try:
             obj = db[key]
         except KeyError:
@@ -153,13 +153,13 @@ def reload_local_hook (shell):
     db = ip.get_db ()
     reload_local_vars (ip, db)
     raise IPython.ipapi.TryNext # ??? copied from %store
-    
+
 init_ip.set_hook ('late_startup_hook', reload_local_hook)
-    
+
 def magic_lstore (self, param_s=''):
     """Per-directory persistence of Python variables along the lines
     of the %store magic.
-    
+
     %lstore <vars...>     - Store the named variables.
     %lstore               - Print names and values of all variables
                             stored for this directory.
@@ -184,17 +184,17 @@ def magic_lstore (self, param_s=''):
     if dodel + dozap + dorel > 1:
         print 'Error: Can only specify one of the -d, -r, and -z options.'
         return
-    
+
     pwd, dbprefix = get_local_key ()
 
     # Ok. Now do stuff. Copied from magic_store, basically.
-        
+
     if dodel:
         # Delete
         if len (args) < 1:
             print 'Error: You must specify the variable to forget.'
             return
-        
+
         for todel in args:
             try: del db[dbprefix + todel]
             except: print 'Error: Can\'t delete variable "%s":' % todel, \
@@ -204,7 +204,7 @@ def magic_lstore (self, param_s=''):
         if len (args) != 0:
             print 'Error: %lstore -z takes no arguments.'
             return
-        
+
         for k in db.keys (dbprefix + '*'):
             del db[k]
     elif dorel:
@@ -212,7 +212,7 @@ def magic_lstore (self, param_s=''):
         if len (args) != 0:
             print 'Error: %lstore -r takes no arguments.'
             return
-        
+
         reload_local_vars (ip, db, True)
     elif not args:
         # List stored vars
@@ -222,7 +222,7 @@ def magic_lstore (self, param_s=''):
         if not v:
             print 'There are no variables stored for "%s".' % pwd
             return
-        
+
         size = max ((len (x) for x in v))
 
         print 'Stored variables for "%s":' % pwd
@@ -234,7 +234,7 @@ def magic_lstore (self, param_s=''):
     else:
         # Store variables.
         stored = []
-        
+
         for a in args:
             try:
                 obj = ip.user_ns[a]
@@ -244,7 +244,7 @@ def magic_lstore (self, param_s=''):
                 if isinstance (inspect.getmodule (obj), FakeModule):
                     print textwrap.dedent ("""\
                     Warning: can't store "%s" (= %s)
-                
+
                     Proper storage of interactively declared classes (or instances
                     of those classes) is not possible! Only instances of classes
                     in real modules on the filesystem can be %%lstore'd. Sorry.
@@ -268,12 +268,12 @@ def magic_redo (shell, argstr):
 
     %redo ranges... - Re-executes the input lines specified
                       in 'ranges'. These ranges have the same
-                      format as the arguments to the %macro 
+                      format as the arguments to the %macro
                       magic.
 
     Example:
 
-      %redo 1-4 12 
+      %redo 1-4 12
 
     Rexecutes lines 1 through 4 (inclusive) and 12.
     """

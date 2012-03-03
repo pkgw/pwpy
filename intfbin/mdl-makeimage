@@ -71,6 +71,6 @@ for enum, line in enumerate (file (descfn)):
 t = mirexec.TaskImGen (in_=timg, factor=0, out=out)
 t.object = ','.join (kinds)
 t.spar = ','.join (params)
-t.run () 
+t.run ()
 
 print >>file (out.path ('deschash'), 'w'), curhash

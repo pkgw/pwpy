@@ -48,14 +48,14 @@ class AstroImage (object):
     shape = None
     "An integer ndarray of the image shape"
 
-    bmaj = None 
+    bmaj = None
     "If not None, the restoring beam FWHM major axis in radians"
 
-    bmin = None 
+    bmin = None
     "If not None, the restoring beam FWHM minor axis in radians"
 
-    bpa = None 
-    """If not None, the restoring beam position angle (east 
+    bpa = None
+    """If not None, the restoring beam position angle (east
     from celestial north) in radians"""
 
     units = None
@@ -510,7 +510,7 @@ class CASAImage (AstroImage):
                     flat.append (subitem)
 
         for i, name in enumerate (flat):
-            # These symbolic names obtained from 
+            # These symbolic names obtained from
             # casacore/coordinates/Coordinates/DirectionCoordinate.cc
             # Would be nice to have a better system for determining
             # this a la what wcslib provides.

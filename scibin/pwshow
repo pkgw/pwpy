@@ -169,7 +169,7 @@ for path in sys.argv[1:]:
             'image: %s' % (path, e)
         anyfailures = True
         continue
-        
+
     data = img.read (flip=True)
     toworld = img.toworld
 

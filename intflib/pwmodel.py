@@ -17,8 +17,8 @@
  the two polarizations separately and then using UVCAL to hack the
  data back into their original polarization state.
 
- PWMODEL will also optionally UVCAT the input dataset(s) into a 
- temporary dataset to apply their calibration parameters. The UV 
+ PWMODEL will also optionally UVCAT the input dataset(s) into a
+ temporary dataset to apply their calibration parameters. The UV
  modeling subsystem in MIRIAD ignores calibration parameters associated
  with UV data, which can be confusing and inconvenient to deal with.
 
@@ -50,7 +50,7 @@
 
 @ model
  The name of the model image, which should be a JY/PIXEL MIRIAD image.
- If unspecified, a point source model must be specified via the 
+ If unspecified, a point source model must be specified via the
  keyword "flux".
 
 @ out
@@ -186,7 +186,7 @@ class Modeler (object):
         def doone (modeltask, pol, polcode):
             pv = self.out.vvis ('mdl' + pol)
             pv.delete ()
-            modeltask.set (select=self.select + ['pol(%s)' % (pol * 2)], 
+            modeltask.set (select=self.select + ['pol(%s)' % (pol * 2)],
                            out=pv).run ()
             cleanup.append (pv)
 
