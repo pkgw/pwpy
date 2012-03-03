@@ -34,17 +34,17 @@ second-to-last. There's probably a way to do this better (though not
 necessarily a very clean way).
 """
 
-import sys, numpy as N
+import sys, numpy as np
 from mirtask import util
 
 GAUSSMINFLUX = 1e-6 # see fill_gauss
-ASEC2RAD = N.pi / 180 / 3600
-FWHM2SIGMA = 1. / N.sqrt (8 * N.log (2))
+ASEC2RAD = np.pi / 180 / 3600
+FWHM2SIGMA = 1. / np.sqrt (8 * np.log (2))
 
 
 def raparse (rastr):
     hr, mn, sec = rastr.split (':')
-    return (int (hr) + int (mn) / 60. + float (sec) / 3600.) * N.pi / 12
+    return (int (hr) + int (mn) / 60. + float (sec) / 3600.) * np.pi / 12
 
 
 def decparse (decstr):
@@ -56,7 +56,7 @@ def decparse (decstr):
 
     deg, mn, sec = decstr.split (':')
     return sgn * (int (deg) + int (mn) / 60. +
-                  float (sec) / 3600.) * N.pi / 180
+                  float (sec) / 3600.) * np.pi / 180
 
 
 def rad2perpix (pix2world, pixelcoords):
@@ -79,28 +79,28 @@ def rad2perpix (pix2world, pixelcoords):
 
 def convolveGaussians (maj1, min1, pa1, maj2, min2, pa2):
     # copied from miriad/src/subs/gaupar.for:gaufac()
-    c1 = N.cos (pa1)
-    s1 = N.sin (pa1)
-    c2 = N.cos (pa2)
-    s2 = N.sin (pa2)
+    c1 = np.cos (pa1)
+    s1 = np.sin (pa1)
+    c2 = np.cos (pa2)
+    s2 = np.sin (pa2)
 
     a = (maj1*c1)**2 + (min1*s1)**2 + (maj2*c2)**2 + (min2*s2)**2
     b = (maj1*s1)**2 + (min1*c1)**2 + (maj2*s2)**2 + (min2*c2)**2
     g = 2 * ((min1**2 - maj1**2) * s1 * c1 + (min2**2 - maj2**2) * s2 * c2)
 
     s = a + b
-    t = N.sqrt ((a - b)**2 + g**2)
-    maj3 = N.sqrt (0.5 * (s + t))
-    min3 = N.sqrt (0.5 * (s - t))
+    t = np.sqrt ((a - b)**2 + g**2)
+    maj3 = np.sqrt (0.5 * (s + t))
+    min3 = np.sqrt (0.5 * (s - t))
 
     if abs (g) + abs (a - b) == 0:
         pa3 = 0.
     else:
-        pa3 = 0.5 * N.arctan2 (-g, a - b)
+        pa3 = 0.5 * np.arctan2 (-g, a - b)
 
     # Amplitude of the resulting Gaussian:
-    # f = N.pi / (4 * N.log (2)) * maj1 * min1 * maj2 * min2 \
-    #    / N.sqrt (a * b - 0.25 * g**2)
+    # f = np.pi / (4 * np.log (2)) * maj1 * min1 * maj2 * min2 \
+    #    / np.sqrt (a * b - 0.25 * g**2)
 
     return maj3, min3, pa3
 
@@ -114,7 +114,7 @@ def fill_point (image, worldcoords, pixelcoords, data, info):
 
     totflux = info[0]
 
-    c = N.floor (pixelcoords).astype (N.int)
+    c = np.floor (pixelcoords).astype (np.int)
     d1 = pixelcoords[-1] - c[-1]
     d2 = pixelcoords[-2] - c[-2]
 
@@ -188,7 +188,7 @@ def fill_gauss (image, worldcoords, pixelcoords, data, info, beaminfo=None):
     # offset by one because they only come up in Python range-type
     # situations.
 
-    abspix = empty (4, dtype=N.int)
+    abspix = empty (4, dtype=np.int)
     abspix[0] = max (floor (deltapix[0] + pixelcoords[-1]), 0)
     abspix[1] = max (floor (deltapix[1] + pixelcoords[-2]), 0)
     abspix[2] = min (ceil (deltapix[2] + pixelcoords[-1]) + 1,
@@ -231,7 +231,7 @@ def fill_image (srcstream, outpath, convolve=False, tmplscale=0,
 
     oi = PI.image (outpath)
     # Fill in world coord values of axes we don't care about.
-    worldcoords = oi.toworld (N.zeros (len (oi.shape ())))
+    worldcoords = oi.toworld (np.zeros (len (oi.shape ())))
     odata = oi.getdata ()
     odata *= tmplscale
 
@@ -268,7 +268,7 @@ def fill_image (srcstream, outpath, convolve=False, tmplscale=0,
 
         worldcoords[-1] = raparse (a[1])
         worldcoords[-2] = decparse (a[2])
-        pixelcoords = N.asarray (oi.topixel (worldcoords))
+        pixelcoords = np.asarray (oi.topixel (worldcoords))
         info = map (float, a[3:])
 
         info[0] *= modelscale # info[0] always the total flux
@@ -280,10 +280,10 @@ def fill_image (srcstream, outpath, convolve=False, tmplscale=0,
             elif kind == 'gaussian':
                 # major/minor can be arbitrary units as long as they're consistent;
                 # PA must be converted from degrees to radians, and back.
-                info[1:4] = convolveGaussians (info[1], info[2], info[3] * N.pi/180,
+                info[1:4] = convolveGaussians (info[1], info[2], info[3] * np.pi/180,
                                                beaminfo[0], beaminfo[1],
-                                               beaminfo[2] * N.pi/180)
-                info[3] *= 180 / N.pi
+                                               beaminfo[2] * np.pi/180)
+                info[3] *= 180 / np.pi
             else:
                 util.die ('unhandled source kind "%s"', kind)
 

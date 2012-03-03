@@ -30,16 +30,16 @@ specified explicitly, so our runs aren't reproducible.
 - Making sure that sources are somewhat well-separated
 """
 
-import numpy as N
+import numpy as np
 import astimage
 
 
 def fmtradec (ra, dec):
-    rahr = ra * 12 / N.pi
-    decdeg = dec * 180 / N.pi
+    rahr = ra * 12 / np.pi
+    decdeg = dec * 180 / np.pi
 
-    hr = int (N.floor (rahr))
-    min = int (N.floor ((rahr - hr) * 60))
+    hr = int (np.floor (rahr))
+    min = int (np.floor ((rahr - hr) * 60))
     sec = round (3600 * (rahr - hr - min / 60.), 3)
 
     if sec >= 60: # this can happen if we round up
@@ -59,8 +59,8 @@ def fmtradec (ra, dec):
         sgn = '-'
         decdeg = -decdeg
 
-    deg = int (N.floor (decdeg))
-    amin = int (N.floor ((decdeg - deg) * 60))
+    deg = int (np.floor (decdeg))
+    amin = int (np.floor ((decdeg - deg) * 60))
     asec = round (3600 * (decdeg - deg - amin / 60.), 2)
 
     if asec >= 60:
@@ -88,13 +88,13 @@ def make_random_sources (tmplpath, flux, radius, nsrc):
         # There's probably a less-dumb way to get a 
         # uniform distribution on a disk.
         while True:
-            dlat = N.random.uniform (-radius, radius) # arcsec
-            dlon = N.random.uniform (-radius, radius) # arcsec
+            dlat = np.random.uniform (-radius, radius) # arcsec
+            dlon = np.random.uniform (-radius, radius) # arcsec
             if dlat**2 + dlon**2 <= radsq:
                 break
 
         slat = latrad + dlat
-        slon = lonrad + dlon / N.cos (slat)
+        slon = lonrad + dlon / np.cos (slat)
 
         print 'point   ', fmtradec (slon, slat), flux
 
@@ -123,5 +123,5 @@ def cmdline (argv):
 
 if __name__ == '__main__':
     import sys, mirtask.cliutil, time
-    N.random.seed (int (time.time ()))
+    np.random.seed (int (time.time ()))
     cmdline (sys.argv)

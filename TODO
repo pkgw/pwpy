@@ -1,5 +1,4 @@
 qu: mass git repo update script
-switch from numpy as N to numpy as np
 switch from omega as O to omega as om
 remove trailing whitespace from all files
 license info so I can post on github

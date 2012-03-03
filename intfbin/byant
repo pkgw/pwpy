@@ -9,7 +9,7 @@
 """
 
 import sys
-import numpy as N
+import numpy as np
 import omega
 from mirtask import uvdat, keys, util
 
@@ -107,7 +107,7 @@ e.g.: create = list, accum = lambda l, v: l.append (v)
 # so use those whenever possible for speed.
 
 _uvd = lambda inp, preamble, datum: \
-    0.001 * N.sqrt (preamble[0]**2 + preamble[1]**2)
+    0.001 * np.sqrt (preamble[0]**2 + preamble[1]**2)
 
 _u = lambda a1, a2, inp, preamble, datum: 0.001 * preamble[0]
 _v = lambda a1, a2, inp, preamble, datum: 0.001 * preamble[1]
@@ -118,9 +118,9 @@ _ti = lambda inp, preamble, datum: preamble[3]
 _dtime = lambda inp, preamble, datum: ((preamble[3] - 0.5) % 1.0) * 24
 
 _ph = lambda theant, otherant, inp, preamble, datum: \
-    N.arctan2 (datum.imag, datum.real) * 180 / N.pi
+    np.arctan2 (datum.imag, datum.real) * 180 / np.pi
 
-_amp = lambda inp, preamble, datum: N.abs (datum)
+_amp = lambda inp, preamble, datum: np.abs (datum)
 
 _re = lambda inp, preamble, datum: datum.real
 
@@ -163,7 +163,7 @@ only = opts.only
 # Load data
 
 def _cr ():
-    return ArrayGrower (2, N.float)
+    return ArrayGrower (2, np.float)
 
 def _acc (ga, tup):
     ga.add (tup[0], tup[1])
@@ -173,7 +173,7 @@ byAp = AccDict (_cr, _acc)
 for dIn, p, d, f in uvdat.read ():
     # Average down this visibility
 
-    w = N.where (f)
+    w = np.where (f)
     nok = len (w[0])
     if nok == 0: continue
 

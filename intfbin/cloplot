@@ -18,7 +18,7 @@
 """
 
 from __future__ import division
-import sys, numpy as N, omega as O
+import sys, numpy as np, omega as O
 from miriad import *
 from mirtask import keys, util, uvdat, cliutil
 
@@ -113,7 +113,7 @@ if args.interval <= 0:
 interval = args.interval / 24 / 60
 
 magsq = lambda cmplx: cmplx.real**2 + cmplx.imag**2
-normph = lambda ph: ((ph + N.pi) % (2 * N.pi)) - N.pi
+normph = lambda ph: ((ph + np.pi) % (2 * np.pi)) - np.pi
 
 class ClosureComputer (object):
     """This closure computer computes the closure for each dump,
@@ -143,8 +143,8 @@ class ClosureComputer (object):
         if self.totwt > 0:
             closure = self.totclowt / self.totwt
             err = self.totwt**-0.5
-            phase = N.arctan2 (closure.imag, closure.real)
-            self.ag.add (xval, phase, err / N.abs (closure))
+            phase = np.arctan2 (closure.imag, closure.real)
+            self.ag.add (xval, phase, err / np.abs (closure))
 
         self.totclowt = 0.
         self.totwt = 0.
@@ -200,8 +200,8 @@ class ClosureComputer (object):
                 tmin = min (tmin, t)
                 tmax = max (tmax, t)
                 lst = ihandle.getVarDouble ('lst')
-                if lst < lstmin - N.pi:
-                    lst += 2 * N.pi # unwrap lst values so min/max/mean work right
+                if lst < lstmin - np.pi:
+                    lst += 2 * np.pi # unwrap lst values so min/max/mean work right
                 lstmin = min (lstmin, lst)
                 lstmax = max (lstmax, lst)
 
@@ -211,7 +211,7 @@ class ClosureComputer (object):
             if bp not in bpmatch:
                 continue
 
-            w = N.where (flags)[0]
+            w = np.where (flags)[0]
             if w.size == 0:
                 continue
 
@@ -250,19 +250,19 @@ p = O.RectPlot ()
 for fn, data in sets:
     # high-uncert points can make the plots pretty useless, so filter.
     # RMS phase of pure noise is about 100 degrees ~= 7/4 radians
-    w = N.where (data[2] < 1.75)[0]
+    w = np.where (data[2] < 1.75)[0]
     if w.size < 1:
         print >>sys.stderr, 'Warning: no valid data collected for', fn
         continue
 
     hangle, phases, uncerts = data[:,w]
-    hours = hangle * 12 / N.pi
-    phases *= 180 / N.pi
-    uncerts *= 180 / N.pi
+    hours = hangle * 12 / np.pi
+    phases *= 180 / np.pi
+    uncerts *= 180 / np.pi
 
     print fn, '- RMS closure phase: %.2f° (only useful for pt src)' % \
-        N.sqrt ((phases**2).mean ())
-    print fn, '- median uncert: %.2f°' % N.median (uncerts)
+        np.sqrt ((phases**2).mean ())
+    print fn, '- median uncert: %.2f°' % np.median (uncerts)
     p.addXYErr (hours, phases, uncerts, fn + ' - ' + qtydesc,
                 lines=False, nudgex=False)
 

@@ -95,7 +95,7 @@
 --
 """
 
-import sys, numpy as N
+import sys, numpy as np
 from miriad import *
 from mirtask import keys, util
 
@@ -161,10 +161,10 @@ sanity1.track (*specVars)
 sanity2 = in2.makeVarTracker ()
 sanity2.track (*specVars)
 
-mData = N.ndarray (1024, dtype=N.complex64)
-mFlags = N.ndarray (1024, dtype=N.int32)
-pream1 = N.ndarray (5, dtype=N.double)
-pream2 = N.ndarray (5, dtype=N.double)
+mData = np.ndarray (1024, dtype=np.complex64)
+mFlags = np.ndarray (1024, dtype=np.int32)
+pream1 = np.ndarray (5, dtype=np.double)
+pream2 = np.ndarray (5, dtype=np.double)
 
 reads = {1: 0, 2: 0} # keyed by half-1 or half-2
 writes = {1: 0, 2: 0}

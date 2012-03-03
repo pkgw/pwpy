@@ -54,7 +54,7 @@
 --
 """
 
-import sys, numpy as N
+import sys, numpy as np
 from miriad import *
 from mirtask import keys, util, uvdat, cliutil
 
@@ -120,6 +120,6 @@ for ihandle, preamble, data, flags in uvdat.read ():
     nPol -= 1
 
 if not polsVaried:
-    ohandle.setScalarItem ('npol', N.int32, savedNPol)
+    ohandle.setScalarItem ('npol', np.int32, savedNPol)
 
 ohandle.close ()

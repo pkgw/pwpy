@@ -27,7 +27,7 @@
 # FIXME: X axis display when X axis is time
 # FIXME: hardcode X/Y as opposed to R/L pols
 
-import sys, numpy as N, omega as O
+import sys, numpy as np, omega as O
 from mirtask import util, readgains
 
 ## quickutil: holder arraygrower
@@ -166,7 +166,7 @@ def _gains_source (vis):
                 h.ant = ant0 + 1
                 h.pol = POL_UNDEF
                 h.gain = gains[ant0 * incr]
-                if N.abs (h.gain) > 0.:
+                if np.abs (h.gain) > 0.:
                     yield h
     elif gr.nfeeds == 2:
         for time, gains in gr.readSeq ():
@@ -176,11 +176,11 @@ def _gains_source (vis):
                 h.ant = ant0 + 1
                 h.pol = POL_P
                 h.gain = gains[ant0 * incr]
-                if N.abs (h.gain) > 0.:
+                if np.abs (h.gain) > 0.:
                     yield h
                 h.pol = POL_Q
                 h.gain = gains[ant0 * incr + 1]
-                if N.abs (h.gain) > 0.:
+                if np.abs (h.gain) > 0.:
                     yield h
     else:
         util.die ('unexpected value for "nfeeds": %d', gr.nfeeds)
@@ -206,7 +206,7 @@ def _bpass_source (vis):
                 h.ant = ant0 + 1
                 h.freq = freqs[chan]
                 h.gain = gains[ant0,0,chan]
-                if N.abs (h.gain) > 0.:
+                if np.abs (h.gain) > 0.:
                     yield h
     else:
         for ant0 in xrange (nants):
@@ -215,11 +215,11 @@ def _bpass_source (vis):
                 h.freq = freqs[chan]
                 h.pol = POL_P
                 h.gain = gains[ant0,0,chan]
-                if N.abs (h.gain) > 0.:
+                if np.abs (h.gain) > 0.:
                     yield h
                 h.pol = POL_Q
                 h.gain = gains[ant0,1,chan]
-                if N.abs (h.gain) > 0.:
+                if np.abs (h.gain) > 0.:
                     yield h
 
 sources['bpass'] = _bpass_source
@@ -255,9 +255,9 @@ yaxes = {}
 
 yaxes['real'] = ('Real', lambda h: h.gain.real)
 yaxes['imaginary'] = ('Imaginary', lambda h: h.gain.imag)
-yaxes['amplitude'] = ('Amplitude', lambda h: N.abs (h.gain))
-yaxes['inverseamp'] = ('Inverse Amplitude', lambda h: 1. / N.abs (h.gain))
-yaxes['phase'] = ('Phase (degrees)', lambda h: 180/N.pi * N.arctan2 (h.gain.imag, h.gain.real))
+yaxes['amplitude'] = ('Amplitude', lambda h: np.abs (h.gain))
+yaxes['inverseamp'] = ('Inverse Amplitude', lambda h: 1. / np.abs (h.gain))
+yaxes['phase'] = ('Phase (degrees)', lambda h: 180/np.pi * np.arctan2 (h.gain.imag, h.gain.real))
 
 
 # Task
@@ -365,13 +365,13 @@ def task (args):
         p.rpainter.paintLabels = False
         p.tpainter.paintLabels = False
         p.rebound (False, False)
-        dx = N.abs (xmax - xmin) * 0.05
+        dx = np.abs (xmax - xmin) * 0.05
         if dx == 0:
             if xmax == 0:
                 dx = 1
             else:
                 dx = 0.05 * xmax
-        dy = N.abs (ymax - ymin) * 0.05
+        dy = np.abs (ymax - ymin) * 0.05
         if dy == 0:
             if ymax == 0:
                 dy = 1
