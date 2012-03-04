@@ -11,7 +11,7 @@ If given --list, list available snippets.
 If given --show <name>, print the snippet <name>.
 If given no arguments, read from standard in and write to standard out.
 If given one nonoption argument, replace the file with utility code
-  embedded.
+  embedded. If there are no utility embeds, the file remains unchanged.
 If given two nonoption arguments, read from the first path and write to
   the second path.
 """
@@ -55,6 +55,7 @@ def insert (name, outstream, utilpath):
 
 def embed (instream, outstream, utilpath):
     outside = True
+    foundany = False
 
     for line in instream:
         if outside:
@@ -64,6 +65,7 @@ def embed (instream, outstream, utilpath):
                 for name in toembed:
                     insert (name, outstream, utilpath)
                 outside = False
+                foundany = True
             else:
                 print >>outstream, line,
         else:
@@ -81,6 +83,8 @@ def embed (instream, outstream, utilpath):
     if not outside:
         raise QUError ('ended processing inside a quickutil stanza; '
                        'missing "## end" statement?')
+
+    return foundany
 
 
 def listsnippets (utilpath):
@@ -117,9 +121,13 @@ def driver (args):
             p = args[0] + '.qunew'
             outstream = open (p, 'w')
             try:
-                embed (instream, outstream, utilpath)
-                mycopystat (args[0], p)
-                os.rename (p, args[0])
+                if not embed (instream, outstream, utilpath):
+                    # No snippets in input file; leave unchanged
+                    os.unlink (p)
+                else:
+                    # Snippets found.
+                    mycopystat (args[0], p)
+                    os.rename (p, args[0])
             except Exception as e:
                 et, ev, etb = sys.exc_info ()
                 try:
