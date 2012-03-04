@@ -14,6 +14,10 @@ If given one nonoption argument, replace the file with utility code
   embedded. If there are no utility embeds, the file remains unchanged.
 If given two nonoption arguments, read from the first path and write to
   the second path.
+
+To mass-update files in a git repository, try:
+
+  git ls-files -z |xargs -n1 -0 quembed
 """
 
 import sys, os
