@@ -220,6 +220,7 @@ class Viewport (gtk.DrawingArea):
     settuning = None
     getsurface = None
     onmotion = None
+    drawoverlay = None
     hack_doubleshift = None
 
     centerx = 0
@@ -282,6 +283,13 @@ class Viewport (gtk.DrawingArea):
         if onmotion is not None and not callable (onmotion):
             raise ValueError ()
         self.onmotion = onmotion
+        return self
+
+
+    def setOverlayDrawer (self, drawoverlay):
+        if drawoverlay is not None and not callable (drawoverlay):
+            raise ValueError ()
+        self.drawoverlay = drawoverlay
         return self
 
 
@@ -387,6 +395,7 @@ class Viewport (gtk.DrawingArea):
         surface, xoffset, yoffset = self.getsurface (xoffset, yoffset,
                                                      seendatawidth, seendataheight)
 
+        ctxt.save ()
         ctxt.set_source (self.bgpattern)
         ctxt.paint ()
         ctxt.scale (self.scale, self.scale)
@@ -395,6 +404,11 @@ class Viewport (gtk.DrawingArea):
         pat.set_extend (cairo.EXTEND_NONE)
         pat.set_filter (cairo.FILTER_NEAREST)
         ctxt.paint ()
+        ctxt.restore ()
+
+        if self.drawoverlay is not None:
+            self.drawoverlay (ctxt, width, height,
+                              -xoffset, -yoffset, self.scale)
 
 
     def _on_expose (self, alsoself, event):
@@ -599,6 +613,11 @@ class Viewer (object):
         return self
 
 
+    def setOverlayDrawer (self, drawoverlay):
+        self.viewport.setOverlayDrawer (drawoverlay)
+        return self
+
+
     def _on_key_press (self, widget, event):
         kn = gtk.gdk.keyval_name (event.keyval)
         modmask = gtk.accelerator_get_default_mod_mask ()
@@ -646,7 +665,8 @@ class Viewer (object):
         return False
 
 
-def view (array, title='Array Viewer', colormap='black_to_blue', toworld=None, yflip=False):
+def view (array, title='Array Viewer', colormap='black_to_blue', toworld=None,
+          drawoverlay=None, yflip=False):
     clipper = Clipper ()
     clipper.allocBuffer (array)
     clipper.setTileSize ()
@@ -723,6 +743,7 @@ def view (array, title='Array Viewer', colormap='black_to_blue', toworld=None, y
     viewer.setTuningSetter (settuning)
     viewer.setSurfaceGetter (getsurface)
     viewer.setStatusFormatter (fmtstatus)
+    viewer.setOverlayDrawer (drawoverlay)
     viewer.win.show_all ()
     viewer.win.connect ('destroy', gtk.main_quit)
     gtk.main ()
@@ -840,6 +861,11 @@ class Cycler (Viewer):
         return self
 
 
+    def setOverlayDrawer (self, drawoverlay):
+        self.viewport.setOverlayDrawer (drawoverlay)
+        return self
+
+
     def setCurrent (self, index):
         n = self.getn ()
         index = index % n
@@ -906,7 +932,8 @@ class Cycler (Viewer):
         return super (Cycler, self)._on_key_press (widget, event)
 
 
-def cycle (arrays, descs=None, cadence=0.6, toworlds=None, yflip=False):
+def cycle (arrays, descs=None, cadence=0.6, toworlds=None,
+           drawoverlay=None, yflip=False):
     import time, glib
 
     n = len (arrays)
@@ -1024,8 +1051,8 @@ def cycle (arrays, descs=None, cadence=0.6, toworlds=None, yflip=False):
     cycler.setTuningSetter (settuningi)
     cycler.setSurfaceGetter (getsurfacei)
     cycler.setStatusFormatter (fmtstatusi)
+    cycler.setOverlayDrawer (drawoverlay)
     cycler.win.show_all ()
     cycler.win.connect ('destroy', gtk.main_quit)
 
     gtk.main ()
-
