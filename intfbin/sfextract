@@ -1,0 +1,314 @@
+#! /usr/bin/env python
+# -*- python -*-
+
+"""
+sfextract <input image> <SFIND keywords=,+options>
+
+Given an image, run MIRIAD SFIND on it and print *deconvolved* source
+parameters on standard output. Options on the command line are passed
+through to SFIND more-or-less verbatim.
+
+Note that SFIND expects there to be restoring beam information in the
+image; if this is missing, it will make a dumb guess.
+
+Suggested sfind keywords: rmsbox=64 alpha=0.5 +fdrpeak
+"""
+
+# Programmer notes:
+"""
+Not very happy with the deconvolution of (near-)pointlike
+sources. I've hacked up the code from gaupar.for which I feel may be
+ill-advised. (See astutil.)
+"""
+
+import sys, numpy as np
+import astimage
+from astutil import *
+import flatdb, srctable
+
+## quickutil: usage
+#- snippet: usage.py
+#- date: 2012 Feb 27
+#- SHA1: 998596af497009015e3bbda6be6694b9869abaa4
+def showusage (docstring):
+    """Print program usage information and exit.
+
+:arg str docstring: the program help text
+
+This function just prints *docstring* and exits. In most cases, the
+function :func:`checkusage` should be used: it automatically checks
+:data:`sys.argv` for a sole "-h" or "--help" argument and invokes this
+function.
+
+This function is provided in case there are instances where the user
+should get a friendly usage message that :func:`checkusage` doesn't
+catch. It can be contrasted with :func:`wrongusage`, which prints a
+terser usage message and exits with an error code.
+"""
+    print docstring.strip ()
+    raise SystemExit (0)
+
+
+def checkusage (docstring, argv=None, usageifnoargs=False):
+    """Check if the program has been run with a --help argument; if so,
+print usage information and exit.
+
+:arg str docstring: the program help text
+:arg argv: the program arguments; taken as :data:`sys.argv` if
+  given as :const:`None` (the default). (Note that this implies
+  ``argv[0]`` should be the program name and not the first option.)
+:arg bool usageifnoargs: if :const:`True`, usage information will be
+  printed and the program will exit if no command-line arguments are
+  passed. Default is :const:`False`.
+
+This function is intended for small programs launched from the command
+line. The intention is for the program help information to be written
+in its docstring, and then for the preamble to contain something
+like::
+
+  \"\"\"myprogram - this is all the usage help you get\"\"\"
+  import sys
+  ... # other setup
+  checkusage (__doc__)
+  ... # go on with business
+
+If it is determined that usage information should be shown,
+:func:`showusage` is called and the program exits.
+
+See also :func:`wrongusage`.
+"""
+
+    if argv is None:
+        from sys import argv
+
+    if len (argv) == 1 and usageifnoargs:
+        showusage (docstring)
+
+    if len (argv) == 2 and argv[1] in ('-h', '--help'):
+        showusage (docstring)
+
+
+def wrongusage (docstring, *rest):
+    """Print a message indicating invalid command-line arguments and
+exit with an error code.
+
+:arg str docstring: the program help text
+:arg rest: an optional specific error message
+
+This function is intended for small programs launched from the command
+line. The intention is for the program help information to be written
+in its docstring, and then for argument checking to look something
+like this::
+
+  \"\"\"mytask <input> <output>
+
+  Do something to the input to create the output.
+  \"\"\"
+  ...
+  import sys
+  ... # other setup
+  checkusage (__doc__)
+  ... # more setup
+  if len (sys.argv) != 3:
+     wrongusage (__doc__, "expect exactly 2 arguments, not %d",
+                 len (sys.argv))
+
+When called, an error message is printed along with the *first stanza*
+of *docstring*. The program then exits with an error code and a
+suggestion to run the program with a --help argument to see more
+detailed usage information. The "first stanza" of *docstring* is
+defined as everything up until the first blank line, ignoring any
+leading blank lines.
+
+The optional message in *rest* is treated as follows. If *rest* is
+empty, the error message "invalid command-line arguments" is
+printed. If it is a single item, the stringification of that item is
+printed. If it is more than one item, the first item is treated as a
+format string, and it is percent-formatted with the remaining
+values. See the above example.
+
+See also :func:`checkusage` and :func:`showusage`.
+"""
+
+    import sys
+    intext = False
+
+    if len (rest) == 0:
+        detail = 'invalid command-line arguments'
+    elif len (rest) == 1:
+        detail = rest[0]
+    else:
+        detail = rest[0] % tuple (rest[1:])
+
+    print >>sys.stderr, 'error:', detail
+    print >>sys.stderr
+
+    for l in docstring.splitlines ():
+        if intext:
+            if not len (l):
+                break
+            print >>sys.stderr, l
+        elif len (l):
+            intext = True
+            print >>sys.stderr, 'Usage:', l
+    print >>sys.stderr
+
+    print >>sys.stderr, \
+        'Run with a sole argument --help for more detailed usage information.'
+    raise SystemExit (1)
+## end
+
+
+def cmdline (argv):
+    inpath = None
+    keywords = {}
+
+    checkusage (__doc__, argv, usageifnoargs=True)
+
+    for arg in argv[1:]:
+        if '=' in arg:
+            kw, val = arg.split ('=', 1)
+            keywords[kw] = val
+        elif arg[0] == '+':
+            for opt in arg[1:].split (','):
+                keywords[opt] = True
+        elif inpath is not None:
+            wrongusage (__doc__, 'only one non-keyword argument is allowed')
+        else:
+            inpath = arg
+
+    if inpath is None:
+        wrongusage (__doc__, 'must supply input image path')
+    if 'logfile' in keywords:
+        del keywords['logfile']
+        warn ('the "logfile" parameter to sfind will be ignored')
+    if keywords.get ('fdrimg', False):
+        warn ('the file created by the "fdrimg" option will be discarded')
+    if keywords.get ('sigmaimg', False):
+        warn ('the file created by the "sigmaimg" option will be discarded')
+    if keywords.get ('rmsimg', False):
+        warn ('the file created by the "rmsimg" option will be discarded')
+    if keywords.get ('normimg', False):
+        warn ('the file created by the "normimg" option will be discarded')
+    if keywords.get ('kvannot', False):
+        warn ('the file created by the "kvannot" option will be discarded')
+
+    sfind_extract (inpath, keywords)
+
+
+def sfind_extract (inpath, keywords):
+    img = astimage.open (inpath, 'r')
+    sfinfo = {'imagepath': inpath,
+              'sfindargs': ' '.join ('%s=%s' % (k, keywords[k])
+                                     for k in sorted (keywords.iterkeys ()))}
+    imageinfo = flatdb.Holder ()
+    imageinfo.naxis = img.shape.size
+
+    if img.bmaj is None:
+        warn ('no restoring beam information; will NOT deconvolve')
+        imageinfo.bmaj = imageinfo.bmin = imageinfo.bpa = None
+        sfinfo['deconvolved'] = 'false'
+    else:
+        imageinfo.bmaj = img.bmaj
+        imageinfo.bmin = img.bmin
+        imageinfo.bpa = img.bpa
+        sfinfo['deconvolved'] = 'true'
+
+    # Get image into MIRIAD format, possibly via FITS, run SFIND, and
+    # process. We're going to change directories so canonicalize the
+    # input path.
+
+    from tempfile import mkdtemp
+    from os.path import join, realpath
+    from os import getcwd, chdir, devnull
+    from shutil import rmtree
+    import subprocess
+    from mirexec import TaskFits, TaskSFind
+
+    origdir = getcwd ()
+    inpath = realpath (inpath)
+    tmpcontainer = mkdtemp (prefix='sfextract.')
+
+    try:
+        mirpath = fitspath = None
+
+        if isinstance (img, astimage.MIRIADImage):
+            mirpath = inpath
+        elif isinstance (img, astimage.FITSImage):
+            fitspath = inpath
+        else:
+            fitspath = join (tmpcontainer, 'input.fits')
+            img.saveAsFITS (fitspath)
+
+        chdir (tmpcontainer)
+
+        if mirpath is None:
+            mirpath = 'input.mirimg'
+            TaskFits (in_=fitspath, out=mirpath, op='xyin').runsilent ()
+
+        stdout, stderr = TaskSFind (in_=mirpath, **keywords).snarf ()
+
+        for l in stdout:
+            if l.startswith ('FDR selected a'):
+                sfinfo['pvalue'] = fortfloat (l.split ()[-1][:-1])
+            if l.startswith ('This corresponds to'):
+                sfinfo['sigmathresh'] = fortfloat (l.split ()[-2])
+            if l.startswith ('which means a minimum'):
+                sfinfo['minflux'] = fortfloat (l.split ()[-2])
+            if l.startswith ('FDR detected'):
+                sfinfo['npix'] = int (l.split ()[-2])
+            if l.startswith ('Of the FDR pixels'):
+                sfinfo['nused'] = int (l.split ()[-6])
+            if l.startswith ('A total of'):
+                sfinfo['nrawsrc'] = int (l.split ()[3])
+            if l.startswith ('No FDR pixels'):
+                sfinfo['neededpvalue'] = fortfloat (l.split ()[6])
+            if l.startswith ('RMS of the interior RMS'):
+                sfinfo['typrms'] = fortfloat (l.split ()[6])
+
+        parse_and_print (sfinfo, imageinfo, open ('sfind.log'))
+    finally:
+        chdir (origdir)
+        try:
+            rmtree (tmpcontainer)
+        except:
+            warn ('couldn\'t remove temporary data directory "%s"', tmpcontainer)
+
+
+def parse_and_print (sfinfo, iminfo, sfstream):
+    import sys
+
+    headers = ['%s=%s' % (k, sfinfo[k])
+               for k in sorted (sfinfo.iterkeys ())]
+
+    if iminfo.bmaj is None:
+        gen = srctable.parseSFind (sfstream)
+    else:
+        def func ():
+            for s in srctable.parseSFind (sfstream):
+                s.pkflux = None
+                srctable.deconvolve (s, iminfo.bmaj, iminfo.bmin, iminfo.bpa)
+                yield s
+        gen = func ()
+
+    cols = [c for c in srctable.sfindcols
+            if c.name not in ('pkflux', 'pkflux_uc')]
+    flatdb.writeStreamedTable (sys.stdout.write, headers, cols, gen)
+
+
+def fortfloat (s):
+    if s[0] == '*':
+        return np.nan
+    return float (s)
+
+
+def warn (fmt, args):
+    print >>sys.stderr, 'warning:', fmt % args
+
+
+if __name__ == '__main__':
+    try:
+        import mirtask.cliutil
+    except ImportError:
+        pass
+    cmdline (sys.argv)
