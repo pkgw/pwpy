@@ -67,7 +67,12 @@ makefltcol ('pa_uc', 12, '%.2f', D2R) # rad
 
 def getCustom (col):
     if col.name in stdcols:
-        return stdcols[col.name].parse, stdcols[col.name].format, True
+        c = stdcols[col.name]
+        # We might have a stdcol that is just a regular datatype
+        # in which case parse is not set and we don't want to
+        # override.
+        if c.parse is not None:
+            return c.parse, c.format, True
     return str, str, False
 
 
