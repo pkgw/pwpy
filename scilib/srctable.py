@@ -4,7 +4,7 @@
 from astutil import *
 from flatdb import *
 
-__all__ = ('Holder stdcols columns getCustom '
+__all__ = ('Holder stdcols columns getCustom readStream '
            'sfindcols nvsscols parseSFind parseNVSS').split ()
 
 stdcols = {}
@@ -84,6 +84,13 @@ def getCustom (col):
         if c.parse is not None:
             return c.parse, c.format, True
     return str, str, False
+
+
+def readStream (stream_or_path):
+    if isinstance (stream_or_path, basestring):
+        stream_or_path = open (stream_or_path)
+
+    return readStreamedTable (stream_or_path.read, getCustom)
 
 
 # Parsing output of MIRIAD sfind
