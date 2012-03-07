@@ -831,9 +831,12 @@ class Cycler (Viewer):
 
 
     def setStatusFormatter (self, fmtstatusi):
-        def onmotion (x, y):
-            self.status_label.set_markup (fmtstatusi (self.i, x, y))
-        self.viewport.setMotionHandler (onmotion)
+        if fmtstatusi is None:
+            self.viewport.setMotionHandler (None)
+        else:
+            def onmotion (x, y):
+                self.status_label.set_markup (fmtstatusi (self.i, x, y))
+            self.viewport.setMotionHandler (onmotion)
         return self
 
 
