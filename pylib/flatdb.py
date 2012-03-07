@@ -493,11 +493,15 @@ headers: iterable of strings, lines of header data
 
     # Write data
 
-    for rec in recs:
-        for index, col in enumerate (cols):
-            write (pad (col.format (getattr (rec, col.name)), col.width))
-            write ('|')
-        write ('\n')
+    try:
+        for rec in recs:
+            for index, col in enumerate (cols):
+                write (pad (col.format (getattr (rec, col.name)), col.width))
+                write ('|')
+            write ('\n')
+    except PadError as e:
+        raise Exception ('formatting fail in column %s for %s: %s' %
+                         (col.name, rec, e))
 
 
 # Opening a flat table and possibly rewriting it if the columns
@@ -641,6 +645,13 @@ _formatters = {
 
 # Text helpers
 
+class PadError (Exception):
+    def __init__ (self, fmt, *args):
+        self.themsg = fmt % args
+    def __str__ (self):
+        return self.themsg
+
+
 def pad (s, width, mkstr=False):
     if s is None:
         s = ''
@@ -648,8 +659,11 @@ def pad (s, width, mkstr=False):
     if not isinstance (s, basestring) and mkstr:
         s = str (s)
 
-    assert len (s) <= width, 'String too wide for its column: %s' % (s, )
-    assert len (s) == 0 or s[-1] != ' ', 'String not safely paddable: >%s<' % (s, )
+    if len (s) > width:
+        raise PadError ('string too wide for its column: %s' % (s, ))
+    if len (s) and s[-1] == ' ':
+        raise PadError ('string not safely paddable: >%s<' % (s, ))
+
     return s.ljust (width, ' ')
 
 
