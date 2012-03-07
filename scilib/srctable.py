@@ -4,7 +4,7 @@
 from astutil import *
 from flatdb import *
 
-__all__ = 'Holder stdcols sfindcols nvsscols parseSFind parseNVSS'.split ()
+__all__ = 'Holder stdcols getCustom sfindcols nvsscols parseSFind parseNVSS'.split ()
 
 stdcols = {}
 
@@ -61,8 +61,14 @@ makestdcol ('major_is_ul', 1, K_BOOL)
 makefltcol ('minor', 7, '%.2f', A2R) # rad
 makefltcol ('minor_uc', 12, '%.2f', A2R) # rad
 makestdcol ('minor_is_ul', 1, K_BOOL)
-makefltcol ('pa', 7, '%.2f', D2R) # rad
+makefltcol ('pa', 7, '%+.2f', D2R) # rad
 makefltcol ('pa_uc', 12, '%.2f', D2R) # rad
+
+
+def getCustom (col):
+    if col.name in stdcols:
+        return stdcols[col.name].parse, stdcols[col.name].format
+    return str, str
 
 
 # Parsing output of MIRIAD sfind
@@ -349,14 +355,8 @@ def deconvolve (source, bmaj, bmin, bpa):
 
 # Overlays for ndshow
 
-def _getparser (col):
-    if col.name in stdcols:
-        return stdcols[col.name].parse
-    return str
-
-
 def loadAsOverlay (path, topixel, imgheight):
-    headers, recs = readStreamedTable (open (path).read, _getparser)
+    headers, cols, recs = readStreamedTable (open (path).read, getCustom)
     compact = []
     ellipse = []
 

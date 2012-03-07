@@ -337,17 +337,19 @@ class FlatTable (object):
 
 # Streaming a tables. No seeks required (or allowed).
 
-def readStreamedTable (read, getparser, recfactory=Holder):
+def readStreamedTable (read, getcustom, recfactory=Holder):
     """Read a flat table from a stream without seeking. Generates a
 stream of records.
 
       read: equivalent of a read() method on a file-like object
- getparser: for custom columns; given Column with name and
-            width, returns parser function (str -> obj)
+ getcustom: for custom columns; given Column with name and
+            width, returns parser and formatter functions (str -> (func, func)).
+            Formatter may be None if you won't use the columns to write
+            out any data
 recfactory: factory for "record" objects; one attr set for each column
 
-   Returns: (headers, recs), where headers is list of header strings,
-            recs is generator of record data.
+   Returns: (headers, cols, recs), where headers is list of header strings,
+            cols are the columns, and recs is generator of record data.
 """
 
     if not callable (read):
@@ -393,7 +395,7 @@ recfactory: factory for "record" objects; one attr set for each column
         recsz += col.width
 
         if col.parse is None:
-            col.parse = getparser (col)
+            col.parse, col.format = getcustom (col)
 
         cols.append (col)
 
@@ -435,7 +437,7 @@ recfactory: factory for "record" objects; one attr set for each column
 
             yield rec
 
-    return headers, getrecords ()
+    return headers, cols, getrecords ()
 
 
 def writeStreamedTable (write, headers, cols, recs):
