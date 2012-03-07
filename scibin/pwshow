@@ -145,16 +145,24 @@ See also :func:`checkusage` and :func:`showusage`.
 
 checkusage (__doc__, sys.argv, usageifnoargs=True)
 
-fft = '-f' in sys.argv
-if fft:
-    sys.argv.remove ('-f')
+fft = False
+overlaypath = None
+images = []
 
-if len (sys.argv) < 2:
+for arg in sys.argv[1:]:
+    if arg == '-f':
+        fft = True
+    elif arg.startswith ('-o'):
+        overlaypath = arg[2:]
+    else:
+        images.append (arg)
+
+if not len (images):
     wrongusage (__doc__, 'must provide at least one path')
 
 anyfailures = False
 
-for path in sys.argv[1:]:
+for path in images:
     try:
         img = astimage.open (path, 'r')
     except Exception, e:
@@ -173,13 +181,20 @@ for path in sys.argv[1:]:
     data = img.read (flip=True)
     toworld = img.toworld
 
+    if overlaypath is None or fft:
+        olay = None
+    else:
+        from srctable import loadAsOverlay
+        olay = loadAsOverlay (overlaypath, img.topixel, img.shape[0])
+
     if fft:
         from numpy.fft import ifftshift, fft2, fftshift
         data = np.abs (ifftshift (fft2 (fftshift (data))))
         toworld = None
 
     ndshow.view (data, title=path + ' — Array Viewer',
-                 toworld=toworld, yflip=True)
+                 toworld=toworld, drawoverlay=olay,
+                 yflip=True)
 
 if anyfailures:
     sys.exit (1)
