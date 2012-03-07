@@ -4,8 +4,8 @@ Implementing your own database is stupid, so if this turns out
 to be a lot of work to get right, I'm doing something wrong.
 """
 
-__all__ = ('Holder Column FlatTable readStreamedTable openForceColumns '
-           'K_INT K_FLOAT K_STR K_BOOL K_CUSTOM').split ()
+__all__ = ('Holder Column FlatTable readStreamedTable writeStreamedTable '
+           'openForceColumns K_INT K_FLOAT K_STR K_BOOL K_CUSTOM').split ()
 
 class Holder (object):
     def __init__ (self, **kwargs):
