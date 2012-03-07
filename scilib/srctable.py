@@ -67,8 +67,8 @@ makefltcol ('pa_uc', 12, '%.2f', D2R) # rad
 
 def getCustom (col):
     if col.name in stdcols:
-        return stdcols[col.name].parse, stdcols[col.name].format
-    return str, str
+        return stdcols[col.name].parse, stdcols[col.name].format, True
+    return str, str, False
 
 
 # Parsing output of MIRIAD sfind

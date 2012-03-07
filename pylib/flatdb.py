@@ -342,8 +342,10 @@ def readStreamedTable (read, getcustom, recfactory=Holder):
 stream of records.
 
       read: equivalent of a read() method on a file-like object
- getcustom: for custom columns; given Column with name and
-            width, returns parser and formatter functions (str -> (func, func)).
+ getcustom: called for each column. Given Column with name and
+            width, returns parser and formatter functions and flag indicating
+            whether builtin functions should be overridden.
+            I.e. getcustom: str -> (func, func, bool)).
             Formatter may be None if you won't use the columns to write
             out any data
 recfactory: factory for "record" objects; one attr set for each column
@@ -391,12 +393,13 @@ recfactory: factory for "record" objects; one attr set for each column
         read (1) # sep
         curofs += W_HEADER_NAME + W_HEADER_INT * 2 + 3
 
+        cparse, cfmt, override = getcustom (col)
         col._fixup ()
+
+        if col.parse is None or override:
+            col.parse, col.format = cparse, cfmt
+
         recsz += col.width
-
-        if col.parse is None:
-            col.parse, col.format = getcustom (col)
-
         cols.append (col)
 
     assert dofs >= curofs, 'too small data offset for streaming'
