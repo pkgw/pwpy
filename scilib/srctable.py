@@ -113,21 +113,11 @@ def parseSFind (lines):
         yield source
 
 
-sfindcols = [
-    stdcols['ra'],
-    stdcols['ra_uc'],
-    stdcols['dec'],
-    stdcols['dec_uc'],
-    stdcols['pkflux'],
-    stdcols['pkflux_uc'],
-    stdcols['totflux'],
-    stdcols['totflux_uc'],
-    stdcols['major'],
-    stdcols['minor'],
-    stdcols['pa'],
-    stdcols['bgrms'],
-    floatcol ('sfind_fitrms', 12, '%9.5f'),
-]
+makefltcol ('sfind_fitrms', 12, '%9.5f') # jy
+
+sfindcols = [stdcols[n] for n in
+             'ra ra_uc dec dec_uc pkflux pkflux_uc totflux totflux_uc '
+             'major minor pa bgrms sfind_fitrms'.split ()]
 
 
 # Parsing the NVSS textual catalog
@@ -277,33 +267,25 @@ def parseNVSS (stream):
     assert source is None, 'NVSS internal logic error 2'
 
 
-nvsscols = [
-    stdcols['ra'],
-    stdcols['ra_uc'],
-    stdcols['dec'],
-    stdcols['dec_uc'],
-    stdcols['totflux'],
-    stdcols['totflux_uc'],
-    stdcols['major'],
-    stdcols['major_uc'],
-    stdcols['major_is_ul'],
-    stdcols['minor'],
-    stdcols['minor_uc'],
-    stdcols['minor_is_ul'],
-    stdcols['pa'],
-    stdcols['pa_uc'],
-    floatcol ('nvss_dist', 12, '%f'),
-    floatcol ('nvss_angle', 12, '%f'),
-    floatcol ('nvss_resid_code', 12, '%f'),
-    floatcol ('nvss_resid_val', 12, '%f'),
-    floatcol ('nvss_linpol_flux', 12, '%f'),
-    floatcol ('nvss_linpol_flux_uc', 12, '%f'),
-    floatcol ('nvss_linpol_pa', 12, '%f'),
-    floatcol ('nvss_linpol_pa_uc', 12, '%f'),
-    floatcol ('nvss_field', 12, '%f'),
-    floatcol ('nvss_pixel_x', 12, '%f'),
-    floatcol ('nvss_pixel_y', 12, '%f'),
-]
+makefltcol ('nvss_dist', 12, '%f'),
+makefltcol ('nvss_angle', 12, '%f'),
+makefltcol ('nvss_resid_code', 12, '%f'),
+makefltcol ('nvss_resid_val', 12, '%f'),
+makefltcol ('nvss_linpol_flux', 12, '%f'),
+makefltcol ('nvss_linpol_flux_uc', 12, '%f'),
+makefltcol ('nvss_linpol_pa', 12, '%f'),
+makefltcol ('nvss_linpol_pa_uc', 12, '%f'),
+makefltcol ('nvss_field', 12, '%f'),
+makefltcol ('nvss_pixel_x', 12, '%f'),
+makefltcol ('nvss_pixel_y', 12, '%f'),
+
+
+nvsscols = [stdcols[n] for n in
+            'ra ra_uc dec dec_uc totflux totflux_uc major major_uc '
+            'major_is_ul minor minor_uc minor_is_ul pa pa_uc '
+            'nvss_dist nvss_angle nvss_resid_code nvss_resid_val '
+            'nvss_linpol_flux nvss_linpol_flux_uc nvss_linpol_pa '
+            'nvss_linpol_pa_uc nvss_field nvss_pixel_x nvss_pixel_y'.split ()]
 
 
 # Transformations on sources
