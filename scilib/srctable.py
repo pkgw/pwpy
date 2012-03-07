@@ -4,7 +4,8 @@
 from astutil import *
 from flatdb import *
 
-__all__ = 'Holder stdcols getCustom sfindcols nvsscols parseSFind parseNVSS'.split ()
+__all__ = ('Holder stdcols columns getCustom '
+           'sfindcols nvsscols parseSFind parseNVSS').split ()
 
 stdcols = {}
 
@@ -65,6 +66,15 @@ makefltcol ('pa', 7, '%+.2f', D2R) # rad
 makefltcol ('pa_uc', 12, '%.2f', D2R) # rad
 
 
+def columns (*names):
+    def gen ():
+        for subnames in names:
+            for name in subnames.split ():
+                yield name
+
+    return [stdcols[n] for n in gen ()]
+
+
 def getCustom (col):
     if col.name in stdcols:
         c = stdcols[col.name]
@@ -120,9 +130,8 @@ def parseSFind (lines):
 
 makefltcol ('sfind_fitrms', 12, '%9.5f') # jy
 
-sfindcols = [stdcols[n] for n in
-             'ra ra_uc dec dec_uc pkflux pkflux_uc totflux totflux_uc '
-             'major minor pa bgrms sfind_fitrms'.split ()]
+sfindcols = columns ('ra ra_uc dec dec_uc pkflux pkflux_uc totflux',
+                     'totflux_uc major minor pa bgrms sfind_fitrms')
 
 
 # Parsing the NVSS textual catalog
@@ -285,12 +294,11 @@ makefltcol ('nvss_pixel_x', 12, '%f'),
 makefltcol ('nvss_pixel_y', 12, '%f'),
 
 
-nvsscols = [stdcols[n] for n in
-            'ra ra_uc dec dec_uc totflux totflux_uc major major_uc '
-            'major_is_ul minor minor_uc minor_is_ul pa pa_uc '
-            'nvss_dist nvss_angle nvss_resid_code nvss_resid_val '
-            'nvss_linpol_flux nvss_linpol_flux_uc nvss_linpol_pa '
-            'nvss_linpol_pa_uc nvss_field nvss_pixel_x nvss_pixel_y'.split ()]
+nvsscols = columns ('ra ra_uc dec dec_uc totflux totflux_uc major major_uc',
+                    'major_is_ul minor minor_uc minor_is_ul pa pa_uc',
+                    'nvss_dist nvss_angle nvss_resid_code nvss_resid_val',
+                    'nvss_linpol_flux nvss_linpol_flux_uc nvss_linpol_pa',
+                    'nvss_linpol_pa_uc nvss_field nvss_pixel_x nvss_pixel_y')
 
 
 # Transformations on sources
