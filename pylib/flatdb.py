@@ -399,6 +399,9 @@ recfactory: factory for "record" objects; one attr set for each column
         if col.parse is None or override:
             col.parse, col.format = cparse, cfmt
 
+        if col.parse is None:
+            raise Exception ('no parser for column %s' % col.name)
+
         recsz += col.width
         cols.append (col)
 
