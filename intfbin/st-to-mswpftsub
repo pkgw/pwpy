@@ -1,0 +1,20 @@
+#! /usr/bin/env python
+# -*- python -*-
+
+"""
+Convert a srctable format source list to something digestible
+by mswpftsub. See header comments in that program for a description
+of why this is all necessary.
+"""
+
+import sys, srctable
+from astutil import *
+
+for rec in srctable.readStream (sys.stdin)[2]:
+    radec = fmtradec (rec.ra, rec.dec)
+
+    if not hasattr (rec, 'major') or rec.major is None or rec.major == 0:
+        print 'point', radec, rec.totflux
+    else:
+        print 'gaussian', radec, rec.totflux, rec.major * R2A, \
+            rec.minor * R2A, rec.pa * R2D
