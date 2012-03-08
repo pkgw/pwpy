@@ -26,6 +26,11 @@ import astimage
 from astutil import *
 import flatdb, srctable
 
+try:
+    from scipy.special import erfinv as ss_erfinv
+except ImportError:
+    ss_erfinv = None
+
 ## quickutil: usage
 #- snippet: usage.py
 #- date: 2012 Feb 27
@@ -262,7 +267,10 @@ def sfind_extract (inpath, keywords):
             if l.startswith ('A total of'):
                 sfinfo['nrawsrc'] = int (l.split ()[3])
             if l.startswith ('No FDR pixels'):
-                sfinfo['neededpvalue'] = fortfloat (l.split ()[6])
+                npv = fortfloat (l.split ()[6])
+                sfinfo['neededpvalue'] = npv
+                if ss_erfinv is not None and np.isfinite (npv):
+                    sfinfo['neededsigma'] = np.sqrt (2) * ss_erfinv (1 - 2 * npv)
             if l.startswith ('RMS of the interior RMS'):
                 sfinfo['typrms'] = fortfloat (l.split ()[6])
 
