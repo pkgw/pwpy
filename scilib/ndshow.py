@@ -1022,33 +1022,24 @@ def cycle (arrays, descs=None, cadence=0.6, toworlds=None,
                for a in arrays]
 
     if toworlds is None:
-        def fmtstatusi (i, x, y):
-            s = ''
-            if x >= 0 and y >= 0 and x < w and y < h:
-                if nomasks[i] or not arrays[i].mask[y,x]:
-                    s += '%g ' % arrays[i][y,x]
-            if yflip:
-                y = h - 1 - y
-            row = int (np.floor (y + 0.5))
-            col = int (np.floor (x + 0.5))
-            return s + '[%d,%d] x=%.1f y=%.1f' % (row, col, x, y)
-    else:
-        from astutil import fmthours, fmtdeglat
-        def fmtstatusi (i, x, y):
-            s = ''
-            if x >= 0 and y >= 0 and x < w and y < h:
-                if nomasks[i] or not arrays[i].mask[y,x]:
-                    s += '%g ' % arrays[i][y,x]
-            if yflip:
-                y = h - 1 - y
-            row = int (np.floor (y + 0.5))
-            col = int (np.floor (x + 0.5))
-            s += '[%d,%d] x=%.1f y=%.1f' % (row, col, x, y)
-            if toworlds[i] is not None:
-                lat, lon = toworlds[i] ([y, x])
-                s += ' lat=%s lon=%s' % (fmtdeglat (lat),
-                                         fmthours (lon))
-            return s
+        toworlds = [None] * n
+
+    from astutil import fmthours, fmtdeglat
+    def fmtstatusi (i, x, y):
+        s = ''
+        if x >= 0 and y >= 0 and x < w and y < h:
+            if nomasks[i] or not arrays[i].mask[y,x]:
+                s += '%g ' % arrays[i][y,x]
+        if yflip:
+            y = h - 1 - y
+        row = int (np.floor (y + 0.5))
+        col = int (np.floor (x + 0.5))
+        s += '[%d,%d] x=%.1f y=%.1f' % (row, col, x, y)
+        if toworlds[i] is not None:
+            lat, lon = toworlds[i] ([y, x])
+            s += ' lat=%s lon=%s' % (fmtdeglat (lat),
+                                     fmthours (lon))
+        return s
 
     cycler = Cycler ()
     cycler.setNGetter (getn)
