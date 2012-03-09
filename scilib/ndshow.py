@@ -307,8 +307,8 @@ class Viewport (gtk.DrawingArea):
         hratio = float (ah) / dh
 
         self.scale = min (wratio, hratio)
-        self.centerx = 0.5 * dw
-        self.centery = 0.5 * dh
+        self.centerx = 0.5 * (dw - 1)
+        self.centery = 0.5 * (dh - 1)
         self.queue_draw ()
         return self
 
@@ -318,8 +318,8 @@ class Viewport (gtk.DrawingArea):
             raise Exception ('Must be called after setting shape-getter')
 
         dw, dh = self.getshape ()
-        self.centerx = 0.5 * dw
-        self.centery = 0.5 * dh
+        self.centerx = 0.5 * (dw - 1)
+        self.centery = 0.5 * (dh - 1)
         self.queue_draw ()
         return self
 
@@ -386,10 +386,13 @@ class Viewport (gtk.DrawingArea):
             self.settuning (self.tunerx, self.tunery)
             self.needtune = False
 
+        # Our data coordinates have integral pixel values being in the
+        # centers of pixels; Cairo uses edges. That's the origin of the
+        # minus one.
         seendatawidth = width / self.scale
-        xoffset = 0.5 * seendatawidth - self.centerx
+        xoffset = 0.5 * (seendatawidth - 1) - self.centerx
         seendataheight = height / self.scale
-        yoffset = 0.5 * seendataheight - self.centery
+        yoffset = 0.5 * (seendataheight - 1) - self.centery
 
         surface, xoffset, yoffset = self.getsurface (xoffset, yoffset,
                                                      seendatawidth, seendataheight)
@@ -718,7 +721,9 @@ def view (array, title='Array Viewer', colormap='black_to_blue', toworld=None,
                     s += '%g ' % array[y,x]
             if yflip:
                 y = h - 1 - y
-            return s + 'x=%d y=%d' % (x, y)
+            row = int (np.floor (y + 0.5))
+            col = int (np.floor (x + 0.5))
+            return s + '[%d,%d] x=%.1f y=%.1f' % (row, col, x, y)
     else:
         from astutil import fmthours, fmtdeglat
         def fmtstatus (x, y):
@@ -728,9 +733,11 @@ def view (array, title='Array Viewer', colormap='black_to_blue', toworld=None,
                     s += '%g ' % array[y,x]
             if yflip:
                 y = h - 1 - y
+            row = int (np.floor (y + 0.5))
+            col = int (np.floor (x + 0.5))
             lat, lon = toworld ([y, x])
-            s += 'x=%d y=%d lat=%s lon=%s' % (x, y, fmtdeglat (lat),
-                                              fmthours (lon))
+            s += '[%d,%d] x=%.1f y=%.1f lat=%s lon=%s' % \
+                (row, col, x, y, fmtdeglat (lat), fmthours (lon))
             return s
 
     viewer = Viewer (title=title)
@@ -1022,7 +1029,9 @@ def cycle (arrays, descs=None, cadence=0.6, toworlds=None,
                     s += '%g ' % arrays[i][y,x]
             if yflip:
                 y = h - 1 - y
-            return s + 'x=%d y=%d' % (x, y)
+            row = int (np.floor (y + 0.5))
+            col = int (np.floor (x + 0.5))
+            return s + '[%d,%d] x=%.1f y=%.1f' % (row, col, x, y)
     else:
         from astutil import fmthours, fmtdeglat
         def fmtstatusi (i, x, y):
@@ -1032,7 +1041,9 @@ def cycle (arrays, descs=None, cadence=0.6, toworlds=None,
                     s += '%g ' % arrays[i][y,x]
             if yflip:
                 y = h - 1 - y
-            s += 'x=%d y=%d' % (x, y)
+            row = int (np.floor (y + 0.5))
+            col = int (np.floor (x + 0.5))
+            s += '[%d,%d] x=%.1f y=%.1f' % (row, col, x, y)
             if toworlds[i] is not None:
                 lat, lon = toworlds[i] ([y, x])
                 s += ' lat=%s lon=%s' % (fmtdeglat (lat),
