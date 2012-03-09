@@ -716,25 +716,27 @@ def view (array, title='Array Viewer', colormap='black_to_blue', toworld=None,
     if toworld is None:
         def fmtstatus (x, y):
             s = ''
-            if x >= 0 and y >= 0 and x < w and y < h:
-                if nomask or not array.mask[y,x]:
-                    s += '%g ' % array[y,x]
-            if yflip:
-                y = h - 1 - y
             row = int (np.floor (y + 0.5))
             col = int (np.floor (x + 0.5))
+            if row >= 0 and col >= 0 and row < h and col < w:
+                if nomask or not array.mask[row,col]:
+                    s += '%g ' % array[row,col]
+            if yflip:
+                y = h - 1 - y
+                row = h - 1 - row
             return s + '[%d,%d] x=%.1f y=%.1f' % (row, col, x, y)
     else:
         from astutil import fmthours, fmtdeglat
         def fmtstatus (x, y):
             s = ''
-            if x >= 0 and y >= 0 and x < w and y < h:
-                if nomask or not array.mask[y,x]:
-                    s += '%g ' % array[y,x]
-            if yflip:
-                y = h - 1 - y
             row = int (np.floor (y + 0.5))
             col = int (np.floor (x + 0.5))
+            if row >= 0 and col >= 0 and row < h and col < w:
+                if nomask or not array.mask[row,col]:
+                    s += '%g ' % array[row,col]
+            if yflip:
+                y = h - 1 - y
+                row = h - 1 - row
             lat, lon = toworld ([y, x])
             s += '[%d,%d] x=%.1f y=%.1f lat=%s lon=%s' % \
                 (row, col, x, y, fmtdeglat (lat), fmthours (lon))
@@ -1027,13 +1029,14 @@ def cycle (arrays, descs=None, cadence=0.6, toworlds=None,
     from astutil import fmthours, fmtdeglat
     def fmtstatusi (i, x, y):
         s = ''
-        if x >= 0 and y >= 0 and x < w and y < h:
-            if nomasks[i] or not arrays[i].mask[y,x]:
-                s += '%g ' % arrays[i][y,x]
-        if yflip:
-            y = h - 1 - y
         row = int (np.floor (y + 0.5))
         col = int (np.floor (x + 0.5))
+        if row >= 0 and col >= 0 and row < h and col < w:
+            if nomasks[i] or not arrays[i].mask[row,col]:
+                s += '%g ' % arrays[i][row,col]
+        if yflip:
+            y = h - 1 - y
+            row = h - 1 - row
         s += '[%d,%d] x=%.1f y=%.1f' % (row, col, x, y)
         if toworlds[i] is not None:
             lat, lon = toworlds[i] ([y, x])
