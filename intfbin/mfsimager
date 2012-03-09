@@ -9,6 +9,9 @@ import sys, os.path, pyrap.tables
 mspaths = []
 kwargs = []
 
+if '--help' in sys.argv:
+    os.execvp ('lwimager', ['lwimager', '--help'])
+
 debug = '--debug' in sys.argv
 if debug:
     sys.argv.remove ('--debug')
