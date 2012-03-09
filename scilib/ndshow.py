@@ -221,7 +221,6 @@ class Viewport (gtk.DrawingArea):
     getsurface = None
     onmotion = None
     drawoverlay = None
-    hack_doubleshift = None
 
     centerx = 0
     centery = 0
@@ -495,13 +494,9 @@ class Viewport (gtk.DrawingArea):
                 self.centerx += dx / self.scale
                 self.centery += dy / self.scale
             elif (event.state & modmask) == gtk.gdk.SHIFT_MASK:
-                if self.hack_doubleshift is not None:
-                    self.hack_doubleshift (self, self.centerx + dx / self.scale,
-                                           self.centery + dy / self.scale)
-                else:
-                    self.tunerx += dx / self.tunerscale
-                    self.tunery += dy / self.tunerscale
-                    self.needtune = True
+                self.tunerx += dx / self.tunerscale
+                self.tunery += dy / self.tunerscale
+                self.needtune = True
             else:
                 return False
 
