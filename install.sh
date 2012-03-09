@@ -57,8 +57,7 @@ for util in quickutils/utils/*.py ; do
 	echo '(gen)' $util '->' "$d"
     fi
 
-    echo '#- snippet:' $(basename $util) >"$d"
-    echo '#- date:' $(date -r $util +'%Y %b %d') >>"$d"
+    echo '#- snippet:' $(basename $util) $(date -r $util +'(%Y %b %d)') >"$d"
     echo '#- SHA1:' $(sha1sum $util |cut -d' ' -f1) >>"$d"
     cat $util >>"$d"
     chmod 644 "$d"
