@@ -19,7 +19,6 @@ Ctrl-W to close the window
 Ctrl-1 to set scale to unity
 Ctrl-S to save the data to "data.png" under the current rendering options
   (but not zoomed to the current view of the data).
-Ctrl-P to print out data pixel coordinates of current pointer location
 
 Added by cycler:
 
@@ -652,12 +651,6 @@ class Viewer (object):
             sys.stdout.flush ()
             self.viewport.writeDataAsPNG ('data.png')
             print 'done'
-            return True
-
-        if kn == 'p' and isctrl:
-            import sys
-            print self.viewport.getPointerDataCoords ()
-            sys.stdout.flush ()
             return True
 
         return False
