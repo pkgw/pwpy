@@ -5,7 +5,8 @@ to be a lot of work to get right, I'm doing something wrong.
 """
 
 __all__ = ('Holder Column FlatTable readStreamedTable writeStreamedTable '
-           'openForceColumns K_INT K_FLOAT K_STR K_BOOL K_CUSTOM').split ()
+           'openForceColumns FlatDBError PadError ParseError '
+           'K_INT K_FLOAT K_STR K_BOOL K_CUSTOM').split ()
 
 class Holder (object):
     def __init__ (self, **kwargs):
@@ -431,15 +432,25 @@ recfactory: factory for "record" objects; one attr set for each column
             rec.recno = recno
 
             i = 0
-            for col in cols:
-                v = unpad (s[i:i + col.width])
-                if v == '':
-                    v = None
-                else:
-                    v = col.parse (v)
 
-                setattr (rec, col.name, v)
-                i += col.width + 1
+            try:
+                for col in cols:
+                    v = unpad (s[i:i + col.width])
+                    if v == '':
+                        v = None
+                    else:
+                        v = col.parse (v)
+
+                    setattr (rec, col.name, v)
+                    i += col.width + 1
+            except FlatDBError:
+                raise
+            except Exception as e:
+                raise ParseError ('exception while parsing value "%s" of row %d in '
+                                  'column %s: %s (%s)', s[i:i+col.width], recno,
+                                  col.name, e, e.__class__.__name__, recno=recno,
+                                  colname=col.name, value=s[i:i+col.width],
+                                  subexc=e)
 
             yield rec
 
@@ -651,11 +662,25 @@ _formatters = {
 
 # Text helpers
 
-class PadError (Exception):
-    def __init__ (self, fmt, *args):
+class FlatDBError (Exception):
+    def __init__ (self, fmt, *args, **kwargs):
         self.themsg = fmt % args
+        self.__dict__.update (kwargs)
+
     def __str__ (self):
         return self.themsg
+
+
+class PadError (FlatDBError):
+    text = None
+    width = None
+
+
+class ParseError (FlatDBError):
+    recno = None
+    colname = None
+    value = None
+    subexc = None
 
 
 def pad (s, width, mkstr=False):
@@ -666,9 +691,9 @@ def pad (s, width, mkstr=False):
         s = str (s)
 
     if len (s) > width:
-        raise PadError ('string too wide for its column: %s' % (s, ))
+        raise PadError ('string too wide for its column: %s', s, text=s, width=width)
     if len (s) and s[-1] == ' ':
-        raise PadError ('string not safely paddable: >%s<' % (s, ))
+        raise PadError ('string not safely paddable: >%s<', s, text=s, width=width)
 
     return s.ljust (width, ' ')
 
