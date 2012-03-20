@@ -687,8 +687,10 @@ def _lmpar (r, ipvt, diag, qtb, delta, x, sdiag, par, enorm, finfo):
         temp = enorm (wa1, finfo)
         parc = fp / delta / temp**2
 
-        if fp > 0: parl = max (parl, par)
-        elif fp < 0: paru = min (paru, par)
+        if fp > 0:
+            parl = max (parl, par)
+        elif fp < 0:
+            paru = min (paru, par)
 
         # Improve estimate of par
 
