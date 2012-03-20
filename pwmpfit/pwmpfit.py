@@ -944,7 +944,7 @@ class Problem (object):
 
     def _checkParamConfig (self):
         if self._npar is None:
-            raise ValueError ('No npar yet.')
+            raise ValueError ('no npar yet')
 
         p = self._pinfof
 
@@ -952,27 +952,27 @@ class Problem (object):
             # note: this allows NaN param values, in which case we'll
             # check in solve() that it's been given valid parameters
             # as arguments.
-            raise ValueError ('Some specified initial values infinite.')
+            raise ValueError ('some specified initial values infinite')
 
         if np.any (np.isinf (p[PI_F_STEP])):
-            raise ValueError ('Some specified parameter steps infinite.')
+            raise ValueError ('some specified parameter steps infinite')
 
         if np.any ((p[PI_F_STEP] > p[PI_F_MAXSTEP]) & ~self._getBits (PI_M_RELSTEP)):
-            raise ValueError ('Some specified steps bigger than specified maxsteps.')
+            raise ValueError ('some specified steps bigger than specified maxsteps')
 
         if np.any (p[PI_F_LLIMIT] > p[PI_F_ULIMIT]):
-            raise ValueError ('Some param lower limits > upper limits.')
+            raise ValueError ('some param lower limits > upper limits')
 
         if np.any (p[PI_F_VALUE] < p[PI_F_LLIMIT]):
-            raise ValueError ('Some param values < lower limits.')
+            raise ValueError ('some param values < lower limits')
 
         if np.any (p[PI_F_VALUE] > p[PI_F_ULIMIT]):
-            raise ValueError ('Some param values < lower limits.')
+            raise ValueError ('some param values < lower limits')
 
         p = self._pinfoo
 
         if not np.all ([x is None or callable (x) for x in p[PI_O_TIED]]):
-            raise ValueError ('Some tied values not None or callable.')
+            raise ValueError ('some tied values not None or callable')
 
         # And compute some useful arrays. A tied parameter counts as fixed.
 
@@ -1058,10 +1058,10 @@ class Problem (object):
         self._checkParamConfig ()
 
         if self._nout is None:
-            raise ValueError ('No nout yet.')
+            raise ValueError ('no nout yet')
 
         if self._nout < self._npar - self._ifree.size:
-            raise RuntimeError ('Too many free parameters.')
+            raise RuntimeError ('too many free parameters')
 
         # Coerce parameters to desired types
 
@@ -1114,7 +1114,7 @@ class Problem (object):
         # Consistency checks
 
         if self._jfunc is not None and self.damp > 0:
-            raise ValueError ('Damping factor not allowed when using '
+            raise ValueError ('damping factor not allowed when using '
                               'explicit derivatives')
 
 
@@ -1319,7 +1319,7 @@ class Problem (object):
             # since fjac has been reduced to a small square matrix."
 
             if any (-isfinite (fjac)):
-                raise RuntimeError ('Nonfinite terms in Jacobian matrix!')
+                raise RuntimeError ('nonfinite terms in Jacobian matrix')
 
             # Calculate the norm of the scaled gradient
 
@@ -1496,7 +1496,7 @@ class Problem (object):
 
             # Check for overflow
             if any (-isfinite (wa1) | -isfinite (wa2) | -isfinite (x)):
-                raise RuntimeError ('Overflow in wa1, wa2, or x!')
+                raise RuntimeError ('overflow in wa1, wa2, or x')
 
         # End outer loop. Finalize params, fvec, and fnorm
 
