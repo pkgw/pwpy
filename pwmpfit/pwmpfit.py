@@ -1158,7 +1158,7 @@ class Problem (object):
         if nfree == 0:
             raise ValueError ('No free parameters in problem specification')
 
-        self.params = x0.copy ()
+        params = x0.copy ()
         x = x0[ifree]
 
         # Which parameters have limits?
@@ -1180,7 +1180,7 @@ class Problem (object):
         fvec = np.ndarray (self._nout, x0.dtype)
         ycall = self._ycall
 
-        ycall (self.params, fvec)
+        ycall (params, fvec)
 
         fnorm = enorm (fvec, finfo)
 
@@ -1195,10 +1195,10 @@ class Problem (object):
         # Outer loop top.
 
         while True:
-            self.params[ifree] = x
+            params[ifree] = x
 
             if self._anytied:
-                self._doTies (self.params)
+                self._doTies (params)
 
             # Print out during this iteration?
 
@@ -1358,12 +1358,12 @@ class Problem (object):
                 if niter == 1:
                     delta = min (delta, pnorm)
 
-                self.params[ifree] = wa2
+                params[ifree] = wa2
 
                 # Evaluate func at x + p and calculate norm
 
                 mperr = 0
-                ycall (self.params, wa4)
+                ycall (params, wa4)
                 fnorm1 = enorm (wa4, finfo)
 
                 # Compute scaled actual reductions
@@ -1456,12 +1456,12 @@ class Problem (object):
         # End outer loop.
 
         if nfree == 0:
-            self.params = x0.copy ()
+            params = x0.copy ()
         else:
-            self.params[ifree] = x
+            params[ifree] = x
 
         if self.nprint > 0: # and self.status > 0
-            ycall (self.params, fvec)
+            ycall (params, fvec)
             fnorm = enorm (fvec, finfo)
 
         if fnorm is not None and fnorm1 is not None:
@@ -1495,7 +1495,7 @@ class Problem (object):
         soln.ndof = self.getNDOF ()
         soln.status = status
         soln.niter = niter
-        soln.params = self.params
+        soln.params = params
         soln.covar = covar
         soln.perror = perror
         soln.fnorm = fnorm
