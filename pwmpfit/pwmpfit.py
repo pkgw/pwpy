@@ -1469,15 +1469,14 @@ class Problem (object):
             fnorm = max (fnorm, fnorm1)
             fnorm **= 2
 
-        covar = perror = None
+        # "(very carefully) set the covariance matrix"
 
-        # "(very carefully) set the covariance matrix covar"
+        covar = None
 
-        if (not self.nocovar and n is not None and fjac is not None and
-            ipvt is not None): # and status > 0
+        if not self.nocovar and n > 0 and fjac is not None and ipvt is not None:
             sz = fjac.shape
 
-            if n > 0 and sz[0] >= n and sz[1] >= n and len (ipvt) >= n:
+            if sz[0] >= n and sz[1] >= n and len (ipvt) >= n:
                 cv = self.calc_covar (fjac[:n,:n], ipvt[:n])
                 cv.shape = (n, n)
                 nn = len (x0)
@@ -1487,11 +1486,17 @@ class Problem (object):
                 for i in xrange (n):
                     covar[ifree[i],ifree] = cv[i]
 
-                # Compute errors in parameters
-                perror = np.zeros (nn, dtype)
-                d = covar.diagonal ()
-                wh = where (d >= 0)
-                perror[wh] = sqrt (d[wh])
+        # Errors in parameters from the diagonal of covar.
+
+        perror = None
+
+        if covar is not None:
+            perror = np.zeros (len (x0), dtype)
+            d = covar.diagonal ()
+            wh = where (d >= 0)
+            perror[wh] = sqrt (d[wh])
+
+        # Export results and we're done.
 
         soln = self.solclass (self)
         soln.ndof = self.getNDOF ()
