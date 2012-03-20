@@ -1164,7 +1164,7 @@ class Problem (object):
         dside = self._pinfob & PI_M_SIDE
         maxstep = self._pinfof[PI_F_MAXSTEP]
         qmax = isfinite (maxstep)
-        qminmax = any (qmax)
+        anymaxsteps = any (qmax)
 
         # Which parameters have limits?
 
@@ -1172,7 +1172,7 @@ class Problem (object):
         ulim = self._pinfof[PI_F_ULIMIT,ifree]
         qllim = isfinite (self._pinfof[PI_F_LLIMIT,ifree])
         llim = self._pinfof[PI_F_LLIMIT,ifree]
-        qanylim = any (qulim) or any (qllim)
+        anylimits = any (qulim) or any (qllim)
 
         # Init fnorm
 
@@ -1212,7 +1212,7 @@ class Problem (object):
 
             fjac = self._fdjac2 (x, fvec, ulim, dside, x0, maxstep, isrel, finfo)
 
-            if qanylim:
+            if anylimits:
                 # Check for parameters pegged at limits
                 whlpeg = where (qllim & (x == llim))
                 nlpeg = len (whlpeg[0])
@@ -1304,7 +1304,7 @@ class Problem (object):
                 # "Store the direction p and x+p. Calculate the norm of p"
                 wa1 = -wa1
 
-                if not qanylim and not qminmax:
+                if not anylimits and not anymaxsteps:
                     # No limits applied, so just move to new position
                     alpha = 1.
                     wa2 = x + wa1
@@ -1312,7 +1312,7 @@ class Problem (object):
                     # We have to respect parameter limits.
                     alpha = 1.
 
-                    if qanylim:
+                    if anylimits:
                         if nlpeg > 0:
                             wa1[whlpeg] = clip (wa1[whlpeg], 0., max (wa1))
                         if nupeg > 0:
@@ -1331,8 +1331,7 @@ class Problem (object):
                             t = (ulim[whu] - x[whu]) / wa1[whu]
                             alpha = min (alpha, t.min ())
 
-                    # Obey max step values
-                    if qminmax:
+                    if anymaxsteps:
                         nwa1 = wa1 * alpha
                         whmax = where (qmax)
                         if len (whmax[0]) > 0:
