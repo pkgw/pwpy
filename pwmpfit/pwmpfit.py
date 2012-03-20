@@ -1151,15 +1151,15 @@ class Problem (object):
 
     # Actual implementation code!
 
-    def _ycall (self, x, vec):
+    def _ycall (self, params, vec):
         if self._anytied:
-            self._doTies (x)
+            self._doTies (params)
 
         self.nfev += 1
 
         if self.debugCalls:
-            print 'Call: #%4d f(%s) ->' % (self.nfev, x),
-        self._yfunc (x, vec)
+            print 'Call: #%4d f(%s) ->' % (self.nfev, params),
+        self._yfunc (params, vec)
         if self.debugCalls:
             print vec
 
@@ -1167,15 +1167,15 @@ class Problem (object):
             np.tanh (vec / self.damp, vec)
 
 
-    def _jcall (self, x, jac):
+    def _jcall (self, params, jac):
         if self._anytied:
-            self._doTies (x)
+            self._doTies (params)
 
         self.nfev += 1
 
         if self.debugCalls:
-            print 'Call: #%4d j(%s) ->' % (self.nfev, x),
-        self._jfunc (x, jac)
+            print 'Call: #%4d j(%s) ->' % (self.nfev, params),
+        self._jfunc (params, jac)
         if self.debugCalls:
             print jac
 
