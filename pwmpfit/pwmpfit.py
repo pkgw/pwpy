@@ -283,7 +283,7 @@ pmut[i]'th column of 'a' has the i'th biggest norm."""
 
     for i in xrange (n):
         v[:] = packed[:,pmut[i]]
-        v[0:i] = 0
+        v[:i] = 0
 
         hhm = np.eye (m) - 2 * np.outer (v, v) / np.dot (v, v)
         q = np.dot (q, hhm)
@@ -1260,8 +1260,8 @@ class Problem (object):
                 temp3 = fjac[j,lj]
                 if temp3 != 0:
                     fj = fjac[j:,lj]
-                    wj = wa4[j:len (wa4)]
-                    wa4[j:len (wa4)] = wj - fj * np.dot (fj, wj) / temp3
+                    wj = wa4[j:]
+                    wa4[j:] = wj - fj * np.dot (fj, wj) / temp3
                 fjac[j,lj] = wa1[j]
                 qtf[j] = wa4[j]
 
@@ -1382,7 +1382,7 @@ class Problem (object):
 
                 for j in xrange (n):
                     wa3[j] = 0
-                    wa3[0:j+1] = wa3[0:j+1] + fjac[0:j+1,j] * wa1[ipvt[j]]
+                    wa3[:j+1] = wa3[:j+1] + fjac[:j+1,j] * wa1[ipvt[j]]
 
                 # "Remember, alpha is the fraction of the full LM step actually
                 # taken."
@@ -1649,7 +1649,7 @@ class Problem (object):
             for j in xrange (k):
                 temp = r[k,k] * r[j,k]
                 r[j,k] = 0.
-                r[0:j+1,k] -= temp * r[0:j+1,j]
+                r[:j+1,k] -= temp * r[:j+1,j]
 
             l = k
 
@@ -1660,9 +1660,9 @@ class Problem (object):
             for k in xrange (l + 1):
                 for j in xrange (k):
                     temp = r[j,k]
-                    r[0:j+1,j] += temp * r[0:j+1,k]
+                    r[:j+1,j] += temp * r[:j+1,k]
                 temp = r[k,k]
-                r[0:k+1,k] *= temp
+                r[:k+1,k] *= temp
 
         # "For the full lower triangle of the covariance matrix
         # in the strict lower triangle or and in wa"
