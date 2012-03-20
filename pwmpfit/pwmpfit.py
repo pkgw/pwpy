@@ -894,6 +894,9 @@ class Problem (object):
         p = self._pinfof
 
         if np.any (np.isinf (p[PI_F_VALUE])):
+            # note: this allows NaN param values, in which case we'll
+            # check in solve() that it's been given valid parameters
+            # as arguments.
             raise ValueError ('Some specified initial values infinite.')
 
         if np.any (np.isinf (p[PI_F_STEP])):
@@ -1134,16 +1137,27 @@ class Problem (object):
     def solve (self, x0=None, dtype=np.float):
         from numpy import any, clip, dot, isfinite, sqrt, where
 
-        if x0 is not None:
-            x0 = np.asarray (x0, dtype=dtype)
-
-        finfo = np.finfo (dtype)
-
         self._fixupCheck ()
         ifree = self._ifree
-        fnorm = fnorm1 = -1.
+        ycall = self._ycall
+        n = ifree.size # note: we try to allow n = 0
 
-        soln = self.solclass (self)
+        # Set up initial values. These can either be specified via the
+        # arguments to this function, or set implicitly with calls to
+        # pValue() and pLimit (). Former overrides the latter.
+
+        if x0 is not None:
+            x0 = np.asarray (x0, dtype=dtype)
+        else:
+            x0 = self._pinfof[PI_F_VALUE]
+
+        if any (-isfinite (x0)):
+            raise ValueError ('some nonfinite initial parameter values')
+
+        dtype = x0.dtype
+        finfo = np.finfo (dtype)
+        params = x0.copy ()
+        x = x0[ifree]
 
         # Steps for numerical derivatives
         isrel = self._getBits (PI_M_RELSTEP)
@@ -1151,15 +1165,6 @@ class Problem (object):
         maxstep = self._pinfof[PI_F_MAXSTEP]
         qmax = isfinite (maxstep)
         qminmax = any (qmax)
-
-        # Which parameters are actually free?
-        nfree = ifree.size
-
-        if nfree == 0:
-            raise ValueError ('No free parameters in problem specification')
-
-        params = x0.copy ()
-        x = x0[ifree]
 
         # Which parameters have limits?
 
@@ -1176,12 +1181,9 @@ class Problem (object):
         else:
             enorm = _enorm_careful
 
-        n = nfree
-        fvec = np.ndarray (self._nout, x0.dtype)
-        ycall = self._ycall
-
+        fnorm1 = -1.
+        fvec = np.ndarray (self._nout, dtype)
         ycall (params, fvec)
-
         fnorm = enorm (fvec, finfo)
 
         # Initialize Levenberg-Marquardt parameter and
@@ -1455,7 +1457,7 @@ class Problem (object):
 
         # End outer loop.
 
-        if nfree == 0:
+        if n == 0:
             params = x0.copy ()
         else:
             params[ifree] = x
@@ -1492,6 +1494,7 @@ class Problem (object):
                 wh = where (d >= 0)
                 perror[wh] = sqrt (d[wh])
 
+        soln = self.solclass (self)
         soln.ndof = self.getNDOF ()
         soln.status = status
         soln.niter = niter
@@ -1501,7 +1504,6 @@ class Problem (object):
         soln.fnorm = fnorm
         soln.fvec = fvec
         soln.fjac = fjac
-
         return soln
 
 
