@@ -1153,7 +1153,7 @@ class Problem (object):
 
     def _ycall (self, params, vec):
         if self._anytied:
-            self._doTies (params)
+            self._apply_ties (params)
 
         self.nfev += 1
 
@@ -1169,7 +1169,7 @@ class Problem (object):
 
     def _jcall (self, params, jac):
         if self._anytied:
-            self._doTies (params)
+            self._apply_ties (params)
 
         self.nfev += 1
 
@@ -1250,7 +1250,7 @@ class Problem (object):
             params[ifree] = x
 
             if self._anytied:
-                self._doTies (params)
+                self._apply_ties (params)
 
             # Calculate the Jacobian
 
@@ -1667,12 +1667,12 @@ class Problem (object):
         return self._fdjac2 (params, fvec, ulimit, dside, maxstep, isrel, finfo)
 
 
-    def _doTies (self, p):
+    def _apply_ties (self, params):
         funcs = self._pinfoo[PI_O_TIED]
 
         for i in xrange (self._npar):
             if funcs[i] is not None:
-                p[i] = funcs[i] (p)
+                params[i] = funcs[i] (params)
 
 
 def checkDerivative (npar, nout, yfunc, jfunc, guess):
