@@ -1483,10 +1483,9 @@ class Problem (object):
             if sz[0] >= n and sz[1] >= n and len (ipvt) >= n:
                 cv = self.calc_covar (fjac[:n,:n], ipvt[:n])
                 cv.shape = (n, n)
-                nn = len (x0)
 
                 # Fill in actual matrix, accounting for fixed params
-                covar = np.zeros ((nn, nn), dtype)
+                covar = np.zeros ((self._npar, self._npar), dtype)
                 for i in xrange (n):
                     covar[ifree[i],ifree] = cv[i]
 
@@ -1495,7 +1494,7 @@ class Problem (object):
         perror = None
 
         if covar is not None:
-            perror = np.zeros (len (x0), dtype)
+            perror = np.zeros (self._npar, dtype)
             d = covar.diagonal ()
             wh = where (d >= 0)
             perror[wh] = sqrt (d[wh])
