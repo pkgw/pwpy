@@ -1141,7 +1141,7 @@ class Problem (object):
 
         self._fixupCheck ()
         ifree = self._ifree
-        self.fnorm = fnorm1 = -1.
+        fnorm = fnorm1 = -1.
 
         soln = self.solclass (self)
 
@@ -1182,7 +1182,7 @@ class Problem (object):
 
         ycall (self.params, fvec)
 
-        self.fnorm = enorm (fvec, finfo)
+        fnorm = enorm (fvec, finfo)
 
         # Initialize Levenberg-Marquardt parameter and
         # iteration counter.
@@ -1278,11 +1278,11 @@ class Problem (object):
             # Calculate the norm of the scaled gradient
 
             gnorm = 0.
-            if self.fnorm != 0:
+            if fnorm != 0:
                 for j in xrange (n):
                     l = ipvt[j]
                     if wa2[l] != 0:
-                        s = dot (fjac[:j+1,j], qtf[:j+1]) / self.fnorm
+                        s = dot (fjac[:j+1,j], qtf[:j+1]) / fnorm
                         gnorm = max (gnorm, abs (s / wa2[l]))
 
             # Test for convergence of gradient norm
@@ -1369,8 +1369,8 @@ class Problem (object):
                 # Compute scaled actual reductions
 
                 actred = -1.
-                if 0.1 * fnorm1 < self.fnorm:
-                    actred = -(fnorm1 / self.fnorm)**2 + 1
+                if 0.1 * fnorm1 < fnorm:
+                    actred = -(fnorm1 / fnorm)**2 + 1
 
                 # Compute scaled predicted reduction and scaled directional
                 # derivative
@@ -1382,8 +1382,8 @@ class Problem (object):
                 # "Remember, alpha is the fraction of the full LM step actually
                 # taken."
 
-                temp1 = enorm (alpha * wa3, finfo) / self.fnorm
-                temp2 = sqrt (alpha * par) * pnorm / self.fnorm
+                temp1 = enorm (alpha * wa3, finfo) / fnorm
+                temp2 = sqrt (alpha * par) * pnorm / fnorm
                 prered = temp1**2 + 2 * temp2**2
                 dirder = -(temp1**2 + temp2**2)
 
@@ -1400,7 +1400,7 @@ class Problem (object):
                     else:
                         temp = 0.5 * dirder / (dirder + 0.5 * actred)
 
-                    if 0.1 * fnorm1 >= self.fnorm or temp < 0.1:
+                    if 0.1 * fnorm1 >= fnorm or temp < 0.1:
                         temp = 0.1
 
                     delta = temp * min (delta, pnorm / 0.1)
@@ -1415,7 +1415,7 @@ class Problem (object):
                     wa2 = diag * x
                     fvec = wa4
                     xnorm = enorm (wa2, finfo)
-                    self.fnorm = fnorm1
+                    fnorm = fnorm1
                     self.niter += 1
 
                 # Check for convergence
@@ -1462,11 +1462,11 @@ class Problem (object):
 
         if self.nprint > 0: # and self.status > 0
             ycall (self.params, fvec)
-            self.fnorm = enorm (fvec, finfo)
+            fnorm = enorm (fvec, finfo)
 
-        if self.fnorm is not None and fnorm1 is not None:
-            self.fnorm = max (self.fnorm, fnorm1)
-            self.fnorm **= 2
+        if fnorm is not None and fnorm1 is not None:
+            fnorm = max (fnorm, fnorm1)
+            fnorm **= 2
 
         self.covar = self.perror = None
 
@@ -1498,7 +1498,7 @@ class Problem (object):
         soln.params = self.params
         soln.covar = self.covar
         soln.perror = self.perror
-        soln.fnorm = self.fnorm
+        soln.fnorm = fnorm
         soln.fvec = fvec
         soln.fjac = fjac
 
