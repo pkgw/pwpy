@@ -797,7 +797,6 @@ class Problem (object):
     epsfunc = None
 
     maxiter = 200
-    nprint = 1
 
     diag = None
 
@@ -1079,7 +1078,6 @@ class Problem (object):
             self.epsfunc = float (self.epsfunc)
 
         self.maxiter = int (self.maxiter)
-        self.nprint = int (self.nprint)
 
         self.nocovar = bool (self.nocovar)
         self.fastnorm = bool (self.fastnorm)
@@ -1151,7 +1149,6 @@ class Problem (object):
         n.factor = self.factor
         n.epsfunc = self.epsfunc
         n.maxiter = self.maxiter
-        n.nprint = self.nprint
         n.nocovar = self.nocovar
         n.fastnorm = self.fastnorm
         n.rescale = self.rescale
@@ -1264,12 +1261,6 @@ class Problem (object):
 
             if self._anytied:
                 self._doTies (params)
-
-            # Print out during this iteration?
-
-            if self.nprint > 0: # and iterfunct is not None
-                # Blah ...
-                pass
 
             # Calculate the Jacobian
 
@@ -1517,20 +1508,17 @@ class Problem (object):
             if any (-isfinite (wa1) | -isfinite (wa2) | -isfinite (x)):
                 raise RuntimeError ('Overflow in wa1, wa2, or x!')
 
-        # End outer loop.
+        # End outer loop. Finalize params, fvec, and fnorm
 
         if n == 0:
             params = initial_params.copy ()
         else:
             params[ifree] = x
 
-        if self.nprint > 0: # and self.status > 0
-            ycall (params, fvec)
-            fnorm = enorm (fvec, finfo)
-
-        if fnorm is not None and fnorm1 is not None:
-            fnorm = max (fnorm, fnorm1)
-            fnorm **= 2
+        ycall (params, fvec)
+        fnorm = enorm (fvec, finfo)
+        fnorm = max (fnorm, fnorm1)
+        fnorm **= 2
 
         # "(very carefully) set the covariance matrix"
 
