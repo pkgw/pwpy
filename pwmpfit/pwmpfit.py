@@ -1134,34 +1134,34 @@ class Problem (object):
             print jac
 
 
-    def solve (self, x0=None, dtype=np.float):
+    def solve (self, initial_params=None, dtype=np.float):
         from numpy import any, clip, dot, isfinite, sqrt, where
 
         self._fixupCheck ()
         ifree = self._ifree
         ycall = self._ycall
-        n = ifree.size # note: we try to allow n = 0
+        n = ifree.size # number of free params; we try to allow n = 0
 
         # Set up initial values. These can either be specified via the
         # arguments to this function, or set implicitly with calls to
         # pValue() and pLimit (). Former overrides the latter.
 
-        if x0 is not None:
-            x0 = np.atleast_1d (np.asarray (x0, dtype=dtype))
+        if initial_params is not None:
+            initial_params = np.atleast_1d (np.asarray (initial_params, dtype=dtype))
         else:
-            x0 = self._pinfof[PI_F_VALUE]
+            initial_params = self._pinfof[PI_F_VALUE]
 
-        if x0.size != self._npar:
+        if initial_params.size != self._npar:
             raise ValueError ('expected exactly %d parameters, got %d'
-                              % (self._npar, x0.size))
+                              % (self._npar, initial_params.size))
 
-        if any (-isfinite (x0)):
+        if any (-isfinite (initial_params)):
             raise ValueError ('some nonfinite initial parameter values')
 
-        dtype = x0.dtype
+        dtype = initial_params.dtype
         finfo = np.finfo (dtype)
-        params = x0.copy ()
-        x = x0[ifree]
+        params = initial_params.copy ()
+        x = params[ifree] # x is the free subset of our parameters
 
         # Steps for numerical derivatives
         isrel = self._getBits (PI_M_RELSTEP)
@@ -1214,7 +1214,7 @@ class Problem (object):
 
             # Calculate the Jacobian
 
-            fjac = self._fdjac2 (x, fvec, ulim, dside, x0, maxstep, isrel, finfo)
+            fjac = self._fdjac2 (params, fvec, ulim, dside, maxstep, isrel, finfo)
 
             if anylimits:
                 # Check for parameters pegged at limits
@@ -1461,7 +1461,7 @@ class Problem (object):
         # End outer loop.
 
         if n == 0:
-            params = x0.copy ()
+            params = initial_params.copy ()
         else:
             params[ifree] = x
 
@@ -1514,13 +1514,13 @@ class Problem (object):
         return soln
 
 
-    def moronsolve (self, x0=None, dtype=np.float, maxiter=20):
-        soln = self.solve (x0, dtype)
+    def moronsolve (self, initial_params=None, dtype=np.float, maxiter=20):
+        soln = self.solve (initial_params, dtype)
         prevfnorm = soln.fnorm
-        x0 = soln.params
+        params = soln.params
 
         for i in xrange (maxiter):
-            soln = self.solve (x0, dtype)
+            soln = self.solve (params, dtype)
 
             if soln.fnorm > prevfnorm:
                 raise RuntimeError ('lame iteration gave worse results')
@@ -1528,16 +1528,18 @@ class Problem (object):
             if (prevfnorm - soln.fnorm) / prevfnorm < 1e-3:
                 return soln
 
-            x0 = soln.params
+            params = soln.params
             prevfnorm = soln.fnorm
 
         raise RuntimeError ('lame iteration didn\'t converge (%d iters)' % maxiter)
 
 
-    def _fdjac2 (self, x, fvec, ulimit, dside, xall, maxstep, isrel, finfo):
+    def _fdjac2 (self, params, fvec, ulimit, dside, maxstep, isrel, finfo):
         ifree = self._ifree
         debug = self.debugJac
         machep = finfo.eps
+
+        x = params[ifree]
 
         if self.epsfunc is None:
             eps = machep
@@ -1550,7 +1552,7 @@ class Problem (object):
         if self._jfunc is not None:
             # Easy, analytic-derivative case.
             fjac = np.zeros ((m, self._npar), finfo.dtype)
-            self._jcall (xall, fjac)
+            self._jcall (params, fjac)
             if n < self._npar:
                 fjac = fjac[:,ifree]
             return fjac
@@ -1584,7 +1586,7 @@ class Problem (object):
         # Compute derivative for each parameter
 
         for j in xrange (n):
-            xp = xall.copy ()
+            xp = params.copy ()
             xp[ifree[j]] += h[j]
             fp = np.empty (self._nout, dtype=finfo.dtype)
             self._ycall (xp, fp)
@@ -1594,7 +1596,7 @@ class Problem (object):
                 fjac[:,j] = (fp - fvec) / h[j]
             else:
                 # Two-sided ... extra func call
-                xp[ifree[j]] = xall[ifree[j]] - h[j]
+                xp[ifree[j]] = params[ifree[j]] - h[j]
                 fm = np.empty (self._nout, dtype=finfo.dtype)
                 self._ycall (xp, fm)
                 fjac[:,j] = (fp - fm) / (2 * h[j])
@@ -1605,13 +1607,12 @@ class Problem (object):
         return fjac
 
 
-    def _manual_fdjac2 (self, xall, dtype=np.float):
+    def _manual_fdjac2 (self, params, dtype=np.float):
         self._fixupCheck ()
 
         ifree = self._ifree
 
-        xall = np.atleast_1d (np.asarray (xall, dtype))
-        x = xall[ifree]
+        params = np.atleast_1d (np.asarray (params, dtype))
         fvec = np.empty (self._nout, dtype)
         ulimit = self._pinfof[PI_F_ULIMIT,ifree]
         dside = self._pinfob & PI_M_SIDE
@@ -1623,8 +1624,8 @@ class Problem (object):
         # to get the initial value of the function at
         # the specified position.
 
-        self._ycall (x, fvec)
-        return self._fdjac2 (x, fvec, ulimit, dside, xall, maxstep, isrel, finfo)
+        self._ycall (params, fvec)
+        return self._fdjac2 (params, fvec, ulimit, dside, maxstep, isrel, finfo)
 
 
     def _doTies (self, p):
