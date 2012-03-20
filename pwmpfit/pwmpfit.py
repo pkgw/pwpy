@@ -1373,16 +1373,13 @@ class Problem (object):
                 fjac, par, wa1, wa2 = _lmpar (fjac, ipvt, diag, qtf, delta,
                                               wa1, wa2, par, enorm, finfo)
                 # "Store the direction p and x+p. Calculate the norm of p"
-                wa1 = -wa1
+                wa1 *= -1
+                alpha = 1.
 
                 if not anylimits and not anymaxsteps:
                     # No limits applied, so just move to new position
-                    alpha = 1.
                     wa2 = x + wa1
                 else:
-                    # We have to respect parameter limits.
-                    alpha = 1.
-
                     if anylimits:
                         if nlpeg > 0:
                             wa1[whlpeg] = clip (wa1[whlpeg], 0., max (wa1))
@@ -1474,10 +1471,10 @@ class Problem (object):
                     if 0.1 * fnorm1 >= fnorm or temp < 0.1:
                         temp = 0.1
 
-                    delta = temp * min (delta, pnorm / 0.1)
+                    delta = temp * min (delta, 10 * pnorm)
                     par /= temp
                 elif par == 0 or ratio >= 0.75:
-                    delta = pnorm / 0.5
+                    delta = 2 * pnorm
                     par *= 0.5
 
                 if ratio >= 0.0001:
