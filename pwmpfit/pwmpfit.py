@@ -1524,7 +1524,7 @@ class Problem (object):
 
         covar = None
 
-        if not self.nocovar and n > 0 and fjac is not None and ipvt is not None:
+        if not self.nocovar and n > 0:
             sz = fjac.shape
 
             if sz[0] >= n and sz[1] >= n and len (ipvt) >= n:
