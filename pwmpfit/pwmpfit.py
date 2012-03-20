@@ -766,6 +766,8 @@ class Solution (object):
     fnorm = None
     fvec = None
     fjac = None
+    nfev = -1
+    njev = -1
 
     def __init__ (self, prob):
         self.prob = prob
@@ -1049,7 +1051,8 @@ class Problem (object):
         self._nout = nout
         self._yfunc = yfunc
         self._jfunc = jfunc
-        self.nfev = 0
+        self._nfev = 0
+        self._njev = 0
         return self
 
 
@@ -1197,10 +1200,10 @@ class Problem (object):
         if self._anytied:
             self._apply_ties (params)
 
-        self.nfev += 1
+        self._nfev += 1
 
         if self.debugCalls:
-            print 'Call: #%4d f(%s) ->' % (self.nfev, params),
+            print 'Call: #%4d f(%s) ->' % (self._nfev, params),
         self._yfunc (params, vec)
         if self.debugCalls:
             print vec
@@ -1572,6 +1575,8 @@ class Problem (object):
         soln.fnorm = fnorm
         soln.fvec = fvec
         soln.fjac = fjac
+        soln.nfev = self._nfev
+        soln.njev = self._njev
         return soln
 
 
@@ -1598,10 +1603,10 @@ class Problem (object):
     def _get_jacobian_explicit (self, params, fvec, ulimit, dside, maxstep, isrel, finfo):
         fjac = np.zeros ((self._nout, self._npar), finfo.dtype)
 
-        self.nfev += 1
+        self._njev += 1
 
         if self.debugCalls:
-            print 'Call: #%4d j(%s) ->' % (self.nfev, params),
+            print 'Call: #%4d j(%s) ->' % (self._njev, params),
         self._jfunc (params, fjac)
         if self.debugCalls:
             print fjac
