@@ -1434,7 +1434,6 @@ class Problem (object):
 
                 # Evaluate func at x + p and calculate norm
 
-                mperr = 0
                 ycall (params, wa4)
                 fnorm1 = enorm (wa4, finfo)
 
