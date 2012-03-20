@@ -758,7 +758,7 @@ def _calc_covar (rr, ipvt, tol=1e-14):
 class Solution (object):
     ndof = None
     prob = None
-    status = -1
+    status = None
     niter = None
     perror = None
     params = None
@@ -770,6 +770,44 @@ class Solution (object):
     def __init__ (self, prob):
         self.prob = prob
 
+"""
+solve() status codes:
+status is a set of strings. The presence of a string in the set means that
+the specified condition was active when the iteration terminated. Multiple
+conditions may contribute to ending the iteration.
+
+'ftol' (MPFIT equiv: 1, 3)
+  "Termination occurs when both the actual and predicted relative
+  reductions in the sum of squares are at most FTOL. Therefore, FTOL
+  measures the relative error desired in the sum of squares."
+
+'xtol' (MPFIT equiv: 2, 3)
+  "Termination occurs when the relative error between two consecutive
+  iterates is at most XTOL. Therefore, XTOL measures the relative
+  error desired in the approximate solution."
+
+'gtol' (MPFIT equiv: 4)
+  "Termination occurs when the cosine of the angle between fvec and
+  any column of the jacobian is at most GTOL in absolute
+  value. Therefore, GTOL measures the orthogonality desired between
+  the function vector and the columns of the jacobian."
+
+'maxiter' (MPFIT equiv: 5)
+  Number of iterations exceeds maxiter.
+
+'feps' (MPFIT equiv: 6)
+  "ftol is too small. no further reduction in the sum of squares is
+  possible."
+
+'xeps' (MPFIT equiv: 7)
+  "xtol is too small. no further improvement in the approximate
+  solution x is possible."
+
+'geps' (MPFIT equiv: 8)
+  "xtol is too small. fvec is orthogonal to the columns of the jacobian
+  to machine precision."
+
+"""
 
 class Problem (object):
     _yfunc = None
@@ -1233,7 +1271,7 @@ class Problem (object):
         par = 0.
         niter = 1
         qtf = x * 0.
-        status = 0
+        status = set ()
 
         # Outer loop top.
 
@@ -1323,7 +1361,7 @@ class Problem (object):
             # Test for convergence of gradient norm
 
             if gnorm <= self.gtol:
-                status = 4
+                status.add ('gtol')
                 break
 
             if self.diag is None:
@@ -1454,33 +1492,32 @@ class Problem (object):
 
                 # Check for convergence
 
-                if abs (actred) <= self.ftol and prered <= self.ftol and 0.5 * ratio <= 1:
-                    status = 1
-                    break
+                if abs (actred) <= self.ftol and prered <= self.ftol and ratio <= 2:
+                    status.add ('ftol')
+
                 if delta <= self.xtol * xnorm:
-                    status = 2
-                    break
-                # If both, status = 3
+                    status.add ('xtol')
 
                 # Check for termination, "stringent tolerances"
+
                 if niter >= self.maxiter:
-                    status = 5
-                    break
-                if abs (actred) <= finfo.eps and prered <= finfo.eps and 0.5 * ratio <= 1:
-                    status = 6
-                    break
+                    status.add ('maxiter')
+
+                if abs (actred) <= finfo.eps and prered <= finfo.eps and ratio <= 2:
+                    status.add ('feps')
+
                 if delta <= finfo.eps * xnorm:
-                    status = 7
-                    break
+                    status.add ('xeps')
+
                 if gnorm <= finfo.eps:
-                    status = 8
+                    status.add ('geps')
+
+                # Repeat loop if iteration unsuccessful (that is,
+                # ratio < 1e-4 and not stopping criteria met)
+                if ratio >= 0.0001 or len (status):
                     break
 
-                # Repeat loop if iteration unsuccessful
-                if ratio >= 0.0001:
-                    break
-
-            if status != 0:
+            if len (status):
                 break
 
             # Check for overflow
