@@ -41,7 +41,7 @@ done
 
 # Python modules
 
-for libdir in pylib scilib intflib ; do
+for libdir in pylib scilib pwmpfit intflib ; do
     install -C$vee -m644 -t $prefix/lib/python/site-packages $libdir/*.py
 done
 
