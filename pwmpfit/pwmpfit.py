@@ -1188,7 +1188,7 @@ class Problem (object):
         # iteration counter.
 
         par = 0.
-        self.niter = 1
+        niter = 1
         qtf = x * 0.
         status = 0
 
@@ -1231,7 +1231,7 @@ class Problem (object):
 
             ipvt, wa1, wa2 = _qr_factor_packed (fjac, enorm, finfo)
 
-            if self.niter == 1:
+            if niter == 1:
                 # If "diag" unspecified, scale according to norms of columns
                 # of the initial jacobian
                 if self.rescale:
@@ -1355,7 +1355,7 @@ class Problem (object):
                 pnorm = enorm (wa3, finfo)
 
                 # On first iter, also adjust initial step bound
-                if self.niter == 1:
+                if niter == 1:
                     delta = min (delta, pnorm)
 
                 self.params[ifree] = wa2
@@ -1416,7 +1416,7 @@ class Problem (object):
                     fvec = wa4
                     xnorm = enorm (wa2, finfo)
                     fnorm = fnorm1
-                    self.niter += 1
+                    niter += 1
 
                 # Check for convergence
 
@@ -1429,7 +1429,7 @@ class Problem (object):
                 # If both, status = 3
 
                 # Check for termination, "stringent tolerances"
-                if self.niter >= self.maxiter:
+                if niter >= self.maxiter:
                     status = 5
                     break
                 if abs (actred) <= finfo.eps and prered <= finfo.eps and 0.5 * ratio <= 1:
@@ -1494,7 +1494,7 @@ class Problem (object):
 
         soln.ndof = self.getNDOF ()
         soln.status = status
-        soln.niter = self.niter
+        soln.niter = niter
         soln.params = self.params
         soln.covar = covar
         soln.perror = perror
