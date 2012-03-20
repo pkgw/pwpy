@@ -1132,6 +1132,8 @@ class Problem (object):
 
 
     def solve (self, x0=None, dtype=np.float):
+        from numpy import any, clip, dot, isfinite, sqrt, where
+
         if x0 is not None:
             x0 = np.asarray (x0, dtype=dtype)
 
@@ -1147,8 +1149,8 @@ class Problem (object):
         isrel = self._getBits (PI_M_RELSTEP)
         dside = self._pinfob & PI_M_SIDE
         maxstep = self._pinfof[PI_F_MAXSTEP]
-        qmax = np.isfinite (maxstep)
-        qminmax = np.any (qmax)
+        qmax = isfinite (maxstep)
+        qminmax = any (qmax)
 
         # Which parameters are actually free?
         nfree = ifree.size
@@ -1161,11 +1163,11 @@ class Problem (object):
 
         # Which parameters have limits?
 
-        qulim = np.isfinite (self._pinfof[PI_F_ULIMIT,ifree])
+        qulim = isfinite (self._pinfof[PI_F_ULIMIT,ifree])
         ulim = self._pinfof[PI_F_ULIMIT,ifree]
-        qllim = np.isfinite (self._pinfof[PI_F_LLIMIT,ifree])
+        qllim = isfinite (self._pinfof[PI_F_LLIMIT,ifree])
         llim = self._pinfof[PI_F_LLIMIT,ifree]
-        qanylim = np.any (qulim) or np.any (qllim)
+        qanylim = any (qulim) or any (qllim)
 
         # Init fnorm
 
@@ -1210,19 +1212,19 @@ class Problem (object):
 
             if qanylim:
                 # Check for parameters pegged at limits
-                whlpeg = np.where (qllim & (x == llim))
+                whlpeg = where (qllim & (x == llim))
                 nlpeg = len (whlpeg[0])
-                whupeg = np.where (qulim & (x == ulim))
+                whupeg = where (qulim & (x == ulim))
                 nupeg = len (whupeg[0])
 
                 if nlpeg > 0:
                     # Check total derivative of sum wrt lower-pegged params
                     for i in xrange (nlpeg):
-                        if np.dot (fvec, fjac[:,whlpeg[0][i]]) > 0:
+                        if dot (fvec, fjac[:,whlpeg[0][i]]) > 0:
                             fjac[:,whlpeg[i]] = 0
                 if nupeg > 0:
                     for i in xrange (nupeg):
-                        if np.dot (fvec, fjac[:,whupeg[0][i]]) < 0:
+                        if dot (fvec, fjac[:,whupeg[0][i]]) < 0:
                             fjac[:,whupeg[i]] = 0
 
             # Compute QR factorization of the Jacobian
@@ -1236,7 +1238,7 @@ class Problem (object):
                     diag = self.diag.copy ()
                 else:
                     diag = wa2.copy ()
-                    diag[np.where (diag == 0)] = 1.
+                    diag[where (diag == 0)] = 1.
 
                 # Calculate norm of scaled x, initialize step bound delta
                 xnorm = enorm (diag * x, finfo)
@@ -1254,7 +1256,7 @@ class Problem (object):
                 if temp3 != 0:
                     fj = fjac[j:,lj]
                     wj = wa4[j:]
-                    wa4[j:] = wj - fj * np.dot (fj, wj) / temp3
+                    wa4[j:] = wj - fj * dot (fj, wj) / temp3
                 fjac[j,lj] = wa1[j]
                 qtf[j] = wa4[j]
 
@@ -1270,7 +1272,7 @@ class Problem (object):
             # "Check for overflow. This should be a cheap test here
             # since fjac has been reduced to a small square matrix."
 
-            if np.any (-np.isfinite (fjac)):
+            if any (-isfinite (fjac)):
                 raise RuntimeError ('Nonfinite terms in Jacobian matrix!')
 
             # Calculate the norm of the scaled gradient
@@ -1280,7 +1282,7 @@ class Problem (object):
                 for j in xrange (n):
                     l = ipvt[j]
                     if wa2[l] != 0:
-                        s = np.dot (fjac[:j+1,j], qtf[:j+1]) / self.fnorm
+                        s = dot (fjac[:j+1,j], qtf[:j+1]) / self.fnorm
                         gnorm = max (gnorm, abs (s / wa2[l]))
 
             # Test for convergence of gradient norm
@@ -1290,7 +1292,7 @@ class Problem (object):
                 break
 
             if not self.rescale:
-                diag = np.where (diag > wa2, diag, wa2)
+                diag = where (diag > wa2, diag, wa2)
 
             # Inner loop
             while True:
@@ -1310,18 +1312,18 @@ class Problem (object):
 
                     if qanylim:
                         if nlpeg > 0:
-                            wa1[whlpeg] = np.clip (wa1[whlpeg], 0., max (wa1))
+                            wa1[whlpeg] = clip (wa1[whlpeg], 0., max (wa1))
                         if nupeg > 0:
-                            wa1[whupeg] = np.clip (wa1[whupeg], min (wa1), 0.)
+                            wa1[whupeg] = clip (wa1[whupeg], min (wa1), 0.)
 
                         dwa1 = abs (wa1) > finfo.eps
-                        whl = np.where ((dwa1 != 0.) & qllim & ((x + wa1) < llim))
+                        whl = where ((dwa1 != 0.) & qllim & ((x + wa1) < llim))
 
                         if len (whl[0]) > 0:
                             t = (llim[whl] - x[whl]) / wa1[whl]
                             alpha = min (alpha, t.min ())
 
-                        whu = np.where ((dwa1 != 0.) & qulim & ((x + wa1) > ulim))
+                        whu = where ((dwa1 != 0.) & qulim & ((x + wa1) > ulim))
 
                         if len (whu[0]) > 0:
                             t = (ulim[whu] - x[whu]) / wa1[whu]
@@ -1330,7 +1332,7 @@ class Problem (object):
                     # Obey max step values
                     if qminmax:
                         nwa1 = wa1 * alpha
-                        whmax = np.where (qmax)
+                        whmax = where (qmax)
                         if len (whmax[0]) > 0:
                             mrat = (nwa1[whmax] / maxstep[whmax]).max ()
                             if mrat > 1:
@@ -1342,10 +1344,10 @@ class Problem (object):
 
                     # Adjust final output values: if we're supposed to be
                     # exactly on a boundary, make it exact.
-                    wh = np.where (qulim & (wa2 >= ulim * (1 - finfo.eps)))
+                    wh = where (qulim & (wa2 >= ulim * (1 - finfo.eps)))
                     if len (wh[0]) > 0:
                         wa2[wh] = ulim[wh]
-                    wh = np.where (qllim & (wa2 <= llim * (1 + finfo.eps)))
+                    wh = where (qllim & (wa2 <= llim * (1 + finfo.eps)))
                     if len (wh[0]) > 0:
                         wa2[wh] = llim[wh]
 
@@ -1381,7 +1383,7 @@ class Problem (object):
                 # taken."
 
                 temp1 = enorm (alpha * wa3, finfo) / self.fnorm
-                temp2 = np.sqrt (alpha * par) * pnorm / self.fnorm
+                temp2 = sqrt (alpha * par) * pnorm / self.fnorm
                 prered = temp1**2 + 2 * temp2**2
                 dirder = -(temp1**2 + temp2**2)
 
@@ -1448,7 +1450,7 @@ class Problem (object):
                 break
 
             # Check for overflow
-            if np.any (-np.isfinite (wa1) | -np.isfinite (wa2) | -np.isfinite (x)):
+            if any (-isfinite (wa1) | -isfinite (wa2) | -isfinite (x)):
                 raise RuntimeError ('Overflow in wa1, wa2, or x!')
 
         # End outer loop.
@@ -1487,8 +1489,8 @@ class Problem (object):
                 # Compute errors in parameters
                 self.perror = np.zeros (nn, dtype)
                 d = self.covar.diagonal ()
-                wh = np.where (d >= 0)
-                self.perror[wh] = np.sqrt (d[wh])
+                wh = where (d >= 0)
+                self.perror[wh] = sqrt (d[wh])
 
         soln.ndof = self.getNDOF ()
         soln.status = status
