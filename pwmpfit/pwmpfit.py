@@ -802,7 +802,6 @@ class Problem (object):
 
     fastnorm = False
     rescale = False
-    quiet = False
     debugCalls = False
     debugJac = False
 
@@ -1080,7 +1079,6 @@ class Problem (object):
 
         self.fastnorm = bool (self.fastnorm)
         self.rescale = bool (self.rescale)
-        self.quiet = bool (self.quiet)
         self.debugCalls = bool (self.debugCalls)
         self.debugJac = bool (self.debugJac)
 
@@ -1149,7 +1147,6 @@ class Problem (object):
         n.maxiter = self.maxiter
         n.fastnorm = self.fastnorm
         n.rescale = self.rescale
-        n.quiet = self.quiet
         n.debugCalls = self.debugCalls
         n.debugJac = self.debugJac
 
