@@ -61,15 +61,9 @@ PI_NUM_O = 2
 _enorm_fast = lambda v, finfo: np.sqrt (np.dot (v, v))
 
 def _enorm_careful (v, finfo):
-    #if v.size == 0:
-    #    return 0.
-
-    agiant = finfo.max / v.size
-    adwarf = finfo.tiny * v.size
-
     # "This is hopefully a compromise between speed and robustness.
     # Need to do this because of the possibility of over- or under-
-    # flow.
+    # flow."
 
     mx = max (abs (v.max ()), abs (v.min ()))
 
@@ -77,7 +71,7 @@ def _enorm_careful (v, finfo):
         return v[0] * 0. # preserve type (?)
     if not np.isfinite (mx):
         raise ValueError ('computed nonfinite vector norm')
-    if mx > agiant or mx < adwarf:
+    if mx > finfo.max / v.size or mx < finfo.tiny * v.size:
         return mx * np.sqrt (np.dot (v / mx, v / mx))
 
     return np.sqrt (np.dot (v, v))
