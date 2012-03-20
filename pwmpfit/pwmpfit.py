@@ -1337,7 +1337,7 @@ class Problem (object):
                                 alpha /= mrat
 
                     # Scale resulting vector
-                    wa1 = wa1 * alpha
+                    wa1 *= alpha
                     wa2 = x + wa1
 
                     # Adjust final output values: if we're supposed to be
