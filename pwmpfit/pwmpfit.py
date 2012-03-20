@@ -694,6 +694,65 @@ def _lmpar (r, ipvt, diag, qtb, delta, x, sdiag, par, enorm, finfo):
     return r, par, x, diag
 
 
+def _calc_covar (rr, ipvt, tol=1e-14):
+    n = rr.shape[0]
+    assert rr.shape[1] == n
+
+    r = rr.copy ()
+
+    # "For the inverse of r in the full upper triangle of r"
+    l = -1
+    tolr = tol * abs(r[0,0])
+    for k in xrange (n):
+        if abs (r[k,k]) <= tolr:
+            break
+        r[k,k] = 1. / r[k,k]
+
+        for j in xrange (k):
+            temp = r[k,k] * r[j,k]
+            r[j,k] = 0.
+            r[:j+1,k] -= temp * r[:j+1,j]
+
+        l = k
+
+    # "Form the full upper triangle of the inverse of (r transpose)*r
+    # in the full upper triangle of r"
+
+    if l >= 0:
+        for k in xrange (l + 1):
+            for j in xrange (k):
+                temp = r[j,k]
+                r[:j+1,j] += temp * r[:j+1,k]
+            temp = r[k,k]
+            r[:k+1,k] *= temp
+
+    # "For the full lower triangle of the covariance matrix
+    # in the strict lower triangle or and in wa"
+
+    wa = np.repeat ([r[0,0]], n)
+
+    for j in xrange (n):
+        jj = ipvt[j]
+        sing = j > l
+        for i in xrange (j + 1):
+            if sing:
+                r[i,j] = 0.
+            ii = ipvt[i]
+            if ii > jj:
+                r[ii,jj] = r[i,j]
+            elif ii < jj:
+                r[jj,ii] = r[i,j]
+        wa[jj] = r[j,j]
+
+    # "Symmetrize the covariance matrix in r"
+
+    for j in xrange (n):
+        r[:j+1,j] = r[j,:j+1]
+        r[j,j] = wa[j]
+
+    return r
+
+
 # The actual user interface to the problem-solving machinery:
 
 class Solution (object):
@@ -1481,7 +1540,7 @@ class Problem (object):
             sz = fjac.shape
 
             if sz[0] >= n and sz[1] >= n and len (ipvt) >= n:
-                cv = self.calc_covar (fjac[:n,:n], ipvt[:n])
+                cv = _calc_covar (fjac[:n,:n], ipvt[:n])
                 cv.shape = (n, n)
 
                 # Fill in actual matrix, accounting for fixed params
@@ -1634,63 +1693,6 @@ class Problem (object):
         for i in xrange (self._npar):
             if funcs[i] is not None:
                 p[i] = funcs[i] (p)
-
-
-    def calc_covar (self, rr, ipvt, tol=1e-14):
-        n = rr.shape[0]
-        assert rr.shape[1] == n
-
-        r = rr.copy ()
-
-        # "For the inverse of r in the full upper triangle of r"
-        l = -1
-        tolr = tol * abs(r[0,0])
-        for k in xrange (n):
-            if abs (r[k,k]) <= tolr:
-                break
-            r[k,k] = 1. / r[k,k]
-
-            for j in xrange (k):
-                temp = r[k,k] * r[j,k]
-                r[j,k] = 0.
-                r[:j+1,k] -= temp * r[:j+1,j]
-
-            l = k
-
-        # "Form the full upper triangle of the inverse of (r transpose)*r
-        # in the full upper triangle of r"
-
-        if l >= 0:
-            for k in xrange (l + 1):
-                for j in xrange (k):
-                    temp = r[j,k]
-                    r[:j+1,j] += temp * r[:j+1,k]
-                temp = r[k,k]
-                r[:k+1,k] *= temp
-
-        # "For the full lower triangle of the covariance matrix
-        # in the strict lower triangle or and in wa"
-
-        wa = np.repeat ([r[0,0]], n)
-
-        for j in xrange (n):
-            jj = ipvt[j]
-            sing = j > l
-            for i in xrange (j + 1):
-                if sing:
-                    r[i,j] = 0.
-                ii = ipvt[i]
-                if ii > jj: r[ii,jj] = r[i,j]
-                elif ii < jj: r[jj,ii] = r[i,j]
-            wa[jj] = r[j,j]
-
-        # "Symmetrize the covariance matrix in r"
-
-        for j in xrange (n):
-            r[:j+1,j] = r[j,:j+1]
-            r[j,j] = wa[j]
-
-        return r
 
 
 def checkDerivative (npar, nout, yfunc, jfunc, guess):
