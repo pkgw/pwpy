@@ -1147,9 +1147,13 @@ class Problem (object):
         # pValue() and pLimit (). Former overrides the latter.
 
         if x0 is not None:
-            x0 = np.asarray (x0, dtype=dtype)
+            x0 = np.atleast_1d (np.asarray (x0, dtype=dtype))
         else:
             x0 = self._pinfof[PI_F_VALUE]
+
+        if x0.size != self._npar:
+            raise ValueError ('expected exactly %d parameters, got %d'
+                              % (self._npar, x0.size))
 
         if any (-isfinite (x0)):
             raise ValueError ('some nonfinite initial parameter values')
