@@ -1170,18 +1170,17 @@ class Problem (object):
         # Init fnorm
 
         if self.fastnorm:
-            _enorm = _enorm_fast
+            enorm = _enorm_fast
         else:
-            _enorm = _enorm_careful
+            enorm = _enorm_careful
 
-        self._enorm = _enorm
         n = nfree
         fvec = np.ndarray (self._nout, x0.dtype)
         ycall = self._ycall
 
         ycall (self.params, fvec)
 
-        self.fnorm = _enorm (fvec, finfo)
+        self.fnorm = enorm (fvec, finfo)
 
         # Initialize Levenberg-Marquardt parameter and
         # iteration counter.
@@ -1228,7 +1227,7 @@ class Problem (object):
 
             # Compute QR factorization of the Jacobian
 
-            ipvt, wa1, wa2 = _qr_factor_packed (fjac, self._enorm, finfo)
+            ipvt, wa1, wa2 = _qr_factor_packed (fjac, enorm, finfo)
 
             if self.niter == 1:
                 # If "diag" unspecified, scale according to norms of columns
@@ -1240,7 +1239,7 @@ class Problem (object):
                     diag[np.where (diag == 0)] = 1.
 
                 # Calculate norm of scaled x, initialize step bound delta
-                xnorm = _enorm (diag * x, finfo)
+                xnorm = enorm (diag * x, finfo)
                 delta = self.factor * xnorm
                 if delta == 0.:
                     delta = self.factor
@@ -1297,7 +1296,7 @@ class Problem (object):
             while True:
                 # Get Levenberg-Marquardt parameter
                 fjac, par, wa1, wa2 = _lmpar (fjac, ipvt, diag, qtf, delta,
-                                              wa1, wa2, par, _enorm, finfo)
+                                              wa1, wa2, par, enorm, finfo)
                 # "Store the direction p and x+p. Calculate the norm of p"
                 wa1 = -wa1
 
@@ -1351,7 +1350,7 @@ class Problem (object):
                         wa2[wh] = llim[wh]
 
                 wa3 = diag * wa1
-                pnorm = _enorm (wa3, finfo)
+                pnorm = enorm (wa3, finfo)
 
                 # On first iter, also adjust initial step bound
                 if self.niter == 1:
@@ -1363,7 +1362,7 @@ class Problem (object):
 
                 mperr = 0
                 ycall (self.params, wa4)
-                fnorm1 = _enorm (wa4, finfo)
+                fnorm1 = enorm (wa4, finfo)
 
                 # Compute scaled actual reductions
 
@@ -1381,7 +1380,7 @@ class Problem (object):
                 # "Remember, alpha is the fraction of the full LM step actually
                 # taken."
 
-                temp1 = _enorm (alpha * wa3, finfo) / self.fnorm
+                temp1 = enorm (alpha * wa3, finfo) / self.fnorm
                 temp2 = np.sqrt (alpha * par) * pnorm / self.fnorm
                 prered = temp1**2 + 2 * temp2**2
                 dirder = -(temp1**2 + temp2**2)
@@ -1413,7 +1412,7 @@ class Problem (object):
                     x = wa2
                     wa2 = diag * x
                     fvec = wa4
-                    xnorm = _enorm (wa2, finfo)
+                    xnorm = enorm (wa2, finfo)
                     self.fnorm = fnorm1
                     self.niter += 1
 
@@ -1461,7 +1460,7 @@ class Problem (object):
 
         if self.nprint > 0: # and self.status > 0
             ycall (self.params, fvec)
-            self.fnorm = _enorm (fvec, finfo)
+            self.fnorm = enorm (fvec, finfo)
 
         if self.fnorm is not None and fnorm1 is not None:
             self.fnorm = max (self.fnorm, fnorm1)
