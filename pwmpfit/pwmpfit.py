@@ -1001,8 +1001,12 @@ class Problem (object):
         if not callable (yfunc):
             raise ValueError ('yfunc')
 
-        if jfunc is not None and not callable (jfunc):
-            raise ValueError ('jfunc')
+        if jfunc is None:
+            self._get_jacobian = self._get_jacobian_automatic
+        else:
+            if not callable (jfunc):
+                raise ValueError ('jfunc')
+            self._get_jacobian = self._get_jacobian_explicit
 
         self._nout = nout
         self._yfunc = yfunc
@@ -1167,19 +1171,6 @@ class Problem (object):
             np.tanh (vec / self.damp, vec)
 
 
-    def _jcall (self, params, jac):
-        if self._anytied:
-            self._apply_ties (params)
-
-        self.nfev += 1
-
-        if self.debugCalls:
-            print 'Call: #%4d j(%s) ->' % (self.nfev, params),
-        self._jfunc (params, jac)
-        if self.debugCalls:
-            print jac
-
-
     def solve (self, initial_params=None, dtype=np.float):
         from numpy import any, clip, dot, isfinite, sqrt, where
 
@@ -1252,9 +1243,7 @@ class Problem (object):
             if self._anytied:
                 self._apply_ties (params)
 
-            # Calculate the Jacobian
-
-            fjac = self._fdjac2 (params, fvec, ulim, dside, maxstep, isrel, finfo)
+            fjac = self._get_jacobian (params, fvec, ulim, dside, maxstep, isrel, finfo)
 
             if anylimits:
                 # Check for parameters pegged at limits
@@ -1573,7 +1562,24 @@ class Problem (object):
         raise RuntimeError ('lame iteration didn\'t converge (%d iters)' % maxiter)
 
 
-    def _fdjac2 (self, params, fvec, ulimit, dside, maxstep, isrel, finfo):
+    def _get_jacobian_explicit (self, params, fvec, ulimit, dside, maxstep, isrel, finfo):
+        fjac = np.zeros ((self._nout, self._npar), finfo.dtype)
+
+        self.nfev += 1
+
+        if self.debugCalls:
+            print 'Call: #%4d j(%s) ->' % (self.nfev, params),
+        self._jfunc (params, fjac)
+        if self.debugCalls:
+            print fjac
+
+        if self._ifree.size < self._npar:
+            fjac = fjac[:,self._ifree]
+
+        return fjac
+
+
+    def _get_jacobian_automatic (self, params, fvec, ulimit, dside, maxstep, isrel, finfo):
         ifree = self._ifree
         debug = self.debugJac
         machep = finfo.eps
@@ -1587,14 +1593,6 @@ class Problem (object):
         eps = np.sqrt (max (eps, machep))
         m = len (fvec)
         n = len (x)
-
-        if self._jfunc is not None:
-            # Easy, analytic-derivative case.
-            fjac = np.zeros ((m, self._npar), finfo.dtype)
-            self._jcall (params, fjac)
-            if n < self._npar:
-                fjac = fjac[:,ifree]
-            return fjac
 
         fjac = np.zeros ((m, n), finfo.dtype)
         h = eps * np.abs (x)
@@ -1646,7 +1644,7 @@ class Problem (object):
         return fjac
 
 
-    def _manual_fdjac2 (self, params, dtype=np.float):
+    def _manual_jacobian (self, params, dtype=np.float):
         self._fixupCheck ()
 
         ifree = self._ifree
@@ -1659,12 +1657,13 @@ class Problem (object):
         isrel = self._getBits (PI_M_RELSTEP)
         finfo = np.finfo (dtype)
 
-        # Before we can evaluate the Jacobian, we need
-        # to get the initial value of the function at
-        # the specified position.
+        # Before we can evaluate the Jacobian, we need to get the
+        # initial value of the function at the specified position.
+        # Note that in the real algorithm, _apply_ties is always
+        # called before _get_jacobian.
 
         self._ycall (params, fvec)
-        return self._fdjac2 (params, fvec, ulimit, dside, maxstep, isrel, finfo)
+        return self._get_jacobian (params, fvec, ulimit, dside, maxstep, isrel, finfo)
 
 
     def _apply_ties (self, params):
@@ -1680,7 +1679,7 @@ def checkDerivative (npar, nout, yfunc, jfunc, guess):
     jfunc (guess, explicit)
 
     p = Problem (npar, nout, yfunc, None)
-    auto = p._manual_fdjac2 (guess)
+    auto = p._manual_jacobian (guess)
 
     return explicit, auto
 
@@ -1716,14 +1715,14 @@ def _simple_automatic_jac ():
         np.exp (pars, vec)
 
     p = Problem (1, 1, f, None)
-    j = p._manual_fdjac2 (0)
+    j = p._manual_jacobian (0)
     Taaae (j, [[1.]])
-    j = p._manual_fdjac2 (1)
+    j = p._manual_jacobian (1)
     Taaae (j, [[np.e]])
 
     p = Problem (3, 3, f, None)
     x = np.asarray ([0, 1, 2])
-    j = p._manual_fdjac2 (x)
+    j = p._manual_jacobian (x)
     Taaae (j, np.diag (np.exp (x)))
 
 @test
@@ -1742,25 +1741,25 @@ def _jac_sidedness ():
     p = Problem (1, 1, f, None)
 
     # Default: positive unless against upper limit.
-    Taaae (p._manual_fdjac2 (0), [[1.]])
+    Taaae (p._manual_jacobian (0), [[1.]])
 
     # DSIDE_AUTO should be the default.
     p.pSide (0, DSIDE_AUTO)
-    Taaae (p._manual_fdjac2 (0), [[1.]])
+    Taaae (p._manual_jacobian (0), [[1.]])
 
     # DSIDE_POS should be equivalent here.
     p.pSide (0, DSIDE_POS)
-    Taaae (p._manual_fdjac2 (0), [[1.]])
+    Taaae (p._manual_jacobian (0), [[1.]])
 
     # DSIDE_NEG should get the other side of the discont.
     p.pSide (0, DSIDE_NEG)
-    Taaae (p._manual_fdjac2 (0), [[-1.]])
+    Taaae (p._manual_jacobian (0), [[-1.]])
 
     # DSIDE_AUTO should react to an upper limit and take
     # a negative-step derivative.
     p.pSide (0, DSIDE_AUTO)
     p.pLimit (0, upper=0)
-    Taaae (p._manual_fdjac2 (0), [[-1.]])
+    Taaae (p._manual_jacobian (0), [[-1.]])
 
 @test
 def _jac_stepsizes ():
@@ -1775,12 +1774,12 @@ def _jac_stepsizes ():
     # Fixed stepsize of 1.
     p = Problem (1, 1, lambda p, v: f (2., p, v), None)
     p.pStep (0, 1.)
-    p._manual_fdjac2 (1)
+    p._manual_jacobian (1)
 
     # Relative stepsize of 0.1
     p = Problem (1, 1, lambda p, v: f (1.1, p, v), None)
     p.pStep (0, 0.1, isrel=True)
-    p._manual_fdjac2 (1)
+    p._manual_jacobian (1)
 
     # Fixed stepsize must be less than max stepsize.
     try:
@@ -1794,12 +1793,12 @@ def _jac_stepsizes ():
     # in default circumstances.
     p = Problem (1, 1, lambda p, v: f (1 + 1e-11, p, v), None)
     p.pStep (0, 0.0, 1e-11)
-    p._manual_fdjac2 (1)
+    p._manual_jacobian (1)
 
     # Maximum stepsize and a relative stepsize
     p = Problem (1, 1, lambda p, v: f (1.1, p, v), None)
     p.pStep (0, 0.5, 0.1, True)
-    p._manual_fdjac2 (1)
+    p._manual_jacobian (1)
 
 # Finally ...
 
