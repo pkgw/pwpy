@@ -800,7 +800,6 @@ class Problem (object):
 
     diag = None
 
-    nocovar = False
     fastnorm = False
     rescale = False
     quiet = False
@@ -1079,7 +1078,6 @@ class Problem (object):
 
         self.maxiter = int (self.maxiter)
 
-        self.nocovar = bool (self.nocovar)
         self.fastnorm = bool (self.fastnorm)
         self.rescale = bool (self.rescale)
         self.quiet = bool (self.quiet)
@@ -1149,7 +1147,6 @@ class Problem (object):
         n.factor = self.factor
         n.epsfunc = self.epsfunc
         n.maxiter = self.maxiter
-        n.nocovar = self.nocovar
         n.fastnorm = self.fastnorm
         n.rescale = self.rescale
         n.quiet = self.quiet
@@ -1520,20 +1517,22 @@ class Problem (object):
         fnorm = max (fnorm, fnorm1)
         fnorm **= 2
 
-        # "(very carefully) set the covariance matrix"
+        # Covariance matrix. Nonfree parameters get zeros. Fill in
+        # everything else if possible. TODO: I don't understand the
+        # "covar = None" branch
 
-        covar = None
+        covar = np.zeros ((self._npar, self._npar), dtype)
 
-        if not self.nocovar and n > 0:
+        if n > 0:
             sz = fjac.shape
 
-            if sz[0] >= n and sz[1] >= n and len (ipvt) >= n:
+            if sz[0] < n or sz[1] < n or len (ipvt) < n:
+                covar = None
+            else:
                 cv = _calc_covar (fjac[:n,:n], ipvt[:n])
                 cv.shape = (n, n)
 
-                # Fill in actual matrix, accounting for fixed params
-                covar = np.zeros ((self._npar, self._npar), dtype)
-                for i in xrange (n):
+                for i in xrange (n): # can't do 2D fancy indexing
                     covar[ifree[i],ifree] = cv[i]
 
         # Errors in parameters from the diagonal of covar.
