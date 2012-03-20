@@ -1538,7 +1538,6 @@ class Problem (object):
         ifree = self._ifree
         debug = self.debugJac
         machep = finfo.eps
-        nall = len (xall)
 
         if self.epsfunc is None:
             eps = machep
@@ -1550,9 +1549,9 @@ class Problem (object):
 
         if self._jfunc is not None:
             # Easy, analytic-derivative case.
-            fjac = np.zeros ((m, nall), finfo.dtype)
+            fjac = np.zeros ((m, self._npar), finfo.dtype)
             self._jcall (xall, fjac)
-            if n < nall:
+            if n < self._npar:
                 fjac = fjac[:,ifree]
             return fjac
 
