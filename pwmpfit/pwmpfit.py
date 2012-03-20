@@ -1468,7 +1468,7 @@ class Problem (object):
             fnorm = max (fnorm, fnorm1)
             fnorm **= 2
 
-        self.covar = self.perror = None
+        covar = perror = None
 
         # "(very carefully) set the covariance matrix covar"
 
@@ -1482,22 +1482,22 @@ class Problem (object):
                 nn = len (x0)
 
                 # Fill in actual matrix, accounting for fixed params
-                self.covar = np.zeros ((nn, nn), dtype)
+                covar = np.zeros ((nn, nn), dtype)
                 for i in xrange (n):
-                    self.covar[ifree[i],ifree] = cv[i]
+                    covar[ifree[i],ifree] = cv[i]
 
                 # Compute errors in parameters
-                self.perror = np.zeros (nn, dtype)
-                d = self.covar.diagonal ()
+                perror = np.zeros (nn, dtype)
+                d = covar.diagonal ()
                 wh = where (d >= 0)
-                self.perror[wh] = sqrt (d[wh])
+                perror[wh] = sqrt (d[wh])
 
         soln.ndof = self.getNDOF ()
         soln.status = status
         soln.niter = self.niter
         soln.params = self.params
-        soln.covar = self.covar
-        soln.perror = self.perror
+        soln.covar = covar
+        soln.perror = perror
         soln.fnorm = fnorm
         soln.fvec = fvec
         soln.fjac = fjac
