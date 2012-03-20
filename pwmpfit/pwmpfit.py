@@ -801,7 +801,6 @@ class Problem (object):
     diag = None
 
     fastnorm = False
-    rescale = False
     debugCalls = False
     debugJac = False
 
@@ -1078,12 +1077,16 @@ class Problem (object):
         self.maxiter = int (self.maxiter)
 
         self.fastnorm = bool (self.fastnorm)
-        self.rescale = bool (self.rescale)
         self.debugCalls = bool (self.debugCalls)
         self.debugJac = bool (self.debugJac)
 
         if self.diag is not None:
-            self.diag = np.asarray (self.diag, dtype=np.float)
+            self.diag = np.atleast_1d (np.asarray (self.diag, dtype=np.float))
+
+            if self.diag.shape != (self._npar, ):
+                raise ValueError ('diag')
+            if np.any (self.diag <= 0.):
+                raise ValueError ('diag')
 
         # Bounds and type checks
 
@@ -1114,12 +1117,6 @@ class Problem (object):
             raise ValueError ('Damping factor not allowed when using '
                               'explicit derivatives')
 
-        if self.rescale:
-            if self.diag is None or self.diag.shape != (self._npar, ):
-                raise ValueError ('diag')
-            if np.any (self.diag <= 0.):
-                raise ValueError ('diag')
-
 
     def getNDOF (self):
         self._fixupCheck ()
@@ -1146,7 +1143,6 @@ class Problem (object):
         n.epsfunc = self.epsfunc
         n.maxiter = self.maxiter
         n.fastnorm = self.fastnorm
-        n.rescale = self.rescale
         n.debugCalls = self.debugCalls
         n.debugJac = self.debugJac
 
@@ -1284,7 +1280,7 @@ class Problem (object):
             if niter == 1:
                 # If "diag" unspecified, scale according to norms of columns
                 # of the initial jacobian
-                if self.rescale:
+                if self.diag is not None:
                     diag = self.diag.copy ()
                 else:
                     diag = wa2.copy ()
@@ -1341,8 +1337,8 @@ class Problem (object):
                 status = 4
                 break
 
-            if not self.rescale:
-                diag = where (diag > wa2, diag, wa2)
+            if self.diag is None:
+                diag = np.maximum (diag, wa2)
 
             # Inner loop
             while True:
