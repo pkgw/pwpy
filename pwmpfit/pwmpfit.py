@@ -1877,6 +1877,7 @@ def _jac_stepsizes ():
 def _lmder1_test (nout, func, jac, guess):
     finfo = np.finfo (np.float)
     tol = np.sqrt (finfo.eps)
+    guess = np.asfarray (guess)
 
     y = np.empty (nout)
     func (guess, y)
@@ -1900,6 +1901,7 @@ def _lmder1_driver (nout, func, jac, guess, target_fnorm1,
                     target_fnorm2, target_params):
     finfo = np.finfo (np.float)
     tol = np.sqrt (finfo.eps)
+    guess = np.asfarray (guess)
 
     y = np.empty (nout)
     func (guess, y)
@@ -2016,6 +2018,25 @@ def _lmder1_linear_r1zcr_2 ():
                           0.17489499707e+04, 0.3691729402e+01,
                           [0.1000000000e+01, 0.3321494859e+03, -0.4396851914e+03,
                            0.1636968826e+03, 0.1000000000e+01])
+
+@test
+def _lmder1_rosenbrock ():
+    def func (params, vec):
+        vec[0] = 10 * (params[1] - params[0]**2)
+        vec[1] = 1 - params[0]
+
+    def jac (params, jac):
+        jac[0,0] = -20 * params[0]
+        jac[0,1] = 10
+        jac[1,0] = -1
+        jac[1,1] = 0
+
+    guess = np.asarray ([-1.2, 1])
+    norm1s = [0.491934955050e+01, 0.134006305822e+04, 0.1430000511923e+06]
+
+    for i in xrange (3):
+        _lmder1_driver (2, func, jac, guess * 10**i,
+                        norm1s[i], 0, [1, 1])
 
 
 # Finally ...
