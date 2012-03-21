@@ -2031,13 +2031,57 @@ def _lmder1_rosenbrock ():
         jac[1,0] = -1
         jac[1,1] = 0
 
-    guess = np.asarray ([-1.2, 1])
+    guess = np.asfarray ([-1.2, 1])
     norm1s = [0.491934955050e+01, 0.134006305822e+04, 0.1430000511923e+06]
 
     for i in xrange (3):
         _lmder1_driver (2, func, jac, guess * 10**i,
                         norm1s[i], 0, [1, 1])
 
+
+@test
+def _lmder1_helical_valley ():
+    tpi = 2 * np.pi
+
+    def func (params, vec):
+        if params[0] == 0:
+            tmp1 = np.copysign (0.25, params[1])
+        elif params[0] > 0:
+            tmp1 = np.arctan (params[1] / params[0]) / tpi
+        else:
+            tmp1 = np.arctan (params[1] / params[0]) / tpi + 0.5
+
+        tmp2 = np.sqrt (params[0]**2 + params[1]**2)
+
+        vec[0] = 10 * (params[2] - 10 * tmp1)
+        vec[1] = 10 * (tmp2 - 1)
+        vec[2] = params[2]
+
+    def jac (params, jac):
+        temp = params[0]**2 + params[1]**2
+        tmp1 = tpi * temp
+        tmp2 = np.sqrt (temp)
+        jac[0,0] = 100 * params[1] / tmp1
+        jac[0,1] = -100 * params[0] / tmp1
+        jac[0,2] = 10
+        jac[1,0] = 10 * params[0] / tmp2
+        jac[1,1] = 10 * params[1] / tmp2
+        jac[1,2] = 0
+        jac[2,0] = 0
+        jac[2,1] = 0
+        jac[2,2] = 1
+
+    guess = np.asfarray ([-1, 0, 0])
+
+    _lmder1_driver (3, func, jac, guess,
+                    50., 0.993652310343e-16,
+                    [0.100000000000e+01, -0.624330159679e-17, 0.000000000000e+00])
+    _lmder1_driver (3, func, jac, guess * 10,
+                    0.102956301410e+03, 0.104467885065e-18,
+                    [0.100000000000e+01, 0.656391080516e-20, 0.000000000000e+00])
+    _lmder1_driver (3, func, jac, guess * 100,
+                    0.991261822124e+03, 0.313877781195e-28,
+                    [0.100000000000e+01, -0.197215226305e-29, 0.000000000000e+00])
 
 # Finally ...
 
