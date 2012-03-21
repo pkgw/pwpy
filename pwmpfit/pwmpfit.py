@@ -1282,7 +1282,7 @@ class Problem (object):
         # Steps for numerical derivatives
         isrel = self._getBits (PI_M_RELSTEP)
         dside = self._pinfob & PI_M_SIDE
-        maxstep = self._pinfof[PI_F_MAXSTEP]
+        maxstep = self._pinfof[PI_F_MAXSTEP,ifree]
         qmax = isfinite (maxstep)
         anymaxsteps = any (qmax)
 
@@ -1440,7 +1440,7 @@ class Problem (object):
                         nwa1 = wa1 * alpha
                         whmax = where (qmax)
                         if len (whmax[0]) > 0:
-                            mrat = (nwa1[whmax] / maxstep[whmax]).max ()
+                            mrat = np.abs (nwa1[whmax] / maxstep[whmax]).max ()
                             if mrat > 1:
                                 alpha /= mrat
 
@@ -1675,7 +1675,7 @@ class Problem (object):
         h[wh] = stepi[wh] * np.where (isrel[ifree[wh]], x[wh], 1.)
 
         # Clamp stepsizes to maxstep.
-        np.minimum (h, maxstep[ifree], h)
+        np.minimum (h, maxstep, h)
 
         # Make sure no zero step values
         h[np.where (h == 0)] = eps
@@ -1725,7 +1725,7 @@ class Problem (object):
         fvec = np.empty (self._nout, dtype)
         ulimit = self._pinfof[PI_F_ULIMIT,ifree]
         dside = self._pinfob & PI_M_SIDE
-        maxstep = self._pinfof[PI_F_MAXSTEP]
+        maxstep = self._pinfof[PI_F_MAXSTEP,ifree]
         isrel = self._getBits (PI_M_RELSTEP)
         finfo = np.finfo (dtype)
 
