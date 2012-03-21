@@ -166,45 +166,46 @@ appeared in Linpack."""
             temp = pmut[i]
             pmut[i] = pmut[kmax]
             pmut[kmax] = temp
+
             rdiag[kmax] = rdiag[i]
             wa[kmax] = wa[i]
+
+            temp = a[:,i].copy ()
+            a[:,i] = a[:,kmax]
+            a[:,kmax] = temp
 
         # "Compute the Householder transformation to reduce the i'th
         # column of A to a multiple of the i'th unit vector."
 
-        li = pmut[i]
-        aii = a[i:,li] # note that modifying aii modifies a
-        ainorm = enorm (aii, finfo)
+        ainorm = enorm (a[i:,i], finfo)
 
         if ainorm == 0:
             rdiag[i] = 0
             continue
 
-        if a[i,li] < 0:
+        if a[i,i] < 0:
             # Doing this apparently improves FP precision somehow.
             ainorm = -ainorm
 
-        aii /= ainorm
-        aii[0] += 1
+        a[i:,i] /= ainorm
+        a[i,i] += 1
 
         # "Apply the transformation to the remaining columns and
         # update the norms."
 
         for j in xrange (i + 1, n):
-            lj = pmut[j]
-            aij = a[i:,lj] # modifying aij modifies a as well.
-
-            if a[i,li] != 0:
-                aij -= aii * np.dot (aij, aii) / a[i,li]
+            s = np.dot (a[i:,j], a[i:,i])
+            temp = s / a[i,i]
+            a[i:,j] -= a[i:,i] * temp
 
             if rdiag[j] != 0:
-                temp = a[i,lj] / rdiag[j]
+                temp = a[i,j] / rdiag[j]
                 rdiag[j] *= np.sqrt (max (1 - temp**2, 0))
                 temp = rdiag[j] / wa[j]
 
                 if 0.05 * temp**2 <= machep:
                     # What does this do???
-                    wa[j] = rdiag[j] = enorm (a[i+1:,lj], finfo)
+                    wa[j] = rdiag[j] = enorm (a[i+1:,j], finfo)
 
         rdiag[i] = -ainorm
 
@@ -256,14 +257,11 @@ pmut[i]'th column of 'a' has the i'th biggest norm."""
     # Now we unpack. Start with the R matrix, which is easy:
     # we just have to piece it together from the strict
     # upper triangle of 'a' and the diagonal in 'rdiag'.
-    # We're working in the "permuted frame", as it were, so
-    # we need to permute indices when accessing 'a', which is
-    # in the "unpermuted" frame.
 
     r = np.zeros ((m, n))
 
     for i in xrange (n):
-        r[:i,i] = packed[:i,pmut[i]]
+        r[:i,i] = packed[:i,i]
         r[i,i] = rdiag[i]
 
     # Now the Q matrix. It is the concatenation of n Householder
@@ -276,7 +274,7 @@ pmut[i]'th column of 'a' has the i'th biggest norm."""
     v = np.empty (m)
 
     for i in xrange (n):
-        v[:] = packed[:,pmut[i]]
+        v[:] = packed[:,i]
         v[:i] = 0
 
         hhm = np.eye (m) - 2 * np.outer (v, v) / np.dot (v, v)
@@ -288,16 +286,14 @@ pmut[i]'th column of 'a' has the i'th biggest norm."""
 @test
 def _qr_examples ():
     # This is the sample given in the comments of Craig Markwardt's
-    # IDL MPFIT implementation. Our results differ because we always
-    # use pivoting whereas his example didn't. But the results become
-    # the same if you remove the pivoting bits.
+    # IDL MPFIT implementation.
 
     a = np.asarray ([[9., 4], [2, 8], [6, 7]])
     packed, pmut, rdiag, acnorm = _manual_qr_factor_packed (a)
 
-    Taaae (packed, [[-8.27623852, 1.35218036],
-                    [ 1.96596229, 0.70436073],
-                    [ 0.25868293, 0.61631563]])
+    Taaae (packed, [[1.35218036, -8.27623852],
+                    [0.70436073,  1.96596229],
+                    [0.61631563,  0.25868293]])
     assert pmut[0] == 1
     assert pmut[1] == 0
     Taaae (rdiag, [-11.35781669, 7.24595584])
@@ -306,22 +302,23 @@ def _qr_examples ():
     q, r, pmut = _qr_factor_full (a)
     Taaae (np.dot (q, r), a[:,pmut])
 
-    # This is the sample given in Wikipedia. I know, shameful!  Once
-    # again, the Wikipedia example doesn't include pivoting, but the
-    # numbers work out.
+    # This is the sample given in Wikipedia. I know, shameful!
 
     a = np.asarray ([[12., -51, 4],
                      [6, 167, -68],
                      [-4, 24, -41]])
     packed, pmut, rdiag, acnorm = _manual_qr_factor_packed (a)
-    Taaae (packed, [[ 1.66803309,  1.28935268, -71.16941178],
-                    [-2.18085468, -0.94748818,   1.36009392],
-                    [ 2.        , -0.13616597,   0.93291606]])
+    Taaae (packed, [[ 1.28935268, -71.16941178,  1.66803309],
+                    [-0.94748818,   1.36009392, -2.18085468],
+                    [-0.13616597,   0.93291606,  2.]])
     assert pmut[0] == 1
     assert pmut[1] == 2
     assert pmut[2] == 0
     Taaae (rdiag, [176.25549637, 35.43888862, 13.72812946])
     Taaae (acnorm, [14., 176.25549637, 79.50471684])
+
+    q, r, pmut = _qr_factor_full (a)
+    Taaae (np.dot (q, r), a[:,pmut])
 
     # A sample I constructed myself analytically. I made the Q
     # from rotation matrices and chose R pretty dumbly to get a
@@ -1304,7 +1301,9 @@ class Problem (object):
                             fjac[:,whupeg[i]] = 0
 
             # Compute QR factorization of the Jacobian
-
+            # wa1: "rdiag", diagonal part of R matrix, pivoting applied
+            # wa2: "acnorm", unpermuted column norms of fjac
+            # fjac: overwritten with Q and R matrix info, pivoted
             ipvt, wa1, wa2 = _qr_factor_packed (fjac, enorm, finfo)
 
             if niter == 1:
@@ -1327,26 +1326,20 @@ class Problem (object):
             wa4 = fvec.copy ()
 
             for j in xrange (n):
-                lj = ipvt[j]
-                temp3 = fjac[j,lj]
+                temp3 = fjac[j,j]
                 if temp3 != 0:
-                    fj = fjac[j:,lj]
+                    fj = fjac[j:,j]
                     wj = wa4[j:]
                     wa4[j:] = wj - fj * dot (fj, wj) / temp3
-                fjac[j,lj] = wa1[j]
+                fjac[j,j] = wa1[j]
                 qtf[j] = wa4[j]
 
-            # "From this point on, only the square matrix consisting of
-            # the triangle of R is needed."
+            # "From this point on, only the square matrix consisting
+            # of the triangle of R is needed." ...  "Check for
+            # overflow. This should be a cheap test here since fjac
+            # has been reduced to a small square matrix."
 
             fjac = fjac[:n,:n]
-            temp = fjac.copy ()
-            for i in xrange (n):
-                temp[:,i] = fjac[:,ipvt[i]]
-            fjac = temp.copy ()
-
-            # "Check for overflow. This should be a cheap test here
-            # since fjac has been reduced to a small square matrix."
 
             if any (-isfinite (fjac)):
                 raise RuntimeError ('nonfinite terms in Jacobian matrix')
