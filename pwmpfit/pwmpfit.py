@@ -1979,6 +1979,45 @@ def _lmder1_linear_rank1_2 ():
                           [-0.20299999e+02, -0.96499995e+01, -0.1652451975e+03, -0.432499975e+01, 0.1105330585e+03])
 
 
+def _lmder1_linear_r1zcr (n, m, factor, target_fnorm1, target_fnorm2, target_params):
+    """linear function - rank 1 with zero columns and rows"""
+
+    def func (params, vec):
+        s = 0
+        for j in xrange (1, n - 1):
+            s += (j + 1) * params[j]
+        for i in xrange (m):
+            vec[i] = i * s - 1
+        vec[m-1] = -1
+
+    def jac (params, jac):
+        jac.fill (0)
+
+        for i in xrange (1, m - 1):
+            for j in xrange (1, n - 1):
+                jac[i,j] = i * (j + 1)
+
+    guess = np.ones (n) * factor
+
+    #_lmder1_test (m, func, jac, guess)
+    _lmder1_driver (m, func, jac, guess,
+                    target_fnorm1, target_fnorm2, target_params)
+
+@test
+def _lmder1_linear_r1zcr_1 ():
+    _lmder1_linear_r1zcr (5, 10, 1,
+                          0.1260396763e+03, 0.1909727421e+01,
+                          [0.1000000000e+01, -0.2103615324e+03, 0.3212042081e+02,
+                           0.8113456825e+02, 0.1000000000e+01])
+
+@test
+def _lmder1_linear_r1zcr_2 ():
+    _lmder1_linear_r1zcr (5, 50, 1,
+                          0.17489499707e+04, 0.3691729402e+01,
+                          [0.1000000000e+01, 0.3321494859e+03, -0.4396851914e+03,
+                           0.1636968826e+03, 0.1000000000e+01])
+
+
 # Finally ...
 
 if __name__ == '__main__':
