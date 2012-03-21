@@ -2112,6 +2112,32 @@ def _lmder1_powell_singular ():
     _lmder1_test (4, func, jac, guess * 10)
     _lmder1_test (4, func, jac, guess * 100)
 
+
+@test
+def _lmder1_freudenstein_roth ():
+    """Freudenstein and Roth function (lmder1 test #7)"""
+
+    def func (params, vec):
+        vec[0] = -13 + params[0] + ((5 - params[1]) * params[1] - 2) * params[1]
+        vec[1] = -29 + params[0] + ((1 + params[1]) * params[1] - 14) * params[1]
+
+    def jac (params, jac):
+        jac[0,0] = jac[1,0] = 1
+        jac[0,1] = params[1] * (10 - 3 * params[1]) - 2
+        jac[1,1] = params[1] * (2 + 3 * params[1]) - 14
+
+    guess = np.asfarray ([0.5, -2])
+
+    _lmder1_driver (2, func, jac, guess,
+                    0.200124960962e+02, 0.699887517585e+01,
+                    [0.114124844655e+02, -0.896827913732e+00])
+    _lmder1_driver (2, func, jac, guess * 10,
+                    0.124328339489e+05, 0.699887517449e+01,
+                    [0.114130046615e+02, -0.896796038686e+00])
+    _lmder1_driver (2, func, jac, guess * 100,
+                    0.11426454595762e+08, 0.699887517243e+01,
+                    [0.114127817858e+02, -0.896805107492e+00])
+
 # Finally ...
 
 if __name__ == '__main__':
