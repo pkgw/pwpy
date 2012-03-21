@@ -2083,6 +2083,35 @@ def _lmder1_helical_valley ():
                     0.991261822124e+03, 0.313877781195e-28,
                     [0.100000000000e+01, -0.197215226305e-29, 0.000000000000e+00])
 
+
+def _lmder1_powell_singular ():
+    """Don't run this as a test, since it just zooms to zero
+    parameters.  The precise results depend a lot on nitty-gritty
+    rounding and tolerances and things."""
+
+    def func (params, vec):
+        vec[0] = params[0] + 10 * params[1]
+        vec[1] = np.sqrt (5) * (params[2] - params[3])
+        vec[2] = (params[1] - 2 * params[2])**2
+        vec[3] = np.sqrt (10) * (params[0] - params[3])**2
+
+    def jac (params, jac):
+        jac.fill (0)
+        jac[0,0] = 1
+        jac[0,1] = 10
+        jac[1,2] = np.sqrt (5)
+        jac[1,3] = -np.sqrt (5)
+        jac[2,1] = 2 * (params[1] - 2 * params[2])
+        jac[2,2] = -2 * jac[2,1]
+        jac[3,0] = 2 * np.sqrt (10) * (params[0] - params[3])
+        jac[3,3] = -jac[3,0]
+
+    guess = np.asfarray ([3, -1, 0, 1])
+
+    _lmder1_test (4, func, jac, guess)
+    _lmder1_test (4, func, jac, guess * 10)
+    _lmder1_test (4, func, jac, guess * 100)
+
 # Finally ...
 
 if __name__ == '__main__':
