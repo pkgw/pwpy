@@ -1831,8 +1831,113 @@ def _jac_stepsizes ():
     p.pStep (0, 0.5, 0.1, True)
     p._manual_jacobian (1)
 
+
+# lmder1 / lmdif1 test cases
+
+def _lmder1_test (nout, func, jac, guess):
+    finfo = np.finfo (np.float)
+    tol = np.sqrt (finfo.eps)
+
+    y = np.empty (nout)
+    func (guess, y)
+    fnorm1 = _enorm_careful (y, finfo)
+    p = Problem (guess.size, nout, func, jac)
+    p.xtol = p.ftol = p.gtol = tol
+    s = p.solve (guess)
+    func (s.params, y)
+    fnorm2 = _enorm_careful (y, finfo)
+
+    print '  n, m:', guess.size, nout
+    print '  fnorm1:', fnorm1
+    print '  fnorm2:', fnorm2
+    print '  nfev, njev:', s.nfev, s.njev
+    print '  status:', s.status
+    print '  params:', s.params
+
+
+def _lmder1_driver (nout, func, jac, guess, target_fnorm1,
+                    target_fnorm2, target_params):
+    finfo = np.finfo (np.float)
+    tol = np.sqrt (finfo.eps)
+
+    y = np.empty (nout)
+    func (guess, y)
+    fnorm1 = _enorm_careful (y, finfo)
+    Taae (fnorm1, target_fnorm1)
+
+    p = Problem (guess.size, nout, func, jac)
+    p.xtol = p.ftol = p.gtol = tol
+    s = p.solve (guess)
+    Taaae (s.params, target_params)
+
+    func (s.params, y)
+    fnorm2 = _enorm_careful (y, finfo)
+    Taae (fnorm2, target_fnorm2)
+
+
+def _lmder1_linear_full_rank (n, m, factor, target_fnorm1, target_fnorm2):
+    def func (params, vec):
+        s = params.sum ()
+        temp = 2. * s / m + 1
+        vec[:] = -temp
+        vec[:params.size] += params
+
+    def jac (params, jac):
+        # jac.shape = (m, n) by LMDER standards
+        temp = 2. / m
+        jac[:,:] = -temp
+        for i in xrange (n):
+            jac[i,i] += 1
+
+    guess = np.ones (n) * factor
+
+    #_lmder1_test (m, func, jac, guess)
+    _lmder1_driver (m, func, jac, guess,
+                    target_fnorm1, target_fnorm2,
+                    [-1] * n)
+
+@test
+def _lmder1_linear_full_rank_1 ():
+    _lmder1_linear_full_rank (5, 10, 1, 5., 0.2236068e+01)
+
+@test
+def _lmder1_linear_full_rank_2 ():
+    _lmder1_linear_full_rank (5, 50, 1, 0.806225774e+01, 0.670820393e+01)
+
+
+def _lmder1_linear_rank1 (n, m, factor, target_fnorm1, target_fnorm2, target_params):
+    def func (params, vec):
+        s = 0
+        for j in xrange (n):
+            s += (j + 1) * params[j]
+        for i in xrange (m):
+            vec[i] = (i + 1) * s - 1
+
+    def jac (params, jac):
+        for i in xrange (m):
+            for j in xrange (n):
+                jac[i,j] = (i + 1) * (j + 1)
+
+    guess = np.ones (n) * factor
+
+    #_lmder1_test (m, func, jac, guess)
+    _lmder1_driver (m, func, jac, guess,
+                    target_fnorm1, target_fnorm2, target_params)
+
+@test
+def _lmder1_linear_rank1_1 ():
+    _lmder1_linear_rank1 (5, 10, 1,
+                          0.2915218688e+03, 0.1463850109e+01,
+                          [-0.167796818e+03, -0.8339840901e+02, 0.2211100431e+03, -0.4119920451e+02, -0.327593636e+02])
+
+@test
+def _lmder1_linear_rank1_2 ():
+    _lmder1_linear_rank1 (5, 50, 1,
+                          0.310160039334e+04, 0.34826301657e+01,
+                          [-0.20299999e+02, -0.96499995e+01, -0.1652451975e+03, -0.432499975e+01, 0.1105330585e+03])
+
+
 # Finally ...
 
 if __name__ == '__main__':
     _runtests ()
-
