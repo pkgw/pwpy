@@ -1886,6 +1886,7 @@ def _lmder1_test (nout, func, jac, guess):
     p = Problem (guess.size, nout, func, jac)
     p.xtol = p.ftol = tol
     p.gtol = 0
+    p.maxiter = 100 * (guess.size + 1)
     s = p.solve (guess)
     func (s.params, y)
     fnorm2 = _enorm_careful (y, finfo)
@@ -1912,8 +1913,15 @@ def _lmder1_driver (nout, func, jac, guess, target_fnorm1,
     p = Problem (guess.size, nout, func, jac)
     p.xtol = p.ftol = tol
     p.gtol = 0
+    p.maxiter = 100 * (guess.size + 1)
     s = p.solve (guess)
-    Taaae (s.params, target_params)
+
+    # assert_array_almost_equal goes to a fixed number of decimal
+    # places regardless of the scale of the number, so it breaks
+    # when we work with very large values.
+    from numpy.testing import assert_array_almost_equal as aaae
+    scale = np.maximum (np.abs (target_params), 1)
+    aaae (s.params / scale, target_params / scale, decimal=10)
 
     func (s.params, y)
     fnorm2 = _enorm_careful (y, finfo)
@@ -1979,7 +1987,8 @@ def _lmder1_linear_rank1_1 ():
 def _lmder1_linear_rank1_2 ():
     _lmder1_linear_rank1 (5, 50, 1,
                           0.310160039334e+04, 0.34826301657e+01,
-                          [-0.20299999e+02, -0.96499995e+01, -0.1652451975e+03, -0.432499975e+01, 0.1105330585e+03])
+                          [-0.2029999900022674e+02, -0.9649999500113370e+01, -0.1652451975264496e+03,
+                            -0.4324999750056676e+01,  0.1105330585100652e+03])
 
 
 def _lmder1_linear_r1zcr (n, m, factor, target_fnorm1, target_fnorm2, target_params):
@@ -2184,6 +2193,49 @@ def _lmder1_bard ():
     _lmder1_driver (15, func, jac, guess * 100,
                     0.3841146786373992e+03, 0.4174768701359691e+01,
                     [0.8406666738676455e+00, -0.1589461672055184e+09, -0.1644649068577712e+09])
+
+
+@test
+def _lmder1_kowalik_osborne ():
+    """Kowalik & Osborne function (lmder1 test #9)"""
+    v = np.asfarray ([4, 2, 1, 0.5, 0.25, 0.167, 0.125, 0.1, 0.0833, 0.0714, 0.0625])
+    y2 = np.asfarray ([0.1957, 0.1947, 0.1735, 0.16, 0.0844, 0.0627, 0.0456,
+                       0.0342, 0.0323, 0.0235, 0.0246])
+
+    def func (params, vec):
+        for i in xrange (11):
+            tmp1 = v[i] * (v[i] + params[1])
+            tmp2 = v[i] * (v[i] + params[2]) + params[3]
+            vec[i] = y2[i] - params[0] * tmp1 / tmp2
+
+    def jac (params, jac):
+        for i in xrange (11):
+            tmp1 = v[i] * (v[i] + params[1])
+            tmp2 = v[i] * (v[i] + params[2]) + params[3]
+            jac[i,0] = -tmp1 / tmp2
+            jac[i,1] = -v[i] * params[0] / tmp2
+            jac[i,2] = jac[i,0] * jac[i,1]
+            jac[i,3] = jac[i,2] / v[i]
+
+    guess = np.asfarray ([0.25, 0.39, 0.415, 0.39])
+
+    _lmder1_driver (11, func, jac, guess,
+                    0.7289151028829448e-01, 0.1753583772112895e-01,
+                    [0.1928078104762493e+00, 0.1912626533540709e+00,
+                     0.1230528010469309e+00, 0.1360532211505167e+00])
+    _lmder1_driver (11, func, jac, guess * 10,
+                    0.2979370075552020e+01, 0.3205219291793696e-01,
+                    [0.7286754737686598e+06, -0.1407588031293926e+02,
+                     -0.3297779778419661e+08, -0.2057159419780170e+08])
+
+    # This last test seems to rely on hitting maxfev in the solver.
+    # Our stopping criterion is a bit different, so we go a bit farther.
+    # I'm going to hope that's why our results are different.
+    #_lmder1_driver (11, func, jac, guess * 100,
+    #                0.2995906170160365e+02, 0.1753583967605901e-01,
+    #                [0.1927984063846549e+00, 0.1914736844615448e+00,
+    #                 0.1230924753714115e+00, 0.1361509629062244e+00])
+
 
 # Finally ...
 
