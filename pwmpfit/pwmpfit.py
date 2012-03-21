@@ -14,8 +14,10 @@ def test (f):
     _testfuncs.append (f)
     return f
 
-def _runtests ():
+def _runtests (namefilt=None):
     for f in _testfuncs:
+        if namefilt is not None and f.__name__ != namefilt:
+            continue
         print f.__name__, '...'
         f ()
 
