@@ -1,6 +1,7 @@
 """pwmpfit - Pythonic, Numpy-based port of MPFIT.
 """
 
+from __future__ import division
 import numpy as np
 
 
@@ -2137,6 +2138,52 @@ def _lmder1_freudenstein_roth ():
     _lmder1_driver (2, func, jac, guess * 100,
                     0.11426454595762e+08, 0.699887517243e+01,
                     [0.114127817858e+02, -0.896805107492e+00])
+
+
+@test
+def _lmder1_bard ():
+    """Bard function (lmder1 test #8)"""
+
+    y1 = np.asfarray ([0.14, 0.18, 0.22, 0.25, 0.29,
+                       0.32, 0.35, 0.39, 0.37, 0.58,
+                       0.73, 0.96, 1.34, 2.10, 4.39])
+
+    def func (params, vec):
+        for i in xrange (15):
+            tmp2 = 15 - i
+
+            if i > 7:
+                tmp3 = tmp2
+            else:
+                tmp3 = i + 1
+
+            vec[i] = y1[i] - (params[0] + (i + 1) / (params[1] * tmp2 + params[2] * tmp3))
+
+    def jac (params, jac):
+        for i in xrange (15):
+            tmp2 = 15 - i
+
+            if i > 7:
+                tmp3 = tmp2
+            else:
+                tmp3 = i + 1
+
+            tmp4 = (params[1] * tmp2 + params[2] * tmp3)**2
+            jac[i,0] = -1
+            jac[i,1] = (i + 1) * tmp2 / tmp4
+            jac[i,2] = (i + 1) * tmp3 / tmp4
+
+    guess = np.asfarray ([1, 1, 1])
+
+    _lmder1_driver (15, func, jac, guess,
+                    0.6456136295159668e+01, 0.9063596033904667e-01,
+                    [0.8241057657583339e-01, 0.1133036653471504e+01, 0.2343694638941154e+01])
+    _lmder1_driver (15, func, jac, guess * 10,
+                    0.3614185315967845e+02, 0.4174768701385386e+01,
+                    [0.8406666738183293e+00, -0.1588480332595655e+09, -0.1643786716535352e+09])
+    _lmder1_driver (15, func, jac, guess * 100,
+                    0.3841146786373992e+03, 0.4174768701359691e+01,
+                    [0.8406666738676455e+00, -0.1589461672055184e+09, -0.1644649068577712e+09])
 
 # Finally ...
 
