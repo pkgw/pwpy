@@ -77,6 +77,44 @@ def _enorm_careful (v, finfo):
     return np.sqrt (np.dot (v, v))
 
 
+def _enorm_minpack (v, finfo):
+    rdwarf = 3.834e-20
+    rgiant = 1.304e19
+    agiant = rgiant / v.size
+
+    s1 = s2 = s3 = x1max = x3max = 0.
+
+    for i in xrange (v.size):
+        xabs = abs (v[i])
+
+        if xabs > rdwarf and xabs < agiant:
+            s2 += xabs**2
+        elif xabs <= rdwarf:
+            if xabs <= x3max:
+                if xabs != 0.:
+                    s3 += (xabs / x3max)**2
+            else:
+                s3 = 1 + s3 * (x3max / xabs)**2
+                x3max = xabs
+        else:
+            if xabs <= x1max:
+                s1 += (xabs / x1max)**2
+            else:
+                s1 = 1. + s1 * (x1max / xabs)**2
+                x1max = xabs
+
+    if s1 != 0.:
+        return x1max * np.sqrt (s1 + (s2 / x1max) / x1max)
+
+    if s2 == 0.:
+        return x3max * np.sqrt (s3)
+
+    if s2 >= x3max:
+        return np.sqrt (s2 * (1 + (x3max / s2) * (x3max * s3)))
+
+    return np.sqrt (x3max * ((s2 / x3max) + (x3max * s3)))
+
+
 # Q-R factorization.
 
 def _qr_factor_packed (a, enorm, finfo):
