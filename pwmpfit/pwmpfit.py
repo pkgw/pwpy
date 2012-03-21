@@ -512,7 +512,7 @@ P^T (A^T A + D D) P = S^T S.
             zwork[i:] = 0
             break
 
-    if nsing >= 1:
+    if nsing > 0:
         zwork[nsing-1] /= sdiag[nsing-1] # Degenerate case
         # "Reverse loop"
         for i in xrange (nsing - 2, -1, -1):
@@ -635,11 +635,14 @@ def _lmpar (r, ipvt, diag, qtb, delta, x, sdiag, par, enorm, finfo):
 
     nsing = n
     wa1 = qtb.copy ()
-    wh = np.where (r.diagonal () == 0)
-    if len (wh[0]) > 0:
-        nsing = wh[0][0]
-        wa1[wh[0][0]:] = 0
-    if nsing > 1:
+
+    for i in xrange (n):
+        if r[i,i] == 0 and nsing == n:
+            nsing = i
+        if nsing < n:
+            wa1[i] = 0.
+
+    if nsing > 0:
         # "Reverse loop"
         for j in xrange (nsing - 1, -1, -1):
             wa1[j] /= r[j,j]
