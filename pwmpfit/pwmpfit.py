@@ -1617,26 +1617,6 @@ class Problem (object):
         return soln
 
 
-    def moronsolve (self, initial_params=None, dtype=np.float, maxiter=20):
-        soln = self.solve (initial_params, dtype)
-        prevfnorm = soln.fnorm
-        params = soln.params
-
-        for i in xrange (maxiter):
-            soln = self.solve (params, dtype)
-
-            if soln.fnorm > prevfnorm:
-                raise RuntimeError ('lame iteration gave worse results')
-
-            if (prevfnorm - soln.fnorm) / prevfnorm < 1e-3:
-                return soln
-
-            params = soln.params
-            prevfnorm = soln.fnorm
-
-        raise RuntimeError ('lame iteration didn\'t converge (%d iters)' % maxiter)
-
-
     def _get_jacobian_explicit (self, params, fvec, ulimit, dside, maxstep, isrel, finfo):
         fjac = np.zeros ((self._nout, self._npar), finfo.dtype)
 
