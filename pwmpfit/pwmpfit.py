@@ -1474,7 +1474,7 @@ class Problem (object):
 
                 actred = -1.
                 if 0.1 * fnorm1 < fnorm:
-                    actred = -(fnorm1 / fnorm)**2 + 1
+                    actred = 1 - (fnorm1 / fnorm)**2
 
                 # Compute scaled predicted reduction and scaled directional
                 # derivative
