@@ -843,7 +843,7 @@ conditions may contribute to ending the iteration.
   solution x is possible."
 
 'geps' (MPFIT equiv: 8)
-  "xtol is too small. fvec is orthogonal to the columns of the jacobian
+  "gtol is too small. fvec is orthogonal to the columns of the jacobian
   to machine precision."
 
 """
