@@ -1175,13 +1175,13 @@ class Problem (object):
         if not issubclass (self.solclass, Solution):
             raise ValueError ('solclass')
 
-        if self.ftol <= 0.:
+        if self.ftol < 0.:
             raise ValueError ('ftol')
 
-        if self.xtol <= 0.:
+        if self.xtol < 0.:
             raise ValueError ('xtol')
 
-        if self.gtol <= 0.:
+        if self.gtol < 0.:
             raise ValueError ('gtol')
 
         if self.damp < 0.:
@@ -1882,7 +1882,8 @@ def _lmder1_test (nout, func, jac, guess):
     func (guess, y)
     fnorm1 = _enorm_careful (y, finfo)
     p = Problem (guess.size, nout, func, jac)
-    p.xtol = p.ftol = p.gtol = tol
+    p.xtol = p.ftol = tol
+    p.gtol = 0
     s = p.solve (guess)
     func (s.params, y)
     fnorm2 = _enorm_careful (y, finfo)
@@ -1906,7 +1907,8 @@ def _lmder1_driver (nout, func, jac, guess, target_fnorm1,
     Taae (fnorm1, target_fnorm1)
 
     p = Problem (guess.size, nout, func, jac)
-    p.xtol = p.ftol = p.gtol = tol
+    p.xtol = p.ftol = tol
+    p.gtol = 0
     s = p.solve (guess)
     Taaae (s.params, target_params)
 
