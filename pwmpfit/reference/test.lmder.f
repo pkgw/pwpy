@@ -42,7 +42,8 @@ C
       open(unit=7,file="lmder.res",status="unknown")
 
       nread = 4
-      nwrite = 7
+c      nwrite = 7
+      nwrite = 6
 
       TOL = DSQRT(DPMPAR(1))
       LDFJAC = 65
@@ -86,12 +87,12 @@ C
    50 FORMAT (4I5)
    60 FORMAT ( //// 5X, 8H PROBLEM, I5, 5X, 11H DIMENSIONS, 2I5, 5X //
      *         )
-   70 FORMAT (5X, 33H INITIAL L2 NORM OF THE RESIDUALS, D15.7 // 5X,
-     *        33H FINAL L2 NORM OF THE RESIDUALS  , D15.7 // 5X,
+   70 FORMAT (5X, 33H INITIAL L2 NORM OF THE RESIDUALS, D18.10 // 5X,
+     *        33H FINAL L2 NORM OF THE RESIDUALS  , D18.10 // 5X,
      *        33H NUMBER OF FUNCTION EVALUATIONS  , I10 // 5X,
      *        33H NUMBER OF JACOBIAN EVALUATIONS  , I10 // 5X,
      *        15H EXIT PARAMETER, 18X, I10 // 5X,
-     *        27H FINAL APPROXIMATE SOLUTION // (5X, 5D15.7))
+     *        27H FINAL APPROXIMATE SOLUTION // (5X, 5D18.10))
    80 FORMAT (12H1SUMMARY OF , I3, 16H CALLS TO LMDER1 /)
    90 FORMAT (49H NPROB   N    M   NFEV  NJEV  INFO  FINAL L2 NORM /)
   100 FORMAT (3I5, 3I6, 1X, D15.7)
@@ -205,6 +206,8 @@ C
       DO 60 J = 1, N
          DO 50 I = 1, M
             FJAC(I,J) = DFLOAT(I)*DFLOAT(J)
+c            WRITE (6,666) I, J, FJAC(I,J)
+c 666        FORMAT(3HJJ , I3, I3, D15.7)
    50       CONTINUE
    60    CONTINUE
       GO TO 500
@@ -818,6 +821,8 @@ C
    50    CONTINUE
       DO 60 I = 1, M
          FVEC(I) = DFLOAT(I)*SUM - ONE
+c         WRITE (6,666) I, FVEC(I)
+c 666     FORMAT(3HXX , I3, D15.7)
    60    CONTINUE
       GO TO 430
 C
