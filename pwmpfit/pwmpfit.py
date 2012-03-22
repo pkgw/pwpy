@@ -1729,6 +1729,78 @@ class Problem (object):
                 params[i] = funcs[i] (params)
 
 
+    def solve_scipy (self, initial_params=None, dtype=np.float, strict=True):
+        from numpy import any, clip, dot, isfinite, sqrt, where
+        self._fixupCheck ()
+
+        if strict:
+            if self._ifree.size != self._npar:
+                raise RuntimeError ('can only use scipy layer with no ties or fixed params')
+            if any (isfinite (self._pinfof[PI_F_ULIMIT]) | isfinite (self._pinfof[PI_F_LLIMIT])):
+                raise RuntimeError ('can only use scipy layer with no parameter limits')
+
+        from scipy.optimize import leastsq
+
+        if initial_params is not None:
+            initial_params = np.atleast_1d (np.asarray (initial_params, dtype=dtype))
+        else:
+            initial_params = self._pinfof[PI_F_VALUE]
+
+        if initial_params.size != self._npar:
+            raise ValueError ('expected exactly %d parameters, got %d'
+                              % (self._npar, initial_params.size))
+
+        if any (-isfinite (initial_params)):
+            raise ValueError ('some nonfinite initial parameter values')
+
+        dtype = initial_params.dtype
+        finfo = np.finfo (dtype)
+
+        def sofunc (pars):
+            y = np.empty (self._nout, dtype=dtype)
+            self._yfunc (pars, y)
+            return y
+
+        if self._jfunc is None:
+            sojac = None
+        else:
+            def sojac (pars):
+                j = np.empty ((self._nout, self._npar), dtype=dtype)
+                self._jfunc (pars, j)
+                return j
+
+        t = leastsq (sofunc, initial_params, Dfun=sojac, full_output=1,
+                     ftol=self.ftol, xtol=self.xtol, gtol=self.gtol,
+                     maxfev=self.maxiter, # approximate
+                     epsfcn=self.epsfunc, factor=self.factor, diag=self.diag,
+                     warning=False)
+
+        covar = t[1]
+        perror = None
+
+        if covar is not None:
+            perror = np.zeros (self._npar, dtype)
+            d = covar.diagonal ()
+            wh = where (d >= 0)
+            perror[wh] = sqrt (d[wh])
+
+        soln = self.solclass (self)
+        soln.ndof = self.getNDOF ()
+        soln.status = set (('scipy', ))
+        soln.scipy_mesg = t[3]
+        soln.scipy_ier = t[4]
+        soln.niter = t[2]['nfev'] # approximate
+        soln.params = t[0]
+        soln.covar = covar
+        soln.perror = perror
+        soln.fvec = t[2]['fvec']
+        soln.fnorm = _enorm_minpack (soln.fvec, finfo)**2
+        soln.fjac = t[2]['fjac']
+        soln.nfev = t[2]['nfev']
+        soln.njev = 0 # could compute when given explicit derivative ...
+        return soln
+
+
 def checkDerivative (npar, nout, yfunc, jfunc, guess):
     explicit = np.empty ((nout, npar))
     jfunc (guess, explicit)
