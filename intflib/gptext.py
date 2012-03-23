@@ -142,7 +142,7 @@ class GainsInfo (object):
         data = []
         curdata = None
 
-        for a in words (stream)
+        for a in words (stream):
             if curdata is None:
                 if a[0] == 'interval':
                     interval = float (a[1])
