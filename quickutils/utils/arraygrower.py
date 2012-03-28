@@ -1,3 +1,6 @@
+## Copyright 2012 Peter Williams
+## This work is dedicated to the public domain.
+
 class ArrayGrower (object):
     __slots__ = 'dtype ncols chunkSize _nextIdx _arr'.split ()
 

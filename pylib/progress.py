@@ -1,3 +1,6 @@
+# Copyright 2012 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
+
 """progress - Easy progress reports during long computations.
 
 This module provides a function, 'progress', that can be used

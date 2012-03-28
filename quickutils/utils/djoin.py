@@ -1,3 +1,6 @@
+## Copyright 2012 Peter Williams
+## This work is dedicated to the public domain.
+
 def djoin (*args):
     """'dotless' join, for nicer paths"""
     from os.path import join

@@ -1,3 +1,6 @@
+## Copyright 2012 Peter Williams
+## This work is dedicated to the public domain.
+
 class AccDict (dict):
     """An accumulating dictionary.
 

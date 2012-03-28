@@ -1,3 +1,6 @@
+## Copyright 2012 Peter Williams
+## This work is dedicated to the public domain.
+
 def ensureiterable (value):
     """Return an iterable version of *value*. If *value* is an instance of
 basestring, it is treated as non-iterable and wrapped."""

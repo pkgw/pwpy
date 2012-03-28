@@ -1,3 +1,6 @@
+## Copyright 2012 Peter Williams
+## This work is dedicated to the public domain.
+
 class WeightAccumulator (object):
     """Standard statistical weighting is wt_i = sigma_i**-2. We don't
 need the 'n' variable to do any stats, but it can be nice to have that

@@ -1,3 +1,6 @@
+## Copyright 2012 Peter Williams
+## This work is dedicated to the public domain.
+
 def words (linegen):
     for line in linegen:
         a = line.split ('#', 1)[0].strip ().split ()

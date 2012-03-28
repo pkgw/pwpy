@@ -1,3 +1,6 @@
+## Copyright 2012 Peter Williams
+## This work is dedicated to the public domain.
+
 class StatsAccumulator (object):
     # FIXME: I worry about loss of precision when n gets very large:
     # we'll be adding a tiny number to a large number.  We could

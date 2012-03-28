@@ -1,3 +1,6 @@
+## Copyright 2012 Peter Williams
+## This work is dedicated to the public domain.
+
 def popoption (ident, args=None):
     """A lame routine for grabbing command-line arguments. Returns a
     boolean indicating whether the option was present. If it was, it's

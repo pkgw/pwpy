@@ -1,3 +1,6 @@
+# Copyright 2012 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
+
 """flatdb - a very quick flat-text database
 
 Implementing your own database is stupid, so if this turns out

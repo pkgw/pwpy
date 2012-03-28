@@ -1,3 +1,6 @@
+# Copyright 2012 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
+
 """Create a file-like object that, when written to, will
 dump its contents into a temporary buffer in an Emacs server."""
 
