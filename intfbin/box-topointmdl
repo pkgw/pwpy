@@ -1,5 +1,7 @@
 #! /usr/bin/env python
 # -*- python -*-
+# Copyright 2012 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
 
 """Output a textual model description from a "box" file, assuming each
 box corresponds to a point source and using a template image to derive

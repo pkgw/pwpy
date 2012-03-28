@@ -1,4 +1,6 @@
 #! /usr/bin/env python
+# Copyright 2012 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
 
 """Convert an sfind logfile into an LSM file, suitable for use with
 MeqTrees Tigger (and other packages, I believe)."""

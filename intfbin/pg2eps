@@ -1,4 +1,6 @@
 #! /bin/bash
+# Copyright 2012 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
 #
 # Execute a MIRIAD task, performing correct voodoo to get its pgplot
 # output to be recorded to an EPS file with user-specified

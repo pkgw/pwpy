@@ -1,3 +1,5 @@
 #! /bin/sh
+# Copyright 2012 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
 exec mirargmerge smauvspec device=1/xs axis=ch,bo nxy=4,3 \
   select='-auto' "$@"

@@ -1,5 +1,7 @@
 #! /usr/bin/env casa-python
 # -*- python -*-
+# Copyright 2012 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
 
 # Quasi-FIXME: the CASA concat implementation makes sure that if any
 # dataset has the "scratch" imaging columns, then all of the datasets

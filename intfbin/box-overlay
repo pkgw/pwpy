@@ -1,5 +1,7 @@
 #! /usr/bin/env python
 # -*- python -*-
+# Copyright 2012 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
 
 """Run a task with a temporary overlay file as an argument. See
 box-region for a general description of the 'box' scripts.

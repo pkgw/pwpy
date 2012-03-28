@@ -1,3 +1,5 @@
 #! /bin/sh
+# Copyright 2012 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
 exec mirargmerge uvplt device=1/xs nxy=4,3 \
   select='pol(xx,yy),auto' axis=ti,am +source "$@"

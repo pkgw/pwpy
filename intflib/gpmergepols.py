@@ -1,5 +1,7 @@
 #! /usr/bin/env python
 # -*- python -*-
+# Copyright 2012 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
 
 """= gpmergepols - merge gains tables for multi-pol data
 & pkgw

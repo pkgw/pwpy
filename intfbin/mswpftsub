@@ -1,5 +1,7 @@
 #! /usr/bin/env casa-python
 # -*- python -*-
+# Copyright 2012 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
 
 # Measurement Set W-Projecting Fourier Transform and Subtract ...
 # equivalent of the casa commands 'ft' and, optionally, 'uvsub', using

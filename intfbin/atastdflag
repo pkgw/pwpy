@@ -1,4 +1,6 @@
 #! /bin/sh
+# Copyright 2012 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
 #
 # Apply very standard ATA flags to a visibility dataset.
 # Many datasets benefit from the flagging of very short

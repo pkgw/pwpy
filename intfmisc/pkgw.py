@@ -1,4 +1,4 @@
-# -*- python ; coding: utf-8 -*-
+# -*- mode: python ; coding: utf-8 -*-
 #
 # Copyright 2011 Peter Williams, the MeqTree Foundation,
 # Netherlands Foundation for Research in Astronomy

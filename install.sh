@@ -81,7 +81,7 @@ if [ x"$mirpysrc" != x ] ; then
     install -C$vee -m755 $mirpysrc/examples/gpcat $prefix/bin
     install -C$vee -m755 $mirpysrc/examples/rtft $prefix/bin
     install -C$vee -m755 $mirpysrc/examples/varcat $prefix/bin
-    cat $mirpysrc/examples/chanaver.py intfmisc/chanaver-arf-support.py \
+    egrep -hv '^##' $mirpysrc/examples/chanaver.py intfmisc/chanaver-arf-support.py \
 	>$prefix/lib/python/site-packages/chanaver.py
     chmod 644 $prefix/lib/python/site-packages/chanaver.py
 fi

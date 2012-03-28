@@ -1,4 +1,6 @@
 #! /usr/bin/env python
+# Copyright 2012 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
 
 """Convert an sfind logfile into a format suitable for use
 as an overlay file with cgdisp using the olay keyword."""

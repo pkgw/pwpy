@@ -1,4 +1,6 @@
 #! /usr/bin/env python
+# Copyright 2012 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
 
 """Attempt to check whether an antenna is subject to shadowing by
 plotting autocorrelation amplitude as a function of az and el."""

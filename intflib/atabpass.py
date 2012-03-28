@@ -1,4 +1,5 @@
-# Correct for the ATA digital filter bandpass
+# Copyright 2012 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
 
 """= atabpass - correct for the ATA digital filter bandpass
 & pkgw
