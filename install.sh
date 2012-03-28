@@ -27,6 +27,11 @@ if [ ! -d $prefix/lib/python/site-packages ] ; then
     exit 1
 fi
 
+if [ ! -x $prefix/bin/mirpymodtask ] ; then
+    echo >&2 "error: no such file $prefix/bin/mirpymodtask"
+    exit 1
+fi
+
 if [ x"$1" = x-v ] ; then
     vee=v
     echo=echo
@@ -45,6 +50,12 @@ done
 
 for libdir in pylib scilib pwmpfit intflib ; do
     install -C$vee -m644 -t $prefix/lib/python/site-packages $libdir/*.py
+done
+
+for intfmod in intflib/*.py ; do
+    grep -q __main__ $intfmod || continue
+    $echo '(ln) mirpymodtask ->' $prefix/bin/$(basename $intfmod .py)
+    (cd $prefix/bin && ln -sf mirpymodtask $(basename $intfmod .py))
 done
 
 # Quickutils
