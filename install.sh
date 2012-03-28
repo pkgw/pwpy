@@ -95,6 +95,8 @@ if [ x"$mirpysrc" != x ] ; then
     egrep -hv '^##' $mirpysrc/examples/chanaver.py intfmisc/chanaver-arf-support.py \
 	>$prefix/lib/python/site-packages/chanaver.py
     chmod 644 $prefix/lib/python/site-packages/chanaver.py
+    $echo '(ln) mirpymodtask ->' $prefix/bin/chanaver
+    (cd $prefix/bin && ln -sf mirpymodtask chanaver)
 fi
 
 # Data file for ATA bandpass correction
