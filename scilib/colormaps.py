@@ -1,3 +1,6 @@
+# Copyright 2012 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
+
 """
 Tools for color mapping -- converting arrays of real-valued data to
 other formats (usually, RGB24) for visualization.

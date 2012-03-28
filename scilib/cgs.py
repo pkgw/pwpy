@@ -1,3 +1,6 @@
+# Copyright 2012 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
+
 """ cgs - Physical constants in CGS.
 
 For reference: the esu has dimensions of g^1/2 cm^3/2 s^-1

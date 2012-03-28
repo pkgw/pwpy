@@ -1,3 +1,6 @@
+# Copyright 2012 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
+
 """cont2da - 2-D analytic contour finding.
 
 Uses my own homebrew algorithm. So far, it's only tested on

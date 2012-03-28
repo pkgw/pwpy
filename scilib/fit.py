@@ -1,3 +1,6 @@
+# Copyright 2012 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
+
 # Routines for doing basic fits with numpy
 
 import numpy as _N

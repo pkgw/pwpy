@@ -1,4 +1,6 @@
 #! /bin/bash
+# Copyright 2012 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
 
 # Installation is configured with a shell script fragment called 'config'.
 # It should set these variables: prefix
