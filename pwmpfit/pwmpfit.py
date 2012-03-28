@@ -1,4 +1,79 @@
-"""pwmpfit - Pythonic, Numpy-based port of MPFIT.
+# -*- mode: python; coding: utf-8 -*-
+# Copyright (C) 1997-2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, Craig Markwardt
+# Copyright 2003 Mark Rivers
+# Copyright 2006, 2009-2011 (inclusive) Nadia Dencheva
+# Copyright 2011-2012 (inclusive) Peter Williams
+#
+# This software is provided as is without any warranty whatsoever.
+# Permission to use, copy, modify, and distribute modified or
+# unmodified copies is granted, provided this copyright and disclaimer
+# are included unchanged.
+#
+# == Provenance ==
+#
+# This implementation of the Levenberg-Marquardt technique has its
+# origins in MINPACK-1 (the lmdif and lmdir subroutines), by Jorge
+# Moré, Burt Garbow, and Ken Hillstrom, implemented around 1980.
+#
+# In 1997-1998, Craig Markwardt ported the FORTRAN code (with
+# permission) to IDL, resulting in the MPFIT procedure.
+#
+# Around 2003, Mark Rivers ported the mpfit.pro file to Python and
+# the Numeric module, creating mpfit.py. (It would be helpful to
+# be able to identify the precise version that was ported, so that
+# bugfixes to mpfit.pro could be forward-ported. The bug corrected
+# on "21 Nov 2003" in mpfit.pro was originally present in this
+# version, so the Python port likely happened before then.)
+#
+# Around 2006, mpfit.py was ported to the Numpy module to create
+# nmpfit.py. Based on STSCI version control logs it appears that this
+# was done by Nadia Dencheva.
+#
+# In 2011-2012, Peter Williams began fixing bugs in the port and
+# significantly reworking the API, creating this file, pwmpfit.py.
+# Previous authors deserve all of the credit for anything that
+# works and none of the blame for anything that doesn't.
+#
+#
+# == Web Links ==
+#
+# MINPACK-1: http://www.netlib.org/minpack/
+#
+# Markwardt's IDL software MPFIT.PRO: http://purl.com/net/mpfit
+#
+# Rivers' Python software mpfit.py: http://cars.uchicago.edu/software/python/mpfit.html
+#
+# nmpfit.py is part of stsci_python:
+#  http://www.stsci.edu/institute/software_hardware/pyraf/stsci_python
+#
+#
+# == Academic References ==
+#
+# For MINPACK-1:
+#
+# Moré, J. 1978, "The Levenberg-Marquardt Algorithm: Implementation
+#  and Theory," in Numerical Analysis, vol. 630, ed. G. A. Watson
+#  (Springer-Verlag: Berlin), p. 105 (DOI: 10.1007/BFb0067690 )
+#
+# Moré, J and Wright, S. 1987, "Optimization Software Guide," SIAM,
+#  Frontiers in Applied Mathematics, no. 14. (ISBN:
+#  978-0-898713-22-0)
+#
+# For Markwardt's IDL software MPFIT.PRO:
+#
+# Markwardt, C. B. 2008, "Non-Linear Least Squares Fitting in IDL with
+#  MPFIT," in Proc. Astronomical Data Analysis Software and Systems
+#  XVIII, Quebec, Canada, ASP Conference Series, Vol. XXX, eds.
+#  D. Bohlender, P. Dowler & D. Durand (Astronomical Society of the
+#  Pacific: San Francisco), pp. 251-254 (ISBN: 978-1-58381-702-5;
+#  arxiv:0902.2850; bibcode: 2009ASPC..411..251M)
+
+"""
+pwmpfit - Pythonic, Numpy-based Levenberg-Marquardt least-squares minimizer
+
+(This docstring will contain only usage information. For important
+information regarding provenance, license, and academic references,
+see comments in the module source code.)
 """
 
 from __future__ import division
