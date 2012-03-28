@@ -23,9 +23,9 @@ __all__ = ('NoiseCal loadNoiseCalExport').split ()
 TTOL = 1./1440 # 1 minute
 
 ## quickutil: arraygrower vectorgrower words
-#- snippet: arraygrower.py
-#- date: 2012 Feb 27
-#- SHA1: 8ae43ac24e7ea0fb6ee2cc1047cab1588433a7ec
+#- snippet: arraygrower.py (2012 Mar 28)
+#- SHA1: bf4a3fba30fb72218800018d482f0d03a13db38b
+
 class ArrayGrower (object):
     __slots__ = 'dtype ncols chunkSize _nextIdx _arr'.split ()
 
@@ -84,9 +84,9 @@ class ArrayGrower (object):
 
         self.clear ()
         return ret
-#- snippet: vectorgrower.py
-#- date: 2012 Feb 27
-#- SHA1: 87dc19e32d84ade4a740dc856d9692fa9be186f7
+#- snippet: vectorgrower.py (2012 Mar 28)
+#- SHA1: 01694490cb126aa663d91b43c9aaee578098f561
+
 class VectorGrower (object):
     __slots__ = 'dtype chunkSize _nextIdx _vec'.split ()
 
@@ -132,9 +132,9 @@ class VectorGrower (object):
 
         self.clear ()
         return ret
-#- snippet: words.py
-#- date: 2012 Feb 27
-#- SHA1: c571563028e9cc559c27d6acd98d4d35defe7d4e
+#- snippet: words.py (2012 Mar 28)
+#- SHA1: 11648697fc0ce5af2a639e53030f60506642df36
+
 def words (linegen):
     for line in linegen:
         a = line.split ('#', 1)[0].strip ().split ()

@@ -93,9 +93,9 @@ IDENT = '$Id$'
 SECOND = 1.0 / 3600. / 24.
 
 ## quickutil: accdict arraygrower vectorgrower statsacc weightacc
-#- snippet: accdict.py
-#- date: 2012 Feb 27
-#- SHA1: 8864021336ff2d87be433823cc9cca04657862ae
+#- snippet: accdict.py (2012 Mar 28)
+#- SHA1: 07ab5143b87a50810a69d7e3031e32f0e3c504c2
+
 class AccDict (dict):
     """An accumulating dictionary.
 
@@ -118,9 +118,9 @@ e.g.: create = list, accum = lambda l, v: l.append (v)
 
         self._accum (entry, val)
         return self
-#- snippet: arraygrower.py
-#- date: 2012 Feb 27
-#- SHA1: 8ae43ac24e7ea0fb6ee2cc1047cab1588433a7ec
+#- snippet: arraygrower.py (2012 Mar 28)
+#- SHA1: bf4a3fba30fb72218800018d482f0d03a13db38b
+
 class ArrayGrower (object):
     __slots__ = 'dtype ncols chunkSize _nextIdx _arr'.split ()
 
@@ -179,9 +179,9 @@ class ArrayGrower (object):
 
         self.clear ()
         return ret
-#- snippet: vectorgrower.py
-#- date: 2012 Feb 27
-#- SHA1: 87dc19e32d84ade4a740dc856d9692fa9be186f7
+#- snippet: vectorgrower.py (2012 Mar 28)
+#- SHA1: 01694490cb126aa663d91b43c9aaee578098f561
+
 class VectorGrower (object):
     __slots__ = 'dtype chunkSize _nextIdx _vec'.split ()
 
@@ -227,9 +227,9 @@ class VectorGrower (object):
 
         self.clear ()
         return ret
-#- snippet: statsacc.py
-#- date: 2012 Feb 27
-#- SHA1: 37d74dcad853c14a76e2fb627c8f9063d19e9d0c
+#- snippet: statsacc.py (2012 Mar 28)
+#- SHA1: 0d4b20e26907fc81e903b3bb0cd738dafdb486ad
+
 class StatsAccumulator (object):
     # FIXME: I worry about loss of precision when n gets very large:
     # we'll be adding a tiny number to a large number.  We could
@@ -288,9 +288,9 @@ class StatsAccumulator (object):
 
     def var (self):
         return self.xsqtot/self.n - (self.xtot/self.n)**2
-#- snippet: weightacc.py
-#- date: 2012 Feb 27
-#- SHA1: 47853621ac1518fe8529d3233df4a9124ecb4f1a
+#- snippet: weightacc.py (2012 Mar 28)
+#- SHA1: 8b7b1bc85874d8f8d2d9602e66655e68bffcf9e2
+
 class WeightAccumulator (object):
     """Standard statistical weighting is wt_i = sigma_i**-2. We don't
 need the 'n' variable to do any stats, but it can be nice to have that

@@ -8,9 +8,9 @@ plotting autocorrelation amplitude as a function of az and el."""
 import sys, numpy as np, omega as om, miriad
 
 ## quickutil: arraygrower
-#- snippet: arraygrower.py
-#- date: 2012 Feb 27
-#- SHA1: 8ae43ac24e7ea0fb6ee2cc1047cab1588433a7ec
+#- snippet: arraygrower.py (2012 Mar 28)
+#- SHA1: bf4a3fba30fb72218800018d482f0d03a13db38b
+
 class ArrayGrower (object):
     __slots__ = 'dtype ncols chunkSize _nextIdx _arr'.split ()
 

@@ -31,9 +31,9 @@ DEFAULT_BANNER = 'PYTHON gptext - foo'
 
 
 ## quickutil: words
-#- snippet: words.py
-#- date: 2012 Feb 27
-#- SHA1: c571563028e9cc559c27d6acd98d4d35defe7d4e
+#- snippet: words.py (2012 Mar 28)
+#- SHA1: 11648697fc0ce5af2a639e53030f60506642df36
+
 def words (linegen):
     for line in linegen:
         a = line.split ('#', 1)[0].strip ().split ()

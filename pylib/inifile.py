@@ -8,9 +8,9 @@ __all__ = ('Holder readStream read FileChunk '
            'mutateStream mutate mutateInPlace').split ()
 
 ## quickutil: holder
-#- snippet: holder.py
-#- date: 2012 Feb 27
-#- SHA1: bf7b59f415225778208e1f25267fce9a38c91462
+#- snippet: holder.py (2012 Mar 28)
+#- SHA1: bd03d5351a3191c559a26f9a003a3afe0715a9ee
+
 class Holder (object):
     def __init__ (self, **kwargs):
         self.set (**kwargs)

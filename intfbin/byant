@@ -16,9 +16,9 @@ import omega
 from mirtask import uvdat, keys, util
 
 ## quickutil: arraygrower accdict
-#- snippet: arraygrower.py
-#- date: 2012 Feb 27
-#- SHA1: 8ae43ac24e7ea0fb6ee2cc1047cab1588433a7ec
+#- snippet: arraygrower.py (2012 Mar 28)
+#- SHA1: bf4a3fba30fb72218800018d482f0d03a13db38b
+
 class ArrayGrower (object):
     __slots__ = 'dtype ncols chunkSize _nextIdx _arr'.split ()
 
@@ -77,9 +77,9 @@ class ArrayGrower (object):
 
         self.clear ()
         return ret
-#- snippet: accdict.py
-#- date: 2012 Feb 27
-#- SHA1: 8864021336ff2d87be433823cc9cca04657862ae
+#- snippet: accdict.py (2012 Mar 28)
+#- SHA1: 07ab5143b87a50810a69d7e3031e32f0e3c504c2
+
 class AccDict (dict):
     """An accumulating dictionary.
 

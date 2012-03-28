@@ -294,9 +294,9 @@ __version_info__ = (1, 0)
 IDENT = '$Id$'
 
 ## quickutil: arraygrower statsacc words
-#- snippet: arraygrower.py
-#- date: 2012 Feb 27
-#- SHA1: 8ae43ac24e7ea0fb6ee2cc1047cab1588433a7ec
+#- snippet: arraygrower.py (2012 Mar 28)
+#- SHA1: bf4a3fba30fb72218800018d482f0d03a13db38b
+
 class ArrayGrower (object):
     __slots__ = 'dtype ncols chunkSize _nextIdx _arr'.split ()
 
@@ -355,9 +355,9 @@ class ArrayGrower (object):
 
         self.clear ()
         return ret
-#- snippet: statsacc.py
-#- date: 2012 Feb 27
-#- SHA1: 37d74dcad853c14a76e2fb627c8f9063d19e9d0c
+#- snippet: statsacc.py (2012 Mar 28)
+#- SHA1: 0d4b20e26907fc81e903b3bb0cd738dafdb486ad
+
 class StatsAccumulator (object):
     # FIXME: I worry about loss of precision when n gets very large:
     # we'll be adding a tiny number to a large number.  We could
@@ -416,9 +416,9 @@ class StatsAccumulator (object):
 
     def var (self):
         return self.xsqtot/self.n - (self.xtot/self.n)**2
-#- snippet: words.py
-#- date: 2012 Feb 27
-#- SHA1: c571563028e9cc559c27d6acd98d4d35defe7d4e
+#- snippet: words.py (2012 Mar 28)
+#- SHA1: 11648697fc0ce5af2a639e53030f60506642df36
+
 def words (linegen):
     for line in linegen:
         a = line.split ('#', 1)[0].strip ().split ()
@@ -1377,26 +1377,10 @@ else:
 # Task implementation.
 
 ## quickutil: die
-#- snippet: die.py
-#- date: 2012 Feb 27
-#- SHA1: 1bb64c8c018023854995c0f8954a2bdc625a7ee0
+#- snippet: die.py (2012 Mar 28)
+#- SHA1: 2d6b12f46e5b894a92000f35c621235adee4213b
+
 def die (fmt, *args):
-    """Raise a :exc:`SystemExit` exception with a formatted error message.
-
-:arg str format: a format string
-:arg args: arguments to the format string
-
-If *args* is empty, a :exc:`SystemExit` exception is raised with the
-argument ``'error: ' + str (fmt)``. Otherwise, the string component is
-``fmt % args``. If uncaught, the interpreter exits with an error code
-and prints the exception argument.
-
-Example::
-
-   if ndim != 3:
-      die ('require exactly 3 dimensions, not %d', ndim)
-"""
-
     if not len (args):
         raise SystemExit ('error: ' + str (fmt))
     raise SystemExit ('error: ' + (fmt % args))
