@@ -135,8 +135,8 @@ class AstroImage (object):
         lat, lon = self._latlonaxes ()
 
         if lat < 0 or lon < 0 or lat == lon:
-            raise UnsupportedError ('the image "%s" cannot be reduced to a '
-                                    'single plane', self.path)
+            raise UnsupportedError ('the image "%s" does not have both latitude '
+                                    'and longitude axes', self.path)
 
         if lat == 0 and lon == 1 and self.shape.size == 2:
             return self # noop
