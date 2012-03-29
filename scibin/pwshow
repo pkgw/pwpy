@@ -88,13 +88,13 @@ for path in images:
     try:
         img = img.simple ()
     except Exception, e:
-        print >>sys.stderr, 'pwshow: can\'t treat path “%s” as simple 2D ' \
-            'image: %s' % (path, e)
-        anyfailures = True
-        continue
-
-    data = img.read (flip=True)
-    toworld = img.toworld
+        print >>sys.stderr, 'pwshow: can\'t convert “%s” to simple 2D ' \
+            'sky image; taking first plane' % path
+        data = img.read (flip=True)[tuple (np.zeros (img.shape.size - 2))]
+        toworld = None
+    else:
+        data = img.read (flip=True)
+        toworld = img.toworld
 
     if overlaypath is None or fft:
         olay = None

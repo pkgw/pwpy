@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+# -*- mode: python; coding: utf-8 -*-
 # Copyright 2012 Peter Williams
 # Licensed under the GNU General Public License version 3 or higher
 
@@ -71,9 +72,21 @@ def wrongusage (docstring, *rest):
 ## end
 
 def load (path, fft, maxnorm):
-    img = astimage.open (path, 'r').simple ()
-    data = img.read (flip=True)
-    toworld = img.toworld
+    try:
+        img = astimage.open (path, 'r')
+    except Exception, e:
+        die ('can\'t open path “%s”: %s' % (path, e))
+
+    try:
+        img = img.simple ()
+    except Exception, e:
+        print >>sys.stderr, 'blink: can\'t convert “%s” to simple 2D ' \
+            'sky image; taking first plane' % path
+        data = img.read (flip=True)[tuple (np.zeros (img.shape.size - 2))]
+        toworld = None
+    else:
+        data = img.read (flip=True)
+        toworld = img.toworld
 
     if fft:
         from numpy.fft import ifftshift, fft2, fftshift
