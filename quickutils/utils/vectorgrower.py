@@ -1,6 +1,6 @@
 ## Copyright 2012 Peter Williams
 ## This work is dedicated to the public domain.
-
+##
 class VectorGrower (object):
     __slots__ = 'dtype chunkSize _nextIdx _vec'.split ()
 
@@ -8,21 +8,16 @@ class VectorGrower (object):
         if dtype is None:
             import numpy
             dtype = numpy.float
-
         self.dtype = dtype
         self.chunkSize = chunkSize
         self.clear ()
 
-
     def clear (self):
-        self._nextIdx = 0
-        self._vec = None
+        self._nextIdx, self._vec = 0, None
         return self
-
 
     def __len__ (self):
         return self._nextIdx
-
 
     def add (self, val):
         if self._vec is None:
@@ -30,11 +25,9 @@ class VectorGrower (object):
             self._vec = ndarray ((self.chunkSize, ), dtype=self.dtype)
         elif self._vec.size <= self._nextIdx:
             self._vec.resize ((self._vec.size + self.chunkSize, ))
-
         self._vec[self._nextIdx] = val
         self._nextIdx += 1
         return self
-
 
     def finish (self):
         if self._vec is None:

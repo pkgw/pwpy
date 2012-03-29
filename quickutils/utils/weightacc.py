@@ -1,11 +1,12 @@
 ## Copyright 2012 Peter Williams
 ## This work is dedicated to the public domain.
-
+##
 class WeightAccumulator (object):
-    """Standard statistical weighting is wt_i = sigma_i**-2. We don't
-need the 'n' variable to do any stats, but it can be nice to have that
-information."""
-
+##<
+## Standard statistical weighting is wt_i = sigma_i**-2. We don't need
+## the 'n' variable to do any stats, but it can be nice to have that
+## information.
+##>
     __slots__ = 'xwtot wtot n _shape'.split ()
 
     def __init__ (self, shape=None):
@@ -20,7 +21,6 @@ information."""
             from numpy import zeros
             self.xwtot = zeros (self._shape)
             self.wtot = zeros (self._shape)
-
         self.n = 0
         return self
 
@@ -51,12 +51,10 @@ information."""
         putmask (result, zerowt, nullval)
         return result
 
-    def var (self):
-        """Assumes wt_i = sigma_i**-2"""
+    def var (self): # Assumes wt_i = sigma_i**-2
         return 1. / self.wtot
 
     def std (self):
-        """Uncertainty of the mean (i.e., scales as ~1/sqrt(n_vals))"""
         if self._shape is None:
             from math import sqrt
         else:

@@ -1,6 +1,6 @@
 ## Copyright 2012 Peter Williams
 ## This work is dedicated to the public domain.
-
+##
 def die (fmt, *args):
 ##<
 ## Raise a :exc:`SystemExit` exception with a formatted error message.

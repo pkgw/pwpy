@@ -1,12 +1,13 @@
 ## Copyright 2012 Peter Williams
 ## This work is dedicated to the public domain.
-
+##
 def rellink (source, dest):
-    """Create a symbolic link to path *source* from path *dest*. If
-    either *source* or *dest* is an absolute path, the link from
-    *dest* will point to the absolute path of *source*. Otherwise, the
-    link to *source* from *dest* will be a relative link."""
-
+##<
+## Create a symbolic link to path *source* from path *dest*. If
+## either *source* or *dest* is an absolute path, the link from
+## *dest* will point to the absolute path of *source*. Otherwise, the
+## link to *source* from *dest* will be a relative link.
+##>
     from os import symlink
     from os.path import isabs, dirname, relpath, abspath
 

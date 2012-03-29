@@ -1,10 +1,12 @@
 ## Copyright 2012 Peter Williams
 ## This work is dedicated to the public domain.
-
+##
 def ensuredir (path, parents=False):
-    """Returns a boolean indicating whether the directory already
-    existed.  Will attempt to create parent directories if *parents*
-    is True."""
+##<
+## Returns a boolean indicating whether the directory already
+## existed.  Will attempt to create parent directories if *parents*
+## is True.
+##>
     import os
 
     if parents:

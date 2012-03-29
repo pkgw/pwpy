@@ -1,6 +1,6 @@
 ## Copyright 2012 Peter Williams
 ## This work is dedicated to the public domain.
-
+##
 class ArrayGrower (object):
     __slots__ = 'dtype ncols chunkSize _nextIdx _arr'.split ()
 
@@ -14,16 +14,13 @@ class ArrayGrower (object):
         self.chunkSize = chunkSize
         self.clear ()
 
-
     def clear (self):
         self._nextIdx = 0
         self._arr = None
         return self
 
-
     def __len__ (self):
         return self._nextIdx
-
 
     def addLine (self, line):
         from numpy import asarray, ndarray
@@ -43,11 +40,9 @@ class ArrayGrower (object):
         self._nextIdx += 1
         return self
 
-
     def add (self, *args):
         self.addLine (args)
         return self
-
 
     def finish (self):
         if self._arr is None:
