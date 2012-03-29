@@ -106,7 +106,9 @@ def readStream (stream):
                 section.setone (key, data.strip ().decode ('utf8'))
             key = m.group (1)
             data = m.group (2)
-            if not data[-1].isspace ():
+            if not len (data):
+                data = ' '
+            elif not data[-1].isspace ():
                 data += ' '
             continue
 
