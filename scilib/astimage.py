@@ -110,6 +110,11 @@ class AstroImage (object):
                                     'read-only image at "%s"', self.path)
 
 
+    @property
+    def size (self):
+        return np.prod (self.shape)
+
+
     def read (self, squeeze=False, flip=False):
         raise NotImplementedError ()
 
