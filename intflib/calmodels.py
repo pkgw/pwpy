@@ -218,9 +218,8 @@ addFromVLAObs ('3c84', 23.9, 23.3)
 # name
 
 ## quickutil: usage popoption
-#- snippet: usage.py (2012 Mar 28)
-#- SHA1: 496e3e02df4b92f0d5c8887446e0cdb7fd5dcb10
-
+#- snippet: usage.py (2012 Mar 29)
+#- SHA1: ac032a5db2efb5508569c4d5ba6eeb3bba19a7ca
 def showusage (docstring, short, stream, exitcode):
     if stream is None:
         from sys import stdout as stream
@@ -261,32 +260,18 @@ def wrongusage (docstring, *rest):
 
     print >>sys.stderr, 'error:', detail, '\n' # extra NL
     showusage (docstring, True, sys.stderr, 1)
-#- snippet: popoption.py (2012 Mar 28)
-#- SHA1: 347e541f49a03a4085c1a74b77fc707043cada6a
-
-def popoption (ident, args=None):
-    """A lame routine for grabbing command-line arguments. Returns a
-    boolean indicating whether the option was present. If it was, it's
-    removed from the argument string. Because of the lame behavior,
-    options can't be combined, and non-boolean options aren't
-    supported. Operates on sys.argv by default.
-
-    Note that this will proceed merrily if argv[0] matches your option.
-    """
-
-    if args is None:
-        args = sys.argv
-
+#- snippet: popoption.py (2012 Mar 29)
+#- SHA1: 5552980b9034cd6d7ead4d0cd4ca1839face7e84
+def popoption (ident, argv=None):
+    if argv is None:
+        from sys import argv
     if len (ident) == 1:
         ident = '-' + ident
     else:
         ident = '--' + ident
-
-    found = ident in args
-
+    found = ident in argv
     if found:
-        args.remove (ident)
-
+        argv.remove (ident)
     return found
 ## end
 

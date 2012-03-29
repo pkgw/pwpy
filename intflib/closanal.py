@@ -93,18 +93,9 @@ IDENT = '$Id$'
 SECOND = 1.0 / 3600. / 24.
 
 ## quickutil: accdict arraygrower vectorgrower statsacc weightacc
-#- snippet: accdict.py (2012 Mar 28)
-#- SHA1: 07ab5143b87a50810a69d7e3031e32f0e3c504c2
-
+#- snippet: accdict.py (2012 Mar 29)
+#- SHA1: d6754ad71b27aa236795590501b5e2a9d3d88cbd
 class AccDict (dict):
-    """An accumulating dictionary.
-
-create = lambda: <new accumulator object>
-accum = lambda a, v: <accumulate v into accumulator a>
-
-e.g.: create = list, accum = lambda l, v: l.append (v)
-"""
-
     __slots__ = '_create _accum'.split ()
 
     def __init__ (self, create, accum):
@@ -115,12 +106,10 @@ e.g.: create = list, accum = lambda l, v: l.append (v)
         entry = self.get (key)
         if entry is None:
             self[key] = entry = self._create ()
-
         self._accum (entry, val)
         return self
-#- snippet: arraygrower.py (2012 Mar 28)
-#- SHA1: bf4a3fba30fb72218800018d482f0d03a13db38b
-
+#- snippet: arraygrower.py (2012 Mar 29)
+#- SHA1: 0524398a658fe9cbf9b3ba557e16018f89e5027d
 class ArrayGrower (object):
     __slots__ = 'dtype ncols chunkSize _nextIdx _arr'.split ()
 
@@ -134,16 +123,13 @@ class ArrayGrower (object):
         self.chunkSize = chunkSize
         self.clear ()
 
-
     def clear (self):
         self._nextIdx = 0
         self._arr = None
         return self
 
-
     def __len__ (self):
         return self._nextIdx
-
 
     def addLine (self, line):
         from numpy import asarray, ndarray
@@ -163,11 +149,9 @@ class ArrayGrower (object):
         self._nextIdx += 1
         return self
 
-
     def add (self, *args):
         self.addLine (args)
         return self
-
 
     def finish (self):
         if self._arr is None:
@@ -179,9 +163,8 @@ class ArrayGrower (object):
 
         self.clear ()
         return ret
-#- snippet: vectorgrower.py (2012 Mar 28)
-#- SHA1: 01694490cb126aa663d91b43c9aaee578098f561
-
+#- snippet: vectorgrower.py (2012 Mar 29)
+#- SHA1: 311b1ab5479475042ba0f51c491fb80dc7d925c7
 class VectorGrower (object):
     __slots__ = 'dtype chunkSize _nextIdx _vec'.split ()
 
@@ -189,21 +172,16 @@ class VectorGrower (object):
         if dtype is None:
             import numpy
             dtype = numpy.float
-
         self.dtype = dtype
         self.chunkSize = chunkSize
         self.clear ()
 
-
     def clear (self):
-        self._nextIdx = 0
-        self._vec = None
+        self._nextIdx, self._vec = 0, None
         return self
-
 
     def __len__ (self):
         return self._nextIdx
-
 
     def add (self, val):
         if self._vec is None:
@@ -211,11 +189,9 @@ class VectorGrower (object):
             self._vec = ndarray ((self.chunkSize, ), dtype=self.dtype)
         elif self._vec.size <= self._nextIdx:
             self._vec.resize ((self._vec.size + self.chunkSize, ))
-
         self._vec[self._nextIdx] = val
         self._nextIdx += 1
         return self
-
 
     def finish (self):
         if self._vec is None:
@@ -227,15 +203,9 @@ class VectorGrower (object):
 
         self.clear ()
         return ret
-#- snippet: statsacc.py (2012 Mar 28)
-#- SHA1: 0d4b20e26907fc81e903b3bb0cd738dafdb486ad
-
+#- snippet: statsacc.py (2012 Mar 29)
+#- SHA1: dd61a34a90a30faf9accb67a1f685c2015c4a958
 class StatsAccumulator (object):
-    # FIXME: I worry about loss of precision when n gets very large:
-    # we'll be adding a tiny number to a large number.  We could
-    # periodically rebalance or something. I'll think about it more if
-    # it's ever actually a problem.
-
     __slots__ = 'xtot xsqtot n _shape'.split ()
 
     def __init__ (self, shape=None):
@@ -250,7 +220,6 @@ class StatsAccumulator (object):
             from numpy import zeros
             self.xtot = zeros (self.shape)
             self.xsqtot = zeros (self.shape)
-
         self.n = 0
         return self
 
@@ -260,7 +229,6 @@ class StatsAccumulator (object):
             x = asarray (x)
             if x.shape != self._shape:
                 raise ValueError ('x has wrong shape')
-
         self.xtot += x
         self.xsqtot += x**2
         self.n += 1
@@ -287,15 +255,10 @@ class StatsAccumulator (object):
         return sqrt (self.var ())
 
     def var (self):
-        return self.xsqtot/self.n - (self.xtot/self.n)**2
-#- snippet: weightacc.py (2012 Mar 28)
-#- SHA1: 8b7b1bc85874d8f8d2d9602e66655e68bffcf9e2
-
+        return self.xsqtot / self.n - (self.xtot / self.n)**2
+#- snippet: weightacc.py (2012 Mar 29)
+#- SHA1: 7d4c39da554898d3a6a9d23ab543845f3f2f4515
 class WeightAccumulator (object):
-    """Standard statistical weighting is wt_i = sigma_i**-2. We don't
-need the 'n' variable to do any stats, but it can be nice to have that
-information."""
-
     __slots__ = 'xwtot wtot n _shape'.split ()
 
     def __init__ (self, shape=None):
@@ -310,7 +273,6 @@ information."""
             from numpy import zeros
             self.xwtot = zeros (self._shape)
             self.wtot = zeros (self._shape)
-
         self.n = 0
         return self
 
@@ -341,12 +303,10 @@ information."""
         putmask (result, zerowt, nullval)
         return result
 
-    def var (self):
-        """Assumes wt_i = sigma_i**-2"""
+    def var (self): # Assumes wt_i = sigma_i**-2
         return 1. / self.wtot
 
     def std (self):
-        """Uncertainty of the mean (i.e., scales as ~1/sqrt(n_vals))"""
         if self._shape is None:
             from math import sqrt
         else:

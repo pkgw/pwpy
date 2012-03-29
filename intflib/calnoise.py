@@ -23,9 +23,8 @@ __all__ = ('NoiseCal loadNoiseCalExport').split ()
 TTOL = 1./1440 # 1 minute
 
 ## quickutil: arraygrower vectorgrower words
-#- snippet: arraygrower.py (2012 Mar 28)
-#- SHA1: bf4a3fba30fb72218800018d482f0d03a13db38b
-
+#- snippet: arraygrower.py (2012 Mar 29)
+#- SHA1: 0524398a658fe9cbf9b3ba557e16018f89e5027d
 class ArrayGrower (object):
     __slots__ = 'dtype ncols chunkSize _nextIdx _arr'.split ()
 
@@ -39,16 +38,13 @@ class ArrayGrower (object):
         self.chunkSize = chunkSize
         self.clear ()
 
-
     def clear (self):
         self._nextIdx = 0
         self._arr = None
         return self
 
-
     def __len__ (self):
         return self._nextIdx
-
 
     def addLine (self, line):
         from numpy import asarray, ndarray
@@ -68,11 +64,9 @@ class ArrayGrower (object):
         self._nextIdx += 1
         return self
 
-
     def add (self, *args):
         self.addLine (args)
         return self
-
 
     def finish (self):
         if self._arr is None:
@@ -84,9 +78,8 @@ class ArrayGrower (object):
 
         self.clear ()
         return ret
-#- snippet: vectorgrower.py (2012 Mar 28)
-#- SHA1: 01694490cb126aa663d91b43c9aaee578098f561
-
+#- snippet: vectorgrower.py (2012 Mar 29)
+#- SHA1: 311b1ab5479475042ba0f51c491fb80dc7d925c7
 class VectorGrower (object):
     __slots__ = 'dtype chunkSize _nextIdx _vec'.split ()
 
@@ -94,21 +87,16 @@ class VectorGrower (object):
         if dtype is None:
             import numpy
             dtype = numpy.float
-
         self.dtype = dtype
         self.chunkSize = chunkSize
         self.clear ()
 
-
     def clear (self):
-        self._nextIdx = 0
-        self._vec = None
+        self._nextIdx, self._vec = 0, None
         return self
-
 
     def __len__ (self):
         return self._nextIdx
-
 
     def add (self, val):
         if self._vec is None:
@@ -116,11 +104,9 @@ class VectorGrower (object):
             self._vec = ndarray ((self.chunkSize, ), dtype=self.dtype)
         elif self._vec.size <= self._nextIdx:
             self._vec.resize ((self._vec.size + self.chunkSize, ))
-
         self._vec[self._nextIdx] = val
         self._nextIdx += 1
         return self
-
 
     def finish (self):
         if self._vec is None:
@@ -132,16 +118,14 @@ class VectorGrower (object):
 
         self.clear ()
         return ret
-#- snippet: words.py (2012 Mar 28)
-#- SHA1: 11648697fc0ce5af2a639e53030f60506642df36
-
+#- snippet: words.py (2012 Mar 29)
+#- SHA1: 5ba0c8c0085d1800ba46e7d5f5dd1dff9cd43a24
 def words (linegen):
     for line in linegen:
         a = line.split ('#', 1)[0].strip ().split ()
         if not len (a):
             continue
         yield a
-
 
 def pathwords (path, noexistok=False, **kwargs):
     try:
@@ -154,7 +138,6 @@ def pathwords (path, noexistok=False, **kwargs):
     except IOError as e:
         if e.errno != 2 or not noexistok:
             raise
-
 
 def pathtext (path, noexistok=False, **kwargs):
     try:

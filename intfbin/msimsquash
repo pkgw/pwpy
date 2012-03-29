@@ -6,9 +6,8 @@
 import sys
 
 ## quickutil: die
-#- snippet: die.py (2012 Mar 28)
-#- SHA1: 2d6b12f46e5b894a92000f35c621235adee4213b
-
+#- snippet: die.py (2012 Mar 29)
+#- SHA1: 3bdd3282e52403d2dec99d72680cb7bc95c99843
 def die (fmt, *args):
     if not len (args):
         raise SystemExit ('error: ' + str (fmt))

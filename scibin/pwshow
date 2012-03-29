@@ -14,9 +14,8 @@ Display images interactively, in sequence.
 import sys, ndshow, numpy as np, astimage
 
 ## quickutil: usage
-#- snippet: usage.py (2012 Mar 28)
-#- SHA1: 496e3e02df4b92f0d5c8887446e0cdb7fd5dcb10
-
+#- snippet: usage.py (2012 Mar 29)
+#- SHA1: ac032a5db2efb5508569c4d5ba6eeb3bba19a7ca
 def showusage (docstring, short, stream, exitcode):
     if stream is None:
         from sys import stdout as stream

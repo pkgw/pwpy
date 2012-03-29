@@ -16,9 +16,8 @@ import omega
 from mirtask import uvdat, keys, util
 
 ## quickutil: arraygrower accdict
-#- snippet: arraygrower.py (2012 Mar 28)
-#- SHA1: bf4a3fba30fb72218800018d482f0d03a13db38b
-
+#- snippet: arraygrower.py (2012 Mar 29)
+#- SHA1: 0524398a658fe9cbf9b3ba557e16018f89e5027d
 class ArrayGrower (object):
     __slots__ = 'dtype ncols chunkSize _nextIdx _arr'.split ()
 
@@ -32,16 +31,13 @@ class ArrayGrower (object):
         self.chunkSize = chunkSize
         self.clear ()
 
-
     def clear (self):
         self._nextIdx = 0
         self._arr = None
         return self
 
-
     def __len__ (self):
         return self._nextIdx
-
 
     def addLine (self, line):
         from numpy import asarray, ndarray
@@ -61,11 +57,9 @@ class ArrayGrower (object):
         self._nextIdx += 1
         return self
 
-
     def add (self, *args):
         self.addLine (args)
         return self
-
 
     def finish (self):
         if self._arr is None:
@@ -77,18 +71,9 @@ class ArrayGrower (object):
 
         self.clear ()
         return ret
-#- snippet: accdict.py (2012 Mar 28)
-#- SHA1: 07ab5143b87a50810a69d7e3031e32f0e3c504c2
-
+#- snippet: accdict.py (2012 Mar 29)
+#- SHA1: d6754ad71b27aa236795590501b5e2a9d3d88cbd
 class AccDict (dict):
-    """An accumulating dictionary.
-
-create = lambda: <new accumulator object>
-accum = lambda a, v: <accumulate v into accumulator a>
-
-e.g.: create = list, accum = lambda l, v: l.append (v)
-"""
-
     __slots__ = '_create _accum'.split ()
 
     def __init__ (self, create, accum):
@@ -99,7 +84,6 @@ e.g.: create = list, accum = lambda l, v: l.append (v)
         entry = self.get (key)
         if entry is None:
             self[key] = entry = self._create ()
-
         self._accum (entry, val)
         return self
 ## end

@@ -31,16 +31,14 @@ DEFAULT_BANNER = 'PYTHON gptext - foo'
 
 
 ## quickutil: words
-#- snippet: words.py (2012 Mar 28)
-#- SHA1: 11648697fc0ce5af2a639e53030f60506642df36
-
+#- snippet: words.py (2012 Mar 29)
+#- SHA1: 5ba0c8c0085d1800ba46e7d5f5dd1dff9cd43a24
 def words (linegen):
     for line in linegen:
         a = line.split ('#', 1)[0].strip ().split ()
         if not len (a):
             continue
         yield a
-
 
 def pathwords (path, noexistok=False, **kwargs):
     try:
@@ -53,7 +51,6 @@ def pathwords (path, noexistok=False, **kwargs):
     except IOError as e:
         if e.errno != 2 or not noexistok:
             raise
-
 
 def pathtext (path, noexistok=False, **kwargs):
     try:

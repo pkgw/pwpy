@@ -294,9 +294,8 @@ __version_info__ = (1, 0)
 IDENT = '$Id$'
 
 ## quickutil: arraygrower statsacc words
-#- snippet: arraygrower.py (2012 Mar 28)
-#- SHA1: bf4a3fba30fb72218800018d482f0d03a13db38b
-
+#- snippet: arraygrower.py (2012 Mar 29)
+#- SHA1: 0524398a658fe9cbf9b3ba557e16018f89e5027d
 class ArrayGrower (object):
     __slots__ = 'dtype ncols chunkSize _nextIdx _arr'.split ()
 
@@ -310,16 +309,13 @@ class ArrayGrower (object):
         self.chunkSize = chunkSize
         self.clear ()
 
-
     def clear (self):
         self._nextIdx = 0
         self._arr = None
         return self
 
-
     def __len__ (self):
         return self._nextIdx
-
 
     def addLine (self, line):
         from numpy import asarray, ndarray
@@ -339,11 +335,9 @@ class ArrayGrower (object):
         self._nextIdx += 1
         return self
 
-
     def add (self, *args):
         self.addLine (args)
         return self
-
 
     def finish (self):
         if self._arr is None:
@@ -355,15 +349,9 @@ class ArrayGrower (object):
 
         self.clear ()
         return ret
-#- snippet: statsacc.py (2012 Mar 28)
-#- SHA1: 0d4b20e26907fc81e903b3bb0cd738dafdb486ad
-
+#- snippet: statsacc.py (2012 Mar 29)
+#- SHA1: dd61a34a90a30faf9accb67a1f685c2015c4a958
 class StatsAccumulator (object):
-    # FIXME: I worry about loss of precision when n gets very large:
-    # we'll be adding a tiny number to a large number.  We could
-    # periodically rebalance or something. I'll think about it more if
-    # it's ever actually a problem.
-
     __slots__ = 'xtot xsqtot n _shape'.split ()
 
     def __init__ (self, shape=None):
@@ -378,7 +366,6 @@ class StatsAccumulator (object):
             from numpy import zeros
             self.xtot = zeros (self.shape)
             self.xsqtot = zeros (self.shape)
-
         self.n = 0
         return self
 
@@ -388,7 +375,6 @@ class StatsAccumulator (object):
             x = asarray (x)
             if x.shape != self._shape:
                 raise ValueError ('x has wrong shape')
-
         self.xtot += x
         self.xsqtot += x**2
         self.n += 1
@@ -415,17 +401,15 @@ class StatsAccumulator (object):
         return sqrt (self.var ())
 
     def var (self):
-        return self.xsqtot/self.n - (self.xtot/self.n)**2
-#- snippet: words.py (2012 Mar 28)
-#- SHA1: 11648697fc0ce5af2a639e53030f60506642df36
-
+        return self.xsqtot / self.n - (self.xtot / self.n)**2
+#- snippet: words.py (2012 Mar 29)
+#- SHA1: 5ba0c8c0085d1800ba46e7d5f5dd1dff9cd43a24
 def words (linegen):
     for line in linegen:
         a = line.split ('#', 1)[0].strip ().split ()
         if not len (a):
             continue
         yield a
-
 
 def pathwords (path, noexistok=False, **kwargs):
     try:
@@ -438,7 +422,6 @@ def pathwords (path, noexistok=False, **kwargs):
     except IOError as e:
         if e.errno != 2 or not noexistok:
             raise
-
 
 def pathtext (path, noexistok=False, **kwargs):
     try:
@@ -1377,9 +1360,8 @@ else:
 # Task implementation.
 
 ## quickutil: die
-#- snippet: die.py (2012 Mar 28)
-#- SHA1: 2d6b12f46e5b894a92000f35c621235adee4213b
-
+#- snippet: die.py (2012 Mar 29)
+#- SHA1: 3bdd3282e52403d2dec99d72680cb7bc95c99843
 def die (fmt, *args):
     if not len (args):
         raise SystemExit ('error: ' + str (fmt))
