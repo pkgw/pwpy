@@ -104,7 +104,7 @@ _sfindMiscOffsets = [24, 32, 40, 50, 58, 68, 74, 80, 86, 92, 100]
 _sfindUnits= [A2R, A2R, 1e-3, 1e-3, 1e-3, A2R,
               A2R, D2R, 1e-3, 1e-3]
 
-def parseSFind (lines):
+def parseSFind (lines, pristine=False):
     for linenum, line in enumerate (lines):
         if line[0] == '#':
             continue
@@ -124,10 +124,17 @@ def parseSFind (lines):
 
             setattr (source, name, val)
 
+        if (not pristine and source.totflux is not None and
+            source.pkflux is not None and source.totflux < source.pkflux):
+            # Sfind docs say you can occasionally get this for
+            # unresolved sources if the fitted Gaussian parameters are
+            # smaller than the beamsize.
+            source.totflux = source.pkflux
+
         if source.pkflux_uc is None or source.pkflux_uc == 0.:
             source.totflux_uc = source.pkflux_uc = None
         else:
-            source.totflux_uc = source.totflux * source.pkflux_uc / source.pkflux
+            source.totflux_uc = abs (source.totflux * source.pkflux_uc / source.pkflux)
 
         if source.ra_uc == 0.:
             source.ra_uc = None
@@ -315,11 +322,16 @@ nvsscols = columns ('ra ra_uc dec dec_uc totflux totflux_uc major major_uc',
 
 has = lambda s, f: hasattr (s, f) and getattr (s, f) is not None
 
-def deconvolve (source, bmaj, bmin, bpa):
+def deconvolve (source, bmaj, bmin, bpa, preserve=True):
     if (not has (source, 'major') or not has (source, 'minor')
         or not has (source, 'pa')):
         source.deconvolve_error = 'missing shape information'
         return source
+
+    if preserve:
+        source.c_major = source.major
+        source.c_minor = source.minor
+        source.c_pa = source.pa
 
     dmaj, dmin, dpa, status = gaussianDeconvolve (source.major,
                                                   source.minor,
