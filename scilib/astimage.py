@@ -651,7 +651,7 @@ class FITSImage (AstroImage):
 
         if openmode is None:
             return None
-        return open (path, openmod)
+        return open (path, openmode)
 
 
     def saveAsFITS (self, path, overwrite=False, openmode=None):
