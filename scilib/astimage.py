@@ -152,6 +152,10 @@ class AstroImage (object):
         raise NotImplementedError ()
 
 
+    def delete (self):
+        raise NotImplementedError ()
+
+
 def maybescale (x, a):
     if x is None:
         return None
@@ -389,6 +393,20 @@ class MIRIADImage (AstroImage):
         return FITSImage (path, openmode)
 
 
+    def delete (self):
+        if self._handle is not None:
+            raise UnsupportedError ('cannot delete the image at "%s" without '
+                                    'first closing it', self.path)
+        self._checkWriteable ()
+
+        import shutil, os.path
+
+        if os.path.isdir (self.path):
+            shutil.rmtree (self.path)
+        else:
+            os.unlink (self.path) # may be a symlink; rmtree rejects this
+
+
 def _casa_convert (d, unitstr):
     from pyrap.quanta import quantity
     return quantity (d['value'], d['unit']).get_value (unitstr)
@@ -554,6 +572,20 @@ class CASAImage (AstroImage):
         return FITSImage (path, openmode)
 
 
+    def delete (self):
+        if self._handle is not None:
+            raise UnsupportedError ('cannot delete the image at "%s" without '
+                                    'first closing it', self.path)
+        self._checkWriteable ()
+
+        import shutil, os.path
+
+        if os.path.isdir (self.path):
+            shutil.rmtree (self.path)
+        else:
+            os.unlink (self.path) # may be a symlink; rmtree rejects this
+
+
 class FITSImage (AstroImage):
     _modemap = {'r': 'readonly',
                 'rw': 'update' # ???
@@ -656,6 +688,15 @@ class FITSImage (AstroImage):
 
     def saveAsFITS (self, path, overwrite=False, openmode=None):
         return self.saveCopy (path, overwrite=overwrite, openmode=openmode)
+
+
+    def delete (self):
+        if self._handle is not None:
+            raise UnsupportedError ('cannot delete the image at "%s" without '
+                                    'first closing it', self.path)
+        self._checkWriteable ()
+
+        os.unlink (self.path)
 
 
 class SimpleImage (AstroImage):
