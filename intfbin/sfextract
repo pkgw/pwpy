@@ -4,11 +4,12 @@
 # Licensed under the GNU General Public License version 3 or higher
 
 """
-sfextract <input image> <SFIND keywords=,+options>
+sfextract <input image> [resid image] <SFIND keywords=,+options>
 
 Given an image, run MIRIAD SFIND on it and print *deconvolved* source
 parameters on standard output. Options on the command line are passed
-through to SFIND more-or-less verbatim.
+through to SFIND more-or-less verbatim. If given a second path, a
+residual image with the SFIND sources subtracted is created.
 
 Note that SFIND expects there to be restoring beam information in the
 image; if this is missing, it will make a dumb guess.
@@ -80,7 +81,7 @@ def wrongusage (docstring, *rest):
 
 
 def cmdline (argv):
-    inpath = None
+    inpath = residpath = None
     keywords = {}
 
     checkusage (__doc__, argv, usageifnoargs=True)
@@ -92,8 +93,10 @@ def cmdline (argv):
         elif arg[0] == '+':
             for opt in arg[1:].split (','):
                 keywords[opt] = True
+        elif residpath is not None:
+            wrongusage (__doc__, 'only one or two non-keyword arguments are allowed')
         elif inpath is not None:
-            wrongusage (__doc__, 'only one non-keyword argument is allowed')
+            residpath = arg
         else:
             inpath = arg
 
@@ -113,11 +116,31 @@ def cmdline (argv):
     if keywords.get ('kvannot', False):
         warn ('the file created by the "kvannot" option will be discarded')
 
-    sfind_extract (inpath, keywords)
+    setup_resid (inpath, residpath, keywords)
 
 
-def sfind_extract (inpath, keywords):
+def setup_resid (inpath, residpath, keywords):
     img = astimage.open (inpath, 'r')
+
+    if residpath is None:
+        return sfind_extract (img, None, inpath, keywords)
+
+    try:
+        resid = img.saveCopy (residpath, openmode='rw')
+        rv = sfind_extract (img, resid, inpath, keywords)
+        resid.close ()
+        return rv
+    except Exception:
+        et, ev, etb = sys.exc_info ()
+        try:
+            resid.close ()
+            resid.delete ()
+        except:
+            warn ('couldn\'t remove residual image "%s"', residpath)
+        raise et, ev, etb
+
+
+def sfind_extract (img, resid, inpath, keywords):
     sfinfo = {'imagepath': inpath,
               'sfindargs': ' '.join ('%s=%s' % (k, keywords[k])
                                      for k in sorted (keywords.iterkeys ()))}
@@ -189,7 +212,7 @@ def sfind_extract (inpath, keywords):
             if l.startswith ('RMS of the interior RMS'):
                 sfinfo['typrms'] = fortfloat (l.split ()[6])
 
-        parse_and_print (sfinfo, imageinfo, open ('sfind.log'))
+        parse_and_print (sfinfo, imageinfo, open ('sfind.log'), resid)
     finally:
         chdir (origdir)
         try:
@@ -198,25 +221,114 @@ def sfind_extract (inpath, keywords):
             warn ('couldn\'t remove temporary data directory "%s"', tmpcontainer)
 
 
-def parse_and_print (sfinfo, iminfo, sfstream):
+def parse_and_print (sfinfo, iminfo, sfstream, resid):
     import sys
 
     headers = ['%s=%s' % (k, sfinfo[k])
                for k in sorted (sfinfo.iterkeys ())]
 
-    if iminfo.bmaj is None:
-        gen = srctable.parseSFind (sfstream)
-    else:
-        def func ():
-            for s in srctable.parseSFind (sfstream):
-                s.pkflux = None
+    if resid is not None:
+        rsimple = resid.simple ()
+        rdata = rsimple.read ()
+
+    def func ():
+        for s in srctable.parseSFind (sfstream):
+            if resid is not None:
+                subtract_source (s, rdata, rsimple)
+
+            s.pkflux = None
+
+            if iminfo.bmaj is not None:
                 srctable.deconvolve (s, iminfo.bmaj, iminfo.bmin, iminfo.bpa)
-                yield s
-        gen = func ()
+                # TODO: do something with s.deconvolve_error
+
+            yield s
 
     cols = [c for c in srctable.sfindcols
             if c.name not in ('pkflux', 'pkflux_uc')]
-    flatdb.writeStreamedTable (sys.stdout.write, headers, cols, gen)
+    flatdb.writeStreamedTable (sys.stdout.write, headers, cols, func ())
+
+    if resid is not None:
+        rsimple.write (rdata)
+
+
+def subtract_source (src, data, image):
+    # FIXME: this is copied from msimgen; should probably centralize
+    # in a module. We sidestep some tricky issues about rotation of
+    # ra/dec vs the pixel axis by computing equatorial coordinates for
+    # every pixel that we think is near the source.
+
+    GAUSSMINFLUX = 1e-5 # XXX lame hardcoding
+
+    from numpy import (array, ceil, cos, empty, exp, floor, log,
+                       maximum, ones, pi, sin, sqrt, zeros)
+
+    smajor = src.major * F2S
+    sminor = src.minor * F2S
+    pixelcoords = image.topixel ([src.dec, src.ra])
+
+    # Compute effective sigmas in RA and Dec directions, then figure
+    # out about how far out we need to image in pixel space to do a
+    # faithful job of representing the source. This is parametrized by
+    # GAUSSMINFLUX, the approximate minimum Jy/px flux value that we
+    # will compute.
+
+    slat = ((cos (src.pa) / smajor)**2 + (sin (src.pa) / sminor)**2)**-0.5
+    slon = ((sin (src.pa) / smajor)**2 + (cos (src.pa) / sminor)**2)**-0.5
+    numsigmatotravel = sqrt (2 * log (abs (src.pkflux) / GAUSSMINFLUX))
+    numsigmatotravel = max (numsigmatotravel, 3)
+
+    dlat = slat * numsigmatotravel
+    dlon = slon * numsigmatotravel
+    deltapix = zeros (4) # minus y, minus x, plus y, plus x
+
+    for c1, c2 in zip ((-1, -1, 1, 1), (-1, 1, -1, 1)):
+        delta = pixelcoords - image.topixel ([src.dec + c1 * dlat,
+                                              src.ra + c2 * dlon / cos (src.dec)])
+        deltapix[0] = min (deltapix[0], delta[0])
+        deltapix[1] = min (deltapix[1], delta[1])
+        deltapix[2] = max (deltapix[2], delta[0])
+        deltapix[3] = max (deltapix[3], delta[1])
+
+    # Pad out to at least 3 pixels each way
+    coeff = array ([-1, -1, 1, 1])
+    deltapix = coeff * maximum (coeff * deltapix, ones (4) * 3)
+
+    # Transform to absolute pixels and clip to bounds. abspix[2,3] are
+    # offset by one because they only come up in Python range-type
+    # situations.
+
+    abspix = empty (4, dtype=np.int)
+    abspix[0] = max (floor (deltapix[0] + pixelcoords[0]), 0)
+    abspix[1] = max (floor (deltapix[1] + pixelcoords[1]), 0)
+    abspix[2] = min (ceil (deltapix[2] + pixelcoords[0]) + 1, image.shape[0])
+    abspix[3] = min (ceil (deltapix[3] + pixelcoords[1]) + 1, image.shape[1])
+
+    # Compute the Gaussian values, precreating arrays of ra/dec values
+    # of pixels so we can do most of the math vectorially.
+
+    ny = abspix[2] - abspix[0]
+    nx = abspix[3] - abspix[1]
+    lats, lons = empty ((2, ny, nx))
+
+    for ypix in xrange (abspix[0], abspix[2]):
+        dy = ypix - abspix[0]
+        pixelcoords[0] = ypix
+
+        for xpix in xrange (abspix[1], abspix[3]):
+            dx = xpix - abspix[1]
+            pixelcoords[1] = xpix
+            lats[dy,dx], lons[dy,dx] = image.toworld (pixelcoords)
+
+    lons -= src.ra
+    lons *= cos (lats) # sky coords to offset
+    lats -= src.dec
+    b = sin (-2 * src.pa) * (sminor**-2 - smajor**-2)
+    q = -0.5 * ((lats / slat)**2 + b * lons * lats + (lons / slon)**2)
+    px = src.pkflux * exp (q)
+
+    # Finally done.
+    data[abspix[0]:abspix[2],abspix[1]:abspix[3]] -= px
 
 
 def fortfloat (s):
