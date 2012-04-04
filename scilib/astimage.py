@@ -603,6 +603,7 @@ class FITSImage (AstroImage):
         self._handle = pyfits.open (path, self._modemap[mode])
         header = self._handle[0].header
         self._wcs = pywcs.WCS (header)
+        self._wcs.wcs.set ()
 
         self.units = maybelower (header.get ('bunit'))
 
