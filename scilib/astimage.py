@@ -617,7 +617,11 @@ class FITSImage (AstroImage):
             self.axdescs.append (header.get ('ctype%d' % q, '???'))
 
         self.bmaj = maybescale (header.get ('bmaj'), D2R)
-        self.bmin = maybescale (header.get ('bmin', self.bmaj * R2D), D2R)
+        if self.bmaj is None:
+            bmindefault = None
+        else:
+            bmindefault = self.bmaj * R2D
+        self.bmin = maybescale (header.get ('bmin', bmindefault), D2R)
         self.bpa = maybescale (header.get ('bpa', 0), D2R)
 
         self.pclat = maybescale (header.get ('obsdec'), D2R)
