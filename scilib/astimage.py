@@ -432,7 +432,9 @@ class CASAImage (AstroImage):
 
         if 'coordinates' in allinfo:
             pc = allinfo['coordinates'].get ('pointingcenter')
-            if pc is not None:
+            # initial=True signifies that the pointing center information
+            # hasn't actually been initialized.
+            if pc is not None and not pc['initial']:
                 # This bit of info doesn't have any metadata about units or
                 # whatever; appears to be fixed as RA/Dec in radians.
                 self.pclat = pc['value'][1]
