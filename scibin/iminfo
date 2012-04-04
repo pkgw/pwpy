@@ -42,7 +42,10 @@ def printinfo (path):
         loncell = (w2[lonax] - w1[lonax]) / delta * np.cos (w2[latax])
 
     if im.pclat is not None:
-        print 'center   =', fmtradec (im.pclon, im.pclat)
+        print 'center   =', fmtradec (im.pclon, im.pclat), '(pointing)'
+    elif im.toworld is not None:
+        w = im.toworld (0.5 * (np.asfarray (im.shape) - 1))
+        print 'center   =', fmtradec (w[lonax], w[latax]), '(lattice)'
 
     if im.shape is not None:
         print 'shape    =', ' '.join (str (x) for x in im.shape)
