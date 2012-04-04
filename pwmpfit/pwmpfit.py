@@ -101,14 +101,6 @@ from numpy.testing import assert_array_almost_equal as Taaae
 from numpy.testing import assert_almost_equal as Taae
 
 
-# Public constants
-
-DSIDE_AUTO = 0x0
-DSIDE_POS  = 0x1
-DSIDE_NEG  = 0x2
-DSIDE_TWO  = 0x3
-
-
 # Parameter Info attributes that can be specified
 #
 # Each parameter can be described by five floats:
@@ -130,6 +122,18 @@ PI_O_NAME = 0 # textual name of the parameter
 PI_O_TIED = 1 # fixed to be a function of other parameters
 PI_NUM_O = 2
 
+# Codes for the automatic derivative sidedness
+DSIDE_AUTO = 0x0
+DSIDE_POS  = 0x1
+DSIDE_NEG  = 0x2
+DSIDE_TWO  = 0x3
+
+_dside_names = {
+    'auto': DSIDE_AUTO,
+    'pos': DSIDE_POS,
+    'neg': DSIDE_NEG,
+    'two': DSIDE_TWO,
+}
 
 # Euclidean norm-calculating functions. Apparently the "careful" norm
 # calculator can be slow, while the "fast" version can be susceptible
@@ -1061,12 +1065,15 @@ class Problem (object):
         return self
 
 
-    def pSide (self, idx, mode):
-        if np.any (mode < 0 or mode > 3):
-            raise ValueError ('mode')
+    def pSide (self, idx, sidedness):
+        """Acceptable values for *sidedness* are "auto", "pos",
+        "neg", and "two"."""
+        dsideval = _dside_names.get (sidedness)
+        if dsideval is None:
+            raise ValueError ('unrecognized sidedness "%s"' % sidedness)
 
         p = self._pinfob
-        p[idx] = (p[idx] & ~PI_M_SIDE) | mode
+        p[idx] = (p[idx] & ~PI_M_SIDE) | dsideval
         return self
 
 
@@ -1940,20 +1947,20 @@ def _jac_sidedness ():
     Taaae (p._manual_jacobian (0), [[1.]])
 
     # DSIDE_AUTO should be the default.
-    p.pSide (0, DSIDE_AUTO)
+    p.pSide (0, 'auto')
     Taaae (p._manual_jacobian (0), [[1.]])
 
     # DSIDE_POS should be equivalent here.
-    p.pSide (0, DSIDE_POS)
+    p.pSide (0, 'pos')
     Taaae (p._manual_jacobian (0), [[1.]])
 
     # DSIDE_NEG should get the other side of the discont.
-    p.pSide (0, DSIDE_NEG)
+    p.pSide (0, 'neg')
     Taaae (p._manual_jacobian (0), [[-1.]])
 
     # DSIDE_AUTO should react to an upper limit and take
     # a negative-step derivative.
-    p.pSide (0, DSIDE_AUTO)
+    p.pSide (0, 'auto')
     p.pLimit (0, upper=0)
     Taaae (p._manual_jacobian (0), [[-1.]])
 
