@@ -94,7 +94,10 @@ def _runtests (namefilt=None):
     for f in _testfuncs:
         if namefilt is not None and f.__name__ != namefilt:
             continue
-        print f.__name__, '...'
+        n = f.__name__
+        if n[0] == '_':
+            n = n[1:]
+        print n, '...'
         f ()
 
 from numpy.testing import assert_array_almost_equal as Taaae
