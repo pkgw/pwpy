@@ -454,7 +454,7 @@ class ClosureComputer (object):
             else:
                 self.seenaps[fpol] = set ((ap, ))
 
-        self.integData[bp] = (data, flags, var, inttime)
+        self.integData[pbp] = (data, flags, var, inttime)
 
 
     def pDataSummary (self):
