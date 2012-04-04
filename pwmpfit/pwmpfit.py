@@ -1745,8 +1745,8 @@ class Problem (object):
         mask = (dside == DSIDE_NEG)[ifree]
         if ulimit is not None:
             mask |= x > ulimit - h
-            wh = np.where (mask)
-            h[wh] = -h[wh]
+        wh = np.where (mask)
+        h[wh] = -h[wh]
 
         if debug:
             print 'Jac-:', h
