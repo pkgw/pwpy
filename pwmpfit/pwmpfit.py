@@ -123,8 +123,7 @@ PI_NUM_F = 5
 # Five bits of data
 PI_M_SIDE = 0x3 # sidedness of derivative - two bits
 PI_M_FIXED = 0x4 # fixed value
-PI_M_PRINT = 0x8 # whether to print parameter value periodically
-PI_M_RELSTEP = 0x10 # whether the specified stepsize is relative
+PI_M_RELSTEP = 0x8 # whether the specified stepsize is relative
 
 # And two objects
 PI_O_NAME = 0 # textual name of the parameter
@@ -1068,11 +1067,6 @@ class Problem (object):
 
         p = self._pinfob
         p[idx] = (p[idx] & ~PI_M_SIDE) | mode
-        return self
-
-
-    def pPrint (self, idx, doprint):
-        self._setBit (idx, PI_M_PRINT, doprint)
         return self
 
 
