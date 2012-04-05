@@ -120,10 +120,9 @@ PI_M_SIDE = 0x3 # sidedness of derivative - two bits
 PI_M_FIXED = 0x4 # fixed value
 PI_M_RELSTEP = 0x8 # whether the specified stepsize is relative
 
-# And two objects
-PI_O_NAME = 0 # textual name of the parameter
-PI_O_TIEFUNC = 1 # fixed to be a function of other parameters
-PI_NUM_O = 2
+# And one object
+PI_O_TIEFUNC = 0 # fixed to be a function of other parameters
+PI_NUM_O = 1
 
 # Codes for the automatic derivative sidedness
 DSIDE_AUTO = 0x0
@@ -1001,7 +1000,6 @@ class Problem (object):
         p[PI_F_MAXSTEP] = np.inf
 
         newinfoo = p = np.ndarray ((PI_NUM_O, npar), dtype=np.object)
-        p[PI_O_NAME] = None
         p[PI_O_TIEFUNC] = None
 
         newinfob = p = np.ndarray (npar, dtype=np.int)
@@ -1086,19 +1084,6 @@ class Problem (object):
             raise ValueError ('tiefunc')
 
         self._pinfoo[PI_O_TIEFUNC,idx] = tiefunc
-        return self
-
-
-    def pName (self, idx, name):
-        self._pinfoo[PI_O_NAME,idx] = name
-        return self
-
-
-    def pNames (self, *names):
-        if len (names) != self._npar:
-            raise ValueError ('names')
-
-        self._pinfoo[PI_O_NAME] = names
         return self
 
 
