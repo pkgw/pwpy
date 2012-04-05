@@ -122,7 +122,7 @@ PI_M_RELSTEP = 0x8 # whether the specified stepsize is relative
 
 # And two objects
 PI_O_NAME = 0 # textual name of the parameter
-PI_O_TIED = 1 # fixed to be a function of other parameters
+PI_O_TIEFUNC = 1 # fixed to be a function of other parameters
 PI_NUM_O = 2
 
 # Codes for the automatic derivative sidedness
@@ -1002,7 +1002,7 @@ class Problem (object):
 
         newinfoo = p = np.ndarray ((PI_NUM_O, npar), dtype=np.object)
         p[PI_O_NAME] = None
-        p[PI_O_TIED] = None
+        p[PI_O_TIEFUNC] = None
 
         newinfob = p = np.ndarray (npar, dtype=np.int)
         p[:] = 0
@@ -1085,7 +1085,7 @@ class Problem (object):
         if not np.all ([x is None or callable (x) for x in t1]):
             raise ValueError ('tiefunc')
 
-        self._pinfoo[PI_O_TIED,idx] = tiefunc
+        self._pinfoo[PI_O_TIEFUNC,idx] = tiefunc
         return self
 
 
@@ -1131,12 +1131,12 @@ class Problem (object):
 
         p = self._pinfoo
 
-        if not np.all ([x is None or callable (x) for x in p[PI_O_TIED]]):
+        if not np.all ([x is None or callable (x) for x in p[PI_O_TIEFUNC]]):
             raise ValueError ('some tied values not None or callable')
 
         # And compute some useful arrays. A tied parameter counts as fixed.
 
-        tied = np.asarray ([x is not None for x in self._pinfoo[PI_O_TIED]])
+        tied = np.asarray ([x is not None for x in self._pinfoo[PI_O_TIEFUNC]])
         self._anytied = np.any (tied)
         self._ifree = np.where (-(self._getBits (PI_M_FIXED) | tied))[0]
 
@@ -1801,7 +1801,7 @@ class Problem (object):
 
 
     def _apply_ties (self, params):
-        funcs = self._pinfoo[PI_O_TIED]
+        funcs = self._pinfoo[PI_O_TIEFUNC]
 
         for i in xrange (self._npar):
             if funcs[i] is not None:
