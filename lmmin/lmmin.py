@@ -107,9 +107,7 @@ __all__ = ('enorm_fast enorm_mpfit_careful enorm_minpack '
 
 _testfuncs = []
 
-def test (f):
-    """A decorator for functions to be run as part of
-    the test suite."""
+def test (f): # a decorator
     _testfuncs.append (f)
     return f
 
@@ -179,7 +177,7 @@ def enorm_mpfit_careful (v, finfo):
     if mx == 0:
         return v[0] * 0. # preserve type (?)
     if not np.isfinite (mx):
-        raise ValueError ('computed nonfinite vector norm')
+        raise ValueError ('tried to compute norm of a vector with nonfinite values')
     if mx > finfo.max / v.size or mx < finfo.tiny * v.size:
         return mx * np.sqrt (np.dot (v / mx, v / mx))
 
@@ -288,20 +286,15 @@ appeared in Linpack."""
     m, n = a.shape
 
     if m < n:
-        raise ValueError ('a must be at least as tall as it is wide')
-
-    # Initialize our various arrays.
+        raise ValueError ('"a" must be at least as tall as it is wide')
 
     acnorm = np.empty (n, finfo.dtype)
     for j in xrange (n):
         acnorm[j] = enorm (a[:,j], finfo)
 
     rdiag = acnorm.copy ()
-    wa = rdiag.copy ()
-
+    wa = acnorm.copy ()
     pmut = np.arange (n)
-
-    # Start the computation.
 
     for i in xrange (n):
         # Find the column of a with the i'th largest norm,
@@ -835,7 +828,6 @@ def _lmpar (r, ipvt, diag, qtb, delta, x, sdiag, par, enorm, finfo):
             paru = min (paru, par)
 
         # Improve estimate of par
-
         par = max (parl, par + parc)
 
     # All done
@@ -1195,9 +1187,9 @@ class Problem (object):
         npar = self._npar
 
         if not np.all (np.isfinite (errinv)):
-            raise ValueError ('some uncertainties are zero or nonfinite')
+            raise ValueError ('some inverse errors are nonfinite')
 
-        # FIXME: handle yobs.ndim != 1 and/or yops being complex
+        # FIXME: handle yobs.ndim != 1 and/or yobs being complex
 
         if reckless:
             def ywrap (pars, nresids):
@@ -1640,8 +1632,10 @@ class Problem (object):
                 if gnorm <= finfo.eps:
                     status.add ('geps')
 
-                # Repeat loop if iteration unsuccessful (that is,
-                # ratio < 1e-4 and not stopping criteria met)
+                # Repeat loop if iteration
+                # unsuccessful. "Unsuccessful" means that the ratio of
+                # actual to predicted norm reduction is less than 1e-4
+                # and none of the stopping criteria were met.
                 if ratio >= 0.0001 or len (status):
                     break
 
@@ -2070,6 +2064,8 @@ def _lmder1_driver (nout, func, jac, guess, target_fnorm1,
 
 
 def _lmder1_linear_full_rank (n, m, factor, target_fnorm1, target_fnorm2):
+    """A full-rank linear function (lmder test #1)"""
+
     def func (params, vec):
         s = params.sum ()
         temp = 2. * s / m + 1
@@ -2100,6 +2096,8 @@ def _lmder1_linear_full_rank_2 ():
 
 
 def _lmder1_linear_rank1 (n, m, factor, target_fnorm1, target_fnorm2, target_params):
+    """A rank-1 linear function (lmder test #2)"""
+
     def func (params, vec):
         s = 0
         for j in xrange (n):
@@ -2133,7 +2131,7 @@ def _lmder1_linear_rank1_2 ():
 
 
 def _lmder1_linear_r1zcr (n, m, factor, target_fnorm1, target_fnorm2, target_params):
-    """linear function - rank 1 with zero columns and rows"""
+    """A rank-1 linear function with zero columns and rows (lmder test #3)"""
 
     def func (params, vec):
         s = 0
@@ -2172,6 +2170,8 @@ def _lmder1_linear_r1zcr_2 ():
 
 @test
 def _lmder1_rosenbrock ():
+    """Rosenbrock function (lmder test #4)"""
+
     def func (params, vec):
         vec[0] = 10 * (params[1] - params[0]**2)
         vec[1] = 1 - params[0]
@@ -2192,6 +2192,7 @@ def _lmder1_rosenbrock ():
 
 @test
 def _lmder1_helical_valley ():
+    """Helical valley function (lmder test #5)"""
     tpi = 2 * np.pi
 
     def func (params, vec):
@@ -2236,9 +2237,9 @@ def _lmder1_helical_valley ():
 
 
 def _lmder1_powell_singular ():
-    """Don't run this as a test, since it just zooms to zero
-    parameters.  The precise results depend a lot on nitty-gritty
-    rounding and tolerances and things."""
+    """Powell's singular function (lmder test #6). Don't run this as a
+    test, since it just zooms to zero parameters.  The precise results
+    depend a lot on nitty-gritty rounding and tolerances and things."""
 
     def func (params, vec):
         vec[0] = params[0] + 10 * params[1]
