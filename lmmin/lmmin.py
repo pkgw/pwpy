@@ -60,6 +60,14 @@
 #
 # == Academic References ==
 #
+# Levenberg, K. 1944, "A method for the solution of certain nonlinear
+#  problems in least squares," Quart. Appl. Math., vol. 2,
+#  pp. 164-168.
+#
+# Marquardt, DW. 1963, "An algorithm for least squares estimation of
+#  nonlinear parameters," SIAM J. Appl. Math., vol. 11, pp. 431-441.
+#  (DOI: 10.1137/0111030 )
+#
 # For MINPACK-1:
 #
 # Moré, J. 1978, "The Levenberg-Marquardt Algorithm: Implementation
