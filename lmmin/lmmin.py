@@ -978,7 +978,7 @@ class Problem (object):
     gtol = 1e-10
     damp = 0.
     factor = 100.
-    epsfunc = None
+    epsilon = None
 
     maxiter = 200
     normfunc = None
@@ -1227,7 +1227,7 @@ class Problem (object):
         return self.setFunc (yobs.size, ywrap, jwrap)
 
 
-    def _fixupCheck (self):
+    def _fixupCheck (self, dtype):
         self._checkParamConfig ()
 
         if self._nout is None:
@@ -1244,8 +1244,10 @@ class Problem (object):
         self.damp = float (self.damp)
         self.factor = float (self.factor)
 
-        if self.epsfunc is not None:
-            self.epsfunc = float (self.epsfunc)
+        if self.epsilon is None:
+            self.epsilon = np.finfo (dtype).eps
+        else:
+            self.epsilon = float (self.epsilon)
 
         self.maxiter = int (self.maxiter)
         self.debugCalls = bool (self.debugCalls)
@@ -1295,7 +1297,7 @@ class Problem (object):
 
 
     def getNDOF (self):
-        self._fixupCheck ()
+        self._fixupCheck (np.float) # dtype is irrelevant here
         return self._nout - self._ifree.size
 
 
@@ -1316,7 +1318,7 @@ class Problem (object):
         n.gtol = self.gtol
         n.damp = self.damp
         n.factor = self.factor
-        n.epsfunc = self.epsfunc
+        n.epsilon = self.epsilon
         n.maxiter = self.maxiter
         n.normfunc = self.normfunc
         n.debugCalls = self.debugCalls
@@ -1346,7 +1348,7 @@ class Problem (object):
     def solve (self, initial_params=None, dtype=np.float):
         from numpy import any, clip, dot, isfinite, sqrt, where
 
-        self._fixupCheck ()
+        self._fixupCheck (dtype)
         ifree = self._ifree
         ycall = self._ycall
         n = ifree.size # number of free params; we try to allow n = 0
@@ -1723,15 +1725,9 @@ class Problem (object):
     def _get_jacobian_automatic (self, params, fvec, ulimit, dside, maxstep, isrel, finfo):
         ifree = self._ifree
         debug = self.debugJac
-        machep = finfo.eps
+        eps = np.sqrt (max (self.epsilon, finfo.eps))
 
         x = params[ifree]
-
-        if self.epsfunc is None:
-            eps = machep
-        else:
-            eps = self.epsfunc
-        eps = np.sqrt (max (eps, machep))
         m = len (fvec)
         n = len (x)
 
@@ -1786,7 +1782,7 @@ class Problem (object):
 
 
     def _manual_jacobian (self, params, dtype=np.float):
-        self._fixupCheck ()
+        self._fixupCheck (dtype)
 
         ifree = self._ifree
 
@@ -1817,7 +1813,7 @@ class Problem (object):
 
     def solve_scipy (self, initial_params=None, dtype=np.float, strict=True):
         from numpy import any, clip, dot, isfinite, sqrt, where
-        self._fixupCheck ()
+        self._fixupCheck (dtype)
 
         if strict:
             if self._ifree.size != self._npar:
@@ -1858,7 +1854,7 @@ class Problem (object):
         t = leastsq (sofunc, initial_params, Dfun=sojac, full_output=1,
                      ftol=self.ftol, xtol=self.xtol, gtol=self.gtol,
                      maxfev=self.maxiter, # approximate
-                     epsfcn=self.epsfunc, factor=self.factor, diag=self.diag,
+                     epsfcn=self.epsilon, factor=self.factor, diag=self.diag,
                      warning=False)
 
         covar = t[1]
