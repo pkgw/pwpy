@@ -98,6 +98,10 @@ see comments in the module source code.)
 from __future__ import division
 import numpy as np
 
+__all__ = ('enorm_fast enorm_mpfit_careful enorm_minpack '
+           'Problem Solution ResidualProblem '
+           'checkDerivative').split ()
+
 
 # Quickie testing infrastructure
 
