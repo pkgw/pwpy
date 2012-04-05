@@ -10,7 +10,7 @@ cosmology.py -- evaluate standard FRW cosmological integrals
 elcmp.py -- "Compare elevations of various sources over time"
    removed 8861468037ea4db4dfb5939e4c3f118287557d19
 mpfit.py -- semi-customized version of Python port of Markwardt's
-   mpfit; deprecated in favor of pwmpfit.git
+   mpfit; deprecated in favor of lmmin/
    removed 8861468037ea4db4dfb5939e4c3f118287557d19
 numstd.py -- import a subset of numpy functions, popaarray(), and rms()
    removed 8861468037ea4db4dfb5939e4c3f118287557d19

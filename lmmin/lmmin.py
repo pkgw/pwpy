@@ -8,7 +8,13 @@
 # Permission to use, copy, modify, and distribute modified or
 # unmodified copies is granted, provided this copyright and disclaimer
 # are included unchanged.
-#
+
+### lmmin is a Levenberg-Marquardt least-squares minimizer derived
+### (circuitously) from the classic MINPACK implementation. Usage
+### information is given in the docstring farther below. Various
+### important pieces of information that are out of the scope of the
+### docstring follow immediately below.
+
 # == Provenance ==
 #
 # This implementation of the Levenberg-Marquardt technique has its
@@ -30,9 +36,14 @@
 # was done by Nadia Dencheva.
 #
 # In 2011-2012, Peter Williams began fixing bugs in the port and
-# significantly reworking the API, creating this file, pwmpfit.py.
+# significantly reworking the API, creating this file, lmmin.py.
 # Previous authors deserve all of the credit for anything that
 # works and none of the blame for anything that doesn't.
+#
+# (There exists a C-based Levenberg-Marquardt minimizer named lmmin by
+# Joachim Wuttke [http://joachimwuttke.de/lmfit/]. This implementation
+# is not directly related to that one, although lmmin also appears to
+# stem from the original MINPACK implementation.)
 #
 #
 # == Web Links ==
@@ -69,7 +80,7 @@
 #  arxiv:0902.2850; bibcode: 2009ASPC..411..251M)
 
 """
-pwmpfit - Pythonic, Numpy-based Levenberg-Marquardt least-squares minimizer
+lmmin - Pythonic, Numpy-based Levenberg-Marquardt least-squares minimizer
 
 (This docstring will contain only usage information. For important
 information regarding provenance, license, and academic references,
