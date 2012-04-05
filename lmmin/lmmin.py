@@ -156,13 +156,16 @@ _dside_names = {
     'two': DSIDE_TWO,
 }
 
-# Euclidean norm-calculating functions. Apparently the "careful" norm
-# calculator can be slow, while the "fast" version can be susceptible
-# to under- or overflows.
+# Euclidean norm-calculating functions. The naive implementation is
+# fast but can be sensitive to under/overflows. The "mpfit_careful"
+# version is slower but tries to be more robust. The "minpack"
+# version, which does indeed emulate the MINPACK implementation, also
+# tries to be careful. I've used this last implementation a little
+# bit but haven't compared it to the others thoroughly.
 
-_enorm_fast = lambda v, finfo: np.sqrt (np.dot (v, v))
+enorm_fast = lambda v, finfo: np.sqrt (np.dot (v, v))
 
-def _enorm_careful (v, finfo):
+def enorm_mpfit_careful (v, finfo):
     # "This is hopefully a compromise between speed and robustness.
     # Need to do this because of the possibility of over- or under-
     # flow."
@@ -179,7 +182,7 @@ def _enorm_careful (v, finfo):
     return np.sqrt (np.dot (v, v))
 
 
-def _enorm_minpack (v, finfo):
+def enorm_minpack (v, finfo):
     rdwarf = 3.834e-20
     rgiant = 1.304e19
     agiant = rgiant / v.size
@@ -357,7 +360,8 @@ def _manual_qr_factor_packed (a, dtype=np.float):
     # and makes a copy of its input to make comparisons easier.
 
     a = np.array (a, dtype)
-    pmut, rdiag, acnorm = _qr_factor_packed (a, _enorm_careful, np.finfo (dtype))
+    pmut, rdiag, acnorm = _qr_factor_packed (a, enorm_mpfit_careful,
+                                             np.finfo (dtype))
     return a, pmut, rdiag, acnorm
 
 
@@ -977,10 +981,10 @@ class Problem (object):
     epsfunc = None
 
     maxiter = 200
+    normfunc = None
 
     diag = None
 
-    fastnorm = False
     debugCalls = False
     debugJac = False
 
@@ -1244,8 +1248,6 @@ class Problem (object):
             self.epsfunc = float (self.epsfunc)
 
         self.maxiter = int (self.maxiter)
-
-        self.fastnorm = bool (self.fastnorm)
         self.debugCalls = bool (self.debugCalls)
         self.debugJac = bool (self.debugJac)
 
@@ -1256,6 +1258,11 @@ class Problem (object):
                 raise ValueError ('diag')
             if np.any (self.diag <= 0.):
                 raise ValueError ('diag')
+
+        if self.normfunc is None:
+            self.normfunc = enorm_mpfit_careful
+        elif not callable (self.normfunc):
+            raise ValueError ('normfunc must be a callable or None')
 
         # Bounds and type checks
 
@@ -1311,7 +1318,7 @@ class Problem (object):
         n.factor = self.factor
         n.epsfunc = self.epsfunc
         n.maxiter = self.maxiter
-        n.fastnorm = self.fastnorm
+        n.normfunc = self.normfunc
         n.debugCalls = self.debugCalls
         n.debugJac = self.debugJac
 
@@ -1382,11 +1389,7 @@ class Problem (object):
 
         # Init fnorm
 
-        if self.fastnorm:
-            enorm = _enorm_fast
-        else:
-            enorm = _enorm_careful
-
+        enorm = self.normfunc
         fnorm1 = -1.
         fvec = np.ndarray (self._nout, dtype)
         ycall (params, fvec)
@@ -1877,7 +1880,7 @@ class Problem (object):
         soln.covar = covar
         soln.perror = perror
         soln.fvec = t[2]['fvec']
-        soln.fnorm = _enorm_minpack (soln.fvec, finfo)**2
+        soln.fnorm = enorm_minpack (soln.fvec, finfo)**2
         soln.fjac = t[2]['fjac']
         soln.nfev = t[2]['nfev']
         soln.njev = 0 # could compute when given explicit derivative ...
@@ -2020,14 +2023,14 @@ def _lmder1_test (nout, func, jac, guess):
 
     y = np.empty (nout)
     func (guess, y)
-    fnorm1 = _enorm_careful (y, finfo)
+    fnorm1 = enorm_mpfit_careful (y, finfo)
     p = Problem (guess.size, nout, func, jac)
     p.xtol = p.ftol = tol
     p.gtol = 0
     p.maxiter = 100 * (guess.size + 1)
     s = p.solve (guess)
     func (s.params, y)
-    fnorm2 = _enorm_careful (y, finfo)
+    fnorm2 = enorm_mpfit_careful (y, finfo)
 
     print '  n, m:', guess.size, nout
     print '  fnorm1:', fnorm1
@@ -2045,7 +2048,7 @@ def _lmder1_driver (nout, func, jac, guess, target_fnorm1,
 
     y = np.empty (nout)
     func (guess, y)
-    fnorm1 = _enorm_careful (y, finfo)
+    fnorm1 = enorm_mpfit_careful (y, finfo)
     Taae (fnorm1, target_fnorm1)
 
     p = Problem (guess.size, nout, func, jac)
@@ -2062,7 +2065,7 @@ def _lmder1_driver (nout, func, jac, guess, target_fnorm1,
     aaae (s.params / scale, target_params / scale, decimal=10)
 
     func (s.params, y)
-    fnorm2 = _enorm_careful (y, finfo)
+    fnorm2 = enorm_mpfit_careful (y, finfo)
     Taae (fnorm2, target_fnorm2)
 
 
