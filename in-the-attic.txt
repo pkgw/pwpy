@@ -28,4 +28,5 @@ attenlogcmp.py, pyscan.py, walsh-flags.py, walsh_adc_conflict.sh
 -- various ATA observing helpers I haven't used for a while
   353ef5cd65ee03e2fb2f9a17cafddcdb2c4fecec
 autohist in fit.py -- automatic guessing of good histogram binning
+gauss2d* in fit.py -- lame 2D non-orientable gaussian fitting
   4d80e9baec40f78882c05a02df7922f242997fdc

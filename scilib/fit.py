@@ -36,51 +36,6 @@ def linearConstrained (x, y, x0, y0, weights = None):
 
     return np.float64 (np.dot (A, B)) / np.dot (A, A)
 
-# This is all copied from the Scipy Cookbook page on "Fitting Data"
-
-def makeGauss2dFunc (A, xmid, ymid, xwidth, ywidth):
-    return lambda x, y: A * _exp (-0.5 * (((xmid - x) / xwidth)**2 + \
-                                          ((ymid - y) / ywidth)**2))
-
-def guessGauss2dParams (data):
-    from numpy import indices, sqrt, abs, arange, int
-
-    total = data.sum ()
-    X, Y = indices (data.shape)
-    x = (X * data).sum () / total
-    y = (Y * data).sum () / total
-
-    col = data[:, int (y)]
-    row = data[int (x), :]
-
-    xwidth = sqrt (abs ((arange (col.size) - y)**2 * col).sum () / col.sum ())
-    ywidth = sqrt (abs ((arange (row.size) - x)**2 * row).sum () / row.sum ())
-
-    A = data.max ()
-
-    return A, x, y, xwidth, ywidth
-
-def gauss2d (data, guess=None, getResid=False, **kwargs):
-    """guess and return value take the form: (height, xctr, yctr, xwidth, ywidth)."""
-
-    from scipy import optimize
-
-    if guess is None: guess = guessGauss2dParams (data)
-
-    def err (params):
-        model = makeGauss2dFunc (*params)(*np.indices (data.shape))
-        return np.ravel (model - data)
-
-    pfit, xx, xx, msg, success = optimize.leastsq (err, guess,
-                                                   full_output=True, **kwargs)
-
-    if success < 1 or success > 4:
-        raise Exception ('Least square fit failed: ' + msg)
-
-    if not getResid: return pfit
-
-    model = makeGauss2dFunc (*pfit)(*np.indices (data.shape))
-    return pfit, data - model
 
 # More organized fitting.
 
