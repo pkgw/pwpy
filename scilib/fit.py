@@ -6,39 +6,6 @@
 import numpy as np
 
 
-def linearConstrained (x, y, x0, y0, weights = None):
-    """Perform a linear fit through the points given in x, y that is
-    constrained to pass through x0, y0. Thus the only free parameter
-    is the slope of the fit line, A, which is the return
-    value. 'weights', if specified, gives a weight that is assigned to
-    each point; otherwise, each point is weighted equally. (Suggested:
-    1 / err). Thus x, y, and weights should all have the same length.
-
-    Returns: A, the slope of the best fit. So 'A * (x - x0) + y0'
-    yields the best-fit points.
-    """
-
-    x = np.asfarray (x)
-    y = np.asfarray (y)
-
-    if weights is None:
-        weights = np.ones (len (x))
-    else:
-        weights = np.asfarray (weights)
-
-    A = (x - x0) * weights
-    B = (y - y0) * weights
-
-    # Upgrade precision in case all of our arrays were ints.
-    # FIXME: is there a function to upgrade something to at least
-    # a float? If all the inputs are float32's, we should also
-    # return a float32.
-
-    return np.float64 (np.dot (A, B)) / np.dot (A, A)
-
-
-# More organized fitting.
-
 class FitBase (object):
     """A object holding information in a generic fitting operation.
     Fields are:
@@ -316,6 +283,7 @@ class FitBase (object):
         vb.setWeight (0, 3)
         return vb
 
+
 class LinearFit (FitBase):
     _paramNames = ['a', 'b']
 
@@ -387,135 +355,6 @@ class SlopeFit (FitBase):
     def _fitExport (self):
         self.m = self.params[0]
         self.sigma_m = self.uncerts[0]
-
-
-class LeastSquaresFit (FitBase):
-    """A Fit object that implements its fit via a generic least-squares
-    minimization algorithm. Extra fields are:
-
-      cov (*) - The covariance matrix of the fitted parameters.
-
-    Subclassers must implement:
-
-      _paramNames - A list of textual names corresponding to the model parameters.
-            guess - The function to guess initial parameters, given the data.
-        makeModel - The function to return a model evaluator function.
-    """
-
-    def _fitImpl (self, x, y, sig, guess, reckless, **kwargs):
-        """Obtain a fit in some way, and set at least the following
-        fields:
-
-        params - a tuple of best-fit parameters (compatible with the result of guess)
-        uncerts - A tuple of uncertainties of the parameters.
-        """
-
-        from scipy.optimize import leastsq
-
-        w = sig ** -1
-
-        if issubclass (y.dtype.type, np.complexfloating):
-            def error (p):
-                self.mfunc = f = self.makeModel (*p)
-                wresid = np.ravel ((f (x) - y) * w)
-                return np.concatenate ((wresid.real, wresid.imag))
-        else:
-            def error (p):
-                self.mfunc = f = self.makeModel (*p)
-                return np.ravel ((f (x) - y) * w)
-
-        pfit, cov, xx, msg, success = leastsq (error, guess, full_output=True,
-                                               **kwargs)
-
-        if not reckless and (success < 1 or success > 4):
-            raise Exception ('Least square fit failed: ' + msg)
-
-        if not reckless and cov is None:
-            print 'No covariance matrix!'
-            print 'Fit params:', pfit
-            print 'Message:', msg
-            print 'Success code:', success
-            raise Exception ('No covariance matrix!')
-
-        self.params = np.atleast_1d (pfit)
-        self.uncerts = np.sqrt (cov.diagonal ())
-        self.cov = cov
-
-
-class CustomLeastSquaresFit (LeastSquaresFit):
-    """A fit whose implementation is set by setting member functions.
-Before an instance may be used, you must call `setup`. Example::
-
-   def model (a, b, c):
-       return lambda x: a * N.exp (b * x**2) + c
-
-   f = CustomLeastSquaresFit ().setup (model, 1, -0.5, 0)
-   f.setData (x, y).fakeSigmas (1).fit ().printParams ()
-
-The parameter names will be determined from the function argument names.
-"""
-
-    _paramNames = None
-    _modeler = None
-    _guesser = None
-
-    def setup (self, model, *guess):
-        """Set the model function and initial guess.
-
-:arg callable model: a function that creates a model function
-:arg guess: guess values or a guess function
-:returns: *self*
-
-The model function works so that::
-
-   modelinstancefunc = model (param1, param2, ...)
-   modeldata = modelinstancefunc (x)
-
-The guess is either a list of guess values, or a callable guess
-function. If it is the latter, it will be used to generate a guess
-from the data, and it should have a prototype of ``paramguesstuple =
-guess (x, y)``.
-
-For example::
-
-   def model (a, b, c):
-       return lambda x: a * N.exp (b * x**2) + c
-
-   fitobj.setup (model, 1, -0.5, 0)
-
-   def guess (x, y):
-       return y.max (), -0.5 / y.var (), y.mean ()
-
-   fitobj.setup (model, guess)
-
-"""
-        self._modeler = model
-        self._paramNames = model.func_code.co_varnames[:model.func_code.co_argcount]
-
-        if len (guess) == 1 and callable (guess[0]):
-            self._guesser = guess[0]
-        else:
-            if len (guess) != len (self._paramNames):
-                raise ValueError ('guess size does not match number of '
-                                  'model parameters')
-            guess = np.asarray (guess)
-            def guesser (x, y):
-                return guess
-            self._guesser = guesser
-
-        return self
-
-
-    def makeModel (self, *params):
-        if self._modeler is None:
-            raise Exception ('setup() has not been called')
-        return self._modeler (*params)
-
-
-    def guess (self):
-        if self._guesser is None:
-            raise Exception ('setup() has not been called')
-        return self._guesser (self.x, self.y)
 
 
 class ConstrainedMinFit (FitBase):
@@ -646,98 +485,6 @@ class ConstrainedMinFit (FitBase):
         self.rchisq = o.fnorm / ndof
 
 
-class MPFitTest (ConstrainedMinFit):
-    _paramNames = ['a', 'b']
-
-    def guess (self):
-        return (0, 0)
-
-    def makeModel (self, a, b):
-        return lambda x: a + b * x
-
-    def _fitExport (self):
-        self.a, self.b = self.params
-        self.sigma_a, self.sigma_b = self.uncerts
-
-class RealConstrainedMinFit (FitBase):
-    """A Fit object that implements its fit via a generic constrained
-    function minimization algorithm. Extra fields are:
-
-      ??
-
-    Subclassers must implement:
-
-      _paramNames - A list of textual names corresponding to the model parameters.
-            guess - The function to guess initial parameters, given the data.
-        makeModel - The function to return a model evaluator function.
-    """
-
-    makeModelDeriv = None
-
-    """Returns a function d(x) such that
-
-    d(x) = J
-
-    J.shape = (len (params), x.size)
-    J[ip,ix] = dModel(x[ix])/dparams[ip]
-
-    """
-
-    def __init__ (self):
-        super (ConstrainedMinFit, self).__init__ ()
-
-        self._bounds = [(None, None)] * len (self._paramNames)
-
-    def setBounds (self, pidx, min=None, max=None):
-        if pidx < 0 or pidx >= len (self._paramNames):
-            raise ValueError ('pidx')
-
-        self._bounds[pidx] = (min, max)
-        return self
-
-    def _fitImpl (self, x, y, sig, guess, reckless, **kwargs):
-        """Obtain a fit in some way, and set at least the following
-        fields:
-
-        params - a tuple of best-fit parameters (compatible with the result of guess)
-        uncerts - A tuple of uncertainties of the parameters.
-        """
-
-        from scipy.optimize import fmin_l_bfgs_b
-
-        w2 = sig ** -2
-        ndof = x.size - len (guess)
-
-        def rchisq (p):
-            self.mfunc = f = self.makeModel (*p)
-            self.mdata = d = f (x)
-            self.resids = r = d - y
-            self.rchisq = c = np.dot (r**2, w2) / ndof
-            return c
-
-        if self.makeModelDeriv is None:
-            approx_grad = True
-            grad = None
-        else:
-            approx_grad = False
-            def grad (p):
-                self.dfunc = d = self.makeModelDeriv (*p)
-                g = (2 * self.resids * w2 * d(x)).sum (1)
-                print 'R:', 2 * self.resids * w2
-                print 'G:', g
-                return g
-
-        pfit, c, info = fmin_l_bfgs_b (rchisq, guess, grad, (), approx_grad,
-                                       self._bounds, **kwargs)
-
-        if not reckless and info['warnflag'] != 0:
-            raise Exception ('L-BFGS-B minimization failed: %d, %s' % (info['warnflag'],
-                                                                       info['task']))
-
-        self.params = np.atleast_1d (pfit)
-        self.uncerts = np.zeros_like (self.params)
-
-
 class GaussianFit (LeastSquaresFit):
     _paramNames = ['height', 'xmid', 'width']
 
@@ -760,6 +507,7 @@ class GaussianFit (LeastSquaresFit):
     def _fitExport (self):
         self.height, self.xmid, self.width = self.params
         self.sigma_h, self.sigma_x, self.sigma_w = self.uncerts
+
 
 class PowerLawFit (LeastSquaresFit):
     _paramNames = ['q', 'alpha']
@@ -784,6 +532,7 @@ class PowerLawFit (LeastSquaresFit):
     def _fitExport (self):
         self.q, self.alpha = self.params
         self.sigma_q, self.sigma_a = self.uncerts
+
 
 class BiPowerLawFit (LeastSquaresFit):
     _paramNames = ['xbr', 'ybr', 'alpha1', 'alpha2']
@@ -810,6 +559,7 @@ class BiPowerLawFit (LeastSquaresFit):
     def _fitExport (self):
         self.xbr, self.ybr, self.alpha1, self.alpha2 = self.params
         self.sigma_xbr, self.sigma_ybr, self.sigma_a1, self.sigma_a2 = self.uncerts
+
 
 class LameQuadraticFit (LeastSquaresFit):
     """This is lame because it uses a least-squares fit when the
