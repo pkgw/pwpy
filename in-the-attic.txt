@@ -29,4 +29,5 @@ attenlogcmp.py, pyscan.py, walsh-flags.py, walsh_adc_conflict.sh
   353ef5cd65ee03e2fb2f9a17cafddcdb2c4fecec
 autohist in fit.py -- automatic guessing of good histogram binning
 gauss2d* in fit.py -- lame 2D non-orientable gaussian fitting
+ricefit in fit.py -- fitting of Rice distribution with helpful comments
   4d80e9baec40f78882c05a02df7922f242997fdc
