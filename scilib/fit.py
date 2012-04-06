@@ -3,7 +3,7 @@
 
 # Routines for doing basic fits with numpy
 
-import numpy as _N
+import numpy as np
 
 # Histogram binning suggestions
 #
@@ -32,18 +32,18 @@ choice: one of 'scott', 'sturges', or 'f-d' (for Freedman-Diaconis)
         if std is None: std = data.std ()
         wbin = 3.5 * std / data.size**0.33333
         wdata = range[1] - range[0]
-        n = int (_N.ceil (wdata / wbin))
+        n = int (np.ceil (wdata / wbin))
         delta = (n * wbin - wdata) / 2
         range = (range[0] - delta, range[1] + delta)
     elif choice == 'sturges':
-        n = int (_N.ceil (_N.log2 (data.size) + 1))
+        n = int (np.ceil (np.log2 (data.size) + 1))
     elif choice == 'f-d':
         from scipy.stats import scoreatpercentile as sap
 
         iqr = sap (data, 75) - sap (data, 25)
         wbin = 2 * iqr / data.size**0.33333
         wdata = range[1] - range[0]
-        n = int (_N.ceil (wdata / wbin))
+        n = int (np.ceil (wdata / wbin))
         delta = (n * wbin - wdata) / 2
         range = (range[0] - delta, range[1] + delta)
     elif choice == 'custom':
@@ -51,7 +51,7 @@ choice: one of 'scott', 'sturges', or 'f-d' (for Freedman-Diaconis)
     else:
         raise Exception ('Unknown histogram binning choice %s' % choice)
 
-    return _N.histogram (data, n, range, **kwargs)
+    return np.histogram (data, n, range, **kwargs)
 
 # Some cheesy fits
 
@@ -67,13 +67,13 @@ def linearConstrained (x, y, x0, y0, weights = None):
     yields the best-fit points.
     """
 
-    x = _N.asfarray (x)
-    y = _N.asfarray (y)
+    x = np.asfarray (x)
+    y = np.asfarray (y)
 
     if weights is None:
-        weights = _N.ones (len (x))
+        weights = np.ones (len (x))
     else:
-        weights = _N.asfarray (weights)
+        weights = np.asfarray (weights)
 
     A = (x - x0) * weights
     B = (y - y0) * weights
@@ -83,7 +83,7 @@ def linearConstrained (x, y, x0, y0, weights = None):
     # a float? If all the inputs are float32's, we should also
     # return a float32.
 
-    return _N.float64 (_N.dot (A, B)) / _N.dot (A, A)
+    return np.float64 (np.dot (A, B)) / np.dot (A, A)
 
 # This is all copied from the Scipy Cookbook page on "Fitting Data"
 
@@ -117,8 +117,8 @@ def gauss2d (data, guess=None, getResid=False, **kwargs):
     if guess is None: guess = guessGauss2dParams (data)
 
     def err (params):
-        model = makeGauss2dFunc (*params)(*_N.indices (data.shape))
-        return _N.ravel (model - data)
+        model = makeGauss2dFunc (*params)(*np.indices (data.shape))
+        return np.ravel (model - data)
 
     pfit, xx, xx, msg, success = optimize.leastsq (err, guess,
                                                    full_output=True, **kwargs)
@@ -128,7 +128,7 @@ def gauss2d (data, guess=None, getResid=False, **kwargs):
 
     if not getResid: return pfit
 
-    model = makeGauss2dFunc (*pfit)(*_N.indices (data.shape))
+    model = makeGauss2dFunc (*pfit)(*np.indices (data.shape))
     return pfit, data - model
 
 # More organized fitting.
@@ -193,47 +193,47 @@ class FitBase (object):
         # N.asfarray ([complex]) should succeed but it doesn't for numpy <= 1.3)
         x[0] += 0.0
         y[0] += 0.0
-        self.x = _N.asarray (x)
-        self.y = _N.asarray (y)
+        self.x = np.asarray (x)
+        self.y = np.asarray (y)
 
         if sigmas is None:
             self.sigmas = None
         else:
-            self.sigmas = _N.asfarray (sigmas)
+            self.sigmas = np.asfarray (sigmas)
 
         return self
 
     def fakeSigmas (self, val):
         """Set the uncertainty of every data point to a fixed value."""
-        self.sigmas = _N.zeros_like (self.y) + val
+        self.sigmas = np.zeros_like (self.y) + val
         return self
 
     def fakeDataSigmas (self, x, sigmas, *params):
         # See comment in setData
         x[0] += 0.0
-        self.x = _N.asarray (x)
-        self.sigmas = _N.asfarray (sigmas)
+        self.x = np.asarray (x)
+        self.sigmas = np.asfarray (sigmas)
 
         mfunc = self.makeModel (*params)
-        self.y = mfunc (self.x) + _N.random.standard_normal (self.y.shape) * self.sigmas
+        self.y = mfunc (self.x) + np.random.standard_normal (self.y.shape) * self.sigmas
 
         return self
 
     def fakeDataFrac (self, x, frac, *params):
         # See comment in setData
         x[0] += 0.0
-        self.x = _N.asarray (x)
+        self.x = np.asarray (x)
 
         mfunc = self.makeModel (*params)
 
         y = mfunc (self.x)
         self.sigmas = y * frac
-        self.y = y + _N.random.standard_normal (self.y.shape) * self.sigmas
+        self.y = y + np.random.standard_normal (self.y.shape) * self.sigmas
 
         return self
 
     def augmentSigmas (self, val):
-        self.sigmas = _N.sqrt (self.sigmas**2 + val**2)
+        self.sigmas = np.sqrt (self.sigmas**2 + val**2)
         return self
 
     def guess (self):
@@ -320,8 +320,8 @@ class FitBase (object):
         return self
 
     def assumeParams (self, *params):
-        self.params = _N.asfarray (params)
-        self.uncerts = _N.zeros_like (self.params)
+        self.params = np.asfarray (params)
+        self.uncerts = np.zeros_like (self.params)
         self.mfunc = self.makeModel (*self.params)
 
         if self.x is not None:
@@ -358,8 +358,8 @@ class FitBase (object):
 
         _cmplx = {'real': lambda x: x.real,
                   'imag': lambda x: x.imag,
-                  'amp': lambda x: _N.abs (x),
-                  'pha': lambda x: _N.arctan2 (x.imag, x.real)}
+                  'amp': lambda x: np.abs (x),
+                  'pha': lambda x: np.arctan2 (x.imag, x.real)}
 
         if not smoothModel:
             modx = self.x
@@ -370,7 +370,7 @@ class FitBase (object):
                 mxmin = self.x.min ()
             if mxmax is None:
                 mxmax = self.x.max ()
-            modx = _N.linspace (mxmin, mxmax, 400)
+            modx = np.linspace (mxmin, mxmax, 400)
             mody = self.mfunc (modx)
             resy = self.mdata
 
@@ -382,7 +382,7 @@ class FitBase (object):
 
         resids = y - resy
         if ycomponent == 'pha':
-            resids = ((resids + _N.pi) % (2 * _N.pi)) - _N.pi
+            resids = ((resids + np.pi) % (2 * np.pi)) - np.pi
 
         vb = omega.layout.VBox (2)
 
@@ -428,25 +428,25 @@ class LinearFit (FitBase):
         sm2 = sm1 ** 2
 
         S = sm2.sum ()
-        Sx = _N.dot (x, sm2)
-        Sy = _N.dot (y, sm2)
-        Sxx = _N.dot (x**2, sm2)
-        Syy = _N.dot (y**2, sm2)
-        Sxy = _N.dot (x * y, sm2)
+        Sx = np.dot (x, sm2)
+        Sy = np.dot (y, sm2)
+        Sxx = np.dot (x**2, sm2)
+        Syy = np.dot (y**2, sm2)
+        Sxy = np.dot (x * y, sm2)
 
         D = S * Sxx - Sx**2
 
         t = (x - Sx / S) * sm1
         Stt = (t**2).sum ()
 
-        b = _N.dot (t * y, sm1) / Stt
+        b = np.dot (t * y, sm1) / Stt
         a = (Sy - Sx * b) / S
 
-        sigma_a = _N.sqrt ((1 + Sx**2 / S / Stt) / S)
-        sigma_b = _N.sqrt (Stt ** -1)
+        sigma_a = np.sqrt ((1 + Sx**2 / S / Stt) / S)
+        sigma_b = np.sqrt (Stt ** -1)
 
-        self.params = _N.asarray ((a, b))
-        self.uncerts = _N.asarray ((sigma_a, sigma_b))
+        self.params = np.asarray ((a, b))
+        self.uncerts = np.asarray ((sigma_a, sigma_b))
 
 
     def _fitExport (self):
@@ -468,14 +468,14 @@ class SlopeFit (FitBase):
 
         sm2 = sig ** -2
 
-        Sxx = _N.dot (x**2, sm2)
-        Sxy = _N.dot (x * y, sm2)
+        Sxx = np.dot (x**2, sm2)
+        Sxy = np.dot (x * y, sm2)
 
         m = Sxy / Sxx
-        sigma_m = 1. / _N.sqrt (Sxx)
+        sigma_m = 1. / np.sqrt (Sxx)
 
-        self.params = _N.asarray ((m, ))
-        self.uncerts = _N.asarray ((sigma_m, ))
+        self.params = np.asarray ((m, ))
+        self.uncerts = np.asarray ((sigma_m, ))
 
 
     def _fitExport (self):
@@ -508,15 +508,15 @@ class LeastSquaresFit (FitBase):
 
         w = sig ** -1
 
-        if issubclass (y.dtype.type, _N.complexfloating):
+        if issubclass (y.dtype.type, np.complexfloating):
             def error (p):
                 self.mfunc = f = self.makeModel (*p)
-                wresid = _N.ravel ((f (x) - y) * w)
-                return _N.concatenate ((wresid.real, wresid.imag))
+                wresid = np.ravel ((f (x) - y) * w)
+                return np.concatenate ((wresid.real, wresid.imag))
         else:
             def error (p):
                 self.mfunc = f = self.makeModel (*p)
-                return _N.ravel ((f (x) - y) * w)
+                return np.ravel ((f (x) - y) * w)
 
         pfit, cov, xx, msg, success = leastsq (error, guess, full_output=True,
                                                **kwargs)
@@ -531,8 +531,8 @@ class LeastSquaresFit (FitBase):
             print 'Success code:', success
             raise Exception ('No covariance matrix!')
 
-        self.params = _N.atleast_1d (pfit)
-        self.uncerts = _N.sqrt (cov.diagonal ())
+        self.params = np.atleast_1d (pfit)
+        self.uncerts = np.sqrt (cov.diagonal ())
         self.cov = cov
 
 
@@ -592,7 +592,7 @@ For example::
             if len (guess) != len (self._paramNames):
                 raise ValueError ('guess size does not match number of '
                                   'model parameters')
-            guess = _N.asarray (guess)
+            guess = np.asarray (guess)
             def guesser (x, y):
                 return guess
             self._guesser = guesser
@@ -709,7 +709,7 @@ class ConstrainedMinFit (FitBase):
             self.resids = r = y - d
             #print 'W:', w
             #print 'R:', r
-            return 0, _N.ravel (r * w)
+            return 0, np.ravel (r * w)
 
         for i in xrange (0, len (self._paramNames)):
             if self._info[i]['fixed']:
@@ -727,14 +727,14 @@ class ConstrainedMinFit (FitBase):
             raise Exception ('MPFIT failed to find uncerts: %d, %s' % (o.status,
                                                                        o.errmsg))
 
-        if not reckless and _N.any (~_N.isfinite (o.params)):
+        if not reckless and np.any (~np.isfinite (o.params)):
             raise Exception ('MPFIT converged on infinite parameters')
 
         # Coerce into arrayness. Calculate rchisq ourselves since
         # fixed parameters may change ndof over what the naive code
         # expects.
-        self.params = _N.atleast_1d (o.params)
-        self.uncerts = _N.atleast_1d (o.perror)
+        self.params = np.atleast_1d (o.params)
+        self.uncerts = np.atleast_1d (o.perror)
         self.cov = o.covar
         self.chisq = o.fnorm
         self.rchisq = o.fnorm / ndof
@@ -806,7 +806,7 @@ class RealConstrainedMinFit (FitBase):
             self.mfunc = f = self.makeModel (*p)
             self.mdata = d = f (x)
             self.resids = r = d - y
-            self.rchisq = c = _N.dot (r**2, w2) / ndof
+            self.rchisq = c = np.dot (r**2, w2) / ndof
             return c
 
         if self.makeModelDeriv is None:
@@ -828,8 +828,8 @@ class RealConstrainedMinFit (FitBase):
             raise Exception ('L-BFGS-B minimization failed: %d, %s' % (info['warnflag'],
                                                                        info['task']))
 
-        self.params = _N.atleast_1d (pfit)
-        self.uncerts = _N.zeros_like (self.params)
+        self.params = np.atleast_1d (pfit)
+        self.uncerts = np.zeros_like (self.params)
 
 
 class GaussianFit (LeastSquaresFit):
@@ -844,12 +844,12 @@ class GaussianFit (LeastSquaresFit):
 
         # Not at all sure if this is a good algorithm. Seems to
         # work OK.
-        width = _N.sqrt (abs ((self.x - xmid)**2 * self.y).sum () / ytotal)
+        width = np.sqrt (abs ((self.x - xmid)**2 * self.y).sum () / ytotal)
 
         return (height, xmid, width)
 
     def makeModel (self, height, xmid, width):
-        return lambda x: height * _N.exp (-0.5 * ((x - xmid)/width)**2)
+        return lambda x: height * np.exp (-0.5 * ((x - xmid)/width)**2)
 
     def _fitExport (self):
         self.height, self.xmid, self.width = self.params
@@ -859,8 +859,8 @@ class PowerLawFit (LeastSquaresFit):
     _paramNames = ['q', 'alpha']
 
     def guess (self):
-        lx = _N.log (self.x)
-        ly = _N.log (self.y)
+        lx = np.log (self.x)
+        ly = np.log (self.y)
 
         dlx = lx.max () - lx.min ()
         dly = ly.max () - ly.min ()
@@ -868,7 +868,7 @@ class PowerLawFit (LeastSquaresFit):
 
         mlx = lx.mean ()
         mly = ly.mean ()
-        q = _N.exp (mly - alpha * mlx)
+        q = np.exp (mly - alpha * mlx)
 
         return (q, alpha)
 
@@ -883,7 +883,7 @@ class BiPowerLawFit (LeastSquaresFit):
     _paramNames = ['xbr', 'ybr', 'alpha1', 'alpha2']
 
     def guess (self):
-        l = _N.log
+        l = np.log
 
         dlx = l (self.x.max ()) - l (self.x.min ())
         dly = l (self.y.max ()) - l (self.y.min ())
@@ -919,7 +919,7 @@ class LameQuadraticFit (LeastSquaresFit):
         return (a, b, c)
 
     def makeModel (self, a, b, c):
-        return _N.poly1d ([c, b, a])
+        return np.poly1d ([c, b, a])
 
     def _fitExport (self):
         self.a, self.b, self.c = self.params
@@ -956,7 +956,7 @@ def ricefit (d):
         s = params[1]
         return -(log (d/s**2 * i0 (d*v/s**2)) - (d**2 + v**2)/2/s**2).sum ()
 
-    p = _N.array ((d.mean (), d.std ()))
+    p = np.array ((d.mean (), d.std ()))
 
     return fmin (likelihood, p)
 
