@@ -5,55 +5,6 @@
 
 import numpy as np
 
-# Histogram binning suggestions
-#
-# Sturges' formula: N_bins = ceil(log_2(N_pts) + 1) (want n >~ 30)
-# Sturges, H.A., 1926, "The choice of a class interval", J Am Stat Assn, 65-66
-#
-# Scott: bin_width = 3.5 sigma / n^(1/3)
-# Scott, D.W., 1979, "On optimal and data-based histograms", Biometrika 66(3) 605-610
-# doi:10.1093/biomet/66.3.605
-#
-# Freedman-Diaconis: bin_width = 2 * IQR(data) / n^(1/3)
-# Here IQR is the interquartile range, IQR = 75th percentile - 25th percentile.
-# Freedman, D & Diaconis, P, 1981, "On the histogram as a density estimator:
-# L_2 theory", Zeitschrift fur Wahrscheinlichkeitstheorie und verwandte Gebiete
-# 57 (4) 453-476 doi:10.1007/BF01025868
-
-def autohist (data, choice='scott', std=None, range=None, **kwargs):
-    """Histogram with automatically-chosen bin sizes.
-
-choice: one of 'scott', 'sturges', or 'f-d' (for Freedman-Diaconis)
-"""
-
-    if range is None: range = (data.min (), data.max ())
-
-    if choice == 'scott':
-        if std is None: std = data.std ()
-        wbin = 3.5 * std / data.size**0.33333
-        wdata = range[1] - range[0]
-        n = int (np.ceil (wdata / wbin))
-        delta = (n * wbin - wdata) / 2
-        range = (range[0] - delta, range[1] + delta)
-    elif choice == 'sturges':
-        n = int (np.ceil (np.log2 (data.size) + 1))
-    elif choice == 'f-d':
-        from scipy.stats import scoreatpercentile as sap
-
-        iqr = sap (data, 75) - sap (data, 25)
-        wbin = 2 * iqr / data.size**0.33333
-        wdata = range[1] - range[0]
-        n = int (np.ceil (wdata / wbin))
-        delta = (n * wbin - wdata) / 2
-        range = (range[0] - delta, range[1] + delta)
-    elif choice == 'custom':
-        pass
-    else:
-        raise Exception ('Unknown histogram binning choice %s' % choice)
-
-    return np.histogram (data, n, range, **kwargs)
-
-# Some cheesy fits
 
 def linearConstrained (x, y, x0, y0, weights = None):
     """Perform a linear fit through the points given in x, y that is
