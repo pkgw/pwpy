@@ -24,8 +24,10 @@ BBS -- ATA broadband spectra observing tools
   353ef5cd65ee03e2fb2f9a17cafddcdb2c4fecec
 pyata -- ATA python observing scripts
   353ef5cd65ee03e2fb2f9a17cafddcdb2c4fecec
-attenlogcmp.py, pyscan.py, walsh-flags.py, walsh_adc_conflict.sh
--- various ATA observing helpers I haven't used for a while
+attenlogcmp.py
+pyscan.py
+walsh-flags.py
+walsh_adc_conflict.sh -- various ATA observing helpers I haven't used for a while
   353ef5cd65ee03e2fb2f9a17cafddcdb2c4fecec
 autohist in fit.py -- automatic guessing of good histogram binning
 gauss2d* in fit.py -- lame 2D non-orientable gaussian fitting
