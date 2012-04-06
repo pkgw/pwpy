@@ -1351,7 +1351,12 @@ class Problem (object):
 
         # Set up initial values. These can either be specified via the
         # arguments to this function, or set implicitly with calls to
-        # pValue() and pLimit (). Former overrides the latter.
+        # pValue() and pLimit (). Former overrides the latter. (The
+        # intent of this flexibility is that if you compose a problem
+        # out of several independent pieces, the caller of solve()
+        # might not know good initial guesses for all of the
+        # parameters. The modules responsible for each piece could set
+        # up good default values with pValue independently.)
 
         if initial_params is not None:
             initial_params = np.atleast_1d (np.asarray (initial_params, dtype=dtype))
@@ -1361,6 +1366,9 @@ class Problem (object):
         if initial_params.size != self._npar:
             raise ValueError ('expected exactly %d parameters, got %d'
                               % (self._npar, initial_params.size))
+
+        w = np.where (self._pinfob & PI_M_FIXED)
+        initial_params[w] = self._pinfof[PI_F_VALUE,w]
 
         if any (-isfinite (initial_params)):
             raise ValueError ('some nonfinite initial parameter values')
