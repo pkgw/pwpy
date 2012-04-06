@@ -32,7 +32,7 @@ Ctrl-C to toggle automatic cycling
 
 import numpy as np
 import cairo
-import glib, gtk
+import glib, gtk # FIXME: might want LazyComputer et al without an X server
 
 
 DEFAULT_TILESIZE = 128
