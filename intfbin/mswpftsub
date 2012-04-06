@@ -3,33 +3,117 @@
 # Copyright 2012 Peter Williams
 # Licensed under the GNU General Public License version 3 or higher
 
-# Measurement Set W-Projecting Fourier Transform and Subtract ...
-# equivalent of the casa commands 'ft' and, optionally, 'uvsub', using
-# w-projection in the FT stage.
-#
-# The model can either be a model image, or a textual table of
-# sources.  Note that we are unable to use srctable format because
-# we're a casa-python program and so don't have access to the
-# necessary libraries. Yaargh. (The "componentlistHome" has an
-# asciitocomponentlist() function but the docstring says it only
-# supports AIPS "star" format, which doesn't allow for source fluxes.
-# The online documentation says it supports more formats including
-# ones with fluxes but it's just too much of a crapfest for me to want
-# to spend time investigating.)
-#
-# Note that the uv subtraction/addition step is cumulative on top
-# of any existing data in the CORRECTED_DATA column. So if you
-# run this program twice successively on a single dataset, you'll
-# subtract off double your model. The CORRECTED_DATA column can be
-# reset via the 'msclearimaging' command.
-#
-# Usage: mswpftsub [-s|-a] <MS path> <model path>
-#
-# Table format:
-#
-# kind ra dec flux[jy] [major[arcsec] minor[arcsec] pa[deg]]
+"""
+mswpftsub [-i] [-s|-a] <MS path> <model path>
+
+Model visibilities with a w-projecting Fourier transform and optional
+subtraction from the data. The model can either be a model image or a
+textual table of sources.
+
+Because this program is a casa-python program, it can't use the
+sourcetable format directly; you must run something like:
+  st-to-mswpftsub <sources.st |mswpftsub data.ms -
+
+With no options, this program replaces the MODEL_DATA column in the MS.
+
+-i -- add the new visibilities into MODEL_DATA, rather than replacing
+-a -- after modeling, add the new MODEL_DATA column into the CORRECTED_DATA column
+-s -- after modeling, subtract the new MODEL_DATA column into CORRECTED_DATA
+
+Note that the uv subtraction/addition step is cumulative on top of any
+existing data in the CORRECTED_DATA column. So if you run this program
+twice successively on a single dataset, you'll subtract off double
+your model. The CORRECTED_DATA and MODEL_DATA columns can be reset via
+the 'mssetupimaging' command. (Also note that MODEL_DATA is
+initialized to unity, so if you use the -i option with a
+freshly-initialized MODEL_DATA column you'll probably get undesirable
+results.) (There furthermore appears to be a problem in the
+subtraction routines in that if CORRECTED_DATA doesn't exist, it will
+initialize both CORRECTED_DATA and MODEL_DATA, wiping out the UV
+modeling that was just done. In other words, don't use
+'msclearimaging' to initialize the dataset, because that will remove
+CORRECTED_DATA and trigger this issue.)
+
+The textual table format is line-oriented ASCII:
+
+  kind ra dec flux[jy] [major[arcsec] minor[arcsec] pa[deg]]
+
+where "kind" is either "point" or "gaussian" and "ra" and "dec" are
+in colon-separated sexagesimal hours and degrees.
+"""
+
+# The "componentlistHome" has an asciitocomponentlist() function but
+# the docstring says it only supports AIPS "star" format, which
+# doesn't allow for source fluxes and so is useless here. The online
+# CASA documentation says more formats are supported, including ones
+# with fluxes, but it's just too much of a crapfest for me to want to
+# spend time investigating.
 
 import sys, os.path, casac
+
+## quickutil: die usage popoption
+#- snippet: die.py (2012 Mar 29)
+#- SHA1: 3bdd3282e52403d2dec99d72680cb7bc95c99843
+def die (fmt, *args):
+    if not len (args):
+        raise SystemExit ('error: ' + str (fmt))
+    raise SystemExit ('error: ' + (fmt % args))
+#- snippet: usage.py (2012 Mar 29)
+#- SHA1: ac032a5db2efb5508569c4d5ba6eeb3bba19a7ca
+def showusage (docstring, short, stream, exitcode):
+    if stream is None:
+        from sys import stdout as stream
+    if not short:
+        print >>stream, 'Usage:', docstring.strip ()
+    else:
+        intext = False
+        for l in docstring.splitlines ():
+            if intext:
+                if not len (l):
+                    break
+                print >>stream, l
+            elif len (l):
+                intext = True
+                print >>stream, 'Usage:', l
+        print >>stream, \
+            '\nRun with a sole argument --help for more detailed usage information.'
+    raise SystemExit (exitcode)
+
+def checkusage (docstring, argv=None, usageifnoargs=False):
+    if argv is None:
+        from sys import argv
+    if len (argv) == 1 and usageifnoargs:
+        showusage (docstring, True, None, 0)
+    if len (argv) == 2 and argv[1] in ('-h', '--help'):
+        showusage (docstring, False, None, 0)
+
+def wrongusage (docstring, *rest):
+    import sys
+    intext = False
+
+    if len (rest) == 0:
+        detail = 'invalid command-line arguments'
+    elif len (rest) == 1:
+        detail = rest[0]
+    else:
+        detail = rest[0] % tuple (rest[1:])
+
+    print >>sys.stderr, 'error:', detail, '\n' # extra NL
+    showusage (docstring, True, sys.stderr, 1)
+#- snippet: popoption.py (2012 Mar 29)
+#- SHA1: 5552980b9034cd6d7ead4d0cd4ca1839face7e84
+def popoption (ident, argv=None):
+    if argv is None:
+        from sys import argv
+    if len (ident) == 1:
+        ident = '-' + ident
+    else:
+        ident = '--' + ident
+    found = ident in argv
+    if found:
+        argv.remove (ident)
+    return found
+## end
 
 def makeComponentList (mdlstream):
     from tempfile import mkdtemp
@@ -38,14 +122,12 @@ def makeComponentList (mdlstream):
     for linenum, line in enumerate (mdlstream):
         if line[0] == '#':
             continue
-
         a = line.strip ().split ()
-
         if not len (a):
             continue
 
-        # Fun fact: if you don't give CASA the h's and m's instead
-        # of colons, it will silently give you super-wrong coordinates.
+        # Fun fact: if you don't give CASA the h's and m's instead of
+        # colons, it will silently give you super-wrong coordinates.
         # Why am I not surprised?
 
         rastr = a[1].replace (':', 'h', 1).replace (':', 'm', 1)
@@ -67,41 +149,32 @@ def makeComponentList (mdlstream):
                              majoraxis='%farcsec' % major, minoraxis='%farcsec' % minor,
                              positionangle='%fdeg' % pa)
         else:
-            print >>sys.stderr, 'error: unknown source kind "%s"' % a[0]
-            print >>sys.stderr, '  from line: %s', line.strip ()
-            sys.exit (1)
+            die ('unknown source kind "%s" in line: "%s"', a[0], line.strip ())
 
     tmpdir = mkdtemp (prefix='mswpftsub.')
     clpath = os.path.join (tmpdir, 'cl')
     cl.rename (clpath)
-    cl.close ()
+    cl.close (log=False)
 
     return clpath, tmpdir
 
 
-dosub = '-s' in sys.argv
-if dosub:
-    sys.argv.remove ('-s')
-
-doadd = '-a' in sys.argv
-if doadd:
-    sys.argv.remove ('-a')
+dosub = popoption ('s')
+doadd = popoption ('a')
+incremental = popoption ('i')
+checkusage (__doc__, usageifnoargs=True)
 
 if len (sys.argv) != 3:
-    print >>sys.stderr, 'Usage: mswpftsub [-s|-a] <MS path> <model path>'
-    sys.exit (1)
+    wrongusage (__doc__, 'exactly 2 nonoption arguments are required')
 
 if doadd and dosub:
-    print >>sys.stderr, 'mswpftsub: usage error: you may ' \
-        'only specify one of -a and -s'
-    sys.exit (1)
+    wrongusage (__doc__, 'you may only specify one of -a and -s')
 
 mspath = sys.argv[1]
 mdlpath = sys.argv[2]
 
 if not os.path.isdir (mspath):
-    print >>sys.stderr, 'mswpftsub: error: "%s" is not a MS directory' % mspath
-    sys.exit (1)
+    die ('"%s" is not a directory', mspath)
 
 if mdlpath == '-':
     # Source list from standard input
@@ -117,8 +190,9 @@ elif os.path.exists (mdlpath):
     clpath, tmpdir = makeComponentList (open (mdlpath))
     args = {'complist': clpath}
 else:
-    print >>sys.stderr, 'mswpftsub: error: "%s" is not a model image or source list' % mdlpath
-    sys.exit (1)
+    die ('"%s" is not a model image or source list', mdlpath)
+
+args['incremental'] = incremental
 
 im = casac.homefinder.find_home_by_name ('imagerHome').create ()
 im.open (mspath, usescratch=True)
@@ -136,7 +210,6 @@ if dosub or doadd:
 
 if tmpdir is not None:
     from shutil import rmtree
-
     try:
         rmtree (tmpdir)
     except Exception:
