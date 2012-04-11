@@ -267,7 +267,9 @@ def parse_and_print (sfinfo, img, sfstream, resid):
             s.pkflux = None
 
             if img.bmaj is not None:
-                srctable.deconvolve (s, img.bmaj, img.bmin, img.bpa)
+                px = rsimple.topixel ([s.dec, s.ra])
+                minaxprod = 2 * np.pi * pixelscale (rsimple.toworld, px)**2 * S2F**2
+                srctable.deconvolve (s, img.bmaj, img.bmin, img.bpa, minaxprod)
                 # TODO: do something with s.deconvolve_error
 
             yield s

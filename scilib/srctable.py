@@ -320,11 +320,11 @@ nvsscols = columns ('ra ra_uc dec dec_uc totflux totflux_uc major major_uc',
 
 # Transformations on sources
 
-has = lambda s, f: hasattr (s, f) and getattr (s, f) is not None
+has = lambda s, f: getattr (s, f, None) is not None
 
-def deconvolve (source, bmaj, bmin, bpa, preserve=True):
-    if (not has (source, 'major') or not has (source, 'minor')
-        or not has (source, 'pa')):
+def deconvolve (source, bmaj, bmin, bpa, minaxprod=0, preserve=True):
+    if not (has (source, 'major') and has (source, 'minor')
+            and has (source, 'pa')):
         source.deconvolve_error = 'missing shape information'
         return source
 
@@ -348,6 +348,9 @@ def deconvolve (source, bmaj, bmin, bpa, preserve=True):
         source.deconvolve_error = None
     else:
         raise Exception ('unexpected deconvolution status ' + status)
+
+    if dmaj is not None and dmaj * dmin < minaxprod:
+        dmaj = dmin = dpa = None
 
     if has (source, 'major_uc'):
         if dmaj is None:
