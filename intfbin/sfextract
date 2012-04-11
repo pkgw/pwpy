@@ -14,7 +14,7 @@ residual image with the SFIND sources subtracted is created.
 Note that SFIND expects there to be restoring beam information in the
 image; if this is missing, it will make a dumb guess.
 
-Suggested sfind keywords: rmsbox=64 alpha=0.5 +fdrpeak
+Suggested sfind keywords: rmsbox=64 alpha=0.5 +fdrpeak,psfsize
 """
 
 # Programmer notes:
@@ -144,17 +144,11 @@ def sfind_extract (img, resid, inpath, keywords):
     sfinfo = {'imagepath': inpath,
               'sfindargs': ' '.join ('%s=%s' % (k, keywords[k])
                                      for k in sorted (keywords.iterkeys ()))}
-    imageinfo = flatdb.Holder ()
-    imageinfo.naxis = img.shape.size
 
     if img.bmaj is None:
         warn ('no restoring beam information; will NOT deconvolve')
-        imageinfo.bmaj = imageinfo.bmin = imageinfo.bpa = None
         sfinfo['deconvolved'] = 'false'
     else:
-        imageinfo.bmaj = img.bmaj
-        imageinfo.bmin = img.bmin
-        imageinfo.bpa = img.bpa
         sfinfo['deconvolved'] = 'true'
 
     # Get image into MIRIAD format, possibly via FITS, run SFIND, and
@@ -212,7 +206,7 @@ def sfind_extract (img, resid, inpath, keywords):
             if l.startswith ('RMS of the interior RMS'):
                 sfinfo['typrms'] = fortfloat (l.split ()[6])
 
-        parse_and_print (sfinfo, imageinfo, open ('sfind.log'), resid)
+        parse_and_print (sfinfo, img, open ('sfind.log'), resid)
     finally:
         chdir (origdir)
         try:
@@ -221,7 +215,7 @@ def sfind_extract (img, resid, inpath, keywords):
             warn ('couldn\'t remove temporary data directory "%s"', tmpcontainer)
 
 
-def parse_and_print (sfinfo, iminfo, sfstream, resid):
+def parse_and_print (sfinfo, img, sfstream, resid):
     import sys
 
     headers = ['%s=%s' % (k, sfinfo[k])
@@ -231,18 +225,54 @@ def parse_and_print (sfinfo, iminfo, sfstream, resid):
         rsimple = resid.simple ()
         rdata = rsimple.read ()
 
+    # Get raw source list and look for duplicate entries. It appears
+    # that sfind doesn't subtract found sources from the image, so
+    # it's possible for multiple starting points to converge to the
+    # same source, and I've seen this happen in practice. Because of
+    # this lack of subtraction, I don't think sfind will ever report
+    # overlapping sources with very different morphologies, so we only
+    # check for overlapping position and don't consider the
+    # shape. (You could imagine a clever algorithm identifying a
+    # certain source as a superposition of a point and an extended
+    # component, for instance.)
+
+    sources = list (srctable.parseSFind (sfstream))
+
+    for s in sources:
+        s._hide = False
+
+    for i1, s1 in enumerate (sources):
+        if s1._hide:
+            continue
+
+        p1 = rsimple.topixel ([s1.dec, s1.ra])
+        pixscale = pixelscale (rsimple.toworld, p1)
+
+        for s2 in sources[i1+1:]:
+            if s2._hide:
+                continue
+
+            if sphdist (s1.dec, s1.ra, s2.dec, s2.ra) < pixscale:
+                s2._hide = True
+
+    sources = [s for s in sources if not s._hide]
+
+    # Now that we've filtered, deconvolve and maybe make residual.
+
     def func ():
-        for s in srctable.parseSFind (sfstream):
+        for s in sources:
             if resid is not None:
                 subtract_source (s, rdata, rsimple)
 
             s.pkflux = None
 
-            if iminfo.bmaj is not None:
-                srctable.deconvolve (s, iminfo.bmaj, iminfo.bmin, iminfo.bpa)
+            if img.bmaj is not None:
+                srctable.deconvolve (s, img.bmaj, img.bmin, img.bpa)
                 # TODO: do something with s.deconvolve_error
 
             yield s
+
+    # Ready to write and possibly make the residual image
 
     cols = [c for c in srctable.sfindcols
             if c.name not in ('pkflux', 'pkflux_uc')]
@@ -329,6 +359,22 @@ def subtract_source (src, data, image):
 
     # Finally done.
     data[abspix[0]:abspix[2],abspix[1]:abspix[3]] -= px
+
+
+def pixelscale (toworld, pixelcoords):
+    """Given pixel coordinates and a transform function, return the
+    root of the angular area of a pixel at those coordinates in
+    radians. This can vary depending on the map projection."""
+
+    DELTA = 1e-5
+
+    pixelcoords = list (pixelcoords)
+    w1 = toworld (pixelcoords)
+    pixelcoords[-1] += DELTA
+    pixelcoords[-2] += DELTA
+    w2 = toworld (pixelcoords)
+    d = w2 - w1
+    return np.sqrt ((d[-1]**2 + d[-2]**2) / (2 * DELTA**2))
 
 
 def fortfloat (s):
