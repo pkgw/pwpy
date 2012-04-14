@@ -51,9 +51,13 @@ class _ModelBase (object):
     def printsoln (self):
         lmax = reduce (max, (len (x) for x in self.paramnames), len ('r chi sq'))
 
-        for pn, val, err in zip (self.paramnames, self.params, self.perror):
-            frac = abs (100. * err / val)
-            print '%s: %14g +/- %14g (%.2f%%)' % (pn.rjust (lmax), val, err, frac)
+        if self.perror is None:
+            for pn, val in zip (self.paramnames, self.params):
+                print '%s: %14g' % (pn.rjust (lmax), val)
+        else:
+            for pn, val, err in zip (self.paramnames, self.params, self.perror):
+                frac = abs (100. * err / val)
+                print '%s: %14g +/- %14g (%.2f%%)' % (pn.rjust (lmax), val, err, frac)
 
         print '%s: %14g' % ('r chi sq'.rjust (lmax), self.rchisq)
         return self
