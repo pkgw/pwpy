@@ -2532,18 +2532,15 @@ def _lmder1_kowalik_osborne ():
                        0.0342, 0.0323, 0.0235, 0.0246])
 
     def func (params, vec):
-        for i in xrange (11):
-            tmp1 = v[i] * (v[i] + params[1])
-            tmp2 = v[i] * (v[i] + params[2]) + params[3]
-            vec[i] = y2[i] - params[0] * tmp1 / tmp2
+        tmp1 = v * (v + params[1])
+        tmp2 = v * (v + params[2]) + params[3]
+        vec[:] = y2 - params[0] * tmp1 / tmp2
 
     def jac (params, jac):
-        for i in xrange (11):
-            tmp1 = v[i] * (v[i] + params[1])
-            tmp2 = v[i] * (v[i] + params[2]) + params[3]
-            jac[0,i] = -tmp1 / tmp2
-            jac[1,i] = -v[i] * params[0] / tmp2
-
+        tmp1 = v * (v + params[1])
+        tmp2 = v * (v + params[2]) + params[3]
+        jac[0] = -tmp1 / tmp2
+        jac[1] = -v * params[0] / tmp2
         jac[2] = jac[0] * jac[1]
         jac[3] = jac[2] / v
 
