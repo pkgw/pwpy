@@ -96,7 +96,8 @@ Basic usage::
     def yfunc (params, vals):
         vals[:] = {stuff with params}
     def jfunc (params, jac):
-        jac[i,j] = {deriv of val[i] w.r.t. params[j]}
+        jac[i,j] = {deriv of val[j] w.r.t. params[i]}
+        # i.e. jac[i] = {deriv of val wrt params[i]}
     p = Problem (npar, nout, yfunc, jfunc=None)
     solution = p.solve (guess)
 
@@ -121,7 +122,7 @@ and multiplies by inverse errors):
     def yrfunc (params, modelyvalues):
         modelyvalues[:] = {stuff with params}
     def yjfunc (params, modelyjac):
-        jac[i,j] = {deriv of modelyvalue[i] w.r.t. param[j]}
+        jac[i,j] = {deriv of modelyvalue[j] w.r.t. params[i]}
     p.setResidualFunc (yobs, errinv, yrfunc, jrfunc, reckless=False)
     p = ResidualProblem (npar, yobs, errinv, yrfunc, jrfunc=None, reckless=False)
 
@@ -1348,8 +1349,7 @@ class Problem (object):
             def jwrap (pars, jac):
                 jfunc (pars, jac)
                 multiply (jac, -1, jac)
-                for i in xrange (npar):
-                    multiply (jac[:,i], errinv, jac[:,i])
+                jac *= errinv # broadcasts how we want
         else:
             def ywrap (pars, nresids):
                 yfunc (pars, nresids)
@@ -1357,14 +1357,12 @@ class Problem (object):
                     raise RuntimeError ('function returned nonfinite values')
                 subtract (yobs, nresids, nresids)
                 multiply (nresids, errinv, nresids)
-                #print 'N:', (nresids**2).sum ()
             def jwrap (pars, jac):
                 jfunc (pars, jac)
                 if anynotfinite (jac):
                     raise RuntimeError ('jacobian returned nonfinite values')
                 multiply (jac, -1, jac)
-                for i in xrange (npar):
-                    multiply (jac[:,i], errinv, jac[:,i])
+                jac *= errinv
 
         if jfunc is None:
             jwrap = None
@@ -1862,7 +1860,20 @@ class Problem (object):
 
 
     def _get_jacobian_explicit (self, params, fvec, ulimit, dside, maxstep, isrel, finfo):
-        fjac = np.zeros ((self._nout, self._npar), finfo.dtype)
+        # TODO #1: preallocate fjac instead of reallocating it on
+        # every call!
+        #
+        # TODO #2: note that we transpose fjac! I need go to through
+        # and reverse all the 2D matrices because the transcribed
+        # code didn't account for the switch between Fortran and
+        # C/Python index ordering. The switch doesn't affect results
+        # but it does affect speed and cleanliness of some constructs.
+        # The Great Transposition will be a large undertaking,
+        # however. In the meantime, fake it here so that
+        # Jacobian-computing functions don't all need to be rewritten
+        # when the transposition finally happens.
+
+        fjac = np.zeros ((self._npar, self._nout), finfo.dtype)
 
         self._njev += 1
 
@@ -1873,9 +1884,9 @@ class Problem (object):
             print fjac
 
         if self._ifree.size < self._npar:
-            fjac = fjac[:,self._ifree]
+            fjac = fjac[self._ifree]
 
-        return fjac
+        return fjac.T
 
 
     def _get_jacobian_automatic (self, params, fvec, ulimit, dside, maxstep, isrel, finfo):
@@ -2003,9 +2014,9 @@ class Problem (object):
             sojac = None
         else:
             def sojac (pars):
-                j = np.empty ((self._nout, self._npar), dtype=dtype)
+                j = np.empty ((self._npar, self._nout), dtype=dtype)
                 self._jfunc (pars, j)
-                return j
+                return j.T
 
         t = leastsq (sofunc, initial_params, Dfun=sojac, full_output=1,
                      ftol=self.ftol, xtol=self.xtol, gtol=self.gtol,
@@ -2033,15 +2044,16 @@ class Problem (object):
         soln.perror = perror
         soln.fvec = t[2]['fvec']
         soln.fnorm = enorm_minpack (soln.fvec, finfo)**2
-        soln.fjac = t[2]['fjac']
+        soln.fjac = t[2]['fjac'].T
         soln.nfev = t[2]['nfev']
         soln.njev = 0 # could compute when given explicit derivative ...
         return soln
 
 
 def checkDerivative (npar, nout, yfunc, jfunc, guess):
-    explicit = np.empty ((nout, npar))
+    explicit = np.empty ((npar, nout))
     jfunc (guess, explicit)
+    explicit = explicit.T
 
     p = Problem (npar, nout, yfunc, None)
     auto = p._manual_jacobian (guess)
@@ -2238,9 +2250,8 @@ def _lmder1_linear_full_rank (n, m, factor, target_fnorm1, target_fnorm2):
         vec[:params.size] += params
 
     def jac (params, jac):
-        # jac.shape = (m, n) by LMDER standards
-        temp = 2. / m
-        jac[:,:] = -temp
+        # jac.shape = (n, m) by LMDER standards
+        jac.fill (-2. / m)
         for i in xrange (n):
             jac[i,i] += 1
 
@@ -2281,8 +2292,8 @@ def _lmder1_linear_rank1 (n, m, factor, target_fnorm1, target_fnorm2, target_par
             vec[i] = (i + 1) * s - 1
 
     def jac (params, jac):
-        for i in xrange (m):
-            for j in xrange (n):
+        for i in xrange (n):
+            for j in xrange (m):
                 jac[i,j] = (i + 1) * (j + 1)
 
     guess = np.ones (n) * factor
@@ -2320,9 +2331,9 @@ def _lmder1_linear_r1zcr (n, m, factor, target_fnorm1, target_fnorm2, target_par
     def jac (params, jac):
         jac.fill (0)
 
-        for i in xrange (1, m - 1):
-            for j in xrange (1, n - 1):
-                jac[i,j] = i * (j + 1)
+        for i in xrange (1, n - 1):
+            for j in xrange (1, m - 1):
+                jac[i,j] = j * (i + 1)
 
     guess = np.ones (n) * factor
 
@@ -2354,8 +2365,8 @@ def _lmder1_rosenbrock ():
 
     def jac (params, jac):
         jac[0,0] = -20 * params[0]
-        jac[0,1] = 10
-        jac[1,0] = -1
+        jac[0,1] = -1
+        jac[1,0] = 10
         jac[1,1] = 0
 
     guess = np.asfarray ([-1.2, 1])
@@ -2390,13 +2401,13 @@ def _lmder1_helical_valley ():
         tmp1 = tpi * temp
         tmp2 = np.sqrt (temp)
         jac[0,0] = 100 * params[1] / tmp1
-        jac[0,1] = -100 * params[0] / tmp1
-        jac[0,2] = 10
-        jac[1,0] = 10 * params[0] / tmp2
+        jac[0,1] = 10 * params[0] / tmp2
+        jac[0,2] = 0
+        jac[1,0] = -100 * params[0] / tmp1
         jac[1,1] = 10 * params[1] / tmp2
-        jac[1,2] = 0
-        jac[2,0] = 0
+        jac[2,0] = 10
         jac[2,1] = 0
+        jac[1,2] = 0
         jac[2,2] = 1
 
     guess = np.asfarray ([-1, 0, 0])
@@ -2426,12 +2437,12 @@ def _lmder1_powell_singular ():
     def jac (params, jac):
         jac.fill (0)
         jac[0,0] = 1
-        jac[0,1] = 10
-        jac[1,2] = np.sqrt (5)
-        jac[1,3] = -np.sqrt (5)
-        jac[2,1] = 2 * (params[1] - 2 * params[2])
+        jac[0,3] = 2 * np.sqrt (10) * (params[0] - params[3])
+        jac[1,0] = 10
+        jac[1,2] = 2 * (params[1] - 2 * params[2])
+        jac[2,1] = np.sqrt (5)
         jac[2,2] = -2 * jac[2,1]
-        jac[3,0] = 2 * np.sqrt (10) * (params[0] - params[3])
+        jac[3,1] = -np.sqrt (5)
         jac[3,3] = -jac[3,0]
 
     guess = np.asfarray ([3, -1, 0, 1])
@@ -2450,8 +2461,8 @@ def _lmder1_freudenstein_roth ():
         vec[1] = -29 + params[0] + ((1 + params[1]) * params[1] - 14) * params[1]
 
     def jac (params, jac):
-        jac[0,0] = jac[1,0] = 1
-        jac[0,1] = params[1] * (10 - 3 * params[1]) - 2
+        jac[0,0] = jac[0,1] = 1
+        jac[1,0] = params[1] * (10 - 3 * params[1]) - 2
         jac[1,1] = params[1] * (2 + 3 * params[1]) - 14
 
     guess = np.asfarray ([0.5, -2])
@@ -2496,9 +2507,9 @@ def _lmder1_bard ():
                 tmp3 = i + 1
 
             tmp4 = (params[1] * tmp2 + params[2] * tmp3)**2
-            jac[i,0] = -1
-            jac[i,1] = (i + 1) * tmp2 / tmp4
-            jac[i,2] = (i + 1) * tmp3 / tmp4
+            jac[0,i] = -1
+            jac[1,i] = (i + 1) * tmp2 / tmp4
+            jac[2,i] = (i + 1) * tmp3 / tmp4
 
     guess = np.asfarray ([1, 1, 1])
 
@@ -2530,10 +2541,11 @@ def _lmder1_kowalik_osborne ():
         for i in xrange (11):
             tmp1 = v[i] * (v[i] + params[1])
             tmp2 = v[i] * (v[i] + params[2]) + params[3]
-            jac[i,0] = -tmp1 / tmp2
-            jac[i,1] = -v[i] * params[0] / tmp2
-            jac[i,2] = jac[i,0] * jac[i,1]
-            jac[i,3] = jac[i,2] / v[i]
+            jac[0,i] = -tmp1 / tmp2
+            jac[1,i] = -v[i] * params[0] / tmp2
+
+        jac[2] = jac[0] * jac[1]
+        jac[3] = jac[2] / v
 
     guess = np.asfarray ([0.25, 0.39, 0.415, 0.39])
 
