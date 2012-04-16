@@ -90,7 +90,50 @@
 """
 lmmin - Pythonic, Numpy-based Levenberg-Marquardt least-squares minimizer
 
-(This docstring will contain only usage information. For important
+Basic usage::
+
+    from lmmin import Problem, ResidualProblem
+    def yfunc (params, vals):
+        vals[:] = {stuff with params}
+    def jfunc (params, jac):
+        jac[i,j] = {deriv of val[i] w.r.t. params[j]}
+    p = Problem (npar, nout, yfunc, jfunc=None)
+    solution = p.solve (guess)
+
+    p2 = Problem ()
+    p2.setNPar (npar) # enables configuration of parameter meta-info
+    p2.setFunc (nout, yfunc, jfunc)
+
+Main Solution properties:
+
+    prob - the Problem
+  status - set of strings; presence of 'ftol', 'gtol', or 'xtol' suggests success
+  params - final parameter values
+  perror - 1-sigma uncertainties on params
+   covar - covariance matrix of parameters
+   fnorm - final norm of function output
+    fvec - final vector of function outputs
+    fjac - final Jacobian matrix of d(fvec)/d(params)
+
+Automatic least-squares model-fitting (subtracts "observed" Y values
+and multiplies by inverse errors):
+
+    def yrfunc (params, modelyvalues):
+        modelyvalues[:] = {stuff with params}
+    def yjfunc (params, modelyjac):
+        jac[i,j] = {deriv of modelyvalue[i] w.r.t. param[j]}
+    p.setResidualFunc (yobs, errinv, yrfunc, jrfunc, reckless=False)
+    p = ResidualProblem (npar, yobs, errinv, yrfunc, jrfunc=None, reckless=False)
+
+Parameter meta-information:
+
+    p.pValue (paramindex, value, fixed=False)
+    p.pLimit (paramindex, lower=-inf, upper=+inf)
+    p.pStep (paramindex, stepsize, maxstep=info, isrel=False)
+    p.pSide (paramindex, sidedness) # one of 'auto', 'pos', 'neg', 'two'
+    p.pTie (paramindex, tiefunc) # pval = tiefunc (params)
+
+(This docstring contains only usage information. For important
 information regarding provenance, license, and academic references,
 see comments in the module source code.)
 """
