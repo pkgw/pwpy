@@ -1113,7 +1113,7 @@ class Problem (object):
         # marks the parameter as fixed.
 
         w = np.where (lower == upper)
-        if len (w) > 0 and w[0].size > 0:
+        if len (w) and w[0].size:
             self.pValue (w, np.atleast_1d (lower)[w], True)
 
         return self
@@ -1472,12 +1472,12 @@ class Problem (object):
                 whupeg = where (hasulim & (x == ulim))
                 nupeg = len (whupeg[0])
 
-                if nlpeg > 0:
+                if nlpeg:
                     # Check total derivative of sum wrt lower-pegged params
                     for i in xrange (nlpeg):
                         if dot (fvec, fjac[:,whlpeg[0][i]]) > 0:
                             fjac[:,whlpeg[i]] = 0
-                if nupeg > 0:
+                if nupeg:
                     for i in xrange (nupeg):
                         if dot (fvec, fjac[:,whupeg[0][i]]) < 0:
                             fjac[:,whupeg[i]] = 0
@@ -1559,21 +1559,21 @@ class Problem (object):
                     wa2 = x + wa1
                 else:
                     if anylimits:
-                        if nlpeg > 0:
+                        if nlpeg:
                             wa1[whlpeg] = clip (wa1[whlpeg], 0., max (wa1))
-                        if nupeg > 0:
+                        if nupeg:
                             wa1[whupeg] = clip (wa1[whupeg], min (wa1), 0.)
 
                         dwa1 = abs (wa1) > finfo.eps
                         whl = where ((dwa1 != 0.) & hasllim & ((x + wa1) < llim))
 
-                        if len (whl[0]) > 0:
+                        if len (whl[0]):
                             t = (llim[whl] - x[whl]) / wa1[whl]
                             alpha = min (alpha, t.min ())
 
                         whu = where ((dwa1 != 0.) & hasulim & ((x + wa1) > ulim))
 
-                        if len (whu[0]) > 0:
+                        if len (whu[0]):
                             t = (ulim[whu] - x[whu]) / wa1[whu]
                             alpha = min (alpha, t.min ())
 
@@ -1590,10 +1590,10 @@ class Problem (object):
                     # Adjust final output values: if we're supposed to be
                     # exactly on a boundary, make it exact.
                     wh = where (hasulim & (wa2 >= ulim * (1 - finfo.eps)))
-                    if len (wh[0]) > 0:
+                    if len (wh[0]):
                         wa2[wh] = ulim[wh]
                     wh = where (hasllim & (wa2 <= llim * (1 + finfo.eps)))
-                    if len (wh[0]) > 0:
+                    if len (wh[0]):
                         wa2[wh] = llim[wh]
 
                 wa3 = diag * wa1
