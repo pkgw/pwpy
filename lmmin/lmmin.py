@@ -1433,11 +1433,11 @@ class Problem (object):
 
         # Which parameters have limits?
 
-        qulim = isfinite (self._pinfof[PI_F_ULIMIT,ifree])
+        hasulim = isfinite (self._pinfof[PI_F_ULIMIT,ifree])
         ulim = self._pinfof[PI_F_ULIMIT,ifree]
-        qllim = isfinite (self._pinfof[PI_F_LLIMIT,ifree])
+        hasllim = isfinite (self._pinfof[PI_F_LLIMIT,ifree])
         llim = self._pinfof[PI_F_LLIMIT,ifree]
-        anylimits = any (qulim) or any (qllim)
+        anylimits = any (hasulim) or any (hasllim)
 
         # Init fnorm
 
@@ -1467,9 +1467,9 @@ class Problem (object):
 
             if anylimits:
                 # Check for parameters pegged at limits
-                whlpeg = where (qllim & (x == llim))
+                whlpeg = where (hasllim & (x == llim))
                 nlpeg = len (whlpeg[0])
-                whupeg = where (qulim & (x == ulim))
+                whupeg = where (hasulim & (x == ulim))
                 nupeg = len (whupeg[0])
 
                 if nlpeg > 0:
@@ -1565,13 +1565,13 @@ class Problem (object):
                             wa1[whupeg] = clip (wa1[whupeg], min (wa1), 0.)
 
                         dwa1 = abs (wa1) > finfo.eps
-                        whl = where ((dwa1 != 0.) & qllim & ((x + wa1) < llim))
+                        whl = where ((dwa1 != 0.) & hasllim & ((x + wa1) < llim))
 
                         if len (whl[0]) > 0:
                             t = (llim[whl] - x[whl]) / wa1[whl]
                             alpha = min (alpha, t.min ())
 
-                        whu = where ((dwa1 != 0.) & qulim & ((x + wa1) > ulim))
+                        whu = where ((dwa1 != 0.) & hasulim & ((x + wa1) > ulim))
 
                         if len (whu[0]) > 0:
                             t = (ulim[whu] - x[whu]) / wa1[whu]
@@ -1589,10 +1589,10 @@ class Problem (object):
 
                     # Adjust final output values: if we're supposed to be
                     # exactly on a boundary, make it exact.
-                    wh = where (qulim & (wa2 >= ulim * (1 - finfo.eps)))
+                    wh = where (hasulim & (wa2 >= ulim * (1 - finfo.eps)))
                     if len (wh[0]) > 0:
                         wa2[wh] = ulim[wh]
-                    wh = where (qllim & (wa2 <= llim * (1 + finfo.eps)))
+                    wh = where (hasllim & (wa2 <= llim * (1 + finfo.eps)))
                     if len (wh[0]) > 0:
                         wa2[wh] = llim[wh]
 
