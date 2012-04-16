@@ -2102,15 +2102,16 @@ def _lmder1_driver (nout, func, jac, guess, target_fnorm1,
     p.maxiter = 100 * (guess.size + 1)
     s = p.solve (guess)
 
-    # assert_array_almost_equal goes to a fixed number of decimal
-    # places regardless of the scale of the number, so it breaks
-    # when we work with very large values.
-    from numpy.testing import assert_array_almost_equal as aaae
-    scale = np.maximum (np.abs (target_params), 1)
-    try:
-        aaae (s.params / scale, target_params / scale, decimal=10)
-    except AssertionError:
-        assert False, '''Arrays are not almost equal to 10 (scaled) decimals
+    if target_params is not None:
+        # assert_array_almost_equal goes to a fixed number of decimal
+        # places regardless of the scale of the number, so it breaks
+        # when we work with very large values.
+        from numpy.testing import assert_array_almost_equal as aaae
+        scale = np.maximum (np.abs (target_params), 1)
+        try:
+            aaae (s.params / scale, target_params / scale, decimal=10)
+        except AssertionError:
+            assert False, '''Arrays are not almost equal to 10 (scaled) decimals
 
 x: %s
 y: %s''' % (s.params, target_params)
@@ -2152,6 +2153,16 @@ def _lmder1_linear_full_rank_2 ():
     _lmder1_linear_full_rank (5, 50, 1, 0.806225774e+01, 0.670820393e+01)
 
 
+# To investigate: the following four linear rank-1 tests have
+# something weird going on. The parameters returned by the optimizer
+# agree with the Fortran implementation for one of my machines (an
+# AMD64) and disagree for another (a 32-bit Intel). Furthermore, the
+# same **Fortran** implementation gives different parameter results on
+# the two machines. I take this as an indication that there's
+# something weird about these tests such that the precise parameter
+# values are unpredictable. I've hacked the tests accordingly to not
+# check the parameter results.
+
 def _lmder1_linear_rank1 (n, m, factor, target_fnorm1, target_fnorm2, target_params):
     """A rank-1 linear function (lmder test #2)"""
 
@@ -2171,20 +2182,21 @@ def _lmder1_linear_rank1 (n, m, factor, target_fnorm1, target_fnorm2, target_par
 
     #_lmder1_test (m, func, jac, guess)
     _lmder1_driver (m, func, jac, guess,
-                    target_fnorm1, target_fnorm2, target_params)
+                    target_fnorm1, target_fnorm2, None) #target_params)
 
 @test
 def _lmder1_linear_rank1_1 ():
     _lmder1_linear_rank1 (5, 10, 1,
                           0.2915218688e+03, 0.1463850109e+01,
-                          [-0.167796818e+03, -0.8339840901e+02, 0.2211100431e+03, -0.4119920451e+02, -0.327593636e+02])
+                          [-0.167796818e+03, -0.8339840901e+02, 0.2211100431e+03,
+                           -0.4119920451e+02, -0.327593636e+02])
 
 @test
 def _lmder1_linear_rank1_2 ():
     _lmder1_linear_rank1 (5, 50, 1,
                           0.310160039334e+04, 0.34826301657e+01,
                           [-0.2029999900022674e+02, -0.9649999500113370e+01, -0.1652451975264496e+03,
-                            -0.4324999750056676e+01,  0.1105330585100652e+03])
+                           -0.4324999750056676e+01,  0.1105330585100652e+03])
 
 
 def _lmder1_linear_r1zcr (n, m, factor, target_fnorm1, target_fnorm2, target_params):
@@ -2209,7 +2221,7 @@ def _lmder1_linear_r1zcr (n, m, factor, target_fnorm1, target_fnorm2, target_par
 
     #_lmder1_test (m, func, jac, guess)
     _lmder1_driver (m, func, jac, guess,
-                    target_fnorm1, target_fnorm2, target_params)
+                    target_fnorm1, target_fnorm2, None) #target_params)
 
 @test
 def _lmder1_linear_r1zcr_1 ():
