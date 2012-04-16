@@ -2107,7 +2107,13 @@ def _lmder1_driver (nout, func, jac, guess, target_fnorm1,
     # when we work with very large values.
     from numpy.testing import assert_array_almost_equal as aaae
     scale = np.maximum (np.abs (target_params), 1)
-    aaae (s.params / scale, target_params / scale, decimal=10)
+    try:
+        aaae (s.params / scale, target_params / scale, decimal=10)
+    except AssertionError:
+        assert False, '''Arrays are not almost equal to 10 (scaled) decimals
+
+x: %s
+y: %s''' % (s.params, target_params)
 
     func (s.params, y)
     fnorm2 = enorm_mpfit_careful (y, finfo)
