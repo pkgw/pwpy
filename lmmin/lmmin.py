@@ -201,6 +201,9 @@ _dside_names = {
     'two': DSIDE_TWO,
 }
 
+
+anynotfinite = lambda x: not np.all (np.isfinite (x))
+
 # Euclidean norm-calculating functions. The naive implementation is
 # fast but can be sensitive to under/overflows. The "mpfit_careful"
 # version is slower but tries to be more robust. The "minpack"
@@ -1091,7 +1094,7 @@ class Problem (object):
 
 
     def pValue (self, idx, value, fixed=False):
-        if np.any (-np.isfinite (value)):
+        if anynotfinite (value):
             raise ValueError ('value')
 
         self._pinfof[PI_F_VALUE,idx] = value
@@ -1229,7 +1232,7 @@ class Problem (object):
         self._checkParamConfig ()
         npar = self._npar
 
-        if not np.all (np.isfinite (errinv)):
+        if anynotfinite (errinv):
             raise ValueError ('some inverse errors are nonfinite')
 
         # FIXME: handle yobs.ndim != 1 and/or yobs being complex
@@ -1247,14 +1250,14 @@ class Problem (object):
         else:
             def ywrap (pars, nresids):
                 yfunc (pars, nresids)
-                if not np.all (np.isfinite (nresids)):
+                if anynotfinite (nresids):
                     raise RuntimeError ('function returned nonfinite values')
                 subtract (yobs, nresids, nresids)
                 multiply (nresids, errinv, nresids)
                 #print 'N:', (nresids**2).sum ()
             def jwrap (pars, jac):
                 jfunc (pars, jac)
-                if not np.all (np.isfinite (jac)):
+                if anynotfinite (jac):
                     raise RuntimeError ('jacobian returned nonfinite values')
                 multiply (jac, -1, jac)
                 for i in xrange (npar):
@@ -1413,7 +1416,7 @@ class Problem (object):
         w = np.where (self._pinfob & PI_M_FIXED)
         initial_params[w] = self._pinfof[PI_F_VALUE,w]
 
-        if any (-isfinite (initial_params)):
+        if anynotfinite (initial_params):
             raise ValueError ('some nonfinite initial parameter values')
 
         dtype = initial_params.dtype
@@ -1520,7 +1523,7 @@ class Problem (object):
 
             fjac = fjac[:n,:n]
 
-            if any (-isfinite (fjac)):
+            if anynotfinite (fjac):
                 raise RuntimeError ('nonfinite terms in Jacobian matrix')
 
             # Calculate the norm of the scaled gradient
@@ -1693,9 +1696,12 @@ class Problem (object):
             if len (status):
                 break
 
-            # Check for overflow
-            if any (-isfinite (wa1) | -isfinite (wa2) | -isfinite (x)):
-                raise RuntimeError ('overflow in wa1, wa2, or x')
+            if anynotfinite (wa1):
+                raise RuntimeError ('overflow in wa1')
+            if anynotfinite (wa2):
+                raise RuntimeError ('overflow in wa2')
+            if anynotfinite (x):
+                raise RuntimeError ('overflow in x')
 
         # End outer loop. Finalize params, fvec, and fnorm
 
@@ -1881,7 +1887,7 @@ class Problem (object):
             raise ValueError ('expected exactly %d parameters, got %d'
                               % (self._npar, initial_params.size))
 
-        if any (-isfinite (initial_params)):
+        if anynotfinite (initial_params):
             raise ValueError ('some nonfinite initial parameter values')
 
         dtype = initial_params.dtype
