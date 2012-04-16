@@ -771,113 +771,216 @@ def _qrd_solve_alone ():
 
 # Calculation of the Levenberg-Marquardt parameter
 
-def _lmpar (r, ipvt, diag, qtb, delta, x, sdiag, par, enorm, finfo):
+def _lm_solve (r, pmut, ddiag, qtb, delta, par0, enorm, finfo):
+    """Compute the Levenberg-Marquardt parameter and solution vector.
+
+Parameters:
+r     - IN/OUT m-by-n matrix, m >= n. On input, the full upper triangle is
+        the full upper triangle of R and the strict lower triangle is
+        ignored.  On output, the strict lower triangle has been
+        obliterated. The value of 'm' here is not relevant.
+pmut  - n-vector, defines permutation of R
+ddiag - n-vector, diagonal elements of D
+qtb   - n-vector, first elements of (Q^T * B)
+delta - positive scalar, specifies scale of enorm(Dx)
+par0  - positive scalar, initial estimate of the LM parameter
+enorm - norm-computing function
+finfo - info about chosen floating-point representation
+
+Returns:
+par   - positive scalar, final estimate of LM parameter
+x     - n-vector, least-squares solution of Ax=B, sqrt(par)Dx = 0
+
+This routine computes the Levenberg-Marquardt parameter 'par' and a LM
+solution vector 'x'. Given an n-by-n matrix A, an n-by-n nonsingular
+diagonal matrix D, an m-vector B, and a positive number delta, the
+problem is to determine values such that 'x' is the least-squares
+solution to
+
+ A x = B
+ sqrt(par) * D x = 0
+
+and either
+
+ (1) par = 0, dxnorm - delta <= 0.1 delta or
+ (2) par > 0 and |dxnorm - delta| <= 0.1 delta
+
+where dxnorm = enorm (D x).
+
+This routine is not given A, B, or D directly. If we define the
+column-pivoted QR factorization of A such that
+
+ A P = Q R
+
+where P is a permutation matrix, Q has orthogonal columns, and R is an
+upper triangular matrix with diagonal elements of nonincreasing
+magnitude, this routine is given the full upper triangle of R, a
+vector defining P ('pmut'), and the first n components of Q^T B
+('qtb'). These values are essentially passed verbatim to _qrd_solve().
+
+This routine iterates to estimate par. Usually only a few iterations
+are needed, but no more than 10 are performed.
+"""
     dwarf = finfo.tiny
     m, n = r.shape
+    x = np.empty_like (qtb)
+    sdiag = np.empty_like (qtb)
 
-    # "Compute and store x in the Gauss-Newton direction. If
-    # the Jacobian is rank-deficient, obtain a least-squares
-    # solution.
+    # "Compute and store x in the Gauss-Newton direction. If the
+    # Jacobian is rank-deficient, obtain a least-squares solution."
 
-    nsing = n
+    nnonsingular = n
     wa1 = qtb.copy ()
 
     for i in xrange (n):
-        if r[i,i] == 0 and nsing == n:
-            nsing = i
-        if nsing < n:
-            wa1[i] = 0.
+        if r[i,i] == 0:
+            nnonsingular = i
+            wa1[i:] = 0
+            break
 
-    if nsing > 0:
-        # "Reverse loop"
-        for j in xrange (nsing - 1, -1, -1):
-            wa1[j] /= r[j,j]
-            if j - 1 >= 0:
-                wa1[:j] -= r[:j,j] * wa1[j]
+    for j in xrange (nnonsingular - 1, -1, -1):
+        wa1[j] /= r[j,j]
+        wa1[:j] -= r[:j,j] * wa1[j]
 
-    # "Note: ipvt here is a permutation array."
-    x[ipvt] = wa1
+    x[pmut] = wa1
 
-    # "Initialize the iteration counter.  Evaluate the function at the
-    # origin, and test for acceptance of the gauss-newton direction"
-    iterct = 0
-    wa2 = diag * x
+    # Initial function evaluation. Check if the Gauss-Newton direction
+    # was good enough.
+
+    wa2 = ddiag * x
     dxnorm = enorm (wa2, finfo)
-    fp = dxnorm - delta
-    if fp <= 0.1 * delta:
-        return r, 0, x, sdiag
+    normdiff = dxnorm - delta
 
-    # "If the Jacobian is not rank deficient, the Newton step provides a
-    # lower bound, parl, for the zero of the function.  Otherwise set
-    # this bound to zero."
+    if normdiff <= 0.1 * delta:
+        return 0, x
 
-    parl = 0.
+    # If the Jacobian is not rank deficient, the Newton step provides
+    # a lower bound for the zero of the function.
 
-    if nsing >= n:
-        wa1 = diag[ipvt] * wa2[ipvt] / dxnorm
-        wa1[0] /= r[0,0] # Degenerate case
+    par_lower = 0.
+
+    if nnonsingular == n:
+        wa1 = ddiag[pmut] * wa2[pmut] / dxnorm
+        wa1[0] /= r[0,0] # "Degenerate case"
+
         for j in xrange (1, n):
-            s = np.dot (r[:j,j], wa1[:j])
-            wa1[j] = (wa1[j] - s) / r[j,j]
+            wa1[j] = (wa1[j] - np.dot (r[:j,j], wa1[:j])) / r[j,j]
 
         temp = enorm (wa1, finfo)
-        parl = fp / delta / temp**2
+        par_lower = normdiff / delta / temp**2
 
-    # "Calculate an upper bound, paru, for the zero of the function."
+    # We can always find an upper bound.
 
     for j in xrange (n):
-        s = np.dot (r[:j+1,j], qtb[:j+1])
-        wa1[j] = s / diag[ipvt[j]]
-    gnorm = enorm (wa1, finfo)
-    paru = gnorm / delta
-    if paru == 0:
-        paru = dwarf / min (delta, 0.1)
+        wa1[j] = np.dot (r[:j+1,j], qtb[:j+1]) / ddiag[pmut[j]]
 
-    par = np.clip (par, parl, paru)
+    gnorm = enorm (wa1, finfo)
+    par_upper = gnorm / delta
+    if par_upper == 0:
+        par_upper = dwarf / min (delta, 0.1)
+
+    # Now iterate our way to victory.
+
+    par = np.clip (par0, par_lower, par_upper)
     if par == 0:
         par = gnorm / dxnorm
 
-    # Begin iteration
-    while True:
-        iterct += 1
+    itercount = 0
 
-        # Evaluate at current value of par.
+    while True:
+        itercount += 1
+
         if par == 0:
-            par = max (dwarf, paru * 0.001)
+            par = max (dwarf, par_upper * 0.001)
 
         temp = np.sqrt (par)
-        wa1 = temp * diag
-        x = _qrd_solve (r, ipvt, wa1, qtb, sdiag)
-        wa2 = diag * x
+        wa1 = temp * ddiag
+        x = _qrd_solve (r, pmut, wa1, qtb, sdiag) # sdiag is an output arg here
+        wa2 = ddiag * x
         dxnorm = enorm (wa2, finfo)
-        temp = fp
-        fp = dxnorm - delta
+        olddiff = normdiff
+        normdiff = dxnorm - delta
 
-        if (abs (fp) < 0.1 * delta or (parl == 0 and fp <= temp and temp < 0) or
-            iterct == 10):
-            break
+        if abs (normdiff) < 0.1 * delta:
+            break # converged
+        if par_lower == 0 and normdiff <= olddiff and olddiff < 0:
+            break # overshot, I guess?
+        if itercount == 10:
+            break # this is taking too long
 
-        # "Compute the Newton correction."
-        wa1 = diag[ipvt] * wa2[ipvt] / dxnorm
+        # Compute and apply the Newton correction
+
+        wa1 = ddiag[pmut] * wa2[pmut] / dxnorm
 
         for j in xrange (n - 1):
             wa1[j] /= sdiag[j]
             wa1[j+1:n] -= r[j+1:n,j] * wa1[j]
         wa1[n-1] /= sdiag[n-1] # degenerate case
 
-        temp = enorm (wa1, finfo)
-        parc = fp / delta / temp**2
+        par_delta = normdiff / delta / enorm (wa1, finfo)**2
 
-        if fp > 0:
-            parl = max (parl, par)
-        elif fp < 0:
-            paru = min (paru, par)
+        if normdiff > 0:
+            par_lower = max (par_lower, par)
+        elif normdiff < 0:
+            par_upper = min (par_upper, par)
 
-        # Improve estimate of par
-        par = max (parl, par + parc)
+        par = max (par_lower, par + par_delta)
 
-    # All done
-    return r, par, x, diag
+    return par, x
+
+
+def _lm_solve_full (a, b, ddiag, delta, par0, dtype=np.float):
+    """Compute the Levenberg-Marquardt parameter and solution vector.
+
+Parameters:
+a     - m-by-n matrix, m >= n (only the n-by-n component is used)
+b     - n-by-n matrix
+ddiag - n-vector, diagonal elements of D
+delta - positive scalar, specifies scale of enorm(Dx)
+par0  - positive scalar, initial estimate of the LM parameter
+
+Returns:
+par    - positive scalar, final estimate of LM parameter
+x      - n-vector, least-squares solution of Ax=B, sqrt(par)Dx = 0
+dxnorm - positive scalar, enorm (D x)
+relnormdiff - scalar, (dxnorm - delta) / delta, maybe abs-ified
+
+This routine computes the Levenberg-Marquardt parameter 'par' and a LM
+solution vector 'x'. Given an n-by-n matrix A, an n-by-n nonsingular
+diagonal matrix D, an m-vector B, and a positive number delta, the
+problem is to determine values such that 'x' is the least-squares
+solution to
+
+ A x = B
+ sqrt(par) * D x = 0
+
+and either
+
+ (1) par = 0, dxnorm - delta <= 0.1 delta or
+ (2) par > 0 and |dxnorm - delta| <= 0.1 delta
+
+where dxnorm = enorm (D x).
+"""
+    a = np.asarray (a, dtype)
+    b = np.asarray (b, dtype)
+    ddiag = np.asarray (ddiag, dtype)
+
+    m, n = a.shape
+    assert m >= n
+    assert b.shape == (m, )
+    assert ddiag.shape == (n, )
+
+    q, r, pmut = _qr_factor_full (a)
+    qtb = np.dot (q.T, b)
+    par, x = _lm_solve (r, pmut, ddiag, qtb, delta, par0,
+                        enorm_mpfit_careful, np.finfo (dtype))
+    dxnorm = enorm_mpfit_careful (ddiag * x, np.finfo (dtype))
+    relnormdiff = (dxnorm - delta) / delta
+
+    if par > 0:
+        relnormdiff = abs (relnormdiff)
+
+    return par, x, dxnorm, relnormdiff
 
 
 def _calc_covar (rr, ipvt, tol=1e-14):
@@ -1547,9 +1650,9 @@ class Problem (object):
 
             # Inner loop
             while True:
-                # Get Levenberg-Marquardt parameter
-                fjac, par, wa1, wa2 = _lmpar (fjac, ipvt, diag, qtf, delta,
-                                              wa1, wa2, par, enorm, finfo)
+                # Get Levenberg-Marquardt parameter. fjac is modified in-place
+                par, wa1 = _lm_solve (fjac, ipvt, diag, qtf, delta, par,
+                                      enorm, finfo)
                 # "Store the direction p and x+p. Calculate the norm of p"
                 wa1 *= -1
                 alpha = 1.
