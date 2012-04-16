@@ -179,7 +179,7 @@ PI_F_STEP = 3 # fixed parameter step size to use (abs or rel), 0. for unspecifie
 PI_F_MAXSTEP = 4 # maximum step to take
 PI_NUM_F = 5
 
-# Five bits of data
+# Four bits of data
 PI_M_SIDE = 0x3 # sidedness of derivative - two bits
 PI_M_FIXED = 0x4 # fixed value
 PI_M_RELSTEP = 0x8 # whether the specified stepsize is relative
