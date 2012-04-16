@@ -1413,7 +1413,7 @@ class Problem (object):
             raise ValueError ('expected exactly %d parameters, got %d'
                               % (self._npar, initial_params.size))
 
-        w = np.where (self._pinfob & PI_M_FIXED)
+        w = where (self._pinfob & PI_M_FIXED)
         initial_params[w] = self._pinfof[PI_F_VALUE,w]
 
         if anynotfinite (initial_params):
@@ -1428,8 +1428,8 @@ class Problem (object):
         isrel = self._getBits (PI_M_RELSTEP)
         dside = self._pinfob & PI_M_SIDE
         maxstep = self._pinfof[PI_F_MAXSTEP,ifree]
-        qmax = isfinite (maxstep)
-        anymaxsteps = any (qmax)
+        whmaxstep = where (isfinite (maxstep))
+        anymaxsteps = whmaxstep[0].size > 0
 
         # Which parameters have limits?
 
@@ -1579,11 +1579,9 @@ class Problem (object):
 
                     if anymaxsteps:
                         nwa1 = wa1 * alpha
-                        whmax = where (qmax)
-                        if len (whmax[0]) > 0:
-                            mrat = np.abs (nwa1[whmax] / maxstep[whmax]).max ()
-                            if mrat > 1:
-                                alpha /= mrat
+                        mrat = np.abs (nwa1[whmaxstep] / maxstep[whmaxstep]).max ()
+                        if mrat > 1:
+                            alpha /= mrat
 
                     # Scale resulting vector
                     wa1 *= alpha
