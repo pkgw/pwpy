@@ -2461,7 +2461,7 @@ def _lmder1_freudenstein_roth ():
         vec[1] = -29 + params[0] + ((1 + params[1]) * params[1] - 14) * params[1]
 
     def jac (params, jac):
-        jac[0,0] = jac[0,1] = 1
+        jac[0] = 1
         jac[1,0] = params[1] * (10 - 3 * params[1]) - 2
         jac[1,1] = params[1] * (2 + 3 * params[1]) - 14
 
