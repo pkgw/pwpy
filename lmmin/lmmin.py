@@ -577,7 +577,7 @@ that
 P^T (A^T A + D D) P = S^T S.
 """
 
-    m, n = r.shape
+    n, m = r.shape
 
     # "Copy r and (q.T)*b to preserve input and initialize s.  In
     # particular, save the diagonal elements of r in x."  Recall that
@@ -585,7 +585,7 @@ P^T (A^T A + D D) P = S^T S.
     # can mirror that into the lower triangle without issues.
 
     for i in xrange (n):
-        r[i:,i] = r[i,i:]
+        r[i,i:] = r[i:,i]
 
     x = r.diagonal ()
     zwork = qtb.copy ()
@@ -636,9 +636,9 @@ P^T (A^T A + D D) P = S^T S.
 
             # "Accumulate the transformation in the row of s."
             if j + 1 < n:
-                temp = cos * r[j+1:,j] + sin * sdiag[j+1:]
-                sdiag[j+1:] = -sin * r[j+1:,j] + cos * sdiag[j+1:]
-                r[j+1:,j] = temp
+                temp = cos * r[j,j+1:] + sin * sdiag[j+1:]
+                sdiag[j+1:] = -sin * r[j,j+1:] + cos * sdiag[j+1:]
+                r[j,j+1:] = temp
 
         # Save the diagonal of S and restore the diagonal of R
         # from its saved location in x.
@@ -660,7 +660,7 @@ P^T (A^T A + D D) P = S^T S.
         zwork[nsing-1] /= sdiag[nsing-1] # Degenerate case
         # "Reverse loop"
         for i in xrange (nsing - 2, -1, -1):
-            s = np.dot (r[i+1:nsing,i], zwork[i+1:nsing])
+            s = np.dot (zwork[i+1:nsing], r[i,i+1:nsing])
             zwork[i] = (zwork[i] - s) / sdiag[i]
 
     # "Permute the components of z back to components of x."
@@ -675,7 +675,7 @@ def _manual_qrd_solve (r, pmut, ddiag, qtb, dtype=np.float, build_s=False):
     qtb = np.asarray (qtb, dtype)
 
     swork = r.copy ()
-    sdiag = np.empty (r.shape[0], r.dtype)
+    sdiag = np.empty (r.shape[1], r.dtype)
 
     x = _qrd_solve (swork, pmut, ddiag, qtb, sdiag)
 
@@ -685,8 +685,8 @@ def _manual_qrd_solve (r, pmut, ddiag, qtb, dtype=np.float, build_s=False):
     # Rebuild s.
 
     swork = swork.T
-    for i in xrange (r.shape[0]):
-        swork[i:,i] = 0
+    for i in xrange (r.shape[1]):
+        swork[i,i:] = 0
         swork[i,i] = sdiag[i]
 
     return x, swork
@@ -721,7 +721,7 @@ has its columns sorted that way.
     b = np.asarray (b, dtype)
     ddiag = np.asarray (ddiag, dtype)
 
-    m, n = a.shape
+    n, m = a.shape
     assert m >= n
     assert b.shape == (m, )
     assert ddiag.shape == (n, )
@@ -729,8 +729,8 @@ has its columns sorted that way.
     # The computation is straightforward.
 
     q, r, pmut = _qr_factor_full (a)
-    qtb = np.dot (q.T, b)
-    x, s = _manual_qrd_solve (r[:n], pmut, ddiag, qtb,
+    qtb = np.dot (b, q.T)
+    x, s = _manual_qrd_solve (r[:,:n], pmut, ddiag, qtb,
                               dtype=dtype, build_s=True)
 
     return x, s, pmut
