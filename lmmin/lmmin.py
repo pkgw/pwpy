@@ -984,61 +984,103 @@ where dxnorm = enorm (D x).
     return par, x, dxnorm, relnormdiff
 
 
-def _calc_covar (rr, ipvt, tol=1e-14):
-    n = rr.shape[0]
-    assert rr.shape[1] == n
+def _calc_covariance (r, pmut, tol=1e-14):
+    """Calculate the covariance matrix of the fitted parameters
 
-    r = rr.copy ()
+Parameters:
+r    - n-by-n matrix, the full upper triangle of R
+pmut - n-vector, defines the permutation of R
+tol  - scalar, relative column scale for determining rank
+       deficiency. Default 1e-14.
 
-    # "For the inverse of r in the full upper triangle of r"
-    l = -1
-    tolr = tol * abs(r[0,0])
-    for k in xrange (n):
-        if abs (r[k,k]) <= tolr:
+Returns:
+cov  - n-by-n matrix, the covariance matrix C
+
+Given an n-by-n matrix A, the corresponding covariance matrix
+is
+
+  C = inverse(A^T A)
+
+This routine is given information relating to the pivoted QR
+factorization of A, which is defined by matrices such that
+
+ A P = Q R
+
+where P is a permutation matrix, Q has orthogonal columns, and R is an
+upper triangular matrix with diagonal elements of nonincreasing
+magnitude. In particular we take the full upper triangle of R ('r')
+and a vector describing P ('pmut'). The covariance matrix is then
+
+ C = P inverse(R^T R) P^T
+
+If A is nearly rank-deficient, it may be desirable to compute the
+covariance matrix corresponding to the linearly-independent columns of
+A. We use a tolerance, 'tol', to define the numerical rank of A. If j
+is the largest integer such that |R[j,j]| > tol*|R[0,0]|, then we
+compute the covariance matrix for the first j columns of R. For k > j,
+the corresponding covariance entries (pmut[k]) are set to zero.
+"""
+    # This routine could save an allocation by operating on r in-place,
+    # which might be worthwhile for large n, and is what the original
+    # Fortran does.
+
+    n = r.shape[0]
+    assert r.shape[1] >= n
+    r = r.copy ()
+
+    # "Form the inverse of R in the full upper triangle of R."
+
+    jrank = -1
+    abstol = tol * abs(r[0,0])
+
+    for i in xrange (n):
+        if abs (r[i,i]) <= abstol:
             break
-        r[k,k] = 1. / r[k,k]
 
-        for j in xrange (k):
-            temp = r[k,k] * r[j,k]
-            r[j,k] = 0.
-            r[:j+1,k] -= temp * r[:j+1,j]
+        r[i,i] **= -1
 
-        l = k
+        for j in xrange (i):
+            temp = r[i,i] * r[j,i]
+            r[j,i] = 0.
+            r[:j+1,i] -= temp * r[:j+1,j]
 
-    # "Form the full upper triangle of the inverse of (r transpose)*r
-    # in the full upper triangle of r"
+        jrank = i
 
-    if l >= 0:
-        for k in xrange (l + 1):
-            for j in xrange (k):
-                temp = r[j,k]
-                r[:j+1,j] += temp * r[:j+1,k]
-            temp = r[k,k]
-            r[:k+1,k] *= temp
+    # "Form the full upper triangle of the inverse(R^T R) in the full
+    # upper triangle of R."
 
-    # "For the full lower triangle of the covariance matrix
-    # in the strict lower triangle or and in wa"
+    for i in xrange (jrank + 1):
+        for j in xrange (i):
+            r[:j+1,j] += r[j,i] * r[:j+1,i]
+        r[:i+1,i] *= r[i,i]
 
-    wa = np.repeat ([r[0,0]], n)
+    # "Form the full lower triangle of the covariance matrix in the
+    # strict lower triangle of R and in wa."
 
-    for j in xrange (n):
-        jj = ipvt[j]
-        sing = j > l
-        for i in xrange (j + 1):
+    wa = np.empty (n)
+    wa.fill (r[0,0])
+
+    for i in xrange (n):
+        pi = pmut[i]
+        sing = i > jrank
+
+        for j in xrange (i + 1):
             if sing:
-                r[i,j] = 0.
-            ii = ipvt[i]
-            if ii > jj:
-                r[ii,jj] = r[i,j]
-            elif ii < jj:
-                r[jj,ii] = r[i,j]
-        wa[jj] = r[j,j]
+                r[j,i] = 0.
 
-    # "Symmetrize the covariance matrix in r"
+            pj = pmut[j]
+            if pj > pi:
+                r[pj,pi] = r[j,i]
+            elif pj < pi:
+                r[pi,pj] = r[j,i]
 
-    for j in xrange (n):
-        r[:j+1,j] = r[j,:j+1]
-        r[j,j] = wa[j]
+        wa[pi] = r[i,i]
+
+    # Symmetrize.
+
+    for i in xrange (n):
+        r[:i+1,i] = r[i,:i+1]
+        r[i,i] = wa[i]
 
     return r
 
@@ -1826,7 +1868,7 @@ class Problem (object):
             if sz[0] < n or sz[1] < n or len (ipvt) < n:
                 covar = None
             else:
-                cv = _calc_covar (fjac[:n,:n], ipvt[:n])
+                cv = _calc_covariance (fjac[:n,:n], ipvt[:n])
                 cv.shape = (n, n)
 
                 for i in xrange (n): # can't do 2D fancy indexing
