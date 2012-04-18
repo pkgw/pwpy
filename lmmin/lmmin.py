@@ -820,7 +820,7 @@ This routine iterates to estimate par. Usually only a few iterations
 are needed, but no more than 10 are performed.
 """
     dwarf = finfo.tiny
-    m, n = r.shape
+    n, m = r.shape
     x = np.empty_like (qtb)
     sdiag = np.empty_like (qtb)
 
@@ -838,7 +838,7 @@ are needed, but no more than 10 are performed.
 
     for j in xrange (nnonsingular - 1, -1, -1):
         wa1[j] /= r[j,j]
-        wa1[:j] -= r[:j,j] * wa1[j]
+        wa1[:j] -= r[j,:j] * wa1[j]
 
     x[pmut] = wa1
 
@@ -862,7 +862,7 @@ are needed, but no more than 10 are performed.
         wa1[0] /= r[0,0] # "Degenerate case"
 
         for j in xrange (1, n):
-            wa1[j] = (wa1[j] - np.dot (r[:j,j], wa1[:j])) / r[j,j]
+            wa1[j] = (wa1[j] - np.dot (wa1[:j], r[j,:j])) / r[j,j]
 
         temp = enorm (wa1, finfo)
         par_lower = normdiff / delta / temp**2
@@ -870,7 +870,7 @@ are needed, but no more than 10 are performed.
     # We can always find an upper bound.
 
     for j in xrange (n):
-        wa1[j] = np.dot (r[:j+1,j], qtb[:j+1]) / ddiag[pmut[j]]
+        wa1[j] = np.dot (qtb[:j+1], r[j,:j+1]) / ddiag[pmut[j]]
 
     gnorm = enorm (wa1, finfo)
     par_upper = gnorm / delta
@@ -912,7 +912,7 @@ are needed, but no more than 10 are performed.
 
         for j in xrange (n - 1):
             wa1[j] /= sdiag[j]
-            wa1[j+1:n] -= r[j+1:n,j] * wa1[j]
+            wa1[j+1:n] -= r[j,j+1:n] * wa1[j]
         wa1[n-1] /= sdiag[n-1] # degenerate case
 
         par_delta = normdiff / delta / enorm (wa1, finfo)**2
@@ -963,13 +963,13 @@ where dxnorm = enorm (D x).
     b = np.asarray (b, dtype)
     ddiag = np.asarray (ddiag, dtype)
 
-    m, n = a.shape
+    n, m = a.shape
     assert m >= n
     assert b.shape == (m, )
     assert ddiag.shape == (n, )
 
     q, r, pmut = _qr_factor_full (a)
-    qtb = np.dot (q.T, b)
+    qtb = np.dot (b, q.T)
     par, x = _lm_solve (r, pmut, ddiag, qtb, delta, par0,
                         enorm_mpfit_careful, np.finfo (dtype))
     dxnorm = enorm_mpfit_careful (ddiag * x, np.finfo (dtype))
