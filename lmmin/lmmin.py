@@ -1021,8 +1021,8 @@ the corresponding covariance entries (pmut[k]) are set to zero.
     # which might be worthwhile for large n, and is what the original
     # Fortran does.
 
-    n = r.shape[0]
-    assert r.shape[1] >= n
+    n = r.shape[1]
+    assert r.shape[0] >= n
     r = r.copy ()
 
     # "Form the inverse of R in the full upper triangle of R."
@@ -1037,9 +1037,9 @@ the corresponding covariance entries (pmut[k]) are set to zero.
         r[i,i] **= -1
 
         for j in xrange (i):
-            temp = r[i,i] * r[j,i]
-            r[j,i] = 0.
-            r[:j+1,i] -= temp * r[:j+1,j]
+            temp = r[i,i] * r[i,j]
+            r[i,j] = 0.
+            r[i,:j+1] -= temp * r[j,:j+1]
 
         jrank = i
 
@@ -1048,8 +1048,8 @@ the corresponding covariance entries (pmut[k]) are set to zero.
 
     for i in xrange (jrank + 1):
         for j in xrange (i):
-            r[:j+1,j] += r[j,i] * r[:j+1,i]
-        r[:i+1,i] *= r[i,i]
+            r[j,:j+1] += r[i,j] * r[i,:j+1]
+        r[i,:i+1] *= r[i,i]
 
     # "Form the full lower triangle of the covariance matrix in the
     # strict lower triangle of R and in wa."
@@ -1063,20 +1063,20 @@ the corresponding covariance entries (pmut[k]) are set to zero.
 
         for j in xrange (i + 1):
             if sing:
-                r[j,i] = 0.
+                r[i,j] = 0.
 
             pj = pmut[j]
             if pj > pi:
-                r[pj,pi] = r[j,i]
+                r[pi,pj] = r[i,j]
             elif pj < pi:
-                r[pi,pj] = r[j,i]
+                r[pj,pi] = r[i,j]
 
         wa[pi] = r[i,i]
 
     # Symmetrize.
 
     for i in xrange (n):
-        r[:i+1,i] = r[i,:i+1]
+        r[i,:i+1] = r[:i+1,i]
         r[i,i] = wa[i]
 
     return r
