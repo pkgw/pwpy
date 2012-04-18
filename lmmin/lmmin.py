@@ -1615,12 +1615,12 @@ class Problem (object):
                 if nlpeg:
                     # Check total derivative of sum wrt lower-pegged params
                     for i in xrange (nlpeg):
-                        if dot (fvec, fjac[:,whlpeg[0][i]]) > 0:
-                            fjac[:,whlpeg[i]] = 0
+                        if dot (fjac[whlpeg[0][i]], fvec) > 0:
+                            fjac[whlpeg[i]] = 0
                 if nupeg:
                     for i in xrange (nupeg):
-                        if dot (fvec, fjac[:,whupeg[0][i]]) < 0:
-                            fjac[:,whupeg[i]] = 0
+                        if dot (fjac[whupeg[0][i]], fvec) < 0:
+                            fjac[whupeg[i]] = 0
 
             # Compute QR factorization of the Jacobian
             # wa1: "rdiag", diagonal part of R matrix, pivoting applied
@@ -1650,9 +1650,9 @@ class Problem (object):
             for j in xrange (n):
                 temp3 = fjac[j,j]
                 if temp3 != 0:
-                    fj = fjac[j:,j]
+                    fj = fjac[j,j:]
                     wj = wa4[j:]
-                    wa4[j:] = wj - fj * dot (fj, wj) / temp3
+                    wa4[j:] = wj - fj * dot (wj, fj) / temp3
                 fjac[j,j] = wa1[j]
                 qtf[j] = wa4[j]
 
@@ -1673,7 +1673,7 @@ class Problem (object):
                 for j in xrange (n):
                     l = ipvt[j]
                     if wa2[l] != 0:
-                        s = dot (fjac[:j+1,j], qtf[:j+1]) / fnorm
+                        s = dot (qtf[:j+1], fjac[j,:j+1]) / fnorm
                         gnorm = max (gnorm, abs (s / wa2[l]))
 
             # Test for convergence of gradient norm
@@ -1761,7 +1761,7 @@ class Problem (object):
 
                 for j in xrange (n):
                     wa3[j] = 0
-                    wa3[:j+1] = wa3[:j+1] + fjac[:j+1,j] * wa1[ipvt[j]]
+                    wa3[:j+1] = wa3[:j+1] + fjac[j,:j+1] * wa1[ipvt[j]]
 
                 # "Remember, alpha is the fraction of the full LM step actually
                 # taken."
@@ -1925,7 +1925,7 @@ class Problem (object):
         if self._ifree.size < self._npar:
             fjac = fjac[self._ifree]
 
-        return fjac.T
+        return fjac
 
 
     def _get_jacobian_automatic (self, params, fvec, ulimit, dside, maxstep, isrel, finfo):
@@ -1984,7 +1984,7 @@ class Problem (object):
         if debug:
             for i in xrange (m):
                 print 'Jac :', fjac[i]
-        return fjac
+        return fjac.T
 
 
     def _manual_jacobian (self, params, dtype=np.float):
