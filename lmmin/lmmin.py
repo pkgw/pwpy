@@ -330,14 +330,14 @@ The form of this transformation and the method of pivoting first
 appeared in Linpack."""
 
     machep = finfo.eps
-    m, n = a.shape
+    n, m = a.shape
 
     if m < n:
         raise ValueError ('"a" must be at least as tall as it is wide')
 
     acnorm = np.empty (n, finfo.dtype)
     for j in xrange (n):
-        acnorm[j] = enorm (a[:,j], finfo)
+        acnorm[j] = enorm (a[j], finfo)
 
     rdiag = acnorm.copy ()
     wa = acnorm.copy ()
@@ -357,14 +357,14 @@ appeared in Linpack."""
             rdiag[kmax] = rdiag[i]
             wa[kmax] = wa[i]
 
-            temp = a[:,i].copy ()
-            a[:,i] = a[:,kmax]
-            a[:,kmax] = temp
+            temp = a[i].copy ()
+            a[i] = a[kmax]
+            a[kmax] = temp
 
         # "Compute the Householder transformation to reduce the i'th
         # column of A to a multiple of the i'th unit vector."
 
-        ainorm = enorm (a[i:,i], finfo)
+        ainorm = enorm (a[i,i:], finfo)
 
         if ainorm == 0:
             rdiag[i] = 0
@@ -374,25 +374,25 @@ appeared in Linpack."""
             # Doing this apparently improves FP precision somehow.
             ainorm = -ainorm
 
-        a[i:,i] /= ainorm
+        a[i,i:] /= ainorm
         a[i,i] += 1
 
         # "Apply the transformation to the remaining columns and
         # update the norms."
 
         for j in xrange (i + 1, n):
-            s = np.dot (a[i:,j], a[i:,i])
+            s = np.dot (a[i,i:], a[j,i:])
             temp = s / a[i,i]
-            a[i:,j] -= a[i:,i] * temp
+            a[j,i:] -= a[i,i:] * temp
 
             if rdiag[j] != 0:
-                temp = a[i,j] / rdiag[j]
+                temp = a[j,i] / rdiag[j]
                 rdiag[j] *= np.sqrt (max (1 - temp**2, 0))
                 temp = rdiag[j] / wa[j]
 
                 if 0.05 * temp**2 <= machep:
                     # What does this do???
-                    wa[j] = rdiag[j] = enorm (a[i+1:,j], finfo)
+                    wa[j] = rdiag[j] = enorm (a[j,i+1:], finfo)
 
         rdiag[i] = -ainorm
 
@@ -435,7 +435,7 @@ The permutation vector pmut is a vector of the integers 0 through
 n-1. It sorts the columns of 'a' by their norms, so that the
 pmut[i]'th column of 'a' has the i'th biggest norm."""
 
-    m, n = a.shape
+    n, m = a.shape
 
     # Compute the packed Q and R matrix information.
 
@@ -446,10 +446,10 @@ pmut[i]'th column of 'a' has the i'th biggest norm."""
     # we just have to piece it together from the strict
     # upper triangle of 'a' and the diagonal in 'rdiag'.
 
-    r = np.zeros ((m, n))
+    r = np.zeros ((n, m))
 
     for i in xrange (n):
-        r[:i,i] = packed[:i,i]
+        r[i,:i] = packed[i,:i]
         r[i,i] = rdiag[i]
 
     # Now the Q matrix. It is the concatenation of n Householder
@@ -462,11 +462,11 @@ pmut[i]'th column of 'a' has the i'th biggest norm."""
     v = np.empty (m)
 
     for i in xrange (n):
-        v[:] = packed[:,i]
+        v[:] = packed[i]
         v[:i] = 0
 
         hhm = np.eye (m) - 2 * np.outer (v, v) / np.dot (v, v)
-        q = np.dot (q, hhm)
+        q = np.dot (hhm, q)
 
     return q, r, pmut
 
@@ -476,29 +476,28 @@ def _qr_examples ():
     # This is the sample given in the comments of Craig Markwardt's
     # IDL MPFIT implementation.
 
-    a = np.asarray ([[9., 4], [2, 8], [6, 7]])
+    a = np.asarray ([[9., 2, 6], [4, 8, 7]])
     packed, pmut, rdiag, acnorm = _manual_qr_factor_packed (a)
 
-    Taaae (packed, [[1.35218036, -8.27623852],
-                    [0.70436073,  1.96596229],
-                    [0.61631563,  0.25868293]])
+    Taaae (packed, [[1.35218036, 0.70436073, 0.61631563],
+                    [-8.27623852, 1.96596229, 0.25868293]])
     assert pmut[0] == 1
     assert pmut[1] == 0
     Taaae (rdiag, [-11.35781669, 7.24595584])
     Taaae (acnorm, [11.0, 11.35781669])
 
     q, r, pmut = _qr_factor_full (a)
-    Taaae (np.dot (q, r), a[:,pmut])
+    Taaae (np.dot (r, q), a[pmut])
 
     # This is the sample given in Wikipedia. I know, shameful!
 
-    a = np.asarray ([[12., -51, 4],
-                     [6, 167, -68],
-                     [-4, 24, -41]])
+    a = np.asarray ([[12., 6, -4],
+                     [-51, 167, 24],
+                     [4, -68, -41]])
     packed, pmut, rdiag, acnorm = _manual_qr_factor_packed (a)
-    Taaae (packed, [[ 1.28935268, -71.16941178,  1.66803309],
-                    [-0.94748818,   1.36009392, -2.18085468],
-                    [-0.13616597,   0.93291606,  2.]])
+    Taaae (packed, [[ 1.28935268, -0.94748818, -0.13616597],
+                    [-71.16941178,  1.36009392, 0.93291606],
+                    [1.66803309, -2.18085468, 2.]])
     assert pmut[0] == 1
     assert pmut[1] == 2
     assert pmut[2] == 0
@@ -506,33 +505,31 @@ def _qr_examples ():
     Taaae (acnorm, [14., 176.25549637, 79.50471684])
 
     q, r, pmut = _qr_factor_full (a)
-    Taaae (np.dot (q, r), a[:,pmut])
+    Taaae (np.dot (r, q), a[pmut])
 
     # A sample I constructed myself analytically. I made the Q
     # from rotation matrices and chose R pretty dumbly to get a
     # nice-ish matrix following the columnar norm constraint.
 
     r3 = np.sqrt (3)
-    a = np.asarray ([[-3 * r3, 3 * r3],
-                     [7, 9],
-                     [-2, -6]])
+    a = np.asarray ([[-3 * r3, 7, -2],
+                     [3 * r3, 9, -6]])
     q, r, pmut = _qr_factor_full (a)
 
     r *= np.sign (q[0,0])
     for i in xrange (3):
         # Normalize signs.
-        q[:,i] *= (-1)**i * np.sign (q[0,i])
+        q[i] *= (-1)**i * np.sign (q[i,0])
 
     assert pmut[0] == 1
     assert pmut[1] == 0
 
-    Taaae (q, 0.25 * np.asarray ([[r3, -2 * r3, 1],
-                                  [3, 2, r3],
-                                  [-2, 0, 2 * r3]]))
-    Taaae (r, np.asarray ([[12, 4],
-                           [0, 8],
-                           [0, 0]]))
-    Taaae (np.dot (q, r), a[:,pmut])
+    Taaae (q, 0.25 * np.asarray ([[r3, 3, -2],
+                                  [-2*r3, 2, 0],
+                                  [1, r3, 2*r3]]))
+    Taaae (r, np.asarray ([[12, 0, 0],
+                           [4, 8, 0]]))
+    Taaae (np.dot (r, q), a[pmut])
 
 
 # QR solution.
