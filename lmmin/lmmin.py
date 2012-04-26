@@ -967,7 +967,7 @@ are needed, but no more than 10 are performed.
 
         temp = np.sqrt (par)
         wa1 = temp * ddiag
-        x = _qrd_solve (r, pmut, wa1, bqt, sdiag) # sdiag is an output arg here
+        x = _qrd_solve (r[:,:n], pmut, wa1, bqt, sdiag) # sdiag is an output arg here
         wa2 = ddiag * x
         dxnorm = enorm (wa2, finfo)
         olddiff = normdiff
@@ -1692,14 +1692,10 @@ class Problem (object):
                 fjac[j,j] = wa1[j]
                 fqt[j] = wa4[j]
 
-            # "From this point on, only the square matrix consisting
-            # of the triangle of R is needed." ...  "Check for
-            # overflow. This should be a cheap test here since fjac
-            # has been reduced to a small square matrix."
+            # Only the n-by-n part of fjac is important now, and this
+            # test will probably be cheap since usually n << m.
 
-            fjac = fjac[:n,:n]
-
-            if anynotfinite (fjac):
+            if anynotfinite (fjac[:,:n]):
                 raise RuntimeError ('nonfinite terms in Jacobian matrix')
 
             # Calculate the norm of the scaled gradient
@@ -1901,7 +1897,7 @@ class Problem (object):
             if sz[0] < n or sz[1] < n or len (ipvt) < n:
                 covar = None
             else:
-                cv = _calc_covariance (fjac[:n,:n], ipvt[:n])
+                cv = _calc_covariance (fjac[:,:n], ipvt[:n])
                 cv.shape = (n, n)
 
                 for i in xrange (n): # can't do 2D fancy indexing
