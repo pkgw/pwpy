@@ -1989,19 +1989,19 @@ class Problem (object):
         fp = np.empty (self._nout, dtype=finfo.dtype)
         fm = np.empty (self._nout, dtype=finfo.dtype)
 
-        for j in xrange (n):
+        for i in xrange (n):
             xp = params.copy ()
-            xp[ifree[j]] += h[j]
+            xp[ifree[i]] += h[i]
             self._ycall (xp, fp)
 
-            if dside[j] != DSIDE_TWO:
+            if dside[i] != DSIDE_TWO:
                 # One-sided derivative
-                fjacfull[j] = (fp - fvec) / h[j]
+                fjacfull[i] = (fp - fvec) / h[i]
             else:
                 # Two-sided ... extra func call
-                xp[ifree[j]] = params[ifree[j]] - h[j]
+                xp[ifree[i]] = params[ifree[i]] - h[i]
                 self._ycall (xp, fm)
-                fjacfull[j] = (fp - fm) / (2 * h[j])
+                fjacfull[i] = (fp - fm) / (2 * h[i])
 
         if self.debugJac:
             for i in xrange (n):
