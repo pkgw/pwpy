@@ -381,16 +381,12 @@ appeared in Linpack."""
         # update the norms."
 
         for j in xrange (i + 1, n):
-            s = np.dot (a[i,i:], a[j,i:])
-            temp = s / a[i,i]
-            a[j,i:] -= a[i,i:] * temp
+            a[j,i:] -= a[i,i:] * np.dot (a[i,i:], a[j,i:]) / a[i,i]
 
             if rdiag[j] != 0:
-                temp = a[j,i] / rdiag[j]
-                rdiag[j] *= np.sqrt (max (1 - temp**2, 0))
-                temp = rdiag[j] / wa[j]
+                rdiag[j] *= np.sqrt (max (1 - (a[j,i] / rdiag[j])**2, 0))
 
-                if 0.05 * temp**2 <= machep:
+                if 0.05 * (rdiag[j] / wa[j])**2 <= machep:
                     # What does this do???
                     wa[j] = rdiag[j] = enorm (a[j,i+1:], finfo)
 
