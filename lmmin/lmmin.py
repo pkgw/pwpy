@@ -1033,14 +1033,14 @@ is
 
   C = inverse(A^T A)
 
-This routine is given information relating to the pivoted QR
-factorization of A, which is defined by matrices such that
+This routine is given information relating to the pivoted transposed
+QR factorization of A, which is defined by matrices such that
 
- A P = Q R
+ A P = R Q
 
-where P is a permutation matrix, Q has orthogonal columns, and R is an
-upper triangular matrix with diagonal elements of nonincreasing
-magnitude. In particular we take the full upper triangle of R ('r')
+where P is a permutation matrix, Q has orthogonal rows, and R is a
+lower triangular matrix with diagonal elements of nonincreasing
+magnitude. In particular we take the full lower triangle of R ('r')
 and a vector describing P ('pmut'). The covariance matrix is then
 
  C = P inverse(R^T R) P^T
@@ -1060,7 +1060,7 @@ the corresponding covariance entries (pmut[k]) are set to zero.
     assert r.shape[0] >= n
     r = r.copy ()
 
-    # "Form the inverse of R in the full upper triangle of R."
+    # Form the inverse of R in the full lower triangle of R.
 
     jrank = -1
     abstol = tol * abs(r[0,0])
@@ -1078,16 +1078,16 @@ the corresponding covariance entries (pmut[k]) are set to zero.
 
         jrank = i
 
-    # "Form the full upper triangle of the inverse(R^T R) in the full
-    # upper triangle of R."
+    # Form the full lower triangle of the inverse(R^T R) in the full
+    # lower triangle of R.
 
     for i in xrange (jrank + 1):
         for j in xrange (i):
             r[j,:j+1] += r[i,j] * r[i,:j+1]
         r[i,:i+1] *= r[i,i]
 
-    # "Form the full lower triangle of the covariance matrix in the
-    # strict lower triangle of R and in wa."
+    # Form the full upper triangle of the covariance matrix in the
+    # strict upper triangle of R and in wa.
 
     wa = np.empty (n)
     wa.fill (r[0,0])
