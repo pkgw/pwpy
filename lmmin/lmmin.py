@@ -807,10 +807,11 @@ def _lm_solve (r, pmut, ddiag, bqt, delta, par0, enorm, finfo):
     """Compute the Levenberg-Marquardt parameter and solution vector.
 
 Parameters:
-r     - IN/OUT m-by-n matrix, m >= n. On input, the full upper triangle is
-        the full upper triangle of R and the strict lower triangle is
-        ignored.  On output, the strict lower triangle has been
-        obliterated. The value of 'm' here is not relevant.
+r     - IN/OUT n-by-m matrix, m >= n. On input, the full lower triangle is
+        the full lower  triangle of R and the strict upper triangle is
+        ignored.  On output, the strict upper triangle has been
+        obliterated. The value of 'm' here is not relevant so long as it
+        is at least n.
 pmut  - n-vector, defines permutation of R
 ddiag - n-vector, diagonal elements of D
 bqt   - n-vector, first elements of B Q^T
@@ -821,7 +822,7 @@ finfo - info about chosen floating-point representation
 
 Returns:
 par   - positive scalar, final estimate of LM parameter
-x     - n-vector, least-squares solution of Ax=B, sqrt(par)Dx = 0
+x     - n-vector, least-squares solution of LM equation (see below)
 
 This routine computes the Levenberg-Marquardt parameter 'par' and a LM
 solution vector 'x'. Given an n-by-n matrix A, an n-by-n nonsingular
@@ -840,13 +841,13 @@ and either
 where dxnorm = enorm (D x).
 
 This routine is not given A, B, or D directly. If we define the
-column-pivoted QR factorization of A such that
+column-pivoted transposed QR factorization of A such that
 
- A P = Q R
+ A P = R Q
 
-where P is a permutation matrix, Q has orthogonal columns, and R is an
-upper triangular matrix with diagonal elements of nonincreasing
-magnitude, this routine is given the full upper triangle of R, a
+where P is a permutation matrix, Q has orthogonal rows, and R is a
+lower triangular matrix with diagonal elements of nonincreasing
+magnitude, this routine is given the full lower triangle of R, a
 vector defining P ('pmut'), and the first n components of B Q^T
 ('bqt'). These values are essentially passed verbatim to _qrd_solve().
 
@@ -965,7 +966,7 @@ def _lm_solve_full (a, b, ddiag, delta, par0, dtype=np.float):
     """Compute the Levenberg-Marquardt parameter and solution vector.
 
 Parameters:
-a     - m-by-n matrix, m >= n (only the n-by-n component is used)
+a     - n-by-m matrix, m >= n (only the n-by-n component is used)
 b     - n-by-n matrix
 ddiag - n-vector, diagonal elements of D
 delta - positive scalar, specifies scale of enorm(Dx)
@@ -973,7 +974,7 @@ par0  - positive scalar, initial estimate of the LM parameter
 
 Returns:
 par    - positive scalar, final estimate of LM parameter
-x      - n-vector, least-squares solution of Ax=B, sqrt(par)Dx = 0
+x      - n-vector, least-squares solution of LM equation
 dxnorm - positive scalar, enorm (D x)
 relnormdiff - scalar, (dxnorm - delta) / delta, maybe abs-ified
 
