@@ -1628,7 +1628,7 @@ class Problem (object):
 
         par = 0.
         niter = 1
-        qtf = x * 0.
+        fqt = x * 0.
         status = set ()
 
         # Outer loop top.
@@ -1679,7 +1679,7 @@ class Problem (object):
                 if delta == 0.:
                     delta = self.factor
 
-            # Compute fvec * (q.T), store the first n components in qtf
+            # Compute fvec * (q.T), store the first n components in fqt
 
             wa4 = fvec.copy ()
 
@@ -1690,7 +1690,7 @@ class Problem (object):
                     wj = wa4[j:]
                     wa4[j:] = wj - fj * dot (wj, fj) / temp3
                 fjac[j,j] = wa1[j]
-                qtf[j] = wa4[j]
+                fqt[j] = wa4[j]
 
             # "From this point on, only the square matrix consisting
             # of the triangle of R is needed." ...  "Check for
@@ -1709,7 +1709,7 @@ class Problem (object):
                 for j in xrange (n):
                     l = ipvt[j]
                     if wa2[l] != 0:
-                        s = dot (qtf[:j+1], fjac[j,:j+1]) / fnorm
+                        s = dot (fqt[:j+1], fjac[j,:j+1]) / fnorm
                         gnorm = max (gnorm, abs (s / wa2[l]))
 
             # Test for convergence of gradient norm
@@ -1724,7 +1724,7 @@ class Problem (object):
             # Inner loop
             while True:
                 # Get Levenberg-Marquardt parameter. fjac is modified in-place
-                par, wa1 = _lm_solve (fjac, ipvt, diag, qtf, delta, par,
+                par, wa1 = _lm_solve (fjac, ipvt, diag, fqt, delta, par,
                                       enorm, finfo)
                 # "Store the direction p and x+p. Calculate the norm of p"
                 wa1 *= -1
