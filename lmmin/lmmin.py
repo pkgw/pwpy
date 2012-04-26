@@ -46,6 +46,38 @@
 # stem from the original MINPACK implementation.)
 #
 #
+# == Transposition ==
+#
+# This version of the MINPACK implementation differs from the others
+# of which I am aware in that it transposes the matrices used in
+# intermediate calculations. While in both Fortran and Python, an
+# n-by-m matrix is visualized as having n rows and m columns, in
+# Fortran the columns are directly adjacent in memory, and hence the
+# preferred inner axis for iteration, while in Python the rows are the
+# preferred inner axis. By transposing the matrices we match the
+# algorithms to the memory layout as intended in the original
+# Fortran. I have no idea how much of a performance boost this gives,
+# and of course we're using Python so you're deluding yourself if
+# you're trying to wring out every cycle, but I suppose it helps, and
+# it makes some of the code constructs nicer and feels a lot cleaner
+# conceptually to me.
+#
+# The main operation of interest is the Q R factorization, which in
+# the Fortran version involves matrices A, P, Q and R such that
+#
+#  A P = Q R or, in Python,
+#  a[:,pmut] == np.dot (q, r)
+#
+# where A is an arbitrary m-by-n matrix, P is a permutation matrix,
+# Q is an orthogonal m-by-m matrix (Q Q^T = Ident), and R is an
+# m-by-n upper triangular matrix. In the transposed version,
+#
+# A P = R Q
+#
+# where A is n-by-m and R is n-by-m and lower triangular. We refer
+# to this as the "transposed Q R factorization."
+#
+#
 # == Web Links ==
 #
 # MINPACK-1: http://www.netlib.org/minpack/
@@ -275,7 +307,7 @@ def _qr_factor_packed (a, enorm, finfo):
     """Compute the packed pivoting Q-R factorization of a matrix.
 
 Parameters:
-a     - An m-by-n matrix, m >= n. This will be *overwritten*
+a     - An n-by-m matrix, m >= n. This will be *overwritten*
         by this function as described below!
 enorm - A Euclidian-norm-computing function.
 finfo - A Numpy finfo object.
@@ -286,14 +318,15 @@ rdiag  - An n-element vector of the diagonal of R
 acnorm - An n-element vector of the norms of the columns
          of the input matrix 'a'.
 
-Computes the Q-R factorization of the matrix 'a', with pivoting, in a
-packed form, in-place. The packed information can be used to construct
-matrices q and r such that
+Computes the transposed Q-R factorization of the matrix 'a', with
+pivoting, in a packed form, in-place. The packed information can be
+used to construct matrices Q and R such that
 
-  np.dot (q, r) = a[:,pmut]
+  A P = R Q or, in Python,
+  np.dot (r, q) = a[:,pmut]
 
-where q is m-by-m and q q^T = ident and r is m-by-n and is upper
-triangular.  The function _qr_factor_full can compute these
+where q is m-by-m and q q^T = ident and r is n-by-m and is lower
+triangular. The function _qr_factor_full can compute these
 matrices. The packed form of output is all that is used by the main LM
 fitting algorithm.
 
@@ -303,10 +336,10 @@ columns of 'a' to permuted columns. That is, the norms of the columns
 of a[:,pmut] are in nonincreasing order.
 
 The parameter 'a' is overwritten by this function. Its new value
-should still be interpreted as an m-by-n array. It comes in two
-parts. Its strict upper triangular part contains the strict upper
+should still be interpreted as an n-by-m array. It comes in two
+parts. Its strict lower triangular part contains the struct lower
 triangular part of R. (The diagonal of R is returned in 'rdiag' and
-the strict lower trapezoidal part of R is zero.) The lower trapezoidal
+the strict upper trapezoidal part of R is zero.) The upper trapezoidal
 part of 'a' contains Q as factorized into a series of Householder
 transformation vectors. Q can be reconstructed as the matrix product
 of n Householder matrices, where the i'th Householder matrix is
@@ -314,11 +347,11 @@ defined by
 
 H_i = I - 2 (v^T v) / (v v^T)
 
-where 'v' is the pmut[i]'th column of 'a' with its strict upper
+where 'v' is the pmut[i]'th column of 'a' with its strict lower
 triangular part set to zero. See _qr_factor_full for more information.
 
 'rdiag' contains the diagonal part of the R matrix, taking into
-account the permutation of 'a'. The strict upper triangular part of R
+account the permutation of 'a'. The strict lower triangular part of R
 is stored in 'a' *with permutation*, so that the i'th column of R has
 rdiag[i] as its diagonal and a[:i,pmut[i]] as its upper part. See
 _qr_factor_full for more information.
