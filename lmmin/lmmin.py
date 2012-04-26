@@ -567,7 +567,7 @@ def _qr_examples ():
 
 # QR solution.
 
-def _qrd_solve (r, pmut, ddiag, qtb, sdiag):
+def _qrd_solve (r, pmut, ddiag, bqt, sdiag):
     """Solve an equation given a QR factored matrix and a diagonal.
 
 Parameters:
@@ -578,7 +578,7 @@ r     - **input-output** n-by-n array. The full lower triangle contains
 pmut  - n-vector describing the permutation matrix P.
 ddiag - n-vector containing the diagonal of the matrix D in the base
         problem (see below).
-qtb   - n-vector containing the first n elements of Q^T B.
+bqt   - n-vector containing the first n elements of B Q^T.
 sdiag - output n-vector. It is filled with the diagonal of S. Should
         be preallocated by the caller -- can result in somewhat greater
         efficiency if the vector is reused from one call to the next.
@@ -588,7 +588,7 @@ x     - n-vector solving the equation.
 
 Compute the n-vector x such that
 
-A x = B, D x = 0
+A^T x = B, D x = 0
 
 where A is an n-by-m matrix, B is an m-vector, and D is an n-by-n
 diagonal matrix. We are given information about pivoted QR
@@ -600,7 +600,7 @@ where P is a permutation matrix, Q has orthogonal rows, and R is lower
 triangular with nonincreasing diagonal elements. Q is m-by-m, R is
 n-by-m, and P is n-by-n. If x = P z, then we need to solve
 
-R z = Q^T B,
+R z = B Q^T,
 P^T D P z = 0 (why the P^T? and do these need to be updated for the transposition?)
 
 If the system is rank-deficient, these equations are solved as well as
@@ -613,7 +613,7 @@ P^T (A^T A + D D) P = S^T S. (transpose?)
 
     n, m = r.shape
 
-    # "Copy r and (q.T)*b to preserve input and initialize s.  In
+    # "Copy r and bqt to preserve input and initialize s.  In
     # particular, save the diagonal elements of r in x."  Recall that
     # on input only the full lower triangle of R is meaningful, so we
     # can mirror that into the upper triangle without issues.
@@ -622,7 +622,7 @@ P^T (A^T A + D D) P = S^T S. (transpose?)
         r[i,i:] = r[i:,i]
 
     x = r.diagonal ()
-    zwork = qtb.copy ()
+    zwork = bqt.copy ()
 
     # "Eliminate the diagonal matrix d using a Givens rotation."
 
@@ -643,7 +643,7 @@ P^T (A^T A + D D) P = S^T S. (transpose?)
         # single element of (q transpose)*b beyond the first n, which
         # is initially zero."
 
-        qtbpi = 0.
+        bqtpi = 0.
 
         for j in xrange (i, n):
             # "Determine a Givens rotation which eliminates the
@@ -664,8 +664,8 @@ P^T (A^T A + D D) P = S^T S. (transpose?)
             # "Compute the modified diagonal element of r and the
             # modified element of ((q transpose)*b,0)."
             r[j,j] = cos * r[j,j] + sin * sdiag[j]
-            temp = cos * zwork[j] + sin * qtbpi
-            qtbpi = -sin * zwork[j] + cos * qtbpi
+            temp = cos * zwork[j] + sin * bqtpi
+            bqtpi = -sin * zwork[j] + cos * bqtpi
             zwork[j] = temp
 
             # "Accumulate the transformation in the row of s."
@@ -702,16 +702,16 @@ P^T (A^T A + D D) P = S^T S. (transpose?)
     return x
 
 
-def _manual_qrd_solve (r, pmut, ddiag, qtb, dtype=np.float, build_s=False):
+def _manual_qrd_solve (r, pmut, ddiag, bqt, dtype=np.float, build_s=False):
     r = np.asarray (r, dtype)
     pmut = np.asarray (pmut, np.int)
     ddiag = np.asarray (ddiag, dtype)
-    qtb = np.asarray (qtb, dtype)
+    bqt = np.asarray (bqt, dtype)
 
     swork = r.copy ()
     sdiag = np.empty (r.shape[1], r.dtype)
 
-    x = _qrd_solve (swork, pmut, ddiag, qtb, sdiag)
+    x = _qrd_solve (swork, pmut, ddiag, bqt, sdiag)
 
     if not build_s:
         return x, swork, sdiag
@@ -763,8 +763,8 @@ has its rows sorted that way.
     # The computation is straightforward.
 
     q, r, pmut = _qr_factor_full (a)
-    qtb = np.dot (b, q.T)
-    x, s = _manual_qrd_solve (r[:,:n], pmut, ddiag, qtb,
+    bqt = np.dot (b, q.T)
+    x, s = _manual_qrd_solve (r[:,:n], pmut, ddiag, bqt,
                               dtype=dtype, build_s=True)
 
     return x, s, pmut
@@ -779,14 +779,14 @@ def _qrd_solve_alone ():
     r = np.eye (2)
     pmut = np.asarray ([0, 1])
     diag = np.asarray ([0., 0])
-    qtb = np.asarray ([3., 5])
-    x, s = _manual_qrd_solve (r, pmut, diag, qtb, build_s=True)
+    bqt = np.asarray ([3., 5])
+    x, s = _manual_qrd_solve (r, pmut, diag, bqt, build_s=True)
     Taaae (x, [3., 5])
     Taaae (s, np.eye (2))
 
     # Now throw in a diagonal matrix ...
     diag = np.asarray ([2., 3.])
-    x, s = _manual_qrd_solve (r, pmut, diag, qtb, build_s=True)
+    x, s = _manual_qrd_solve (r, pmut, diag, bqt, build_s=True)
     Taaae (x, [0.6, 0.5])
     Taaae (s, np.sqrt (np.diag ([5, 10])))
 
@@ -796,14 +796,14 @@ def _qrd_solve_alone ():
     # by the amounts that yield nice X values.
     pmut = np.asarray ([1, 0])
     diag = np.asarray ([3., 2.])
-    x, s = _manual_qrd_solve (r, pmut, diag, qtb, build_s=True)
+    x, s = _manual_qrd_solve (r, pmut, diag, bqt, build_s=True)
     Taaae (x, [0.5, 0.6])
     Taaae (s, np.sqrt (np.diag ([5, 10])))
 
 
 # Calculation of the Levenberg-Marquardt parameter
 
-def _lm_solve (r, pmut, ddiag, qtb, delta, par0, enorm, finfo):
+def _lm_solve (r, pmut, ddiag, bqt, delta, par0, enorm, finfo):
     """Compute the Levenberg-Marquardt parameter and solution vector.
 
 Parameters:
@@ -813,7 +813,7 @@ r     - IN/OUT m-by-n matrix, m >= n. On input, the full upper triangle is
         obliterated. The value of 'm' here is not relevant.
 pmut  - n-vector, defines permutation of R
 ddiag - n-vector, diagonal elements of D
-qtb   - n-vector, first elements of (Q^T * B)
+bqt   - n-vector, first elements of B Q^T
 delta - positive scalar, specifies scale of enorm(Dx)
 par0  - positive scalar, initial estimate of the LM parameter
 enorm - norm-computing function
@@ -847,22 +847,22 @@ column-pivoted QR factorization of A such that
 where P is a permutation matrix, Q has orthogonal columns, and R is an
 upper triangular matrix with diagonal elements of nonincreasing
 magnitude, this routine is given the full upper triangle of R, a
-vector defining P ('pmut'), and the first n components of Q^T B
-('qtb'). These values are essentially passed verbatim to _qrd_solve().
+vector defining P ('pmut'), and the first n components of B Q^T
+('bqt'). These values are essentially passed verbatim to _qrd_solve().
 
 This routine iterates to estimate par. Usually only a few iterations
 are needed, but no more than 10 are performed.
 """
     dwarf = finfo.tiny
     n, m = r.shape
-    x = np.empty_like (qtb)
-    sdiag = np.empty_like (qtb)
+    x = np.empty_like (bqt)
+    sdiag = np.empty_like (bqt)
 
     # "Compute and store x in the Gauss-Newton direction. If the
     # Jacobian is rank-deficient, obtain a least-squares solution."
 
     nnonsingular = n
-    wa1 = qtb.copy ()
+    wa1 = bqt.copy ()
 
     for i in xrange (n):
         if r[i,i] == 0:
@@ -904,7 +904,7 @@ are needed, but no more than 10 are performed.
     # We can always find an upper bound.
 
     for j in xrange (n):
-        wa1[j] = np.dot (qtb[:j+1], r[j,:j+1]) / ddiag[pmut[j]]
+        wa1[j] = np.dot (bqt[:j+1], r[j,:j+1]) / ddiag[pmut[j]]
 
     gnorm = enorm (wa1, finfo)
     par_upper = gnorm / delta
@@ -927,7 +927,7 @@ are needed, but no more than 10 are performed.
 
         temp = np.sqrt (par)
         wa1 = temp * ddiag
-        x = _qrd_solve (r, pmut, wa1, qtb, sdiag) # sdiag is an output arg here
+        x = _qrd_solve (r, pmut, wa1, bqt, sdiag) # sdiag is an output arg here
         wa2 = ddiag * x
         dxnorm = enorm (wa2, finfo)
         olddiff = normdiff
@@ -1003,8 +1003,8 @@ where dxnorm = enorm (D x).
     assert ddiag.shape == (n, )
 
     q, r, pmut = _qr_factor_full (a)
-    qtb = np.dot (b, q.T)
-    par, x = _lm_solve (r, pmut, ddiag, qtb, delta, par0,
+    bqt = np.dot (b, q.T)
+    par, x = _lm_solve (r, pmut, ddiag, bqt, delta, par0,
                         enorm_mpfit_careful, np.finfo (dtype))
     dxnorm = enorm_mpfit_careful (ddiag * x, np.finfo (dtype))
     relnormdiff = (dxnorm - delta) / delta
