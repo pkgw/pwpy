@@ -243,6 +243,11 @@ def _runtests (namefilt=None):
 from numpy.testing import assert_array_almost_equal as Taaae
 from numpy.testing import assert_almost_equal as Taae
 
+def _timer_helper (n=100):
+    for i in xrange (n):
+        for f in _testfuncs:
+            f ()
+
 
 # Parameter Info attributes that can be specified
 #
