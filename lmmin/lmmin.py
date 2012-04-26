@@ -74,8 +74,12 @@
 #
 # A P = R Q
 #
-# where A is n-by-m and R is n-by-m and lower triangular. We refer
-# to this as the "transposed Q R factorization."
+# where A is n-by-m and R is n-by-m and lower triangular. We refer to
+# this as the "transposed Q R factorization." I've tried to update the
+# documentation to reflect this change, but I can't claim that I
+# completely understand the mapping of the matrix algebra into code,
+# so there are probably confusing mistakes in the comments and
+# docstrings.
 #
 #
 # == Web Links ==
@@ -315,7 +319,7 @@ finfo - A Numpy finfo object.
 Returns:
 pmut   - An n-element permutation vector
 rdiag  - An n-element vector of the diagonal of R
-acnorm - An n-element vector of the norms of the columns
+acnorm - An n-element vector of the norms of the rows
          of the input matrix 'a'.
 
 Computes the transposed Q-R factorization of the matrix 'a', with
@@ -323,17 +327,17 @@ pivoting, in a packed form, in-place. The packed information can be
 used to construct matrices Q and R such that
 
   A P = R Q or, in Python,
-  np.dot (r, q) = a[:,pmut]
+  np.dot (r, q) = a[pmut]
 
 where q is m-by-m and q q^T = ident and r is n-by-m and is lower
 triangular. The function _qr_factor_full can compute these
 matrices. The packed form of output is all that is used by the main LM
 fitting algorithm.
 
-"Pivoting" refers to permuting the columns of 'a' to have their norms
-in nonincreasing order. The return value 'pmut' maps the unpermuted
-columns of 'a' to permuted columns. That is, the norms of the columns
-of a[:,pmut] are in nonincreasing order.
+"Pivoting" refers to permuting the rows of 'a' to have their norms in
+nonincreasing order. The return value 'pmut' maps the unpermuted rows
+of 'a' to permuted rows. That is, the norms of the rows of a[pmut] are
+in nonincreasing order.
 
 The parameter 'a' is overwritten by this function. Its new value
 should still be interpreted as an n-by-m array. It comes in two
@@ -347,16 +351,16 @@ defined by
 
 H_i = I - 2 (v^T v) / (v v^T)
 
-where 'v' is the pmut[i]'th column of 'a' with its strict lower
+where 'v' is the pmut[i]'th row of 'a' with its strict lower
 triangular part set to zero. See _qr_factor_full for more information.
 
 'rdiag' contains the diagonal part of the R matrix, taking into
 account the permutation of 'a'. The strict lower triangular part of R
-is stored in 'a' *with permutation*, so that the i'th column of R has
-rdiag[i] as its diagonal and a[:i,pmut[i]] as its upper part. See
+is stored in 'a' *with permutation*, so that the i'th row of R has
+rdiag[i] as its diagonal and a[pmut[i],:i] as its upper part. See
 _qr_factor_full for more information.
 
-'acnorm' contains the norms of the columns of the original input
+'acnorm' contains the norms of the rows of the original input
 matrix 'a' without permutation.
 
 The form of this transformation and the method of pivoting first
@@ -377,8 +381,8 @@ appeared in Linpack."""
     pmut = np.arange (n)
 
     for i in xrange (n):
-        # Find the column of a with the i'th largest norm,
-        # and note it in the pivot vector.
+        # Find the row of a with the i'th largest norm, and note it in
+        # the pivot vector.
 
         kmax = rdiag[i:].argmax () + i
 
@@ -394,8 +398,8 @@ appeared in Linpack."""
             a[i] = a[kmax]
             a[kmax] = temp
 
-        # "Compute the Householder transformation to reduce the i'th
-        # column of A to a multiple of the i'th unit vector."
+        # Compute the Householder transformation to reduce the i'th
+        # row of A to a multiple of the i'th unit vector.
 
         ainorm = enorm (a[i,i:], finfo)
 
@@ -410,8 +414,8 @@ appeared in Linpack."""
         a[i,i:] /= ainorm
         a[i,i] += 1
 
-        # "Apply the transformation to the remaining columns and
-        # update the norms."
+        # Apply the transformation to the remaining rows and update
+        # the norms.
 
         for j in xrange (i + 1, n):
             a[j,i:] -= a[i,i:] * np.dot (a[i,i:], a[j,i:]) / a[i,i]
@@ -461,8 +465,8 @@ production code, there are faster ways to do it. This function is for
 testing _qr_factor_packed.
 
 The permutation vector pmut is a vector of the integers 0 through
-n-1. It sorts the columns of 'a' by their norms, so that the
-pmut[i]'th column of 'a' has the i'th biggest norm."""
+n-1. It sorts the rows of 'a' by their norms, so that the
+pmut[i]'th row of 'a' has the i'th biggest norm."""
 
     n, m = a.shape
 
@@ -471,9 +475,9 @@ pmut[i]'th column of 'a' has the i'th biggest norm."""
     packed, pmut, rdiag, acnorm = \
         _manual_qr_factor_packed (a, dtype)
 
-    # Now we unpack. Start with the R matrix, which is easy:
-    # we just have to piece it together from the strict
-    # lower triangle of 'a' and the diagonal in 'rdiag'.
+    # Now we unpack. Start with the R matrix, which is easy: we just
+    # have to piece it together from the strict lower triangle of 'a'
+    # and the diagonal in 'rdiag'.
 
     r = np.zeros ((n, m))
 
@@ -482,10 +486,10 @@ pmut[i]'th column of 'a' has the i'th biggest norm."""
         r[i,i] = rdiag[i]
 
     # Now the Q matrix. It is the concatenation of n Householder
-    # transformations, each of which is defined by a column in the
-    # upper trapezoidal portion of 'a'. We extract the appropriate
-    # vector, construct the matrix for the Householder transform,
-    # and build up the Q matrix.
+    # transformations, each of which is defined by a row in the upper
+    # trapezoidal portion of 'a'. We extract the appropriate vector,
+    # construct the matrix for the Householder transform, and build up
+    # the Q matrix.
 
     q = np.eye (m)
     v = np.empty (m)
@@ -567,9 +571,9 @@ def _qrd_solve (r, pmut, ddiag, qtb, sdiag):
     """Solve an equation given a QR factored matrix and a diagonal.
 
 Parameters:
-r     - n-by-n in-out array. The full upper triangle contains the full
-        upper triangle of R. On output, the strict lower triangle
-        contains the transpose of the strict upper triangle of
+r     - **input-output** n-by-n array. The full lower triangle contains
+        the full lower triangle of R. On output, the strict upper
+        triangle contains the transpose of the strict lower triangle of
         S.
 pmut  - n-vector describing the permutation matrix P.
 ddiag - n-vector containing the diagonal of the matrix D in the base
@@ -586,32 +590,33 @@ Compute the n-vector x such that
 
 A x = B, D x = 0
 
-where A is an m-by-n matrix, B is an m-vector, and D is an n-by-n
+where A is an n-by-m matrix, B is an m-vector, and D is an n-by-n
 diagonal matrix. We are given information about pivoted QR
 factorization of A with permutation, such that
 
-A P = Q R
+A P = R Q
 
-where P is a permutation matrix, Q has orthogonal columns, and R is
-upper triangular with nonincreasing diagonal elements. Q is m-by-m, R
-is m-by-n, and P is n-by-n. If x = P z, then we need to solve
+where P is a permutation matrix, Q has orthogonal rows, and R is lower
+triangular with nonincreasing diagonal elements. Q is m-by-m, R is
+n-by-m, and P is n-by-n. If x = P z, then we need to solve
 
-R z = Q^T B, P^T D P z = 0 (why the P^T?)
+R z = Q^T B,
+P^T D P z = 0 (why the P^T? and do these need to be updated for the transposition?)
 
 If the system is rank-deficient, these equations are solved as well as
 possible in a least-squares sense. For the purposes of the LM
-algorithm we also compute the upper triangular n-by-n matrix S such
+algorithm we also compute the lower triangular n-by-n matrix S such
 that
 
-P^T (A^T A + D D) P = S^T S.
+P^T (A^T A + D D) P = S^T S. (transpose?)
 """
 
     n, m = r.shape
 
     # "Copy r and (q.T)*b to preserve input and initialize s.  In
     # particular, save the diagonal elements of r in x."  Recall that
-    # on input only the full upper triangle of R is meaningful, so we
-    # can mirror that into the lower triangle without issues.
+    # on input only the full lower triangle of R is meaningful, so we
+    # can mirror that into the upper triangle without issues.
 
     for i in xrange (n):
         r[i,i:] = r[i:,i]
@@ -722,10 +727,10 @@ def _manual_qrd_solve (r, pmut, ddiag, qtb, dtype=np.float, build_s=False):
 
 
 def _qrd_solve_full (a, b, ddiag, dtype=np.float):
-    """Solve the equation A x = B, D x = 0.
+    """Solve the equation A^T x = B, D x = 0.
 
 Parameters:
-a     - an m-by-n array, m >= n
+a     - an n-by-m array, m >= n
 b     - an m-vector
 ddiag - an n-vector giving the diagonal of D. (The rest of D is 0.)
 
@@ -736,14 +741,14 @@ pmut - n-element permutation vector defining the permutation matrix P.
 
 The equations are solved in a least-squares sense if the system is
 rank-deficient.  D is a diagonal matrix and hence only its diagonal is
-in fact supplied as an argument. The matrix s is full upper triangular
+in fact supplied as an argument. The matrix s is full lower triangular
 and solves the equation
 
-P^T (A^T A + D D) P = S^T S
+P^T (A A^T + D D) P = S^T S (needs transposition?)
 
 where P is the permutation matrix defined by the vector pmut; it puts
-the columns of 'a' in order of nonincreasing rank, so that a[:,pmut]
-has its columns sorted that way.
+the rows of 'a' in order of nonincreasing rank, so that a[pmut]
+has its rows sorted that way.
 """
 
     a = np.asarray (a, dtype)
