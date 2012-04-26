@@ -1620,6 +1620,8 @@ class Problem (object):
         enorm = self.normfunc
         fnorm1 = -1.
         fvec = np.ndarray (self._nout, dtype)
+        fullfjac = np.zeros ((self._npar, self._nout), finfo.dtype)
+        fjac = fullfjac[:n]
         ycall (params, fvec)
         fnorm = enorm (fvec, finfo)
 
@@ -1639,7 +1641,7 @@ class Problem (object):
             if self._anytied:
                 self._apply_ties (params)
 
-            fjac = self._get_jacobian (params, fvec, ulim, dside, maxstep, isrel, finfo)
+            self._get_jacobian (params, fvec, fullfjac, ulim, dside, maxstep, isrel, finfo)
 
             if anylimits:
                 # Check for parameters pegged at limits
@@ -1930,37 +1932,33 @@ class Problem (object):
         return soln
 
 
-    def _get_jacobian_explicit (self, params, fvec, ulimit, dside, maxstep, isrel, finfo):
-        # TODO #1: preallocate fjac instead of reallocating it on
-        # every call!
-
-        fjac = np.zeros ((self._npar, self._nout), finfo.dtype)
-
+    def _get_jacobian_explicit (self, params, fvec, fjacfull, ulimit, dside, maxstep, isrel, finfo):
         self._njev += 1
 
         if self.debugCalls:
             print 'Call: #%4d j(%s) ->' % (self._njev, params),
-        self._jfunc (params, fjac)
+        self._jfunc (params, fjacfull)
         if self.debugCalls:
-            print fjac
+            print fjacfull
 
-        if self._ifree.size < self._npar:
-            fjac = fjac[self._ifree]
+        # Condense down to contain only the rows relevant to the free
+        # parameters. We actually copy the data here instead of using
+        # fancy indexing since this condensed matrix will be used a
+        # lot.
 
-        return fjac
-
-
-    def _get_jacobian_automatic (self, params, fvec, ulimit, dside, maxstep, isrel, finfo):
-        # TODO: transpose this!
         ifree = self._ifree
-        debug = self.debugJac
-        eps = np.sqrt (max (self.epsilon, finfo.eps))
 
+        if ifree.size < self._npar:
+            for i in xrange (ifree.size):
+                fjac[i] = fjac[ifree[i]]
+
+
+    def _get_jacobian_automatic (self, params, fvec, fjacfull, ulimit, dside, maxstep, isrel, finfo):
+        eps = np.sqrt (max (self.epsilon, finfo.eps))
+        ifree = self._ifree
         x = params[ifree]
         m = len (fvec)
         n = len (x)
-
-        fjac = np.zeros ((m, n), finfo.dtype)
         h = eps * np.abs (x)
 
         # Apply any fixed steps, absolute and relative.
@@ -1983,31 +1981,31 @@ class Problem (object):
         wh = np.where (mask)
         h[wh] = -h[wh]
 
-        if debug:
+        if self.debugJac:
             print 'Jac-:', h
 
         # Compute derivative for each parameter
 
+        fp = np.empty (self._nout, dtype=finfo.dtype)
+        fm = np.empty (self._nout, dtype=finfo.dtype)
+
         for j in xrange (n):
             xp = params.copy ()
             xp[ifree[j]] += h[j]
-            fp = np.empty (self._nout, dtype=finfo.dtype)
             self._ycall (xp, fp)
 
             if dside[j] != DSIDE_TWO:
                 # One-sided derivative
-                fjac[:,j] = (fp - fvec) / h[j]
+                fjacfull[j] = (fp - fvec) / h[j]
             else:
                 # Two-sided ... extra func call
                 xp[ifree[j]] = params[ifree[j]] - h[j]
-                fm = np.empty (self._nout, dtype=finfo.dtype)
                 self._ycall (xp, fm)
-                fjac[:,j] = (fp - fm) / (2 * h[j])
+                fjacfull[j] = (fp - fm) / (2 * h[j])
 
-        if debug:
-            for i in xrange (m):
-                print 'Jac :', fjac[i]
-        return fjac.T
+        if self.debugJac:
+            for i in xrange (n):
+                print 'Jac :', fjacfull[i]
 
 
     def _manual_jacobian (self, params, dtype=np.float):
@@ -2017,6 +2015,7 @@ class Problem (object):
 
         params = np.atleast_1d (np.asarray (params, dtype))
         fvec = np.empty (self._nout, dtype)
+        fjacfull = np.empty ((self._npar, self._nout), dtype)
         ulimit = self._pinfof[PI_F_ULIMIT,ifree]
         dside = self._pinfob & PI_M_SIDE
         maxstep = self._pinfof[PI_F_MAXSTEP,ifree]
@@ -2029,7 +2028,8 @@ class Problem (object):
         # called before _get_jacobian.
 
         self._ycall (params, fvec)
-        return self._get_jacobian (params, fvec, ulimit, dside, maxstep, isrel, finfo)
+        self._get_jacobian (params, fvec, fjacfull, ulimit, dside, maxstep, isrel, finfo)
+        return fjacfull[:ifree.size]
 
 
     def _apply_ties (self, params):
