@@ -170,6 +170,45 @@ Parameter meta-information:
     p.pSide (paramindex, sidedness) # one of 'auto', 'pos', 'neg', 'two'
     p.pTie (paramindex, tiefunc) # pval = tiefunc (params)
 
+solve() status codes:
+
+Solution.status is a set of strings. The presence of a string in the
+set means that the specified condition was active when the iteration
+terminated. Multiple conditions may contribute to ending the
+iteration. The algorithm likely did not converge correctly if none of
+'ftol', 'xtol', or 'gtol' are in status upon termination.
+
+'ftol' (MINPACK/MPFIT equiv: 1, 3)
+  "Termination occurs when both the actual and predicted relative
+  reductions in the sum of squares are at most FTOL. Therefore, FTOL
+  measures the relative error desired in the sum of squares."
+
+'xtol' (MINPACK/MPFIT equiv: 2, 3)
+  "Termination occurs when the relative error between two consecutive
+  iterates is at most XTOL. Therefore, XTOL measures the relative
+  error desired in the approximate solution."
+
+'gtol' (MINPACK/MPFIT equiv: 4)
+  "Termination occurs when the cosine of the angle between fvec and
+  any column of the jacobian is at most GTOL in absolute
+  value. Therefore, GTOL measures the orthogonality desired between
+  the function vector and the columns of the jacobian."
+
+'maxiter' (MINPACK/MPFIT equiv: 5)
+  Number of iterations exceeds maxiter.
+
+'feps' (MINPACK/MPFIT equiv: 6)
+  "ftol is too small. no further reduction in the sum of squares is
+  possible."
+
+'xeps' (MINPACK/MPFIT equiv: 7)
+  "xtol is too small. no further improvement in the approximate
+  solution x is possible."
+
+'geps' (MINPACK/MPFIT equiv: 8)
+  "gtol is too small. fvec is orthogonal to the columns of the jacobian
+  to machine precision."
+
 (This docstring contains only usage information. For important
 information regarding provenance, license, and academic references,
 see comments in the module source code.)
@@ -1136,44 +1175,6 @@ class Solution (object):
     def __init__ (self, prob):
         self.prob = prob
 
-"""
-solve() status codes:
-status is a set of strings. The presence of a string in the set means that
-the specified condition was active when the iteration terminated. Multiple
-conditions may contribute to ending the iteration.
-
-'ftol' (MPFIT equiv: 1, 3)
-  "Termination occurs when both the actual and predicted relative
-  reductions in the sum of squares are at most FTOL. Therefore, FTOL
-  measures the relative error desired in the sum of squares."
-
-'xtol' (MPFIT equiv: 2, 3)
-  "Termination occurs when the relative error between two consecutive
-  iterates is at most XTOL. Therefore, XTOL measures the relative
-  error desired in the approximate solution."
-
-'gtol' (MPFIT equiv: 4)
-  "Termination occurs when the cosine of the angle between fvec and
-  any column of the jacobian is at most GTOL in absolute
-  value. Therefore, GTOL measures the orthogonality desired between
-  the function vector and the columns of the jacobian."
-
-'maxiter' (MPFIT equiv: 5)
-  Number of iterations exceeds maxiter.
-
-'feps' (MPFIT equiv: 6)
-  "ftol is too small. no further reduction in the sum of squares is
-  possible."
-
-'xeps' (MPFIT equiv: 7)
-  "xtol is too small. no further improvement in the approximate
-  solution x is possible."
-
-'geps' (MPFIT equiv: 8)
-  "gtol is too small. fvec is orthogonal to the columns of the jacobian
-  to machine precision."
-
-"""
 
 class Problem (object):
     _yfunc = None
