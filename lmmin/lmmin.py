@@ -442,18 +442,18 @@ def _qr_factor_full (a, dtype=np.float):
     """Compute the QR factorization of a matrix, with pivoting.
 
 Parameters:
-a     - An m-by-n arraylike, m >= n.
+a     - An n-by-m arraylike, m >= n.
 dtype - (optional) The data type to use for computations.
         Default is np.float.
 
 Returns:
 q    - An m-by-m orthogonal matrix (q q^T = ident)
-r    - An m-by-n upper triangular matrix
+r    - An n-by-m upper triangular matrix
 pmut - An n-element permutation vector
 
 The returned values will satisfy the equation
 
-np.dot (q, r) = a[:,pmut]
+np.dot (r, q) == a[:,pmut]
 
 The outputs are computed indirectly via the function
 _qr_factor_packed. If you need to compute q and r matrices in
@@ -473,7 +473,7 @@ pmut[i]'th column of 'a' has the i'th biggest norm."""
 
     # Now we unpack. Start with the R matrix, which is easy:
     # we just have to piece it together from the strict
-    # upper triangle of 'a' and the diagonal in 'rdiag'.
+    # lower triangle of 'a' and the diagonal in 'rdiag'.
 
     r = np.zeros ((n, m))
 
@@ -483,7 +483,7 @@ pmut[i]'th column of 'a' has the i'th biggest norm."""
 
     # Now the Q matrix. It is the concatenation of n Householder
     # transformations, each of which is defined by a column in the
-    # lower trapezoidal portion of 'a'. We extract the appropriate
+    # upper trapezoidal portion of 'a'. We extract the appropriate
     # vector, construct the matrix for the Householder transform,
     # and build up the Q matrix.
 
