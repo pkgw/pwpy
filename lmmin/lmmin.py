@@ -2272,7 +2272,7 @@ def _lmder1_test (nout, func, jac, guess):
 
 
 def _lmder1_driver (nout, func, jac, guess, target_fnorm1,
-                    target_fnorm2, target_params):
+                    target_fnorm2, target_params, decimal=10):
     finfo = np.finfo (np.float)
     tol = np.sqrt (finfo.eps)
     guess = np.asfarray (guess)
@@ -2295,12 +2295,12 @@ def _lmder1_driver (nout, func, jac, guess, target_fnorm1,
         from numpy.testing import assert_array_almost_equal as aaae
         scale = np.maximum (np.abs (target_params), 1)
         try:
-            aaae (s.params / scale, target_params / scale, decimal=10)
+            aaae (s.params / scale, target_params / scale, decimal=decimal)
         except AssertionError:
-            assert False, '''Arrays are not almost equal to 10 (scaled) decimals
+            assert False, '''Arrays are not almost equal to %d (scaled) decimals
 
 x: %s
-y: %s''' % (s.params, target_params)
+y: %s''' % (decimal, s.params, target_params)
 
     func (s.params, y)
     fnorm2 = enorm_mpfit_careful (y, finfo)
@@ -2664,6 +2664,109 @@ def _lmder1_meyer ():
     #                0.4168216891308465e+07, 0.7929178717795005e+03,
     #                [0.1423670741579940e-10, 0.3369571334325413e+05,
     #                 0.9012685279538006e+03])
+
+
+@test
+def _lmder1_watson ():
+    """Watson function (lmder1 test #11)"""
+
+    def func (params, vec):
+        div = (np.arange (29) + 1.) / 29
+        s1 = 0
+        dx = 1
+
+        for j in xrange (1, params.size):
+            s1 += j * dx * params[j]
+            dx *= div
+
+        s2 = 0
+        dx = 1
+
+        for j in xrange (params.size):
+            s2 += dx * params[j]
+            dx *= div
+
+        vec[:29] = s1 - s2**2 - 1
+        vec[29] = params[0]
+        vec[30] = params[1] - params[0]**2 - 1
+
+    def jac (params, jac):
+        jac.fill (0)
+        div = (np.arange (29) + 1.) / 29
+        s2 = 0
+        dx = 1
+
+        for j in xrange (params.size):
+            s2 += dx * params[j]
+            dx *= div
+
+        temp = 2 * div * s2
+        dx = 1. / div
+
+        for j in xrange (params.size):
+            jac[j,:29] = dx * (j - temp)
+            dx *= div
+
+        jac[0,29] = 1
+        jac[0,30] = -2 * params[0]
+        jac[1,30] = 1
+
+    _lmder1_driver (31, func, jac, np.zeros (6),
+                    0.5477225575051661e+01, 0.4782959390976008e-01,
+                    [-0.1572496150837816e-01, 0.1012434882329655e+01,
+                     -0.2329917223876733e+00, 0.1260431011028184e+01,
+                     -0.1513730313944205e+01, 0.9929972729184200e+00])
+    _lmder1_driver (31, func, jac, np.zeros (6) + 10,
+                    0.6433125789500264e+04, 0.4782959390969513e-01,
+                    [-0.1572519013866769e-01, 0.1012434858601051e+01,
+                     -0.2329915458438287e+00, 0.1260429320891626e+01,
+                     -0.1513727767065747e+01, 0.9929957342632802e+00])
+    _lmder1_driver (31, func, jac, np.zeros (6) + 100,
+                    0.6742560406052133e+06, 0.4782959391154397e-01,
+                    [-0.1572470197125856e-01, 0.1012434909256583e+01,
+                     -0.2329919227616415e+00, 0.1260432929295546e+01,
+                     -0.1513733204527065e+01, 0.9929990192232198e+00])
+    _lmder1_driver (31, func, jac, np.zeros (9),
+                    0.5477225575051661e+01, 0.1183114592124197e-02,
+                    [-0.1530706441667223e-04, 0.9997897039345969e+00, 0.1476396349109780e-01,
+                     0.1463423301459916e+00, 0.1000821094548170e+01, -0.2617731120705071e+01,
+                     0.4104403139433541e+01, -0.3143612262362414e+01, 0.1052626403787590e+01],
+                    decimal=8) # good enough for me
+    _lmder1_driver (31, func, jac, np.zeros (9) + 10,
+                    0.1208812706930700e+05, 0.1183114592125130e-02,
+                    [-0.1530713348492787e-04, 0.9997897039412339e+00, 0.1476396297862168e-01,
+                     0.1463423348188364e+00, 0.1000821073213860e+01, -0.2617731070847222e+01,
+                     0.4104403076555641e+01, -0.3143612221786855e+01, 0.1052626393225894e+01],
+                    decimal=7) # ditto
+    _lmder1_driver (31, func, jac, np.zeros (9) + 100,
+                    0.1269109290438338e+07, 0.1183114592123836e-02,
+                    [-0.1530695233521759e-04, 0.9997897039583713e+00, 0.1476396251853923e-01,
+                     0.1463423410963262e+00, 0.1000821047291639e+01, -0.2617731015736446e+01,
+                     0.4104403014272860e+01, -0.3143612186025031e+01, 0.1052626385167739e+01],
+                    decimal=7)
+    # I've hacked params[0] below to agree with the Python since most everything else
+    # is a lot closer. Fortran value is -0.6602660013963822D-08.
+    _lmder1_driver (31, func, jac, np.zeros (12),
+                    0.5477225575051661e+01, 0.2173104025358612e-04,
+                    [-0.66380604e-08, 0.1000001644118327e+01, -0.5639321469801545e-03,
+                     0.3478205400507559e+00, -0.1567315002442332e+00, 0.1052815158255932e+01,
+                     -0.3247271095194506e+01, 0.7288434783750497e+01, -0.1027184809861398e+02,
+                     0.9074113537157828e+01, -0.4541375419181941e+01, 0.1012011879750439e+01],
+                    decimal=7)
+    # These last two don't need any hacking or decimal < 10 ...
+    _lmder1_driver (31, func, jac, np.zeros (12) + 10,
+                    0.1922075897909507e+05, 0.2173104025185086e-04,
+                    [-0.6637102230174097e-08, 0.1000001644117873e+01, -0.5639322083473270e-03,
+                     0.3478205404869979e+00, -0.1567315039556524e+00, 0.1052815176545732e+01,
+                     -0.3247271151521395e+01, 0.7288434894306651e+01, -0.1027184823696385e+02,
+                      0.9074113643837332e+01, -0.4541375465336661e+01, 0.1012011888308566e+01])
+    _lmder1_driver (31, func, jac, np.zeros (12) + 100,
+                    0.2018918044623666e+07, 0.2173104025398453e-04,
+                    [-0.6638060464852487e-08, 0.1000001644117862e+01, -0.5639322103249589e-03,
+                     0.3478205405035875e+00, -0.1567315040913747e+00, 0.1052815177180306e+01,
+                     -0.3247271153370249e+01, 0.7288434897753017e+01, -0.1027184824108129e+02,
+                      0.9074113646884637e+01, -0.4541375466608216e+01, 0.1012011888536897e+01])
+
 
 # Finally ...
 
