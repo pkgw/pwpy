@@ -1669,7 +1669,7 @@ class Problem (object):
             # wa1: "rdiag", diagonal part of R matrix, pivoting applied
             # wa2: "acnorm", unpermuted row norms of fjac
             # fjac: overwritten with Q and R matrix info, pivoted
-            ipvt, wa1, wa2 = _qr_factor_packed (fjac, enorm, finfo)
+            pmut, wa1, wa2 = _qr_factor_packed (fjac, enorm, finfo)
 
             if niter == 1:
                 # If "diag" unspecified, scale according to norms of rows
@@ -1710,7 +1710,7 @@ class Problem (object):
             gnorm = 0.
             if fnorm != 0:
                 for j in xrange (n):
-                    l = ipvt[j]
+                    l = pmut[j]
                     if wa2[l] != 0:
                         s = dot (fqt[:j+1], fjac[j,:j+1]) / fnorm
                         gnorm = max (gnorm, abs (s / wa2[l]))
@@ -1727,7 +1727,7 @@ class Problem (object):
             # Inner loop
             while True:
                 # Get Levenberg-Marquardt parameter. fjac is modified in-place
-                par, wa1 = _lm_solve (fjac, ipvt, diag, fqt, delta, par,
+                par, wa1 = _lm_solve (fjac, pmut, diag, fqt, delta, par,
                                       enorm, finfo)
                 # "Store the direction p and x+p. Calculate the norm of p"
                 wa1 *= -1
@@ -1800,7 +1800,7 @@ class Problem (object):
 
                 for j in xrange (n):
                     wa3[j] = 0
-                    wa3[:j+1] = wa3[:j+1] + fjac[j,:j+1] * wa1[ipvt[j]]
+                    wa3[:j+1] = wa3[:j+1] + fjac[j,:j+1] * wa1[pmut[j]]
 
                 # "Remember, alpha is the fraction of the full LM step actually
                 # taken."
@@ -1901,10 +1901,10 @@ class Problem (object):
         if n > 0:
             sz = fjac.shape
 
-            if sz[0] < n or sz[1] < n or len (ipvt) < n:
+            if sz[0] < n or sz[1] < n or len (pmut) < n:
                 covar = None
             else:
-                cv = _calc_covariance (fjac[:,:n], ipvt[:n])
+                cv = _calc_covariance (fjac[:,:n], pmut[:n])
                 cv.shape = (n, n)
 
                 for i in xrange (n): # can't do 2D fancy indexing
