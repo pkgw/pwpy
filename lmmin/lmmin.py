@@ -2631,6 +2631,40 @@ def _lmder1_kowalik_osborne ():
     #                 0.1230924753714115e+00, 0.1361509629062244e+00])
 
 
+@test
+def _lmder1_meyer ():
+    """Meyer function (lmder1 test #10)"""
+
+    y3 = np.asarray ([3.478e4, 2.861e4, 2.365e4, 1.963e4, 1.637e4, 1.372e4, 1.154e4,
+                      9.744e3, 8.261e3, 7.03e3, 6.005e3, 5.147e3, 4.427e3, 3.82e3,
+                      3.307e3, 2.872e3])
+
+    def func (params, vec):
+        temp = 5 * (np.arange (16) + 1) + 45 + params[2]
+        tmp1 = params[1] / temp
+        tmp2 = np.exp (tmp1)
+        vec[:] = params[0] * tmp2 - y3
+
+    def jac (params, jac):
+        temp = 5 * (np.arange (16) + 1) + 45 + params[2]
+        tmp1 = params[1] / temp
+        tmp2 = np.exp (tmp1)
+        jac[0] = tmp2
+        jac[1] = params[0] * tmp2 / temp
+        jac[2] = -tmp1 * jac[1]
+
+    guess = np.asfarray ([0.02, 4000, 250])
+
+    _lmder1_driver (16, func, jac, guess,
+                    0.4115346655430312e+05, 0.9377945146518742e+01,
+                    [0.5609636471026614e-02, 0.6181346346286591e+04,
+                     0.3452236346241440e+03])
+    # This one depends on maxiter semantics.
+    #_lmder1_driver (16, func, jac, guess * 10,
+    #                0.4168216891308465e+07, 0.7929178717795005e+03,
+    #                [0.1423670741579940e-10, 0.3369571334325413e+05,
+    #                 0.9012685279538006e+03])
+
 # Finally ...
 
 if __name__ == '__main__':
