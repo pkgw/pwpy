@@ -1659,12 +1659,12 @@ class Problem (object):
 
             # Compute QR factorization of the Jacobian
             # wa1: "rdiag", diagonal part of R matrix, pivoting applied
-            # wa2: "acnorm", unpermuted column norms of fjac
+            # wa2: "acnorm", unpermuted row norms of fjac
             # fjac: overwritten with Q and R matrix info, pivoted
             ipvt, wa1, wa2 = _qr_factor_packed (fjac, enorm, finfo)
 
             if niter == 1:
-                # If "diag" unspecified, scale according to norms of columns
+                # If "diag" unspecified, scale according to norms of rows
                 # of the initial jacobian
                 if self.diag is not None:
                     diag = self.diag.copy ()
@@ -1678,7 +1678,7 @@ class Problem (object):
                 if delta == 0.:
                     delta = self.factor
 
-            # Compute (q.T) * fvec, store the first n components in qtf
+            # Compute fvec * (q.T), store the first n components in qtf
 
             wa4 = fvec.copy ()
 
@@ -1936,16 +1936,6 @@ class Problem (object):
     def _get_jacobian_explicit (self, params, fvec, ulimit, dside, maxstep, isrel, finfo):
         # TODO #1: preallocate fjac instead of reallocating it on
         # every call!
-        #
-        # TODO #2: note that we transpose fjac! I need go to through
-        # and reverse all the 2D matrices because the transcribed
-        # code didn't account for the switch between Fortran and
-        # C/Python index ordering. The switch doesn't affect results
-        # but it does affect speed and cleanliness of some constructs.
-        # The Great Transposition will be a large undertaking,
-        # however. In the meantime, fake it here so that
-        # Jacobian-computing functions don't all need to be rewritten
-        # when the transposition finally happens.
 
         fjac = np.zeros ((self._npar, self._nout), finfo.dtype)
 
@@ -1964,6 +1954,7 @@ class Problem (object):
 
 
     def _get_jacobian_automatic (self, params, fvec, ulimit, dside, maxstep, isrel, finfo):
+        # TODO: transpose this!
         ifree = self._ifree
         debug = self.debugJac
         eps = np.sqrt (max (self.epsilon, finfo.eps))
