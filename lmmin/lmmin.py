@@ -1955,7 +1955,7 @@ class Problem (object):
 
         if ifree.size < self._npar:
             for i in xrange (ifree.size):
-                fjac[i] = fjac[ifree[i]]
+                fjacfull[i] = fjacfull[ifree[i]]
 
 
     def _get_jacobian_automatic (self, params, fvec, fjacfull, ulimit, dside, maxstep, isrel, finfo):
