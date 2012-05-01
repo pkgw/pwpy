@@ -70,6 +70,9 @@ class AstroImage (object):
     pclon = None
     "Longitude of the pointing center in radians"
 
+    restfreq = None
+    "Mean rest frequency of the image in GHz"
+
     axdescs = None
     """If not None, list of strings describing the axis types;
     no standard format."""
@@ -274,6 +277,10 @@ class MIRIADImage (AstroImage):
             pass
 
         self._wcscale = _get_wcs_scale (self._wcs, self.shape.size)
+
+        # FIXME: assuming that spectral axis exists and is in units of Hz
+        s = naxis - self._wcs.wcs.spec - 1
+        self.restfreq = self.toworld (np.zeros (naxis))[s] * 1e-9
 
 
     def _closeImpl (self):
@@ -482,6 +489,9 @@ class CASAImage (AstroImage):
                     wcscale[i] = getconversion (subitem)
                     i += 1
 
+        # TODO: is this always in Hz?
+        self.restfreq = c.get_coordinate ('spectral').get_restfrequency () * 1e-9
+
 
     def _closeImpl (self):
         # No explicit close method provided here. Annoying.
@@ -631,6 +641,10 @@ class FITSImage (AstroImage):
 
         self._wcscale = _get_wcs_scale (self._wcs, self.shape.size)
 
+        # FIXME: assuming that spectral axis exists and is in units of Hz
+        s = naxis - self._wcs.wcs.spec - 1
+        self.restfreq = self.toworld (np.zeros (naxis))[s] * 1e-9
+
 
     def _closeImpl (self):
         self._handle.close ()
@@ -742,6 +756,7 @@ class SimpleImage (AstroImage):
         self.units = parent.units
         self.pclat = parent.pclat
         self.pclon = parent.pclon
+        self.restfreq = parent.restfreq
 
         self._pctmpl = np.zeros (parent.shape.size)
         self._wctmpl = parent.toworld (self._pctmpl)
