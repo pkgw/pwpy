@@ -2,7 +2,7 @@
 # Licensed under the GNU General Public License version 3 or higher
 
 """
-astimage -- generic loading of radio astronomical images
+astimage -- generic loading of (radio) astronomical images
 
 Use `astimage.open (path, mode)` to open an astronomical image,
 regardless of its file format.
@@ -16,10 +16,15 @@ like the pyrap.images API, and I'd rather not require that casacore
 and pyrap be installed. pyrap.images doesn't support masks in MIRIAD
 images.
 
-TODO: for iminfo, need: axis types, ref freq
+TODO: make sure restfreq semantics are right (probably aren't)
 
-TODO: standardized celestial axis types for proper generic formatting
-of RA/Dec ; glat/glon etc
+TODO: axis types (ugh standardizing these would be a bear)
+      Some kind of way to get generic formatting of RA/Dec, glat/glon,
+      etc would be nice.
+
+TODO: obs date (MJD? that's native system used by CASA)
+
+TODO: image units (ie, "set units to Jy/px"; standardization also a pain)
 """
 
 import numpy as np
