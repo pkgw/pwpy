@@ -1594,6 +1594,7 @@ class Problem (object):
             raise ValueError ('expected exactly %d parameters, got %d'
                               % (self._npar, initial_params.size))
 
+        initial_params = initial_params.copy () # make sure not to modify arg
         w = where (self._pinfob & PI_M_FIXED)
         initial_params[w] = self._pinfof[PI_F_VALUE,w]
 
