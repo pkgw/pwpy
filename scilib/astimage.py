@@ -278,8 +278,14 @@ class MIRIADImage (AstroImage):
         if self.pclat is not None:
             self.pclon = h.getScalarItem ('obsra')
         else:
-            # TODO: check for mosaic table, read a pointing center from there
-            pass
+            try:
+                import mirtask.mostable
+                mt = mirtask.mostable.readDataSet (h)[0] # ignore WCS warnings here
+                if mt.radec.shape[0] == 1:
+                    self.pclat = mt.radec[0,1]
+                    self.pclon = mt.radec[0,0]
+            except Exception:
+                pass
 
         self._wcscale = _get_wcs_scale (self._wcs, self.shape.size)
 
