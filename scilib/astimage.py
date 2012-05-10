@@ -289,9 +289,11 @@ class MIRIADImage (AstroImage):
 
         self._wcscale = _get_wcs_scale (self._wcs, self.shape.size)
 
-        # FIXME: assuming that spectral axis exists and is in units of Hz
-        s = naxis - self._wcs.wcs.spec - 1
-        self.restfreq = self.toworld (np.zeros (naxis))[s] * 1e-9
+        if self._wcs.wcs.spec >= 0:
+            # FIXME: assuming that spectral axis is frequency in units of Hz.
+            # This is bad, because it could be velocity!
+            s = naxis - self._wcs.wcs.spec - 1
+            self.restfreq = self.toworld (np.zeros (naxis))[s] * 1e-9
 
 
     def _closeImpl (self):
@@ -652,9 +654,11 @@ class FITSImage (AstroImage):
 
         self._wcscale = _get_wcs_scale (self._wcs, self.shape.size)
 
-        # FIXME: assuming that spectral axis exists and is in units of Hz
-        s = naxis - self._wcs.wcs.spec - 1
-        self.restfreq = self.toworld (np.zeros (naxis))[s] * 1e-9
+        if self._wcs.wcs.spec >= 0:
+            # FIXME: assuming that spectral axis is frequency in units of Hz.
+            # This is bad, because it could be velocity!
+            s = naxis - self._wcs.wcs.spec - 1
+            self.restfreq = self.toworld (np.zeros (naxis))[s] * 1e-9
 
 
     def _closeImpl (self):
