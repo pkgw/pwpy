@@ -22,8 +22,6 @@ TODO: axis types (ugh standardizing these would be a bear)
       Some kind of way to get generic formatting of RA/Dec, glat/glon,
       etc would be nice.
 
-TODO: obs date (MJD? that's native system used by CASA)
-
 TODO: image units (ie, "set units to Jy/px"; standardization also a pain)
 """
 
@@ -77,6 +75,9 @@ class AstroImage (object):
 
     restfreq = None
     "Mean rest frequency of the image in GHz"
+
+    mjd = None
+    "Mean MJD of the observations"
 
     axdescs = None
     """If not None, list of strings describing the axis types;
@@ -295,6 +296,10 @@ class MIRIADImage (AstroImage):
             s = naxis - self._wcs.wcs.spec - 1
             self.restfreq = self.toworld (np.zeros (naxis))[s] * 1e-9
 
+        jd = h.getScalarItem ('obstime')
+        if jd is not None:
+            self.mjd = jd - 2400000.5
+
 
     def _closeImpl (self):
         self._handle.close ()
@@ -505,6 +510,9 @@ class CASAImage (AstroImage):
         # TODO: is this always in Hz?
         self.restfreq = c.get_coordinate ('spectral').get_restfrequency () * 1e-9
 
+        # TODO: any unit weirdness or whatever here?
+        self.mjd = c.get_obsdate ()['m0']['value']
+
 
     def _closeImpl (self):
         # No explicit close method provided here. Annoying.
@@ -629,6 +637,7 @@ class FITSImage (AstroImage):
         header = self._handle[0].header
         self._wcs = pywcs.WCS (header)
         self._wcs.wcs.set ()
+        self._wcs.wcs.fix () # I'm interested in mjd computation via datfix()
 
         self.units = maybelower (header.get ('bunit'))
 
@@ -659,6 +668,12 @@ class FITSImage (AstroImage):
             # This is bad, because it could be velocity!
             s = naxis - self._wcs.wcs.spec - 1
             self.restfreq = self.toworld (np.zeros (naxis))[s] * 1e-9
+
+        if np.isfinite (self._wcs.wcs.mjdavg):
+            self.mjd = self._wcs.wcs.mjdavg
+        elif np.isfinite (self._wcs.wcs.mjdobs):
+            # close enough
+            self.mjd = self._wcs.wcs.mjdobs
 
 
     def _closeImpl (self):
@@ -772,6 +787,7 @@ class SimpleImage (AstroImage):
         self.pclat = parent.pclat
         self.pclon = parent.pclon
         self.restfreq = parent.restfreq
+        self.mjd = parent.mjd
 
         self._pctmpl = np.zeros (parent.shape.size)
         self._wctmpl = parent.toworld (self._pctmpl)
