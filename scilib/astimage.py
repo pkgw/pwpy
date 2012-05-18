@@ -16,8 +16,6 @@ like the pyrap.images API, and I'd rather not require that casacore
 and pyrap be installed. pyrap.images doesn't support masks in MIRIAD
 images.
 
-TODO: make sure restfreq semantics are right (probably aren't)
-
 TODO: axis types (ugh standardizing these would be a bear)
       Some kind of way to get generic formatting of RA/Dec, glat/glon,
       etc would be nice.
@@ -51,6 +49,10 @@ class AstroImage (object):
     mode = None
     _handle = None
 
+    _latax = None # index of the spatial latitude axis
+    _lonax = None # ditto for longitude
+    _specax = None # ditto for spectral axis (may be freq or velocity!)
+
     shape = None
     "An integer ndarray of the image shape"
 
@@ -73,8 +75,10 @@ class AstroImage (object):
     pclon = None
     "Longitude of the pointing center in radians"
 
-    restfreq = None
-    "Mean rest frequency of the image in GHz"
+    charfreq = None
+    "Characteristic observing frequency of the image in GHz"
+    # NOTE: we get this from evaluating the spectral axis in its middle
+    # pixel, not the reference value.
 
     mjd = None
     "Mean MJD of the observations"
@@ -141,16 +145,9 @@ class AstroImage (object):
 
 
     def simple (self):
-        lat, lon = self._latlonaxes ()
-
-        if lat < 0 or lon < 0 or lat == lon:
-            raise UnsupportedError ('the image "%s" does not have both latitude '
-                                    'and longitude axes', self.path)
-
-        if lat == 0 and lon == 1 and self.shape.size == 2:
+        if self._latax == 0 and self._lonax == 1 and self.shape.size == 2:
             return self # noop
-
-        return SimpleImage (self, lat, lon)
+        return SimpleImage (self)
 
 
     def saveCopy (self, path, overwrite=False, openmode=None):
@@ -226,15 +223,24 @@ def _wcs_topixel (wcs, world, wcscale, naxis):
     return pixel[0,::-1]
 
 
-def _wcs_latlonaxes (wcs, naxis):
-    lat = lon = -1
+def _wcs_axes (wcs, naxis):
+    lat = lon = spec = None
 
     if wcs.wcs.lat >= 0:
         lat = naxis - 1 - wcs.wcs.lat
     if wcs.wcs.lng >= 0:
         lon = naxis - 1 - wcs.wcs.lng
+    if wcs.wcs.spec >= 0:
+        spec = naxis - 1 - wcs.wcs.spec
 
-    return lat, lon
+    return lat, lon, spec
+
+
+def _wcs_get_freq (wcs, specval):
+    from mirtask._miriad_c import mirwcs_compute_freq
+    assert wcs.wcs.spec >= 0
+    spectype = wcs.wcs.ctype[wcs.wcs.spec][:4]
+    return mirwcs_compute_freq (spectype, specval, wcs.wcs.restfrq) * 1e-9
 
 
 class MIRIADImage (AstroImage):
@@ -281,20 +287,25 @@ class MIRIADImage (AstroImage):
         else:
             try:
                 import mirtask.mostable
+            except ImportError:
+                pass
+            else:
                 mt = mirtask.mostable.readDataSet (h)[0] # ignore WCS warnings here
                 if mt.radec.shape[0] == 1:
                     self.pclat = mt.radec[0,1]
                     self.pclon = mt.radec[0,0]
-            except Exception:
-                pass
 
         self._wcscale = _get_wcs_scale (self._wcs, self.shape.size)
+        self._latax, self._lonax, self._specax = _wcs_axes (self._wcs, self.shape.size)
 
-        if self._wcs.wcs.spec >= 0:
-            # FIXME: assuming that spectral axis is frequency in units of Hz.
-            # This is bad, because it could be velocity!
-            s = naxis - self._wcs.wcs.spec - 1
-            self.restfreq = self.toworld (np.zeros (naxis))[s] * 1e-9
+        if self._specax is not None:
+            try:
+                from mirtask._miriad_c import mirwcs_compute_freq
+            except ImportError:
+                pass
+            else:
+                specval = self.toworld (0.5 * (self.shape - 1))[self._specax]
+                self.charfreq = _wcs_get_freq (self._wcs, specval)
 
         jd = h.getScalarItem ('obstime')
         if jd is not None:
@@ -368,13 +379,6 @@ class MIRIADImage (AstroImage):
                                     'but not present in "%s"', self.path)
 
         return _wcs_topixel (self._wcs, world, self._wcscale, self.shape.size)
-
-
-    def _latlonaxes (self):
-        if self._wcs is None:
-            raise UnsupportedError ('world coordinate information is required '
-                                    'but not present in "%s"', self.path)
-        return _wcs_latlonaxes (self._wcs, self.shape.size)
 
 
     def saveCopy (self, path, overwrite=False, openmode=None):
@@ -507,8 +511,60 @@ class CASAImage (AstroImage):
                     wcscale[i] = getconversion (subitem)
                     i += 1
 
-        # TODO: is this always in Hz?
-        self.restfreq = c.get_coordinate ('spectral').get_restfrequency () * 1e-9
+        # Figure out which axes are lat/long/spec. We have some
+        # paranoia code the give up in case there are multiple axes
+        # that appear to be of the same type. This stuff could
+        # be cleaned up.
+
+        lat = lon = spec = -1
+
+        try:
+            logspecidx = c.get_names ().index ('spectral')
+        except ValueError:
+            specaxname = None
+        else:
+            specaxname = c.get_axes ()[logspecidx]
+
+        for i, name in enumerate (self.axdescs):
+            # These symbolic direction names obtained from
+            # casacore/coordinates/Coordinates/DirectionCoordinate.cc
+            # Would be nice to have a better system for determining
+            # this a la what wcslib provides.
+            if name == specaxname:
+                spec = i
+            elif name in ('Right_Ascension', 'Hour_Angle', 'Longitude'):
+                if lon == -1:
+                    lon = i
+                else:
+                    lon = -2
+            elif name in ('Declination', 'Latitude'):
+                if lat == -1:
+                    lat = i
+                else:
+                    lat = -2
+
+        if lat >= 0:
+            self._latax = lat
+        if lon >= 0:
+            self._lonax = lon
+        if spec >= 0:
+            self._specax = spec
+
+        # Phew, that was gross.
+
+        if self._specax is not None:
+            sd = c.get_coordinate ('spectral').dict ()
+            wi = sd.get ('wcs')
+            if wi is not None:
+                try:
+                    from mirtask._miriad_c import mirwcs_compute_freq
+                except ImportError:
+                    pass
+                else:
+                    spectype = wi['ctype'].replace ('\x00', '')[:4]
+                    restfreq = sd.get ('restfreq', 0.)
+                    specval = self.toworld (0.5 * (self.shape - 1))[self._specax]
+                    self.charfreq = mirwcs_compute_freq (spectype, specval, restfreq) * 1e-9
 
         # TODO: any unit weirdness or whatever here?
         self.mjd = c.get_obsdate ()['m0']['value']
@@ -553,38 +609,6 @@ class CASAImage (AstroImage):
         self._checkOpen ()
         world = np.asarray (world)
         return np.asarray (self._handle.topixel (world / self._wcscale))
-
-
-    def _latlonaxes (self):
-        self._checkOpen ()
-
-        lat = lon = -1
-        flat = []
-
-        for item in self._handle.coordinates ().get_axes ():
-            if isinstance (item, basestring):
-                flat.append (item)
-            else:
-                for subitem in item:
-                    flat.append (subitem)
-
-        for i, name in enumerate (flat):
-            # These symbolic names obtained from
-            # casacore/coordinates/Coordinates/DirectionCoordinate.cc
-            # Would be nice to have a better system for determining
-            # this a la what wcslib provides.
-            if name in ('Right Ascension', 'Hour Angle', 'Longitude'):
-                if lon == -1:
-                    lon = i
-                else:
-                    lon = -2
-            elif name in ('Declination', 'Latitude'):
-                if lat == -1:
-                    lat = i
-                else:
-                    lat = -2
-
-        return lat, lon
 
 
     def saveCopy (self, path, overwrite=False, openmode=None):
@@ -662,12 +686,16 @@ class FITSImage (AstroImage):
         self.pclon = maybescale (header.get ('obsra'), D2R)
 
         self._wcscale = _get_wcs_scale (self._wcs, self.shape.size)
+        self._latax, self._lonax, self._specax = _wcs_axes (self._wcs, self.shape.size)
 
-        if self._wcs.wcs.spec >= 0:
-            # FIXME: assuming that spectral axis is frequency in units of Hz.
-            # This is bad, because it could be velocity!
-            s = naxis - self._wcs.wcs.spec - 1
-            self.restfreq = self.toworld (np.zeros (naxis))[s] * 1e-9
+        if self._specax is not None:
+            try:
+                from mirtask._miriad_c import mirwcs_compute_freq
+            except ImportError:
+                pass
+            else:
+                specval = self.toworld (0.5 * (self.shape - 1))[self._specax]
+                self.charfreq = _wcs_get_freq (self._wcs, specval)
 
         if np.isfinite (self._wcs.wcs.mjdavg):
             self.mjd = self._wcs.wcs.mjdavg
@@ -721,13 +749,6 @@ class FITSImage (AstroImage):
         return _wcs_topixel (self._wcs, world, self._wcscale, self.shape.size)
 
 
-    def _latlonaxes (self):
-        if self._wcs is None:
-            raise UnsupportedError ('world coordinate information is required '
-                                    'but not present in "%s"', self.path)
-        return _wcs_latlonaxes (self._wcs, self.shape.size)
-
-
     def saveCopy (self, path, overwrite=False, openmode=None):
         self._checkOpen ()
         self._handle.writeto (path, output_verify='fix', clobber=overwrite)
@@ -751,10 +772,19 @@ class FITSImage (AstroImage):
 
 
 class SimpleImage (AstroImage):
-    def __init__ (self, parent, latax, lonax):
+    def __init__ (self, parent):
+        platax, plonax = parent._latax, parent._lonax
+
+        if platax is None or plonax is None or platax == plonax:
+            raise UnsupportedError ('the image "%s" does not have both latitude '
+                                    'and longitude axes', parent.path)
+
         self._handle = parent
-        self._latax = latax
-        self._lonax = lonax
+        self._platax = platax
+        self._plonax = plonax
+
+        self._latax = 0
+        self._lonax = 1
 
         checkworld1 = parent.toworld (parent.shape * 0.) # need float!
         checkworld2 = parent.toworld (parent.shape - 1.) # (for pyrap)
@@ -769,7 +799,7 @@ class SimpleImage (AstroImage):
             # Secondly, check that non-lat/lon world coordinates
             # don't vary over the image; otherwise topixel() will
             # be broken.
-            if i in (latax, lonax):
+            if i in (platax, plonax):
                 continue
             if parent.shape[i] != 1:
                 raise UnsupportedError ('cannot simplify an image with '
@@ -778,15 +808,15 @@ class SimpleImage (AstroImage):
                 self._topixelok = False
 
         self.path = '<subimage of %s>' % parent.path
-        self.shape = np.asarray ([parent.shape[latax], parent.shape[lonax]])
-        self.axdescs = [parent.axdescs[latax], parent.axdescs[lonax]]
+        self.shape = np.asarray ([parent.shape[platax], parent.shape[plonax]])
+        self.axdescs = [parent.axdescs[platax], parent.axdescs[plonax]]
         self.bmaj = parent.bmaj
         self.bmin = parent.bmin
         self.bpa = parent.bpa
         self.units = parent.units
         self.pclat = parent.pclat
         self.pclon = parent.pclon
-        self.restfreq = parent.restfreq
+        self.charfreq = parent.charfreq
         self.mjd = parent.mjd
 
         self._pctmpl = np.zeros (parent.shape.size)
@@ -801,11 +831,11 @@ class SimpleImage (AstroImage):
         self._checkOpen ()
         data = self._handle.read (flip=flip)
         idx = list (self._pctmpl)
-        idx[self._latax] = slice (None)
-        idx[self._lonax] = slice (None)
+        idx[self._platax] = slice (None)
+        idx[self._plonax] = slice (None)
         data = data[tuple (idx)]
 
-        if self._latax > self._lonax:
+        if self._platax > self._plonax:
             # Ensure that order is (lat, lon). Note that unlike the
             # above operations, this forces a copy of data.
             data = data.T
@@ -828,10 +858,10 @@ class SimpleImage (AstroImage):
 
         fulldata = np.ma.empty (self._handle.shape, dtype=data.dtype)
         idx = list (self._pctmpl)
-        idx[self._latax] = slice (None)
-        idx[self._lonax] = slice (None)
+        idx[self._platax] = slice (None)
+        idx[self._plonax] = slice (None)
 
-        if self._latax > self._lonax:
+        if self._platax > self._plonax:
             fulldata[tuple (idx)] = data.T
         else:
             fulldata[tuple (idx)] = data
@@ -843,12 +873,12 @@ class SimpleImage (AstroImage):
     def toworld (self, pixel):
         self._checkOpen ()
         p = self._pctmpl.copy ()
-        p[self._latax] = pixel[0]
-        p[self._lonax] = pixel[1]
+        p[self._platax] = pixel[0]
+        p[self._plonax] = pixel[1]
         w = self._handle.toworld (p)
         world = np.empty (2)
-        world[0] = w[self._latax]
-        world[1] = w[self._lonax]
+        world[0] = w[self._platax]
+        world[1] = w[self._plonax]
         return world
 
 
@@ -860,12 +890,12 @@ class SimpleImage (AstroImage):
                                     'world to pixel coordinates')
 
         w = self._wctmpl.copy ()
-        w[self._latax] = world[0]
-        w[self._lonax] = world[1]
+        w[self._platax] = world[0]
+        w[self._plonax] = world[1]
         p = self._handle.topixel (w)
         pixel = np.empty (2)
-        pixel[0] = p[self._latax]
-        pixel[1] = p[self._lonax]
+        pixel[0] = p[self._platax]
+        pixel[1] = p[self._plonax]
         return pixel
 
 

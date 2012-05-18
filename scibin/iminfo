@@ -29,7 +29,7 @@ def printinfo (path):
     latcell = loncell = None
 
     if im.toworld is not None:
-        latax, lonax = im._latlonaxes ()
+        latax, lonax = im._latax, im._lonax
         delta = 1e-6
         p = 0.5 * (np.asfarray (im.shape) - 1)
         w1 = im.toworld (p)
@@ -56,6 +56,15 @@ def printinfo (path):
 
     if im.axdescs is not None:
         print 'axdescs  =', ' '.join (x for x in im.axdescs)
+
+    if im.charfreq is not None:
+        print 'charfreq = %f GHz' % im.charfreq
+
+    if im.mjd is not None:
+        from time import gmtime, strftime
+        posix = 86400. * (im.mjd - 40587.)
+        ts = strftime ('%Y-%m-%dT%H-%M-%SZ', gmtime (posix))
+        print 'mjd      = %f # %s' % (im.mjd, ts)
 
     if latcell is not None:
         print 'ctrcell  = %fʺ × %fʺ # lat, lon' % (latcell * R2A,
