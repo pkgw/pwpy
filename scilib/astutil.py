@@ -234,7 +234,7 @@ def sphofs (lat1, lon1, r, pa, tol=1e-2, rmax=None):
     gives a maximum fractional distance error of ~3%.
     """
 
-    if rmax is not None and abs (r) > rmax:
+    if rmax is not None and np.abs (r) > rmax:
         raise ValueError ('sphofs radius value %f is too big for '
                           'our approximation' % r)
 
@@ -243,9 +243,9 @@ def sphofs (lat1, lon1, r, pa, tol=1e-2, rmax=None):
 
     if tol is not None:
         s = sphdist (lat1, lon1, lat2, lon2)
-        if abs ((s - r) / s) > tol:
+        if np.any (np.abs ((s - r) / s) > tol):
             raise ValueError ('sphofs approximation broke down '
-                              '(%f %f %f %f %f %f %f)' % (lat1, lon1,
+                              '(%s %s %s %s %s %s %s)' % (lat1, lon1,
                                                           lat2, lon2,
                                                           r, s, pa))
 
