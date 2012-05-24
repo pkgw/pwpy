@@ -47,8 +47,10 @@ class Column (object):
 
 
     def _fixup (self):
-        assert len (self.name) <= W_HEADER_NAME
-        assert self.name not in _forbidden_colnames
+        if len (self.name) > W_HEADER_NAME:
+            raise ValueError ('column name "%s" is too long' % self.name)
+        if self.name in _forbidden_colnames:
+            raise ValueError ('column name "%s" is too forbidden' % self.name)
         assert self.width > 0 and self.width < 512
         assert self.kind >= 0 and self.kind <= _K_LAST_VALID
 
