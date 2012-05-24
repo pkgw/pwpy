@@ -215,6 +215,58 @@ def sphdist (lat1, lon1, lat2, lon2):
     return np.arctan2 (a, b)
 
 
+def sphbear (lat1, lon1, lat2, lon2, erronpole=True, tol=1e-15):
+    """Args are (lat1, lon1, lat2, lon2, erronpole=True, tol=1e-15) --
+    consistent with the usual coordinates in images, but note that
+    this maps to (Dec, RA) or (Y, X). All in radians. Returns the
+    bearing (AKA position angle, PA) of point 2 with regards to point
+    1.
+
+    The sign convention is astronomical: bearing ranges from -pi to pi,
+    with negative values if point 2 is in the western hemisphere w.r.t.
+    point 1, positive if it is in the eastern.
+
+    If point1 is very near the pole, the bearing is undefined and an
+    exception is raised. If erronpole is set to False, 0 is returned
+    instead.
+
+    tol is used for checking pole nearness and for rounding the bearing
+    to precisely zero if it's extremely small.
+
+    Derived from bear() in angles.py from Prasanth Nair,
+    https://github.com/phn/angles . His version is BSD licensed. This
+    one is sufficiently different that I think it counts as a separate
+    implementation.
+    """
+
+    v1 = np.asarray ([np.cos (lat1) * np.cos (lon1),
+                      np.cos (lat1) * np.sin (lon1),
+                      np.sin (lat1)])
+
+    if v1[0]**2 + v1[1]**2 < tol:
+        if erronpole:
+            raise ValueError ('trying to compute undefined bearing from the pole')
+        return 0.
+
+    v2 = np.asarray ([np.cos (lat2) * np.cos (lon2),
+                      np.cos (lat2) * np.sin (lon2),
+                      np.sin (lat2)])
+
+    p12 = np.cross (v1, v2) # ~"perpendicular to great circle containing points"
+    p1z = np.asarray ([v1[1], -v1[0], 0.]) # ~"perp to base and Z axis"
+
+    # ~"angle between these vectors"
+    cm = np.sqrt ((np.cross (p12, p1z)**2).sum ())
+    bearing = np.arctan2 (cm, np.dot (p12, p1z))
+
+    if p12[2] < 0:
+        bearing = -bearing
+
+    if abs (bearing) < tol:
+        return 0.
+    return bearing
+
+
 def sphofs (lat1, lon1, r, pa, tol=1e-2, rmax=None):
     """Args are: lat1, lon1, r, pa -- consistent with
     the usual coordinates in images, but note that this maps
@@ -252,7 +304,7 @@ def sphofs (lat1, lon1, r, pa, tol=1e-2, rmax=None):
     return lat2, lon2
 
 
-__all__ += 'sphdist sphofs'.split ()
+__all__ += 'sphdist sphbear sphofs'.split ()
 
 
 # 2D Gaussian (de)convolution
