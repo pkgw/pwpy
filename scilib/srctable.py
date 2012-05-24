@@ -167,8 +167,8 @@ nvss_columns1 = {
     'minor': (44, 49), # ditto
     'pa': (50, 55), # [deg], poss. absent
     'nvss_resid_code': (56, 59), # P*=high pk, R*=high rms, S*=high sum
-    'nvss_linpol_flux': (60, 65), # [mjy] linear polarized flux
-    'nvss_linpol_pa': (66, 71), # [deg] lin. pol E vector PA
+    'nvss_lpflux': (60, 65), # [mjy] linear polarized flux
+    'nvss_lppa': (66, 71), # [deg] lin. pol E vector PA
     'nvss_field': (72, 80),
     'nvss_pixel_x': (81, 88),
     'nvss_pixel_y': (89, 96),
@@ -183,8 +183,8 @@ nvss_columns2 = {
     'minor_uc': (44, 49), # [arcsec], poss. absent
     'pa_uc': (50, 55), # [deg], poss. absent
     'nvss_resid_val': (56, 59), # [100s of ujy] value triggering residual flag
-    'nvss_linpol_flux_uc': (60, 65), # [mjy]
-    'nvss_linpol_pa_uc': (66, 71), # [deg] poss. absent
+    'nvss_lpflux_uc': (60, 65), # [mjy]
+    'nvss_lppa_uc': (66, 71), # [deg] poss. absent
 }
 
 
@@ -250,10 +250,10 @@ nvss_parsers = {
     'pa_uc': nvss_degornone,
     'nvss_resid_code': nvss_strornone,
     'nvss_resid_val': nvss_hujyornone,
-    'nvss_linpol_flux': nvss_mjy2jy,
-    'nvss_linpol_flux_uc': nvss_mjyornone,
-    'nvss_linpol_pa': nvss_degornone,
-    'nvss_linpol_pa_uc': nvss_degornone,
+    'nvss_lpflux': nvss_mjy2jy,
+    'nvss_lpflux_uc': nvss_mjyornone,
+    'nvss_lppa': nvss_degornone,
+    'nvss_lppa_uc': nvss_degornone,
     'nvss_field': str,
 }
 
@@ -300,13 +300,13 @@ def parseNVSS (stream):
 
 makefltcol ('nvss_dist', 12, '%f'),
 makefltcol ('nvss_angle', 12, '%f'),
-makefltcol ('nvss_resid_code', 12, '%f'),
+makestdcol ('nvss_resid_code', 2, K_STR),
 makefltcol ('nvss_resid_val', 12, '%f'),
-makefltcol ('nvss_linpol_flux', 12, '%f'),
-makefltcol ('nvss_linpol_flux_uc', 12, '%f'),
-makefltcol ('nvss_linpol_pa', 12, '%f'),
-makefltcol ('nvss_linpol_pa_uc', 12, '%f'),
-makefltcol ('nvss_field', 12, '%f'),
+makefltcol ('nvss_lpflux', 12, '%f'),
+makefltcol ('nvss_lpflux_uc', 12, '%f'),
+makefltcol ('nvss_lppa', 12, '%f'),
+makefltcol ('nvss_lppa_uc', 12, '%f'),
+makestdcol ('nvss_field', 8, K_STR),
 makefltcol ('nvss_pixel_x', 12, '%f'),
 makefltcol ('nvss_pixel_y', 12, '%f'),
 
@@ -314,8 +314,8 @@ makefltcol ('nvss_pixel_y', 12, '%f'),
 nvsscols = columns ('ra ra_uc dec dec_uc totflux totflux_uc major major_uc',
                     'major_is_ul minor minor_uc minor_is_ul pa pa_uc',
                     'nvss_dist nvss_angle nvss_resid_code nvss_resid_val',
-                    'nvss_linpol_flux nvss_linpol_flux_uc nvss_linpol_pa',
-                    'nvss_linpol_pa_uc nvss_field nvss_pixel_x nvss_pixel_y')
+                    'nvss_lpflux nvss_lpflux_uc nvss_lppa',
+                    'nvss_lppa_uc nvss_field nvss_pixel_x nvss_pixel_y')
 
 
 # Transformations on sources
