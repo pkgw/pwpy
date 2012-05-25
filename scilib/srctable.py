@@ -114,8 +114,13 @@ def parseSFind (lines, pristine=False):
         source.ra = parsehours (a[0])
         source.dec = parsedeglat (a[1])
 
+        if a[1][0] in '+-':
+            ofs = 1
+        else:
+            ofs = 0
+
         for i, name in enumerate (_sfindMiscColumns):
-            substr = line[_sfindMiscOffsets[i]:_sfindMiscOffsets[i+1]]
+            substr = line[_sfindMiscOffsets[i]+ofs:_sfindMiscOffsets[i+1]+ofs]
 
             if '*' in substr:
                 val = None
