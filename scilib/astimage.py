@@ -343,7 +343,7 @@ class MIRIADImage (AstroImage):
         data = np.ma.asarray (data)
 
         if data.shape != tuple (self.shape):
-            raise ValueError ('data is wrong shape: got %s, want %s' \
+            raise ValueError ('"data" is wrong shape: got %s, want %s' \
                                   % (data.shape, tuple (self.shape)))
 
         self._checkOpen ()
