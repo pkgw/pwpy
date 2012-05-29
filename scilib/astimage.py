@@ -329,7 +329,8 @@ class MIRIADImage (AstroImage):
             fdata = data.reshape ((n, self.shape[-2], self.shape[-1]))
 
             for i in xrange (n):
-                axes = np.unravel_index (i, nonplane)
+                # Must convert from C to Fortran indexing convention
+                axes = np.unravel_index (i, nonplane)[::-1]
                 self._handle.readPlane (axes, fdata[i], topIsZero=flip)
 
         if squeeze:
