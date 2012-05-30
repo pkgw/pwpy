@@ -37,7 +37,7 @@ __all__ += 'angcen orientcen'.split ()
 
 # Formatting/parsing of lat/long/etc
 
-def _fmtsexagesimal (base, norm, basemax, precision=3):
+def _fmtsexagesimal (base, norm, basemax, seps, precision=3):
     if norm == 'none':
         pass
     elif norm == 'raise':
@@ -47,6 +47,11 @@ def _fmtsexagesimal (base, norm, basemax, precision=3):
         base = base % basemax
     else:
         raise ValueError ('unrecognized normalization type "%s"' % norm)
+
+    if len (seps) < 2:
+        # To ponder: we accept len(seps) > 3; seems OK.
+        raise ValueError ('there must be at least two sexagesimal separators; '
+                          'got value "%s"' % seps)
 
     precision = max (int (precision), 0)
     if precision == 0:
@@ -72,27 +77,32 @@ def _fmtsexagesimal (base, norm, basemax, precision=3):
             if bs >= basemax:
                 bs -= basemax
 
-    return '%0*d:%02d:%0*.*f' % \
-        (basewidth, bs, min, width, precision, sec)
+    if len (seps) > 2:
+        sep2 = seps[2]
+    else:
+        sep2 = ''
+
+    return '%0*d%s%02d%s%0*.*f%s' % \
+        (basewidth, bs, seps[0], min, seps[1], width, precision, sec, sep2)
 
 
-def fmthours (radians, norm='wrap', precision=3):
+def fmthours (radians, norm='wrap', precision=3, seps='::'):
     """(radians, norm=wrap, precision=3) -> string
 
 norm[alization] can be one of 'none', 'raise', or 'wrap'
 """
-    return _fmtsexagesimal (radians * R2H, norm, 24, precision=precision)
+    return _fmtsexagesimal (radians * R2H, norm, 24, seps, precision=precision)
 
 
-def fmtdeglon (radians, norm='wrap', precision=2):
+def fmtdeglon (radians, norm='wrap', precision=2, seps='::'):
     """(radians, norm=wrap, precision=2) -> string
 
 norm[alization] can be one of 'none', 'raise', or 'wrap'
 """
-    return _fmtsexagesimal (radians * R2D, norm, 360, precision=precision)
+    return _fmtsexagesimal (radians * R2D, norm, 360, seps, precision=precision)
 
 
-def fmtdeglat (radians, norm='raise', precision=2):
+def fmtdeglat (radians, norm='raise', precision=2, seps='::'):
     """(radians, norm=raise, precision=2) -> string
 
 norm[alization] can be one of 'none', 'raise', or 'wrap'
@@ -111,6 +121,11 @@ norm[alization] can be one of 'none', 'raise', or 'wrap'
             radians = -pi - radians
     else:
         raise ValueError ('unrecognized normalization type "%s"' % norm)
+
+    if len (seps) < 2:
+        # To ponder: we accept len(seps) > 3; seems OK.
+        raise ValueError ('there must be at least two sexagesimal separators; '
+                          'got value "%s"' % seps)
 
     precision = max (int (precision), 0)
     if precision == 0:
@@ -139,13 +154,18 @@ norm[alization] can be one of 'none', 'raise', or 'wrap'
             amin -= 60
             deg += 1
 
-    return '%s%02d:%02d:%0*.*f' % \
-        (sgn, deg, amin, width, precision, asec)
+    if len (seps) > 2:
+        sep2 = seps[2]
+    else:
+        sep2 = ''
+
+    return '%s%02d%s%02d%s%0*.*f%s' % \
+        (sgn, deg, seps[0], amin, seps[1], width, precision, asec, sep2)
 
 
-def fmtradec (rarad, decrad, precision=2):
-    return fmthours (rarad, precision=precision + 1) + ' ' \
-        + fmtdeglat (decrad, precision=precision)
+def fmtradec (rarad, decrad, precision=2, raseps='::', decseps='::', intersep=' '):
+    return fmthours (rarad, precision=precision + 1, seps=raseps) + str (intersep) \
+        + fmtdeglat (decrad, precision=precision, seps=decseps)
 
 
 __all__ += 'fmthours fmtdeglon fmtdeglat fmtradec'.split ()
