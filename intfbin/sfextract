@@ -4,7 +4,7 @@
 # Licensed under the GNU General Public License version 3 or higher
 
 """
-sfextract <input image> [resid image] <SFIND keywords=,+options>
+sfextract [-k] <input image> [resid image] <SFIND keywords=,+options>
 
 Given an image, run MIRIAD SFIND on it and print *deconvolved* source
 parameters on standard output. Options on the command line are passed
@@ -15,6 +15,9 @@ Note that SFIND expects there to be restoring beam information in the
 image; if this is missing, it will make a dumb guess.
 
 Suggested sfind keywords: rmsbox=64 alpha=0.5 +fdrpeak,psfsize
+
+-k : keep the temporary data directory, and print its location to
+     stderr.
 """
 
 # Programmer notes:
@@ -82,12 +85,15 @@ def wrongusage (docstring, *rest):
 
 def cmdline (argv):
     inpath = residpath = None
+    keepdir = False
     keywords = {}
 
     checkusage (__doc__, argv, usageifnoargs=True)
 
     for arg in argv[1:]:
-        if '=' in arg:
+        if arg == '-k':
+            keepdir = True
+        elif '=' in arg:
             kw, val = arg.split ('=', 1)
             keywords[kw] = val
         elif arg[0] == '+':
@@ -116,18 +122,18 @@ def cmdline (argv):
     if keywords.get ('kvannot', False):
         warn ('the file created by the "kvannot" option will be discarded')
 
-    setup_resid (inpath, residpath, keywords)
+    setup_resid (inpath, residpath, keywords, keepdir=keepdir)
 
 
-def setup_resid (inpath, residpath, keywords):
+def setup_resid (inpath, residpath, keywords, keepdir=False):
     img = astimage.open (inpath, 'r')
 
     if residpath is None:
-        return sfind_extract (img, None, inpath, keywords)
+        return sfind_extract (img, None, inpath, keywords, keepdir=keepdir)
 
     try:
         resid = img.saveCopy (residpath, openmode='rw')
-        rv = sfind_extract (img, resid, inpath, keywords)
+        rv = sfind_extract (img, resid, inpath, keywords, keepdir=keepdir)
         resid.close ()
         return rv
     except Exception:
@@ -140,7 +146,7 @@ def setup_resid (inpath, residpath, keywords):
         raise et, ev, etb
 
 
-def sfind_extract (img, resid, inpath, keywords):
+def sfind_extract (img, resid, inpath, keywords, keepdir=False):
     sfinfo = {'imagepath': inpath,
               'sfindargs': ' '.join ('%s=%s' % (k, keywords[k])
                                      for k in sorted (keywords.iterkeys ()))}
@@ -165,6 +171,9 @@ def sfind_extract (img, resid, inpath, keywords):
     origdir = getcwd ()
     inpath = realpath (inpath)
     tmpcontainer = mkdtemp (prefix='sfextract.')
+
+    if keepdir:
+        print >>sys.stderr, '# sfextract temporary directory:', tmpcontainer
 
     try:
         mirpath = fitspath = None
@@ -209,10 +218,11 @@ def sfind_extract (img, resid, inpath, keywords):
         parse_and_print (sfinfo, img, open ('sfind.log'), resid)
     finally:
         chdir (origdir)
-        try:
-            rmtree (tmpcontainer)
-        except:
-            warn ('couldn\'t remove temporary data directory "%s"', tmpcontainer)
+        if not keepdir:
+            try:
+                rmtree (tmpcontainer)
+            except:
+                warn ('couldn\'t remove temporary data directory "%s"', tmpcontainer)
 
 
 def parse_and_print (sfinfo, img, sfstream, resid):
