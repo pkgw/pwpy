@@ -136,16 +136,21 @@ def parseSFind (lines, pristine=False):
             # smaller than the beamsize.
             source.totflux = source.pkflux
 
-        if source.pkflux_uc is None or source.pkflux_uc == 0.:
-            source.totflux_uc = source.pkflux_uc = None
+        if source.pkflux_uc == 0.:
+            # Sometimes the precision in the text output is
+            # insufficient; be conservative.
+            source.pkflux_uc = 0.0005 * 1e-3
+
+        if source.pkflux_uc is None:
+            source.totflux_uc = None
         else:
             source.totflux_uc = abs (source.totflux * source.pkflux_uc / source.pkflux)
 
-        if source.ra_uc == 0.:
-            source.ra_uc = None
+        if source.ra_uc == 0.: # as with pkflux_uc
+            source.ra_uc = 0.0005 * A2R
 
         if source.dec_uc == 0.:
-            source.dec_uc = None
+            source.dec_uc = 0.005 * A2R
 
         yield source
 
