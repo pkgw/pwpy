@@ -144,7 +144,7 @@ def plot (config):
     p.setLabels (config.xlabel, config.ylabel)
 
     if config.aspect is not None:
-        p._toplevel_render_aspect = config.aspect
+        p.fieldAspect = config.aspect
 
     return p
 
