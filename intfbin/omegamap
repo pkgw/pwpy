@@ -68,10 +68,16 @@
  Label of the Y axis. **Underscores are replaced with spaces**,
  because MIRIAD arg parsing converts spaces to commas.
  (default: Declination_(J2000))
+
+@ ccrad
+ Radius of an overlaid circle to draw around the pointing
+ center, in arcseconds. If zero (the default), not circle
+ is drawn. Useful for denoting the primary beam size.
+ (default: 0)
 """
 
 import sys, numpy as np, omega as om, cairo
-import omega.pango, omega.pyrapimage, pyrap.images, colormaps, ndshow
+import omega.pango, omega.pyrapimage, pyrap.images, colormaps, ndshow, astutil
 
 
 class Config (object):
@@ -88,6 +94,7 @@ class Config (object):
     aspect = None
     xlabel = None
     ylabel = None
+    ccircle = None
 
 
 def plot (config):
@@ -146,6 +153,16 @@ def plot (config):
     if config.aspect is not None:
         p.fieldAspect = config.aspect
 
+    if config.ccircle is not None:
+        pc = im.info ()['coordinates'].get ('pointingcenter')
+        assert pc is not None, 'need pointing center info to draw circle'
+        assert not pc['initial'], 'pointing center info is uninitialized'
+        pclon, pclat = pc['value'][:2]
+        lat, lon = astutil.sphofs (pclat, pclon, config.ccircle,
+                                   np.linspace (0, 2 * np.pi, 200))
+        cx, cy = coords.arb2lin (lon, lat)
+        p.addXY (cx, cy, None, dsn=1)
+
     return p
 
 
@@ -180,6 +197,7 @@ def cmdline (args):
     ks.keyword ('aspect', 'd', -1)
     ks.keyword ('xlabel', 'a', 'Right_Ascension_(J2000)')
     ks.keyword ('ylabel', 'a', 'Declination_(J2000)')
+    ks.keyword ('ccrad', 'd', 0)
 
     vals = ks.process (args)
     config = Config ()
@@ -222,6 +240,9 @@ def cmdline (args):
 
     if vals.aspect > 0:
         config.aspect = vals.aspect
+
+    if vals.ccrad != 0: # accept negative values
+        config.ccircle = vals.ccrad * astutil.A2R
 
     config.map = vals.map
     config.fontsize = vals.fontsize
