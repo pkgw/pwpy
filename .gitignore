@@ -1,3 +1,5 @@
 *.pyc
 *.pyo
 /config
+/lmmin/reference/lmder.res
+/lmmin/reference/test.lmder
