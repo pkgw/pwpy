@@ -301,14 +301,14 @@ aasjournals = [
     (r'.*Bull.*Astr.*Soc.*India', u'BASI'),
     (r'.*Bull.*Americ.*Astron.*Soc', u'BAAS'),
     (r'.*IAU\sCirc', u'IAU Circ.'),
-    (r'.*New\sAstron.*Rev', u'New A Rev.'),
-    (r'.*New\sAstron', u'New A'),
-    (r'.*Plan.*Sp.*Sci', u'Planet. Space Sci.'),
+    (r'New\sAstron.*Rev', u'New A Rev.'),
+    (r'New\sAstron', u'New A'),
+    (r'Plan.*Sp.*Sci', u'Planet. Space Sci.'),
     (r'.*Proc.*SPIE', u'Proc. SPIE'),
     (r'Pub.*Astron.*Soc.*Australia', u'PASA'),
     (r'Pub.*Astron.*Soc.*Japan', u'PASJ'),
     (r'Pub.*Astron.*Soc.*Pacific', u'PASP'),
-    (r'.*Sky.*Telescope', u'S&T'),
+    (r'Sky.*Telescope', u'S&T'),
     (r'.*IEEE\sProc', u'IEEE Proc.'),
 ]
 
