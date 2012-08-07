@@ -298,6 +298,7 @@ aasjournals = [
     (r'.*Astron.*Astrophys.*Supp', u'A&AS'),
     (r'.*Astron.*Astrophys', u'A&A'),
     (r'.*Bull.*Astr.*Soc.*India', u'BASI'),
+    (r'.*Bull.*Americ.*Astron.*Soc', u'BAAS'),
     (r'.*IAU\sCirc', u'IAU Circ.'),
     (r'.*New\sAstron.*Rev', u'New A Rev.'),
     (r'.*New\sAstron', u'New A'),
