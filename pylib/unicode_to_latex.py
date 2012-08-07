@@ -1,3 +1,5 @@
+# This work is dedicated to the public domain.
+
 # Retrieved from https://gist.github.com/798549 (owned by github use piquadrat)
 # Modified to make a table usable with unicode.translate(), requiring commenting
 # out of a few things.
