@@ -285,7 +285,7 @@ def bibprint (bib):
 # Mapping of journal names
 
 aasjournals = [
-    (r'.*Ann.*Rev.*Astr.*Astro', u'ARA\&A'),
+    (r'.*Ann.*Rev.*Astr.*Astro', u'ARA&A'),
     (r'.*ASP.*Conf.*Ser', u'ASP Conf. Ser.'),
     (r'.*Astronomical\sJournal', u'AJ'),
     (r'.*Astrophysical\sJournal\sLett', u'ApJL'),
