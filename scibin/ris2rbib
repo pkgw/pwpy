@@ -1,0 +1,341 @@
+#! /usr/bin/env python
+# -*- mode: python; coding: utf-8 -*-
+
+"""
+Convert an RIS bibliography database to a streamlined BibTeX format
+suitable for generating bibliographies.
+
+The motivation is that I store my bibliography online using CiteULike
+and want to use that information when compiling my papers in
+LaTeX. But I often want to transform the data in some way before
+feeding the database to BibTeX -- e.g., abbreviate journal names in
+the standard AAS style. The RIS format is WAY easier to deal with than
+BibTeX, so I prefer to get the data out of CiteULike in that format
+and generate the BibTeX myself.
+
+On the other hand, CiteULike's RIS output appears to sometimes miss
+information that is included in the BibTeX output.
+"""
+
+import sys, re
+from unicode_to_latex import unicode_to_latex
+
+## quickutil: holder popoption
+#- snippet: holder.py (2012 Apr 04)
+#- SHA1: bc9ad74474ffc74f18a12675f7422f0c5963df59
+class Holder (object):
+    def __init__ (self, **kwargs):
+        self.set (**kwargs)
+
+    def __str__ (self):
+        d = self.__dict__
+        s = sorted (d.iterkeys ())
+        return '{' + ', '.join ('%s=%s' % (k, d[k]) for k in s) + '}'
+
+    def __repr__ (self):
+        d = self.__dict__
+        s = sorted (d.iterkeys ())
+        return '%s(%s)' % (self.__class__.__name__,
+                           ', '.join ('%s=%r' % (k, d[k]) for k in s))
+
+    def set (self, **kwargs):
+        self.__dict__.update (kwargs)
+        return self
+
+    def get (self, name, defval=None):
+        return self.__dict__.get (name, defval)
+
+    def setone (self, name, value):
+        self.__dict__[name] = value
+        return self
+
+    def has (self, name):
+        return name in self.__dict__
+
+    def copy (self):
+        new = self.__class__ ()
+        new.__dict__ = dict (self.__dict__)
+        return new
+#- snippet: popoption.py (2012 Apr 04)
+#- SHA1: 5552980b9034cd6d7ead4d0cd4ca1839face7e84
+def popoption (ident, argv=None):
+    if argv is None:
+        from sys import argv
+    if len (ident) == 1:
+        ident = '-' + ident
+    else:
+        ident = '--' + ident
+    found = ident in argv
+    if found:
+        argv.remove (ident)
+    return found
+## end
+
+
+def parseRIS (stream):
+    currecord = None
+    curcode = None
+    curfield = None
+    linenum = 0
+
+    for line in stream:
+        linenum += 1
+
+        if not len (line.strip ()):
+            continue
+
+        if len (line) < 6:
+            print >>sys.stderr, 'line %d: partial line?' % linenum
+            continue
+
+        code = line[:2]
+
+        if line[2:6] == '  - ':
+            # New field.
+            if currecord is None:
+                if code == 'TY':
+                    currecord = Holder ()
+                else:
+                    print >>sys.stderr, 'line %d: first field is not TY' % linenum
+                    continue
+
+            if curfield is not None:
+                # Finish up the previous field.
+                prevval = getattr (currecord, curcode, None)
+
+                if prevval is None:
+                    newval = curfield
+                elif isinstance (prevval, list):
+                    prevval.append (curfield)
+                    newval = prevval
+                else:
+                    newval = [prevval, curfield]
+
+                setattr (currecord, curcode, newval)
+                curcode = curfield = None
+
+            if code == 'ER':
+                # End of this record
+                yield currecord
+                currecord = curcode = curfield = None
+            else:
+                curcode = code
+                curfield = line[6:].strip ().decode ('utf8')
+        elif currecord is None:
+            print >>sys.stderr, 'line %d: information outside of a record' % linenum
+            continue
+        elif curfield is None:
+            print >>sys.stderr, 'line %d: malformatted line within record' % linenum
+            continue
+        else:
+            curfield += ' ' + line.strip ()
+
+    if currecord is not None:
+        print >>sys.stderr, 'line %d: stream ends with unclosed record' % linenum
+        yield currecord
+
+
+# Conversion from RIS to bibtex data structures
+
+tymap = {
+    'JOUR': 'article',
+    'BOOK': 'book',
+    'CHAP': 'incollection',
+    'CONF': 'inproceedings',
+    'GEN': 'misc',
+    'RPRT': 'techreport',
+    'THES': 'phdthesis',
+}
+
+
+verbatim = {
+    'JF': 'journal',
+    'VL': 'volume',
+    'TI': 'title',
+    'T2': 'booktitle',
+    'IS': 'number',
+    'PB': 'publisher',
+}
+
+condverb = {
+    'THES': {'PB': 'school'},
+}
+
+
+authlike = {'AU': 'author', 'A2': 'editor'}
+
+
+def ris2bib_auth (risname):
+    # Tons of entries have stray bibtexy { and } characters
+    risname = risname.replace ('{', '').replace ('}', '')
+
+    bits = [latexescape (x.strip ()) for x in risname.split (',')]
+
+    if len (bits) > 1:
+        return '{%s}, %s' % (bits[0], bits[1])
+    return '{%s}' % bits[0]
+
+
+def ris2bib (ris):
+    bib = Holder ()
+
+    bib._class = tymap[ris.TY]
+    bib._ident = ris.ID
+
+    # Ensure that certain entries exist and are arrays:
+
+    for code in 'AU A2 UR'.split ():
+        v = getattr (ris, code, None)
+        if v is None:
+            setattr (ris, code, [])
+        elif not isinstance (v, list):
+            setattr (ris, code, [v])
+
+    # Easy stuff
+
+    for riscode, bibkey in verbatim.iteritems ():
+        if hasattr (ris, riscode):
+            setattr (bib, bibkey, brace (latexescape (getattr (ris, riscode))))
+
+    if ris.TY in condverb:
+        for riscode, bibkey in condverb[ris.TY].iteritems ():
+            if hasattr (ris, riscode):
+                setattr (bib, bibkey, brace (latexescape (getattr (ris, riscode))))
+
+    # Authors
+
+    for riscode, bibkey in authlike.iteritems ():
+        if len (getattr (ris, riscode)):
+            setattr (bib, bibkey, brace (' and '.join (ris2bib_auth (a)
+                                                       for a in getattr (ris, riscode))))
+
+    # Useful metadata from URLs
+
+    for url in ris.UR:
+        if url.startswith ('http://dx.doi.org/'):
+            bib.doi = brace (url[18:])
+        elif url.startswith ('http://adsabs.harvard.edu/cgi-bin/nph-bib_query?bibcode='):
+            bib.bibcode = brace (url[56:])
+        elif url.startswith ('http://adsabs.harvard.edu/abs/'):
+            bib.bibcode = brace (url[31:])
+        elif url.startswith ('http://labs.adsabs.harvard.edu/ui/abs/'):
+            bib.bibcode = brace (url[39:])
+
+    if len (ris.UR):
+        bib.url = brace (latexescapeurl (ris.UR[0]))
+
+    # Pages. CiteULike's usage disagrees a bit with some other docs
+    # but seems sensible enough. Recall that page "numbers" can
+    # certainly be things that are very far from numbers.
+
+    if hasattr (ris, 'SP'):
+        if hasattr (ris, 'EP'):
+            bib.pages = brace ('%s--%s' % (latexescape (ris.SP),
+                                           latexescape (ris.EP)))
+        else:
+            bib.pages = brace (latexescape (ris.SP))
+
+    # Publication year.
+
+    if hasattr (ris, 'PY'):
+        bits = ris.PY.split ('/')
+        bib.year = brace (latexescape (bits[0]))
+
+    return bib
+
+
+def latexescape (text):
+    try:
+        return text.translate (unicode_to_latex).encode ('ascii')
+    except UnicodeError:
+        print >>sys.stderr, 'error: ASCII encoding failed for "%s" (%r)' % (text, text)
+        sys.exit (1)
+
+
+def latexescapeurl (text):
+    try:
+        return text.replace ('%', r'\%').encode ('ascii')
+    except UnicodeError:
+        print >>sys.stderr, 'error: ASCII encoding failed for "%s" (%r)' % (text, text)
+        sys.exit (1)
+
+
+def brace (text):
+    return '{' + text + '}'
+
+
+def bibprint (bib):
+    # We need to do some dumb stuff since bibtex really doesn't
+    # like trailing commas within entries
+
+    print '@%s{%s' % (bib._class, bib._ident),
+
+    for key, val in bib.__dict__.iteritems ():
+        if key[0] == '_':
+            continue
+        print ','
+        print '  %s = %s' % (key, val),
+    print
+    print '}'
+    print
+
+
+# Mapping of journal names
+
+aasjournals = [
+    (r'.*Ann.*Rev.*Astr.*Astro', u'ARA\&A'),
+    (r'.*ASP.*Conf.*Ser', u'ASP Conf. Ser.'),
+    (r'.*Astronomical\sJournal', u'AJ'),
+    (r'.*Astrophysical\sJournal\sLett', u'ApJL'),
+    (r'.*Astrophysical\sJournal\sSupp', u'ApJS'),
+    (r'.*Astrophysical\sJournal', u'ApJ'),
+    (r'.*Mon.*Not.*Roy.*Ast.*Soc', u'MNRAS'),
+    (r'.*Astron.*Astrophys.*Rev', u'A&A Rev.'),
+    (r'.*Astron.*Astrophys.*Supp', u'A&AS'),
+    (r'.*Astron.*Astrophys', u'A&A'),
+    (r'.*Bull.*Astr.*Soc.*India', u'BASI'),
+    (r'.*IAU\sCirc', u'IAU Circ.'),
+    (r'.*New\sAstron.*Rev', u'New A Rev.'),
+    (r'.*New\sAstron', u'New A'),
+    (r'.*Plan.*Sp.*Sci', u'Planet. Space Sci.'),
+    (r'.*Proc.*SPIE', u'Proc. SPIE'),
+    (r'.*Sky.*Telescope', u'S&T'),
+    (r'.*IEEE\sProc', u'IEEE Proc.'),
+]
+
+
+def mapjournal (journal, table):
+    if table is None:
+        return journal
+
+    for pattern, repl in table:
+        if pattern.match (journal) is not None:
+            return repl
+
+    return journal
+
+
+def mapjournalRIS (ris, table):
+    journal = getattr (ris, 'JF', None)
+    if journal is not None:
+        ris.JF = mapjournal (journal, table)
+
+
+def jmapcompile (raw):
+    # Nonbreaking spaces for all spaces in abbreviated journal names.
+    return [(re.compile (rre), repl.replace (' ', u'\u00A0'))
+            for (rre, repl) in raw]
+
+
+# Driver
+
+aasmode = popoption ('a')
+
+if aasmode:
+    journalmap = jmapcompile (aasjournals)
+else:
+    journalmap = None
+
+for ris in parseRIS (sys.stdin):
+    mapjournalRIS (ris, journalmap)
+    bibprint (ris2bib (ris))
