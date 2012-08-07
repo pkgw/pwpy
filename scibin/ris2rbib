@@ -309,6 +309,7 @@ aasjournals = [
     (r'Pub.*Astron.*Soc.*Japan', u'PASJ'),
     (r'Pub.*Astron.*Soc.*Pacific', u'PASP'),
     (r'Sky.*Telescope', u'S&T'),
+    (r'Phys.*Rep', u'Phys. Rep.'),
     (r'.*IEEE\sProc', u'IEEE Proc.'),
 ]
 
