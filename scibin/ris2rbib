@@ -221,9 +221,9 @@ def ris2bib (ris):
         elif url.startswith ('http://adsabs.harvard.edu/cgi-bin/nph-bib_query?bibcode='):
             bib.bibcode = brace (url[56:])
         elif url.startswith ('http://adsabs.harvard.edu/abs/'):
-            bib.bibcode = brace (url[31:])
+            bib.bibcode = brace (url[30:])
         elif url.startswith ('http://labs.adsabs.harvard.edu/ui/abs/'):
-            bib.bibcode = brace (url[39:])
+            bib.bibcode = brace (url[38:])
 
     if len (ris.UR):
         bib.url = brace (latexescapeurl (ris.UR[0]))
