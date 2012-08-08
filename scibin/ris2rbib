@@ -172,13 +172,25 @@ def ris2bib_auth (risname):
     # Tons of entries have stray bibtexy { and } characters
     risname = risname.replace ('{', '').replace ('}', '')
 
-    bits = [latexescape (x.strip ()) for x in risname.split (',')]
+    bits = [x.strip () for x in risname.split (',')]
+    surname = latexescape (bits[0])
 
-    if len (bits) > 1:
-        if all (c.isupper () for c in bits[1]):
-            return '{%s}, %s' % (bits[0], ' '.join (c + '.' for c in bits[1]))
-        return '{%s}, %s' % (bits[0], bits[1])
-    return '{%s}' % bits[0]
+    if len (bits) < 2:
+        return brace (surname)
+
+    if '.' in bits[1]:
+        # Firstname already abbreviated; that's all we need.
+        return '{%s}, %s' % (surname, latexescape (bits[1]))
+
+    if all (c.isupper () for c in bits[1]):
+        # Firstname seems to be abbreviated in dotless RIS style like
+        # "PKG". We need to add dots so BibTeX knows what's up. If
+        # there are entries that look like "Zhao, J-H" this won't
+        # work. Thanks for trying to parse names, BibTeX.
+        return '{%s}, %s' % (surname, latexescape (' '.join (c + '.' for c in bits[1])))
+
+    # Dunno, just pass it through.
+    return '{%s}, %s' % (surname, latexescape (bits[1]))
 
 
 def ris2bib (ris):
