@@ -123,7 +123,7 @@ def parseRIS (stream):
                 currecord = curcode = curfield = None
             else:
                 curcode = code
-                curfield = line[6:].strip ().decode ('utf8')
+                curfield = line[6:].decode ('utf8').strip ()
         elif currecord is None:
             print >>sys.stderr, 'line %d: information outside of a record' % linenum
             continue
@@ -131,7 +131,7 @@ def parseRIS (stream):
             print >>sys.stderr, 'line %d: malformatted line within record' % linenum
             continue
         else:
-            curfield += ' ' + line.strip ()
+            curfield += ' ' + line.decode ('utf8').strip ()
 
     if currecord is not None:
         print >>sys.stderr, 'line %d: stream ends with unclosed record' % linenum
