@@ -214,10 +214,25 @@ def ris2bib (ris):
             setattr (bib, bibkey, brace (' and '.join (ris2bib_auth (a)
                                                        for a in getattr (ris, riscode))))
 
+    # DOI. I've guessed a few ways that people might format the field.
+    # The official examples have the "DOI:" prefix which seems dumb.
+
+    if ris.has ('DO'):
+        if ris.DO.lower ().startswith ('doi: '):
+            bib.doi = brace (latexescape (ris.DO[5:]))
+        elif ris.DO.lower ().startswith ('doi:'):
+            bib.doi = brace (latexescape (ris.DO[4:]))
+        elif ris.DO.startswith ('10.'):
+            bib.doi = brace (latexescape (ris.DO))
+        else:
+            bib.doi = brace (latexescape (ris.DO))
+            print >>sys.stderr, ('warning: entry "%s": unexpected format '
+                                 'in DO field "%s"' % (ris.ID, ris.DO))
+
     # Useful metadata from URLs
 
     for url in ris.UR:
-        if url.startswith ('http://dx.doi.org/'):
+        if url.startswith ('http://dx.doi.org/') and not bib.has ('doi'):
             bib.doi = brace (urlunquote (url[18:]))
         elif url.startswith ('http://adsabs.harvard.edu/cgi-bin/nph-bib_query?bibcode='):
             bib.bibcode = brace (urlunquote (url[56:]))
