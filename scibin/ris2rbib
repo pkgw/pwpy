@@ -104,7 +104,7 @@ def parseRIS (stream):
 
             if curfield is not None:
                 # Finish up the previous field.
-                prevval = getattr (currecord, curcode, None)
+                prevval = currecord.get (curcode)
 
                 if prevval is None:
                     newval = curfield
@@ -114,7 +114,7 @@ def parseRIS (stream):
                 else:
                     newval = [prevval, curfield]
 
-                setattr (currecord, curcode, newval)
+                currecord.setone (curcode, newval)
                 curcode = curfield = None
 
             if code == 'ER':
@@ -190,29 +190,29 @@ def ris2bib (ris):
     # Ensure that certain entries exist and are arrays:
 
     for code in 'AU A2 UR'.split ():
-        v = getattr (ris, code, None)
+        v = ris.get (code)
         if v is None:
-            setattr (ris, code, [])
+            ris.setone (code, [])
         elif not isinstance (v, list):
-            setattr (ris, code, [v])
+            ris.setone (code, [v])
 
     # Easy stuff
 
     for riscode, bibkey in verbatim.iteritems ():
-        if hasattr (ris, riscode):
-            setattr (bib, bibkey, brace (latexescape (getattr (ris, riscode))))
+        if ris.has (riscode):
+            bib.setone (bibkey, brace (latexescape (ris.get (riscode))))
 
     if ris.TY in condverb:
         for riscode, bibkey in condverb[ris.TY].iteritems ():
-            if hasattr (ris, riscode):
-                setattr (bib, bibkey, brace (latexescape (getattr (ris, riscode))))
+            if ris.has (riscode):
+                bib.setone (bibkey, brace (latexescape (ris.get (riscode))))
 
     # Authors
 
     for riscode, bibkey in authlike.iteritems ():
-        if len (getattr (ris, riscode)):
-            setattr (bib, bibkey, brace (' and '.join (ris2bib_auth (a)
-                                                       for a in getattr (ris, riscode))))
+        if len (ris.get (riscode)):
+            bib.setone (bibkey, brace (' and '.join (ris2bib_auth (a)
+                                                     for a in ris.get (riscode))))
 
     # DOI. I've guessed a few ways that people might format the field.
     # The official examples have the "DOI:" prefix which seems dumb.
@@ -248,8 +248,8 @@ def ris2bib (ris):
     # but seems sensible enough. Recall that page "numbers" can
     # certainly be things that are very far from numbers.
 
-    if hasattr (ris, 'SP'):
-        if hasattr (ris, 'EP'):
+    if ris.has ('SP'):
+        if ris.has ('EP'):
             bib.pages = brace ('%s--%s' % (latexescape (ris.SP),
                                            latexescape (ris.EP)))
         else:
@@ -257,7 +257,7 @@ def ris2bib (ris):
 
     # Publication year.
 
-    if hasattr (ris, 'PY'):
+    if ris.has ('PY'):
         bits = ris.PY.split ('/')
         bib.year = brace (latexescape (bits[0]))
 
@@ -342,7 +342,7 @@ def mapjournal (journal, table):
 
 
 def mapjournalRIS (ris, table):
-    journal = getattr (ris, 'JF', None)
+    journal = ris.get ('JF')
     if journal is not None:
         ris.JF = mapjournal (journal, table)
 
