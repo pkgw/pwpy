@@ -816,7 +816,12 @@ class SimpleImage (AstroImage):
             if parent.shape[i] != 1:
                 raise UnsupportedError ('cannot simplify an image with '
                                         'nondegenerate nonspatial axes')
-            if np.abs (1 - checkworld1[i] / checkworld2[i]) > 1e-6:
+            if checkworld2[i] == 0:
+                if checkworld1[i] == 0:
+                    pass
+                elif np.abs (checkworld1[i]) > 1e-6:
+                    self._topixelok = False
+            elif np.abs (1 - checkworld1[i] / checkworld2[i]) > 1e-6:
                 self._topixelok = False
 
         self.path = '<subimage of %s>' % parent.path
