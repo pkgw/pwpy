@@ -656,6 +656,17 @@ class FITSImage (AstroImage):
             raise UnsupportedError ('cannot open FITS images without the '
                                     'Python modules "pyfits" and "pywcs"')
 
+        # YARRRRGGHH. Pyfits overrides functions in the warnings
+        # module for no good reason. (The motivation seems to be
+        # compat with Python <2.6.) Part of what it does is to make
+        # warnings be printed to stdout, rather than stderr, which
+        # breaks things if you're printing specially-formatted output
+        # to stdout and a random warning comes up. Hypothetically. At
+        # least the original routines are backed up.
+        import warnings
+        warnings.showwarning = pyfits.core._showwarning
+        warnings.formatwarning = pyfits.core._formatwarning
+
         super (FITSImage, self).__init__ (path, mode)
 
         self._handle = pyfits.open (path, self._modemap[mode])
