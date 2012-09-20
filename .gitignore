@@ -1,5 +1,6 @@
 *.pyc
 *.pyo
 /config
+/intfmisc/casa-python.manual
 /lmmin/reference/lmder.res
 /lmmin/reference/test.lmder

@@ -11,7 +11,10 @@ mirpysrc=../miriad-python # (optional) location of miriad-python source tree
 # casaprefix is used in the casa-python script, which makes it
 # possible to create standalone python programs that can be run using
 # CASA's builtin version of the python interpreter (see
-# e.g. intfbin/msconcat)
+# e.g. intfbin/msconcat).
+#
+# As an alternative, if you create intfmisc/casa-python.manual, that will
+# be installed as casa-python.
 
 # mirpysrc is used to install the examples from the miriad-python source
 # tree: gpcat, rtft, varcat, and chanaver.py.

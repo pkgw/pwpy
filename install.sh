@@ -80,7 +80,9 @@ done
 
 # casa-python
 
-if [ x"$casaprefix" = x ] ; then
+if [ -f intfmisc/casa-python.manual ] ; then
+    cp -p$vee intfmisc/casa-python.manual $prefix/bin/casa-python
+elif [ x"$casaprefix" = x ] ; then
     cp -p$vee intfmisc/casa-python.fail $prefix/bin/casa-python
 else
     $echo "Creating $prefix/bin/casa-python."
