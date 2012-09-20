@@ -1,0 +1,4 @@
+#! /bin/sh
+
+echo "error: cannot run $0: miriad-python not installed" >&2
+exit 1
