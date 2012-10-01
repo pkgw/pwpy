@@ -1,0 +1,5 @@
+#! /usr/bin/env casa-script
+# -*- python -*-
+
+import sys
+listobs (vis=sys.argv[-1])
