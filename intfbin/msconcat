@@ -17,8 +17,12 @@ timesort = '-s' in sys.argv
 if timesort:
     sys.argv.remove ('-s')
 
-tb = casac.homefinder.find_home_by_name ('tableHome').create ()
-ms = casac.homefinder.find_home_by_name ('msHome').create ()
+if hasattr (casac, 'homefinder'): # CASA < 4.0.0?
+    tb = casac.homefinder.find_home_by_name ('tableHome').create ()
+    ms = casac.homefinder.find_home_by_name ('msHome').create ()
+else:
+    tb = casac.casac.table ()
+    ms = casac.casac.ms ()
 
 if len (sys.argv) < 3:
     print >>sys.stderr, 'Usage: msconcat [-s] <input vises ...> <output vis>'

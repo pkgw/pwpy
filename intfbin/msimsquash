@@ -87,8 +87,12 @@ def _mungecoords (ia):
 def squash (inpath, outpath, overwrite):
     import casac
 
-    ia = casac.homefinder.find_home_by_name ('imageHome').create ()
-    tb = casac.homefinder.find_home_by_name ('tableHome').create ()
+    if hasattr (casac, 'homefinder'): # CASA < 4.0.0?
+        ia = casac.homefinder.find_home_by_name ('imageHome').create ()
+        tb = casac.homefinder.find_home_by_name ('tableHome').create ()
+    else:
+        ia = casac.casac.image ()
+        tb = casac.casac.table ()
 
     ia.open (inpath)
     data = ia.getchunk (dropdeg=True)

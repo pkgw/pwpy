@@ -23,8 +23,12 @@ IMAGING_DMINFO_TEMPLATE = {'TYPE': 'TiledShapeStMan',
                            'SPEC': {'DEFAULTTILESHAPE': [32, 128]},
                            'NAME': 'imagingweight'}
 
-tb = casac.homefinder.find_home_by_name ('tableHome').create ()
-cb = casac.homefinder.find_home_by_name ('calibraterHome').create ()
+if hasattr (casac, 'homefinder'): # CASA < 4.0.0?
+    tb = casac.homefinder.find_home_by_name ('tableHome').create ()
+    cb = casac.homefinder.find_home_by_name ('calibraterHome').create ()
+else:
+    tb = casac.casac.table ()
+    cb = casac.casac.calibrater ()
 
 for mspath in sys.argv[1:]:
     # cb.open() will create the tables if they're not present, so

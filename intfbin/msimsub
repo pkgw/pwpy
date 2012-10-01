@@ -80,7 +80,11 @@ def wrongusage (docstring, *rest):
 ## end
 
 checkusage (__doc__, usageifnoargs=True)
-ia = casac.homefinder.find_home_by_name ('imageHome').create ()
+
+if hasattr (casac, 'homefinder'): # CASA < 4.0.0?
+    ia = casac.homefinder.find_home_by_name ('imageHome').create ()
+else:
+    ia = casac.casac.image ()
 
 overwrite = '-f' in sys.argv
 if overwrite:

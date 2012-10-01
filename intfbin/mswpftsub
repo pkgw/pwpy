@@ -117,7 +117,11 @@ def popoption (ident, argv=None):
 
 def makeComponentList (mdlstream):
     from tempfile import mkdtemp
-    cl = casac.homefinder.find_home_by_name ('componentlistHome').create ()
+
+    if hasattr (casac, 'homefinder'): # CASA < 4.0.0?
+        cl = casac.homefinder.find_home_by_name ('componentlistHome').create ()
+    else:
+        cl = casac.casac.componentlist ()
 
     for linenum, line in enumerate (mdlstream):
         if line[0] == '#':
@@ -194,7 +198,11 @@ else:
 
 args['incremental'] = incremental
 
-im = casac.homefinder.find_home_by_name ('imagerHome').create ()
+if hasattr (casac, 'homefinder'): # CASA < 4.0.0?
+    im = casac.homefinder.find_home_by_name ('imagerHome').create ()
+else:
+    im = casac.casac.imager ()
+
 im.open (mspath, usescratch=True)
 im.selectvis (usescratch=True)
 im.defineimage ()
@@ -203,7 +211,10 @@ im.ft (**args)
 im.close ()
 
 if dosub or doadd:
-    ms = casac.homefinder.find_home_by_name ('msHome').create ()
+    if hasattr (casac, 'homefinder'): # CASA < 4.0.0?
+        ms = casac.homefinder.find_home_by_name ('msHome').create ()
+    else:
+        ms = casac.casac.ms ()
     ms.open (thems=mspath, nomodify=False)
     ms.uvsub (reverse=doadd)
     ms.close ()
