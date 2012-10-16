@@ -944,8 +944,13 @@ def open (path, mode):
     if isdir (path):
         raise UnsupportedError ('cannot infer format of image "%s"' % path)
 
-    with __builtin__.open (path, 'rb') as f:
+    f = None
+    try:
+        f = __builtin__.open (path, 'rb')
         sniff = f.read (9)
+    finally:
+        if f is not None:
+            f.close ()
 
     if sniff.startswith ('SIMPLE  ='):
         return FITSImage (path, mode)
