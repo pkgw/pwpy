@@ -308,17 +308,17 @@ def parseNVSS (stream):
     assert source is None, 'NVSS internal logic error 2'
 
 
-makefltcol ('nvss_dist', 12, '%f'),
-makefltcol ('nvss_angle', 12, '%f'),
-makestdcol ('nvss_resid_code', 2, str),
-makefltcol ('nvss_resid_val', 12, '%f'),
-makefltcol ('nvss_lpflux', 12, '%f'),
-makefltcol ('nvss_lpflux_uc', 12, '%f'),
-makefltcol ('nvss_lppa', 12, '%f'),
-makefltcol ('nvss_lppa_uc', 12, '%f'),
-makestdcol ('nvss_field', 8, str),
-makefltcol ('nvss_pixel_x', 12, '%f'),
-makefltcol ('nvss_pixel_y', 12, '%f'),
+makefltcol ('nvss_dist', 12, '%f')
+makefltcol ('nvss_angle', 12, '%f')
+makestdcol ('nvss_resid_code', 2, str)
+makefltcol ('nvss_resid_val', 12, '%f')
+makefltcol ('nvss_lpflux', 12, '%f')
+makefltcol ('nvss_lpflux_uc', 12, '%f')
+makefltcol ('nvss_lppa', 12, '%f')
+makefltcol ('nvss_lppa_uc', 12, '%f')
+makestdcol ('nvss_field', 8, str)
+makefltcol ('nvss_pixel_x', 12, '%f')
+makefltcol ('nvss_pixel_y', 12, '%f')
 
 
 nvsscols = columns ('ra ra_uc dec dec_uc totflux totflux_uc major major_uc',
