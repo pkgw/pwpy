@@ -8,8 +8,7 @@ to be a lot of work to get right, I'm doing something wrong.
 """
 
 __all__ = ('Holder Column FlatTable readStreamedTable writeStreamedTable '
-           'openForceColumns FlatDBError PadError ParseError '
-           'K_INT K_FLOAT K_STR K_BOOL K_CUSTOM').split ()
+           'openForceColumns FlatDBError PadError ParseError').split ()
 
 class Holder (object):
     def __init__ (self, **kwargs):
@@ -27,13 +26,26 @@ class Holder (object):
                            ', '.join ('%s=%r' % (k, d[k]) for k in s))
 
 _forbidden_colnames = frozenset (['recno'])
-
-K_INT = 0
-K_FLOAT = 1
-K_STR = 2
-K_BOOL = 3
-K_CUSTOM = 4
-_K_LAST_VALID = K_CUSTOM
+_kind_to_code = {
+    int: 'i',
+    float: 'f',
+    str: 's',
+    bool: 'b',
+    object: 'g', # generic
+}
+_code_to_kind = {
+    'i': int,
+    'f': float,
+    's': str,
+    'b': bool,
+    'g': object,
+    # compat with older style:
+    '0': int,
+    '1': float,
+    '2': str,
+    '3': bool,
+    '4': object,
+}
 
 class Column (object):
     name = None
@@ -52,7 +64,7 @@ class Column (object):
         if self.name in _forbidden_colnames:
             raise ValueError ('column name "%s" is too forbidden' % self.name)
         assert self.width > 0 and self.width < 512
-        assert self.kind >= 0 and self.kind <= _K_LAST_VALID
+        assert self.kind in _kind_to_code
 
         if self.format is None and self.kind in _formatters:
             self.format = _formatters[self.kind]
@@ -238,7 +250,9 @@ class FlatTable (object):
         for col in cols:
             h.write (pad (col.name, W_HEADER_NAME) + '/')
             h.write (pad (col.width, W_HEADER_INT, True) + '/')
-            h.write (pad (col.kind, W_HEADER_INT, True) + '|')
+            # Kinds used to be stored as ints, so the width of this
+            # is W_HEADER_INT for compatibility.
+            h.write (pad (_kind_to_code[col.kind], W_HEADER_INT, True) + '|')
 
         h.write ('\n')
         h.flush ()
@@ -276,7 +290,7 @@ class FlatTable (object):
             h.read (1) # sep
             col.width = int (unpad (h.read (W_HEADER_INT)))
             h.read (1) # sep
-            col.kind = int (unpad (h.read (W_HEADER_INT)))
+            col.kind = _code_to_kind[unpad (h.read (W_HEADER_INT))]
             h.read (1) # sep
             return col
 
@@ -395,7 +409,7 @@ recfactory: factory for "record" objects; one attr set for each column
         read (1) # sep
         col.width = int (unpad (read (W_HEADER_INT)))
         read (1) # sep
-        col.kind = int (unpad (read (W_HEADER_INT)))
+        col.kind = _code_to_kind[unpad (read (W_HEADER_INT))]
         read (1) # sep
         curofs += W_HEADER_NAME + W_HEADER_INT * 2 + 3
 
@@ -509,7 +523,7 @@ headers: iterable of strings, lines of header data
     for col in cols:
         write (pad (col.name, W_HEADER_NAME) + '/')
         write (pad (col.width, W_HEADER_INT, True) + '/')
-        write (pad (col.kind, W_HEADER_INT, True) + '|')
+        write (pad (_kind_to_code[col.kind], W_HEADER_INT, True) + '|')
 
     write ('\n')
 
@@ -632,10 +646,10 @@ def _p_bool (v):
 
 
 _parsers = {
-    K_INT: int,
-    K_FLOAT: float,
-    K_STR: lambda x: x,
-    K_BOOL: _p_bool,
+    int: int,
+    float: float,
+    str: lambda x: x,
+    bool: _p_bool,
     }
 
 
@@ -658,10 +672,10 @@ def _f_float (v):
 
 
 _formatters = {
-    K_INT: _f_stringable,
-    K_FLOAT: _f_float,
-    K_STR: lambda x: x,
-    K_BOOL: _f_bool,
+    int: _f_stringable,
+    float: _f_float,
+    str: lambda x: x,
+    bool: _f_bool,
     }
 
 

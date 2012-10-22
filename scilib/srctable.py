@@ -40,31 +40,31 @@ def floatcol (name, width, fmt, scale=None):
         parse = mkscalep (scale)
         format = mkscalef (scale, fmt)
 
-    return Column (name=name, width=width, kind=K_FLOAT,
+    return Column (name=name, width=width, kind=float,
                    parse=parse, format=format)
 
 def makefltcol (name, width, fmt, scale=None):
     stdcols[name] = floatcol (name, width, fmt, scale)
 
 
-makestdcol ('ident', 20, K_STR)
-makestdcol ('ra', 12, K_CUSTOM, parse=parsehours, format=fmthours) # rad
+makestdcol ('ident', 20, str)
+makestdcol ('ra', 12, object, parse=parsehours, format=fmthours) # rad
 makefltcol ('ra_uc', 8, '%.3f', A2R) # rad
-makestdcol ('dec', 12, K_CUSTOM, parse=parsedeglat, format=fmtdeglat) # rad
+makestdcol ('dec', 12, object, parse=parsedeglat, format=fmtdeglat) # rad
 makefltcol ('dec_uc', 8, '%.2f', A2R) # rad
 makefltcol ('totflux', 12, '%.5f') # jy
 makefltcol ('totflux_uc', 12, '%.7f') # jy
-makestdcol ('totflux_is_ul', 1, K_BOOL)
+makestdcol ('totflux_is_ul', 1, bool)
 makefltcol ('pkflux', 12, '%.5f') # jy
 makefltcol ('pkflux_uc', 12, '%.7f') # jy
-makestdcol ('pkflux_is_ul', 1, K_BOOL)
+makestdcol ('pkflux_is_ul', 1, bool)
 makefltcol ('bgrms', 12, '%.5f') # jy
 makefltcol ('major', 7, '%.2f', A2R) # rad
 makefltcol ('major_uc', 12, '%.2f', A2R) # rad
-makestdcol ('major_is_ul', 1, K_BOOL)
+makestdcol ('major_is_ul', 1, bool)
 makefltcol ('minor', 7, '%.2f', A2R) # rad
 makefltcol ('minor_uc', 12, '%.2f', A2R) # rad
-makestdcol ('minor_is_ul', 1, K_BOOL)
+makestdcol ('minor_is_ul', 1, bool)
 makefltcol ('pa', 7, '%+.2f', D2R) # rad
 makefltcol ('pa_uc', 12, '%.2f', D2R) # rad
 
@@ -310,13 +310,13 @@ def parseNVSS (stream):
 
 makefltcol ('nvss_dist', 12, '%f'),
 makefltcol ('nvss_angle', 12, '%f'),
-makestdcol ('nvss_resid_code', 2, K_STR),
+makestdcol ('nvss_resid_code', 2, str),
 makefltcol ('nvss_resid_val', 12, '%f'),
 makefltcol ('nvss_lpflux', 12, '%f'),
 makefltcol ('nvss_lpflux_uc', 12, '%f'),
 makefltcol ('nvss_lppa', 12, '%f'),
 makefltcol ('nvss_lppa_uc', 12, '%f'),
-makestdcol ('nvss_field', 8, K_STR),
+makestdcol ('nvss_field', 8, str),
 makefltcol ('nvss_pixel_x', 12, '%f'),
 makefltcol ('nvss_pixel_y', 12, '%f'),
 
