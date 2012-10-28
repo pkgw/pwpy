@@ -2,11 +2,14 @@
 
 """unicode_to_latex - what it says
 
-Usage:
+Provides unicode_to_latex(u) and unicode_to_latex_string(u).
 
-from unicode_to_latex import unicode_to_latex
-unistr = u'blahblahblah'
-asciibytes = unistr.translate (unicode_to_latex).encode ('ascii')
+unicode_to_latex returns ASCII bytes that can be fed to LaTeX to
+reproduce the Unicode string 'u' as closely as possible.
+
+unicode_to_latex_string returns a Unicode string rather than bytes.
+That is,
+  unicode_to_latex(u) = unicode_to_latex_string(u).encode('ascii').
 """
 
 # Based on https://gist.github.com/798549 (owned by github user
@@ -21,7 +24,7 @@ asciibytes = unistr.translate (unicode_to_latex).encode ('ascii')
 # XSL script: https://gist.github.com/798546 . Based on my experience
 # so far, the source table is far from perfect.
 
-unicode_to_latex_base = {
+unicode_to_latex_table_base = {
     u"\u0023": r"\#",
     u"\u0024": r"\textdollar{}",
     u"\u0025": r"\%",
@@ -2386,4 +2389,7 @@ unicode_to_latex_base = {
 #    u"\u2AC6\u0338": r"\nsupseteqq",
 #    u"\u2AFD\u20E5": r"{\rlap{\textbackslash}{{/}\!\!{/}}}",
 
-unicode_to_latex = dict ((ord (k), unicode (v)) for (k, v) in unicode_to_latex_base.iteritems ())
+unicode_to_latex_table = dict ((ord (k), unicode (v))
+                               for k, v in unicode_to_latex_table_base.iteritems ())
+unicode_to_latex_string = lambda u: u.translate (unicode_to_latex_table)
+unicode_to_latex = lambda u: u.translate (unicode_to_latex_table).encode ('ascii')

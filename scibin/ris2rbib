@@ -278,9 +278,9 @@ def ris2bib (ris):
 
 def latexescape (text):
     try:
-        return text.translate (unicode_to_latex).encode ('ascii')
+        return unicode_to_latex (text)
     except UnicodeError:
-        print >>sys.stderr, 'error: ASCII encoding failed for "%s" (%r)' % (text, text)
+        print >>sys.stderr, 'error: LaTeX/ASCII encoding failed for "%s" (%r)' % (text, text)
         sys.exit (1)
 
 
