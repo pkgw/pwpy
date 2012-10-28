@@ -9,20 +9,17 @@ unistr = u'blahblahblah'
 asciibytes = unistr.translate (unicode_to_latex).encode ('ascii')
 """
 
-# Retrieved from https://gist.github.com/798549 (owned by github use piquadrat)
-# Modified to make a table usable with unicode.translate(), requiring commenting
-# out of a few things.
-# Also added conversions needed so that the resulting Unicode can be ASCIIfied:
-# u00a0 -> ~
-# u2010 -> -
-# u2018 -> `
-# u2019 -> '
-# Removed u0020 -> \space
-# Override u0027 to ', not \textquotesingle
+# Based on https://gist.github.com/798549 (owned by github user
+# piquadrat), but modified to make a table usable with
+# unicode.translate(). I had to comment out a few things and also
+# tweak various of the conversions to make the LaTeX more
+# natural. There were also some surprising missing conversions
+# (e.g. u2010 -> -).
 
-# original XML at http://www.w3.org/Math/characters/unicode.xml
-# XSL for conversion: https://gist.github.com/798546
-
+# The original table comes from
+# http://www.w3.org/Math/characters/unicode.xml, converted via this
+# XSL script: https://gist.github.com/798546 . Based on my experience
+# so far, the source table is far from perfect.
 
 unicode_to_latex_base = {
 #    u"\u0020": r"\space{}",
