@@ -12,7 +12,7 @@ of why this is all necessary.
 import sys, srctable
 from astutil import *
 
-for rec in srctable.readStream (sys.stdin)[2]:
+for rec in srctable.readst (sys.stdin)[2]:
     radec = fmtradec (rec.ra, rec.dec)
 
     if not hasattr (rec, 'major') or rec.major is None or rec.major == 0:

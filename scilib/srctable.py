@@ -2,98 +2,80 @@
 # Licensed under the GNU General Public License version 3 or higher
 
 """srctable - flexible table of astronomical source information
+
+The main API is the stmapping() function, which creates a Mapping
+object for reading a flatdb as a source table.
+
+readst() is a convenience function analogous to flatdb.readtable()
+that uses stmapping() as its Mapping.
+
+sfindcols is the list of columns that we can extract by parsing
+the output of MIRIAD sfind with parseSFind().
+
+nvsscols is likewise the list of columns that we can extract
+by parsing the output of the NVSS query program with parseNVSS().
 """
 
 from astutil import *
-from flatdb import *
+import flatdb
 
-__all__ = ('Holder stdcols columns getCustom readStream '
-           'sfindcols nvsscols parseSFind parseNVSS').split ()
-
-stdcols = {}
-
-def makestdcol (name, width, kind, **rest):
-    stdcols[name] = Column (name=name, width=width, kind=kind, **rest)
-
-def mkscalep (scale):
-    def f (s):
-        if not len (s):
-            return None
-        return float (s) * scale
-    return f
-
-def mkscalef (scale, fmt='%e'):
-    def f (v):
-        if v is None:
-            return ''
-        return fmt % (v / scale)
-    return f
-
-def floatcol (name, width, fmt, scale=None):
-    if scale is None:
-        parse = float
-        def format (v):
-            if v is None:
-                return ''
-            return fmt % v
-    else:
-        parse = mkscalep (scale)
-        format = mkscalef (scale, fmt)
-
-    return Column (name=name, width=width, kind=float,
-                   parse=parse, format=format)
-
-def makefltcol (name, width, fmt, scale=None):
-    stdcols[name] = floatcol (name, width, fmt, scale)
+__all__ = ('stmapping readst sfindcols nvsscols parseSFind parseNVSS').split ()
 
 
-makestdcol ('ident', 20, str)
-makestdcol ('ra', 12, object, parse=parsehours, format=fmthours) # rad
-makefltcol ('ra_uc', 8, '%.3f', A2R) # rad
-makestdcol ('dec', 12, object, parse=parsedeglat, format=fmtdeglat) # rad
-makefltcol ('dec_uc', 8, '%.2f', A2R) # rad
-makefltcol ('totflux', 12, '%.5f') # jy
-makefltcol ('totflux_uc', 12, '%.7f') # jy
-makestdcol ('totflux_is_ul', 1, bool)
-makefltcol ('pkflux', 12, '%.5f') # jy
-makefltcol ('pkflux_uc', 12, '%.7f') # jy
-makestdcol ('pkflux_is_ul', 1, bool)
-makefltcol ('bgrms', 12, '%.5f') # jy
-makefltcol ('major', 7, '%.2f', A2R) # rad
-makefltcol ('major_uc', 12, '%.2f', A2R) # rad
-makestdcol ('major_is_ul', 1, bool)
-makefltcol ('minor', 7, '%.2f', A2R) # rad
-makefltcol ('minor_uc', 12, '%.2f', A2R) # rad
-makestdcol ('minor_is_ul', 1, bool)
-makefltcol ('pa', 7, '%+.2f', D2R) # rad
-makefltcol ('pa_uc', 12, '%.2f', D2R) # rad
+def stmapping ():
+    # TODO: tunable precision in flux, position, etc. Maybe I should
+    # put the definition of the sfind and NVSS columns with the rest
+    # of the sfind and NVSS bits. I dunno.
+
+    m = flatdb.Mapping ()
+    m.add ('ident', str, 20)
+    m.add ('ra', object, 12, parse=parsehours, format=fmthours) # rad
+    m.addfloat ('ra_uc', '%.3f', 8, A2R) # rad
+    m.add ('dec', object, 12, parse=parsedeglat, format=fmtdeglat) # rad
+    m.addfloat ('dec_uc', '%.2f', 8, A2R) # rad
+    m.addfloat ('totflux', '%.5f', 12) # jy
+    m.addfloat ('totflux_uc', '%.7f', 12) # jy
+    m.add ('totflux_is_ul', bool, 1)
+    m.addfloat ('pkflux', '%.5f', 12) # jy
+    m.addfloat ('pkflux_uc', '%.7f', 12) # jy
+    m.add ('pkflux_is_ul', bool, 1)
+    m.addfloat ('bgrms', '%.5f', 12) # jy
+    m.addfloat ('major', '%.2f', 7, A2R) # rad
+    m.addfloat ('major_uc', '%.2f', 12, A2R) # rad
+    m.add ('major_is_ul', bool, 1)
+    m.addfloat ('minor', '%.2f', 7, A2R) # rad
+    m.addfloat ('minor_uc', '%.2f', 12, A2R) # rad
+    m.add ('minor_is_ul', bool, 1)
+    m.addfloat ('pa', '%+.2f', 7, D2R) # rad
+    m.addfloat ('pa_uc', '%.2f', 12, D2R) # rad
+
+    m.addfloat ('sfind_fitrms', '%9.5f', 12) # jy
+
+    m.addfloat ('nvss_dist', '%f', 12)
+    m.addfloat ('nvss_angle', '%f', 12)
+    m.add ('nvss_resid_code', str, 2)
+    m.addfloat ('nvss_resid_val', '%f', 12)
+    m.addfloat ('nvss_lpflux', '%f', 12)
+    m.addfloat ('nvss_lpflux_uc', '%f', 12)
+    m.addfloat ('nvss_lppa', '%f', 12)
+    m.addfloat ('nvss_lppa_uc', '%f', 12)
+    m.add ('nvss_field', str, 8)
+    m.addfloat ('nvss_pixel_x', '%f', 12)
+    m.addfloat ('nvss_pixel_y', '%f', 12)
+
+    # these are used by precastro:
+    m.addfloat ('promora', '%.3f', 9) # mas/yr
+    m.addfloat ('promodec', '%.3f', 9) # mas/yr
+    m.addfloat ('promoepoch', '%.4f', 12) # JD TDB
+    m.addfloat ('parallax', '%.3f', 9) # mas
+    m.addfloat ('vradial', '%.2f', 10) # km/s
+
+    return m
 
 
-def columns (*names):
-    def gen ():
-        for subnames in names:
-            for name in subnames.split ():
-                yield name
-
-    return [stdcols[n] for n in gen ()]
-
-
-def getCustom (col):
-    if col.name in stdcols:
-        c = stdcols[col.name]
-        # We might have a stdcol that is just a regular datatype
-        # in which case parse is not set and we don't want to
-        # override.
-        if c.parse is not None:
-            return c.parse, c.format, True
-    return str, str, False
-
-
-def readStream (stream_or_path):
-    if isinstance (stream_or_path, basestring):
-        stream_or_path = open (stream_or_path)
-
-    return readStreamedTable (stream_or_path.read, getCustom)
+def readst (source, recfactory=flatdb.Holder, **kwargs):
+    return flatdb.readtable (source, stmapping (**kwargs),
+                             recfactory=recfactory)
 
 
 # Parsing output of MIRIAD sfind
@@ -155,10 +137,8 @@ def parseSFind (lines, pristine=False):
         yield source
 
 
-makefltcol ('sfind_fitrms', 12, '%9.5f') # jy
-
-sfindcols = columns ('ra ra_uc dec dec_uc pkflux pkflux_uc totflux',
-                     'totflux_uc major minor pa bgrms sfind_fitrms')
+sfindcols = ('ra ra_uc dec dec_uc pkflux pkflux_uc totflux '
+             'totflux_uc major minor pa bgrms sfind_fitrms').split ()
 
 
 # Parsing the NVSS textual catalog
@@ -308,24 +288,13 @@ def parseNVSS (stream):
     assert source is None, 'NVSS internal logic error 2'
 
 
-makefltcol ('nvss_dist', 12, '%f')
-makefltcol ('nvss_angle', 12, '%f')
-makestdcol ('nvss_resid_code', 2, str)
-makefltcol ('nvss_resid_val', 12, '%f')
-makefltcol ('nvss_lpflux', 12, '%f')
-makefltcol ('nvss_lpflux_uc', 12, '%f')
-makefltcol ('nvss_lppa', 12, '%f')
-makefltcol ('nvss_lppa_uc', 12, '%f')
-makestdcol ('nvss_field', 8, str)
-makefltcol ('nvss_pixel_x', 12, '%f')
-makefltcol ('nvss_pixel_y', 12, '%f')
 
 
-nvsscols = columns ('ra ra_uc dec dec_uc totflux totflux_uc major major_uc',
-                    'major_is_ul minor minor_uc minor_is_ul pa pa_uc',
-                    'nvss_dist nvss_angle nvss_resid_code nvss_resid_val',
-                    'nvss_lpflux nvss_lpflux_uc nvss_lppa',
-                    'nvss_lppa_uc nvss_field nvss_pixel_x nvss_pixel_y')
+nvsscols = ('ra ra_uc dec dec_uc totflux totflux_uc major major_uc '
+            'major_is_ul minor minor_uc minor_is_ul pa pa_uc '
+            'nvss_dist nvss_angle nvss_resid_code nvss_resid_val '
+            'nvss_lpflux nvss_lpflux_uc nvss_lppa '
+            'nvss_lppa_uc nvss_field nvss_pixel_x nvss_pixel_y').split ()
 
 
 # Transformations on sources
@@ -383,12 +352,13 @@ def deconvolve (source, bmaj, bmin, bpa, minaxprod=0, preserve=True):
     return source
 
 
-# Overlays for ndshow
+# Overlays for ndshow. This is kind of an awkward place for this, but
+# ndshow shouldn't depend on srctable, and I might want to reuse this
+# functionality interactively, so it shouldn't go in pwshow.
 
-def loadAsOverlay (path, topixel, imgheight):
-    headers, cols, recs = readStreamedTable (open (path).read, getCustom)
+def loadAsOverlay (source, topixel, imgheight):
+    headers, cols, recs = flatdb.readtable (source, stmapping ())
     compact = []
-    ellipse = []
 
     for rec in recs:
         y, x = topixel ([rec.dec, rec.ra])

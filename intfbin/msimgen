@@ -260,7 +260,7 @@ def fill_image (srcstream, outpath, convolve=False, tmplscale=0,
         if ii['restoringbeam']['positionangle']['unit'] != 'deg':
             die ('expect restoring beam position angle to be given in degrees')
 
-    for src in srctable.readStream (srcstream)[2]:
+    for src in srctable.readst (srcstream)[2]:
         worldcoords[-1] = src.ra
         worldcoords[-2] = src.dec
         pixelcoords = np.asarray (oi.topixel (worldcoords))
