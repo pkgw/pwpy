@@ -19,7 +19,11 @@ by parsing the output of the NVSS query program with parseNVSS().
 from astutil import *
 import flatdb
 
-__all__ = ('stmapping readst sfindcols nvsscols parseSFind parseNVSS').split ()
+__all__ = ('Holder readtable writetable stmapping readst '
+           'sfindcols nvsscols parseSFind parseNVSS').split ()
+
+
+from flatdb import Holder, readtable, writetable # convenience
 
 
 def stmapping ():
@@ -73,9 +77,8 @@ def stmapping ():
     return m
 
 
-def readst (source, recfactory=flatdb.Holder, **kwargs):
-    return flatdb.readtable (source, stmapping (**kwargs),
-                             recfactory=recfactory)
+def readst (source, recfactory=Holder, **kwargs):
+    return readtable (source, stmapping (**kwargs), recfactory=recfactory)
 
 
 # Parsing output of MIRIAD sfind
@@ -357,7 +360,7 @@ def deconvolve (source, bmaj, bmin, bpa, minaxprod=0, preserve=True):
 # functionality interactively, so it shouldn't go in pwshow.
 
 def loadAsOverlay (source, topixel, imgheight):
-    headers, cols, recs = flatdb.readtable (source, stmapping ())
+    headers, cols, recs = readtable (source, stmapping ())
     compact = []
 
     for rec in recs:
