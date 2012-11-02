@@ -366,9 +366,9 @@ headers: iterable of strings, lines of header data
 def _p_bool (v):
     if v in '+TY':
         return True
-    if v in ' FN':
+    if v in '.FN':
         return False
-    raise ParseError ('illegal text for boolean: must be one of "+ TFYN"',
+    raise ParseError ('illegal text for boolean: must be one of "+.TFYN"',
                       value=v)
 
 _builtin_parsers = {
@@ -382,7 +382,7 @@ _builtin_parsers = {
 def _f_bool (v):
     if v:
         return '+'
-    return ' '
+    return '.'
 
 
 def _f_stringable (v):
