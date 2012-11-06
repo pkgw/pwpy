@@ -1,0 +1,167 @@
+#! /usr/bin/env casa-python
+# -*- python -*-
+
+"""
+msphotom <ms>
+
+Extract photometry from the visibilities in a measurement set.
+
+IMPORTANT: assumes that there's a point source at phase center, and
+that all other emission has been subtracted out.
+
+IMPORTANT: computes fluxes as (RR+LL)/2, and discards data for which
+one or both of these products is missing.
+
+IMPORTANT: reads the DATA column and doesn't do any filtering of the
+visbilities (i.e., no field selection).
+
+NOTE: assumes that the 'sigma' column in the dataset isn't scaled
+correctly; will assess uncertainties from the scatter of all the
+visibilities in each timeslot. (Code to use the sigmas is present
+but disabled.)
+
+Prints out
+
+  MJD dt[min] re reErr im imErr mag magErr npts
+
+with sorted MJDs, one record for each timestamp present in the dataset,
+with all fluxes in ujy. dt is simply (MJD - MJD[0])/86400.
+
+You will probably want to apply a moving smoothing window to the
+output of this program. The function smooth() below shows how to do
+this. Recommended to plot re(t) and im(t) in the same plot window
+since im(t) should give a sense of the random variation in the data.
+"""
+
+import sys, os.path, casac, numpy as np
+
+RR = 5
+LL = 8
+
+def process (mspath, datacol='data', believe_sigmas=False):
+    if hasattr (casac, 'homefinder'): # CASA < 4.0.0?
+        tb = casac.homefinder.find_home_by_name ('tableHome').create ()
+        ms = casac.homefinder.find_home_by_name ('msHome').create ()
+    else:
+        tb = casac.casac.table ()
+        ms = casac.casac.ms ()
+
+    # Load info we need to decode polarization stuff
+
+    tb.open (os.path.join (mspath, 'DATA_DESCRIPTION'))
+    ddid_to_pid = tb.getcol ('POLARIZATION_ID')
+    tb.close ()
+
+    tb.open (os.path.join (mspath, 'POLARIZATION'))
+    numcorrs = tb.getcol ('NUM_CORR')
+    npids = numcorrs.size
+    prodinfo = [None] * npids
+
+    for i in xrange (npids):
+        corrtypes = tb.getcell ('CORR_TYPE', i)
+        rridx = llidx = None
+
+        for j in xrange (numcorrs[i]):
+            if corrtypes[j] == RR:
+                rridx = j
+            elif corrtypes[j] == LL:
+                llidx = j
+
+        if rridx is not None and llidx is not None:
+            prodinfo[i] = (rridx, llidx)
+
+    tb.close ()
+
+    ddprods = [prodinfo[p] for p in ddid_to_pid]
+
+    # Now we can read the visibilities. The sigma values don't seem to
+    # have their absolute scale set correctly but we can still use
+    # them to set the relative weighting of the data points.
+
+    ms.open (sys.argv[1])
+    ms.iterinit ()
+    ms.iterorigin ()
+    colnames = [datacol] + 'flag sigma time data_desc_id'.split ()
+    tbins = {}
+
+    while True:
+        cols = ms.getdata (items=colnames)
+
+        for i in xrange (cols['time'].size):
+            data = cols[datacol][:,0,i]
+            flags = cols['flag'][:,0,i]
+            sigma = cols['sigma'][:,i]
+            time = cols['time'][i]
+
+            prodinfo = ddprods[cols['data_desc_id'][i]]
+            if prodinfo is None:
+                continue # this record doesn't contain both RR and LL
+
+            rr, ll = prodinfo
+            if flags[rr] or flags[ll]:
+                continue
+
+            d = 0.5 * (data[rr] + data[ll])
+            wt = 4. / (sigma[rr]**2 + sigma[ll]**2)
+            wd = wt * d
+            wd2 = wt * (d.real**2 + (1j) * d.imag**2)
+
+            tdata = tbins.get (time, None)
+            if tdata is None:
+                tbins[time] = [wd, wd2, wt, wt**2, 1]
+            else:
+                tdata[0] += wd
+                tdata[1] += wd2
+                tdata[2] += wt
+                tdata[3] += wt**2
+                tdata[4] += 1
+
+        if not ms.iternext ():
+            break
+
+    ms.close ()
+
+    # Could gain some efficiency by using a better data structure than a dict().
+    st = sorted (tbins.iterkeys ())
+
+    for t in st:
+        wd, wd2, wt, wt2, n = tbins[t]
+
+        mjd = t / 86400.
+        dtmin = (t - st[0]) / 60.
+        r_ujy = wd.real / wt * 1e6 # -> uJy
+        i_ujy = wd.imag / wt * 1e6
+        r2_ujy = wd2.real / wt * 1e12
+        i2_ujy = wd2.imag / wt * 1e12
+
+        if believe_sigmas:
+            ru_ujy = wt**-0.5 * 1e6
+            iu_ujy = wt**-0.5 * 1e6
+        else:
+            rv_ujy = r2_ujy - r_ujy**2 # variance among real/imag msmts
+            iv_ujy = i2_ujy - i_ujy**2
+            ru_ujy = np.sqrt (rv_ujy * wt2) / wt # uncert in mean real/img values
+            iu_ujy = np.sqrt (iv_ujy * wt2) / wt
+
+        mag = np.sqrt (r_ujy**2 + i_ujy**2)
+        umag = np.sqrt (r_ujy**2 * ru_ujy**2 + i_ujy**2 * iu_ujy**2) / mag
+
+        print '%12.5f %6.2f %10.2f %10.2f %10.2f %10.2f %10.2f %10.2f %d' % \
+            (mjd, dtmin, r_ujy, ru_ujy, i_ujy, iu_ujy, mag, umag, n)
+
+
+def smooth (re, reerr, im, imerr, window):
+    conv = lambda q, r: np.convolve (q, r, mode='valid')
+
+    rewt = reerr**-2
+    cre = conv (rewt * re, window) / conv (rewt, window)
+    crerr = np.sqrt (conv (rewt, window**2)) / conv (rewt, window)
+
+    imwt = imerr**-2
+    cim = conv (imwt * im, window) / conv (imwt, window)
+    cimrr = np.sqrt (conv (imwt, window**2)) / conv (imwt, window)
+
+    return cre, crerr, cim, cimerr
+
+
+process (sys.argv[1], datacol='data', believe_sigmas=False)
