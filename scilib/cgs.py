@@ -11,7 +11,7 @@ esu * field = dyne
 """
 
 # make e the electron charge
-from numpy import pi, e as euler, exp, sqrt
+from numpy import pi, e as euler, exp, sqrt, log, log10
 
 c = 2.99792458e10 # cm / s
 h = 6.6260755e-27 # erg s
