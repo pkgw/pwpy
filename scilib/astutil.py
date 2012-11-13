@@ -173,43 +173,53 @@ __all__ += 'fmthours fmtdeglon fmtdeglat fmtradec'.split ()
 
 # Parsing routines are currently very lame.
 
-def parsehours (hrstr):
+def _parsesexagesimal (sxgstr, desc, negok):
+    sxgstr_orig = sxgstr
+    sgn = 1
+
+    if sxgstr[0] == '-':
+        if negok:
+            sgn = -1
+            sxgstr = sxgstr[1:]
+        else:
+            raise ValueError ('illegal negative %s expression: %s' % (desc, sxgstr_orig))
+
     try:
-        hr, mn, sec = hrstr.split (':')
-        hr = int (hr)
+        # TODO: other separators ...
+        bs, mn, sec = sxgstr.split (':')
+        bs = int (bs)
         mn = int (mn)
         sec = float (sec)
     except Exception:
-        raise ValueError ('unable to parse as hours: ' + hrstr)
+        raise ValueError ('unable to parse as %s: %s' % (desc, sxgstr_orig))
 
-    if hr < 0 or hr > 23 or mn < 0 or mn > 59 or sec < 0 or sec >= 60.:
+    if mn < 0 or mn > 59 or sec < 0 or sec >= 60.:
+        raise ValueError ('illegal sexagesimal %s expression: ' % (desc, sxgstr_orig))
+    if bs < 0: # two minus signs, or something
+        raise ValueError ('illegal negative %s expression: %s' % (desc, sxgstr_orig))
+
+    return sgn * (bs + mn / 60. + sec / 3600.)
+
+
+def parsehours (hrstr):
+    hr = _parsesexagesimal (hrstr, 'hours', False)
+    if hr >= 24:
         raise ValueError ('illegal hour specification: ' + hrstr)
-
-    return (hr + mn / 60. + sec / 3600.) * H2R
+    return hr * H2R
 
 
 def parsedeglat (latstr):
-    if latstr[0] != '-':
-        sgn = 1
-    else:
-        sgn = -1
-        latstr = latstr[1:]
-
-    try:
-        deg, mn, sec = latstr.split (':')
-        deg = int (deg)
-        mn = int (mn)
-        sec = float (sec)
-    except Exception:
-        raise ValueError ('unable to parse as latitude: ' + latstr)
-
-    if deg < 0 or deg > 90 or mn < 0 or mn > 59 or sec < 0 or sec >= 60.:
+    deg = _parsesexagesimal (latstr, 'latitude', True)
+    if abs (deg) > 90:
         raise ValueError ('illegal latitude specification: ' + latstr)
+    return deg * D2R
 
-    return sgn * (deg + mn / 60. + sec / 3600.) * D2R
+
+def parsedeglon (lonstr):
+    return _parsesexagesimal (lonstr, 'longitude', True) * D2R
 
 
-__all__ += 'parsehours parsedeglat'.split ()
+__all__ += 'parsehours parsedeglat parsedeglon'.split ()
 
 
 # Spherical trig
