@@ -74,6 +74,13 @@
  center, in arcseconds. If zero (the default), not circle
  is drawn. Useful for denoting the primary beam size.
  (default: 0)
+
+@ locator
+ Three to five values: RA (sexagesimal hours), dec (sexagesimal
+ degrees), major axis (arcseconds), minor (arcsec, defaults to major),
+ PA (degrees, defaults to 0). An ellipse of the specified shape will
+ be drawn at the position. Useful for identifying special sources. PA
+ is east from north.
 """
 
 import sys, numpy as np, omega as om, cairo
@@ -95,6 +102,10 @@ class Config (object):
     xlabel = None
     ylabel = None
     ccircle = None
+    oellipses = None
+
+    def __init__ (self):
+        self.oellipses = []
 
 
 def plot (config):
@@ -163,6 +174,18 @@ def plot (config):
         cx, cy = coords.arb2lin (lon, lat)
         p.addXY (cx, cy, None, dsn=1)
 
+    for clat, clon, maj, min, pa in config.oellipses:
+        print pa * 180 / np.pi
+        th = np.linspace (0, 2 * np.pi, 200)
+        cp, sp = np.cos (pa), np.sin (pa)
+        ct, st = np.cos (th), np.sin (th)
+        dlat = maj * ct * cp - min * st * sp # x = dec = lat for astro PA def'n.
+        dlon = maj * ct * sp + min * st * cp
+        lat = clat + dlat
+        lon = clon + dlon / np.cos (lat) # ignore pole issues
+        ex, ey = coords.arb2lin (lon, lat)
+        p.addXY (ex, ey, None, dsn=1)
+
     return p
 
 
@@ -198,6 +221,7 @@ def cmdline (args):
     ks.keyword ('xlabel', 'a', 'Right_Ascension_(J2000)')
     ks.keyword ('ylabel', 'a', 'Declination_(J2000)')
     ks.keyword ('ccrad', 'd', 0)
+    ks.mkeyword ('locator', 'a', 5)
 
     vals = ks.process (args)
     config = Config ()
@@ -243,6 +267,28 @@ def cmdline (args):
 
     if vals.ccrad != 0: # accept negative values
         config.ccircle = vals.ccrad * astutil.A2R
+
+    n = len (vals.locator)
+
+    if n:
+        if n not in (3, 4, 5):
+            util.die ('number of locator keyword values must between 3 and 5 (inclusive)')
+
+        lon = astutil.parsehours (vals.locator[0])
+        lat = astutil.parsedeglat (vals.locator[1])
+        maj = float (vals.locator[2]) * astutil.A2R
+
+        if n > 3:
+            min = float (vals.locator[3]) * astutil.A2R
+        else:
+            min = maj
+
+        if n > 4:
+            pa = float (vals.locator[4]) * astutil.D2R
+        else:
+            pa = 0
+
+        config.oellipses.append ((lat, lon, maj, min, pa))
 
     config.map = vals.map
     config.fontsize = vals.fontsize
