@@ -1,3 +1,6 @@
+# Copyright 2012 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
+
 """ellutil - utilities for manipulating 2D Gaussians and ellipses
 
 Useful for sources and bivariate error distributions. We can express
