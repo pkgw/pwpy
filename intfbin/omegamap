@@ -85,27 +85,134 @@
 
 import sys, numpy as np, omega as om, cairo
 import omega.pango, omega.pyrapimage, pyrap.images, colormaps, ndshow, astutil
+from kwargv import ParseKeywords, Custom
 
 
-class Config (object):
-    map = None
-    out = None
-    dims = None
-    style = None
-    subshape = None
-    logfactor = None
-    fontsize = None
-    margins = None
-    coloring = None
-    range = None
-    aspect = None
-    xlabel = None
-    ylabel = None
-    ccircle = None
-    oellipses = None
+## quickutil: usage die
+#- snippet: usage.py (2012 Oct 01)
+#- SHA1: ac032a5db2efb5508569c4d5ba6eeb3bba19a7ca
+def showusage (docstring, short, stream, exitcode):
+    if stream is None:
+        from sys import stdout as stream
+    if not short:
+        print >>stream, 'Usage:', docstring.strip ()
+    else:
+        intext = False
+        for l in docstring.splitlines ():
+            if intext:
+                if not len (l):
+                    break
+                print >>stream, l
+            elif len (l):
+                intext = True
+                print >>stream, 'Usage:', l
+        print >>stream, \
+            '\nRun with a sole argument --help for more detailed usage information.'
+    raise SystemExit (exitcode)
 
-    def __init__ (self):
-        self.oellipses = []
+def checkusage (docstring, argv=None, usageifnoargs=False):
+    if argv is None:
+        from sys import argv
+    if len (argv) == 1 and usageifnoargs:
+        showusage (docstring, True, None, 0)
+    if len (argv) == 2 and argv[1] in ('-h', '--help'):
+        showusage (docstring, False, None, 0)
+
+def wrongusage (docstring, *rest):
+    import sys
+    intext = False
+
+    if len (rest) == 0:
+        detail = 'invalid command-line arguments'
+    elif len (rest) == 1:
+        detail = rest[0]
+    else:
+        detail = rest[0] % tuple (rest[1:])
+
+    print >>sys.stderr, 'error:', detail, '\n' # extra NL
+    showusage (docstring, True, sys.stderr, 1)
+#- snippet: die.py (2012 Oct 01)
+#- SHA1: 3bdd3282e52403d2dec99d72680cb7bc95c99843
+def die (fmt, *args):
+    if not len (args):
+        raise SystemExit ('error: ' + str (fmt))
+    raise SystemExit ('error: ' + (fmt % args))
+## end
+
+
+class Config (ParseKeywords):
+    map = Custom (str, required=True)
+
+    @Custom ([float, float], required=True)
+    def range (v):
+        if v[0] >= v[1]:
+            wrongusage (__doc__, 'data range must have min < max')
+        return v
+
+    out = str
+    fontsize = 10.0
+    coloring = 'white_to_black'
+    logfactor = float
+    xlabel = 'Right Ascension (J2000)'
+    ylabel = 'Declination (J2000)'
+    ccrad = Custom (float, scale=astutil.A2R)
+
+    @Custom ([int, int], default=None)
+    def subshape (v):
+        if v[1] is None:
+            v[1] = v[0]
+        return v
+
+    @Custom (float)
+    def aspect (v):
+        if v <= 0:
+            wrongusage (__doc__, 'aspect ratio must be greater than zero')
+        return v
+
+    @Custom (2.0)
+    def margin (v):
+        return [v] * 4
+
+    @Custom ([256.0, float])
+    def dims (v):
+        if v[1] is None:
+            v[1] = v[0]
+        return v
+
+    @Custom ([str, str, float, float, 0.], minvals=3, default=None)
+    def locator (v):
+        # switch order from ra,dec to lat,lon!
+        tmp = astutil.parsehours (v[0])
+        v[0] = astutil.parsedeglat (v[1])
+        v[1] = tmp
+
+        v[2] *= astutil.A2R # major axis
+
+        if v[2] <= 0:
+            die ('locator major axis must be greater than zero')
+
+        if v[3] is None:
+            v[3] = v[2]
+        else:
+            v[3] *= astutil.A2R # minor axis
+
+        if v[3] <= 0:
+            die ('locator minor axis must be greater than zero')
+
+        v[4] *= astutil.D2R # PA
+
+        if v[3] > v[2]: # try to be sensible if minor > major
+            v[2], v[3] = v[3], v[2]
+            v[4] += 0.5 * np.pi
+
+        return v
+
+    @Custom ('ColorOnWhiteVector')
+    def omstyle (v):
+        try:
+            return getattr (om.styles, v) ()
+        except:
+            die ('can\'t load/instantiate OmegaPlot style "%s"', v)
 
 
 def plot (config):
@@ -164,18 +271,18 @@ def plot (config):
     if config.aspect is not None:
         p.fieldAspect = config.aspect
 
-    if config.ccircle is not None:
+    if config.ccrad is not None:
         pc = im.info ()['coordinates'].get ('pointingcenter')
         assert pc is not None, 'need pointing center info to draw circle'
         assert not pc['initial'], 'pointing center info is uninitialized'
         pclon, pclat = pc['value'][:2]
-        lat, lon = astutil.sphofs (pclat, pclon, config.ccircle,
+        lat, lon = astutil.sphofs (pclat, pclon, config.ccrad,
                                    np.linspace (0, 2 * np.pi, 200))
         cx, cy = coords.arb2lin (lon, lat)
         p.addXY (cx, cy, None, dsn=1)
 
-    for clat, clon, maj, min, pa in config.oellipses:
-        print pa * 180 / np.pi
+    if config.locator is not None:
+        clat, clon, maj, min, pa = config.locator
         th = np.linspace (0, 2 * np.pi, 200)
         cp, sp = np.cos (pa), np.sin (pa)
         ct, st = np.cos (th), np.sin (th)
@@ -194,113 +301,16 @@ def doit (config):
     p = plot (config)
 
     if config.out is None:
-        p.show (style=config.style)
+        p.show (style=config.omstyle)
     else:
-        p.save (config.out, style=config.style, dims=config.dims,
-                margins=config.margins)
+        p.save (config.out, style=config.omstyle, dims=config.dims,
+                margins=config.margin)
 
 
-def cmdline (args):
-    from mirtask import keys, util
-
-    util.checkusage (__doc__, ['omegamap'] + args,
-                     usageifnoargs=True)
-
-    ks = keys.KeySpec ()
-    ks.keyword ('map', 'f', ' ')
-    ks.keyword ('out', 'f', ' ')
-    ks.keyword ('fontsize', 'd', 10)
-    ks.mkeyword ('dims', 'd', 2)
-    ks.keyword ('margin', 'd', 2)
-    ks.keyword ('coloring', 'a', 'white_to_black')
-    ks.keyword ('omstyle', 'a', 'ColorOnWhiteVector')
-    ks.mkeyword ('subshape', 'i', 2)
-    ks.mkeyword ('range', 'd', 2)
-    ks.mkeyword ('logfactor', 'd', 1)
-    ks.keyword ('aspect', 'd', -1)
-    ks.keyword ('xlabel', 'a', 'Right_Ascension_(J2000)')
-    ks.keyword ('ylabel', 'a', 'Declination_(J2000)')
-    ks.keyword ('ccrad', 'd', 0)
-    ks.mkeyword ('locator', 'a', 5)
-
-    vals = ks.process (args)
-    config = Config ()
-
-    if vals.map == ' ':
-        util.wrongusage (__doc__, 'must specify input image (map=)')
-
-    if len (vals.range) != 2:
-        util.wrongusage (__doc__, 'must specify data range (range=)')
-
-    if vals.range[0] >= vals.range[1]:
-        util.wrongusage (__doc__, 'data range must have min < max')
-
-    try:
-        config.style = getattr (om.styles, vals.omstyle) ()
-    except:
-        util.die ('can\'t load/instantiate OmegaPlot style "%s"', vals.omstyle)
-
-    if vals.out == ' ':
-        config.out = None
-    else:
-        config.out = vals.out
-
-    if len (vals.subshape) == 0:
-        config.subshape = None
-    elif len (vals.subshape) == 1:
-        config.subshape = vals.subshape * 2
-    else:
-        config.subshape = vals.subshape
-
-    if len (vals.dims) == 0:
-        config.dims = [256, 256]
-    elif len (vals.dims) == 1:
-        config.dims = vals.dims * 2
-    else:
-        config.dims = vals.dims
-
-    if len (vals.logfactor):
-        config.logfactor = vals.logfactor[0]
-
-    if vals.aspect > 0:
-        config.aspect = vals.aspect
-
-    if vals.ccrad != 0: # accept negative values
-        config.ccircle = vals.ccrad * astutil.A2R
-
-    n = len (vals.locator)
-
-    if n:
-        if n not in (3, 4, 5):
-            util.die ('number of locator keyword values must between 3 and 5 (inclusive)')
-
-        lon = astutil.parsehours (vals.locator[0])
-        lat = astutil.parsedeglat (vals.locator[1])
-        maj = float (vals.locator[2]) * astutil.A2R
-
-        if n > 3:
-            min = float (vals.locator[3]) * astutil.A2R
-        else:
-            min = maj
-
-        if n > 4:
-            pa = float (vals.locator[4]) * astutil.D2R
-        else:
-            pa = 0
-
-        config.oellipses.append ((lat, lon, maj, min, pa))
-
-    config.map = vals.map
-    config.fontsize = vals.fontsize
-    config.margin = [vals.margin] * 4
-    config.coloring = vals.coloring
-    config.range = vals.range
-    config.xlabel = vals.xlabel.replace ('_', ' ')
-    config.ylabel = vals.ylabel.replace ('_', ' ')
-
-    doit (config)
+def cmdline (argv):
+    checkusage (__doc__, argv, usageifnoargs=True)
+    doit (Config ().parse (argv[1:]))
 
 
 if __name__ == '__main__':
-    import mirtask.cliutil
-    cmdline (sys.argv[1:])
+    cmdline (sys.argv)
