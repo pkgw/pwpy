@@ -3,79 +3,69 @@
 # Copyright 2012 Peter Williams
 # Licensed under the GNU General Public License version 3 or higher
 
-"""= omegamap - plot an attractive map
-& pkgw
-: analysis
-+
- Render an image attractively into vector or bitmap output.
+"""omegamap [keywords]
 
-@ map
- Path to the input image: FITS, MIRIAD, or CASA format
+Render an image attractively into vector or bitmap output.
 
-@ out
- Path of output image to create; image will be displayed
- interactively if unspecified. Format guessed from the file
- extension; legal ones include pdf, eps, ps, png, svg.
+map=
+ Required. Path to the input image: FITS, MIRIAD, or CASA format
 
-@ fontsize
- Size of the font to use (default: 10)
-
-@ dims
- Width and height of the output image, in points or pixels;
- ignored if displaying interactively. If only one value is
- specified, it is used for both width and height
- (default: 256,256)
-
-@ margin
- Margin width, in points or pixels (default: 2)
-
-@ coloring
- Name of the color scale to use. A list of possibilities can
- be seen by running "python -m colormaps".
- (default: white_to_black)
-
-@ omstyle
- Name of the OmegaPlot style class to use
- (default: ColorOnWhiteVector)
-
-@ subshape
- Width and height of the subregion of the input map to
- image, in pixels, centered on the image center. No subregion
- is extracted if unspecified. If only one value is specified,
- it is used for both the width and height of the subregion.
-
-@ range
- Data values that anchor the minimum and maximum of the color
- scale. The first range value must be smaller than the second.
+range=
+ Required. Data values that anchor the minimum and maximum of the
+ color scale. The first range value must be smaller than the second.
  If unspecified, the minimum and maximum data values are used.
 
-@ logfactor
+out=
+ Path of output image to create; image will be displayed interactively
+ if unspecified. Format guessed from the file extension; legal ones
+ include pdf, eps, ps, png, svg.
+
+fontsize=
+ Size of the font to use (default: 10)
+
+dims=
+ Width and height of the output image, in points or pixels; ignored if
+ displaying interactively. If only one value is specified, it is used
+ for both width and height. (default: 256,256)
+
+margin=
+ Margin width, in points or pixels (default: 2)
+
+coloring=
+ Name of the color scale to use. A list of possibilities can be seen
+ by running "python -m colormaps".  (default: white_to_black)
+
+omstyle=
+ Name of the OmegaPlot style class to use (default:
+ ColorOnWhiteVector)
+
+subshape=
+ Width and height of the subregion of the input map to image, in
+ pixels, centered on the image center. No subregion is extracted if
+ unspecified. If only one value is specified, it is used for both the
+ width and height of the subregion.
+
+logfactor=
  If specified, the data are logarithmically scaled such that
   newdata = log (data + logfactor * (1 - median(data)))
  If unspecified, linear scaling is used. The range values used
  above are taken relative to the _transformed_ data.
 
-@ aspect
- Aspect ratio of the plot field. Ratio is unconstrained if
- left unspecified.
+aspect=
+ Aspect ratio of the plot field. Ratio is unconstrained if left
+ unspecified.
 
-@ xlabel
- Label of the X axis. **Underscores are replaced with spaces**,
- because MIRIAD arg parsing converts spaces to commas.
- (default: Right_Ascension_(J2000))
+xlabel=
+ Label of the X axis. (default: "Right Ascension (J2000)")
 
-@ ylabel
- Label of the Y axis. **Underscores are replaced with spaces**,
- because MIRIAD arg parsing converts spaces to commas.
- (default: Declination_(J2000))
+ylabel=
+ Label of the Y axis. (default: "Declination (J2000)")
 
-@ ccrad
- Radius of an overlaid circle to draw around the pointing
- center, in arcseconds. If zero (the default), not circle
- is drawn. Useful for denoting the primary beam size.
- (default: 0)
+ccrad=
+ Radius of an overlaid circle to draw around the pointing center, in
+ arcseconds. Useful for denoting the primary beam size.
 
-@ locator
+locator=
  Three to five values: RA (sexagesimal hours), dec (sexagesimal
  degrees), major axis (arcseconds), minor (arcsec, defaults to major),
  PA (degrees, defaults to 0). An ellipse of the specified shape will
