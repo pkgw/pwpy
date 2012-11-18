@@ -74,7 +74,8 @@ locator=
 """
 
 import sys, numpy as np, omega as om, cairo
-import omega.pango, omega.pyrapimage, pyrap.images, colormaps, ndshow, astutil
+import omega.pango, omega.pyrapimage, pyrap.images
+import colormaps, ndshow, astutil, ellutil
 from kwargv import ParseKeywords, Custom
 
 
@@ -273,11 +274,8 @@ def plot (config):
 
     if config.locator is not None:
         clat, clon, maj, min, pa = config.locator
-        th = np.linspace (0, 2 * np.pi, 200)
-        cp, sp = np.cos (pa), np.sin (pa)
-        ct, st = np.cos (th), np.sin (th)
-        dlat = maj * ct * cp - min * st * sp # x = dec = lat for astro PA def'n.
-        dlon = maj * ct * sp + min * st * cp
+        # lat = dec = x in astro PA convention
+        dlat, dlon = ellutil.ellpoint (maj, min, pa, np.linspace (0, 2 * np.pi, 200))
         lat = clat + dlat
         lon = clon + dlon / np.cos (lat) # ignore pole issues
         ex, ey = coords.arb2lin (lon, lat)
