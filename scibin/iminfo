@@ -20,7 +20,7 @@ from astutil import *
 def printinfo (path):
     try:
         im = astimage.open (path, 'r')
-    except Exception, e:
+    except Exception as e:
         print >>sys.stderr, 'error: can\'t open "%s": %s' % (path, e)
         return True
 

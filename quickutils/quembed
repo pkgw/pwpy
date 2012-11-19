@@ -47,7 +47,7 @@ def mycopystat (src, dst):
 def insert (name, outstream, utilpath):
     try:
         f = open (join (utilpath, name + '.py'))
-    except IOError, e:
+    except IOError as e:
         if e.errno == 2:
             raise QUError ('no such snippet "%s" (no file %s)', name,
                            join (utilpath, name + '.py'))
@@ -109,7 +109,7 @@ def driver (args):
 
     try:
         open (join (utilpath, 'die.py'))
-    except Exception, e:
+    except Exception as e:
         print >>sys.stderr, 'error: snippets not found? sniff failed: %s' % e
         sys.exit (1)
 
@@ -134,11 +134,11 @@ def driver (args):
                     # Snippets found.
                     mycopystat (args[0], p)
                     os.rename (p, args[0])
-            except Exception, e:
+            except Exception as e:
                 et, ev, etb = sys.exc_info ()
                 try:
                     os.unlink (p)
-                except Exception, e:
+                except Exception as e:
                     pass
                 raise et, ev, etb
         elif len (args) == 2:
@@ -150,7 +150,7 @@ def driver (args):
             print >>sys.stderr
             print >>sys.stderr, __doc__.strip ()
             sys.exit (1)
-    except QUError, e:
+    except QUError as e:
         print >>sys.stderr, 'error:', e
         sys.exit (1)
 
