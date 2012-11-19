@@ -286,7 +286,7 @@ recfactory: factory for "record" objects; one attr set for each column
                     i += col.width + 1
             except FlatDBError:
                 raise
-            except Exception as e:
+            except Exception, e:
                 raise ParseError ('exception while parsing value "%s" of row %d in '
                                   'column %s: %s (%s)', s[i:i+col.width], recno,
                                   col.name, e, e.__class__.__name__, recno=recno,
@@ -356,7 +356,7 @@ headers: iterable of strings, lines of header data
                 write (pad (col.format (getattr (rec, col.name)), col.width))
                 write ('|')
             write ('\n')
-    except PadError as e:
+    except PadError, e:
         raise Exception ('formatting fail in column %s for %s: %s' %
                          (col.name, rec, e))
 
