@@ -16,6 +16,7 @@ else
    LD_LIBRARY_PATH="$lib:$LD_LIBRARY_PATH"
 fi
 
-PYTHONPATH=
-export LD_LIBRARY_PATH PYTHONPATH CASAPATH
+# I used to clear PYTHONPATH, but now that's seeming like a bad idea.
+
+export LD_LIBRARY_PATH CASAPATH
 exec $lib/casapy/bin/python "$@"
