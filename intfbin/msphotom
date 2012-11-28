@@ -4,9 +4,24 @@
 # Licensed under the GNU General Public License version 3 or higher
 
 """
-msphotom <ms>
+msphotom vis=<MS> [keywords...]
 
-Extract photometry from the visibilities in a measurement set.
+Extract photometry from the visibilities in a measurement set. See
+below the keyword docs for some important caveats.
+
+vis=
+  Path of the MeasurementSet dataset to read.
+
+datacol=
+  Name of the column to use for visibility data. Defaults to 'data'.
+  You might want it to be 'corrected_data'.
+
+believesigmas=[t|f]
+  Defaults to false, which means that we assume that the 'sigma'
+  column in the dataset isn't scaled correctly. Instead uncertainties
+  are assessed from the scatter of all the visibilities in each
+  timeslot. If true, sigmas are used and propagated in the standard
+  way.
 
 IMPORTANT: assumes that there's a point source at phase center, and
 that all other emission has been subtracted out.
@@ -14,13 +29,8 @@ that all other emission has been subtracted out.
 IMPORTANT: computes fluxes as (RR+LL)/2, and discards data for which
 one or both of these products is missing.
 
-IMPORTANT: reads the DATA column and doesn't do any filtering of the
-visbilities (i.e., no field selection).
-
-NOTE: assumes that the 'sigma' column in the dataset isn't scaled
-correctly; will assess uncertainties from the scatter of all the
-visibilities in each timeslot. (Code to use the sigmas is present
-but disabled.)
+IMPORTANT: doesn't do any filtering of the visbilities (i.e., no field
+selection).
 
 Prints out
 
@@ -30,17 +40,69 @@ with sorted MJDs, one record for each timestamp present in the dataset,
 with all fluxes in ujy. dt is simply (MJD - MJD[0])/86400.
 
 You will probably want to apply a moving smoothing window to the
-output of this program. The function smooth() below shows how to do
-this. Recommended to plot re(t) and im(t) in the same plot window
-since im(t) should give a sense of the random variation in the data.
+output of this program. The function smooth() in the source shows how
+to do this. Recommended to plot re(t) and im(t) in the same plot
+window since im(t) should give a sense of the random variation in the
+data.
 """
 
 import sys, os.path, casac, numpy as np
+from kwargv import ParseKeywords, Custom
+
+## quickutil: usage
+#- snippet: usage.py (2012 Oct 01)
+#- SHA1: ac032a5db2efb5508569c4d5ba6eeb3bba19a7ca
+def showusage (docstring, short, stream, exitcode):
+    if stream is None:
+        from sys import stdout as stream
+    if not short:
+        print >>stream, 'Usage:', docstring.strip ()
+    else:
+        intext = False
+        for l in docstring.splitlines ():
+            if intext:
+                if not len (l):
+                    break
+                print >>stream, l
+            elif len (l):
+                intext = True
+                print >>stream, 'Usage:', l
+        print >>stream, \
+            '\nRun with a sole argument --help for more detailed usage information.'
+    raise SystemExit (exitcode)
+
+def checkusage (docstring, argv=None, usageifnoargs=False):
+    if argv is None:
+        from sys import argv
+    if len (argv) == 1 and usageifnoargs:
+        showusage (docstring, True, None, 0)
+    if len (argv) == 2 and argv[1] in ('-h', '--help'):
+        showusage (docstring, False, None, 0)
+
+def wrongusage (docstring, *rest):
+    import sys
+    intext = False
+
+    if len (rest) == 0:
+        detail = 'invalid command-line arguments'
+    elif len (rest) == 1:
+        detail = rest[0]
+    else:
+        detail = rest[0] % tuple (rest[1:])
+
+    print >>sys.stderr, 'error:', detail, '\n' # extra NL
+    showusage (docstring, True, sys.stderr, 1)
+## end
+
+class Config (ParseKeywords):
+    vis = Custom (str, required=True)
+    datacol = 'data'
+    believesigmas = False
 
 RR = 5
 LL = 8
 
-def process (mspath, datacol='data', believe_sigmas=False):
+def process (cfg):
     if hasattr (casac, 'homefinder'): # CASA < 4.0.0?
         tb = casac.homefinder.find_home_by_name ('tableHome').create ()
         ms = casac.homefinder.find_home_by_name ('msHome').create ()
@@ -50,11 +112,11 @@ def process (mspath, datacol='data', believe_sigmas=False):
 
     # Load info we need to decode polarization stuff
 
-    tb.open (os.path.join (mspath, 'DATA_DESCRIPTION'))
+    tb.open (os.path.join (cfg.vis, 'DATA_DESCRIPTION'))
     ddid_to_pid = tb.getcol ('POLARIZATION_ID')
     tb.close ()
 
-    tb.open (os.path.join (mspath, 'POLARIZATION'))
+    tb.open (os.path.join (cfg.vis, 'POLARIZATION'))
     numcorrs = tb.getcol ('NUM_CORR')
     npids = numcorrs.size
     prodinfo = [None] * npids
@@ -80,17 +142,17 @@ def process (mspath, datacol='data', believe_sigmas=False):
     # have their absolute scale set correctly but we can still use
     # them to set the relative weighting of the data points.
 
-    ms.open (sys.argv[1])
+    ms.open (cfg.vis)
     ms.iterinit ()
     ms.iterorigin ()
-    colnames = [datacol] + 'flag sigma time data_desc_id'.split ()
+    colnames = [cfg.datacol] + 'flag sigma time data_desc_id'.split ()
     tbins = {}
 
     while True:
         cols = ms.getdata (items=colnames)
 
         for i in xrange (cols['time'].size):
-            data = cols[datacol][:,0,i]
+            data = cols[cfg.datacol][:,0,i]
             flags = cols['flag'][:,0,i]
             sigma = cols['sigma'][:,i]
             time = cols['time'][i]
@@ -136,7 +198,7 @@ def process (mspath, datacol='data', believe_sigmas=False):
         r2_ujy = wd2.real / wt * 1e12
         i2_ujy = wd2.imag / wt * 1e12
 
-        if believe_sigmas:
+        if cfg.believesigmas:
             ru_ujy = wt**-0.5 * 1e6
             iu_ujy = wt**-0.5 * 1e6
         else:
@@ -153,6 +215,7 @@ def process (mspath, datacol='data', believe_sigmas=False):
 
 
 def smooth (re, reerr, im, imerr, window):
+    """Sample function for reference. Not used in this task."""
     conv = lambda q, r: np.convolve (q, r, mode='valid')
 
     rewt = reerr**-2
@@ -166,4 +229,11 @@ def smooth (re, reerr, im, imerr, window):
     return cre, crerr, cim, cimerr
 
 
-process (sys.argv[1], datacol='data', believe_sigmas=False)
+def cmdline (argv):
+    checkusage (__doc__, usageifnoargs=True)
+    cfg = Config ().parse (argv[1:])
+    process (cfg)
+
+
+if __name__ == '__main__':
+    cmdline (sys.argv)
