@@ -3,5 +3,5 @@
 # Licensed under the GNU General Public License version 3 or higher
 
 echo "casa-python: error: casa-python wasn't configured with the path to CASA" >&2
-echo "casa-python:        Do this by creating 'casapfx' inside mmm/pwilliams" >&2
+echo "casa-python:        Do this by setting 'casaprefix' in pwpy/config" >&2
 exit 1
