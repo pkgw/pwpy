@@ -10,7 +10,11 @@ Extract photometry from the visibilities in a measurement set. See
 below the keyword docs for some important caveats.
 
 vis=
-  Path of the MeasurementSet dataset to read.
+  Path of the MeasurementSet dataset to read. Required.
+
+out=
+  Path to which data will be written. If unspecified, data are written
+  to standard output.
 
 datacol=
   Name of the column to use for visibility data. Defaults to 'data'.
@@ -49,7 +53,7 @@ data.
 import sys, os.path, casac, numpy as np
 from kwargv import ParseKeywords, Custom
 
-## quickutil: usage
+## quickutil: usage die
 #- snippet: usage.py (2012 Oct 01)
 #- SHA1: ac032a5db2efb5508569c4d5ba6eeb3bba19a7ca
 def showusage (docstring, short, stream, exitcode):
@@ -92,12 +96,27 @@ def wrongusage (docstring, *rest):
 
     print >>sys.stderr, 'error:', detail, '\n' # extra NL
     showusage (docstring, True, sys.stderr, 1)
+#- snippet: die.py (2012 Oct 01)
+#- SHA1: 3bdd3282e52403d2dec99d72680cb7bc95c99843
+def die (fmt, *args):
+    if not len (args):
+        raise SystemExit ('error: ' + str (fmt))
+    raise SystemExit ('error: ' + (fmt % args))
 ## end
 
 class Config (ParseKeywords):
     vis = Custom (str, required=True)
     datacol = 'data'
     believesigmas = False
+
+    @Custom (str, uiname='out')
+    def outstream (val):
+        if val is None:
+            return sys.stdout
+        try:
+            return open (val, 'w')
+        except Exception as e:
+            die ('cannot open path "%s" for writing', val)
 
 RR = 5
 LL = 8
@@ -210,7 +229,8 @@ def process (cfg):
         mag = np.sqrt (r_ujy**2 + i_ujy**2)
         umag = np.sqrt (r_ujy**2 * ru_ujy**2 + i_ujy**2 * iu_ujy**2) / mag
 
-        print '%12.5f %6.2f %10.2f %10.2f %10.2f %10.2f %10.2f %10.2f %d' % \
+        print >>cfg.outstream, \
+            '%12.5f %6.2f %10.2f %10.2f %10.2f %10.2f %10.2f %10.2f %d' % \
             (mjd, dtmin, r_ujy, ru_ujy, i_ujy, iu_ujy, mag, umag, n)
 
 
