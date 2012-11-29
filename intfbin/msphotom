@@ -27,6 +27,13 @@ datacol=
   Name of the column to use for visibility data. Defaults to 'data'.
   You might want it to be 'corrected_data'.
 
+datascale=
+  Multiply fluxes by this number before reporting them. Defaults
+  to 1e6, so that the output is in terms of microjanskys if the
+  data are correctly flux-scaled. The textual output has two
+  decimal places so adjusting this value can give better results
+  if your characteristic fluxes are significant different than this.
+
 believesigmas=[t|f]
   Defaults to false, which means that we assume that the 'sigma'
   column in the dataset isn't scaled correctly. Instead uncertainties
@@ -118,6 +125,8 @@ class Config (ParseKeywords):
             return open (val, 'w')
         except Exception as e:
             die ('cannot open path "%s" for writing', val)
+
+    datascale = 1e6
 
     # MeasurementSet filters
     array = str
@@ -237,26 +246,26 @@ def process (cfg):
 
         mjd = t / 86400.
         dtmin = (t - st[0]) / 60.
-        r_ujy = wd.real / wt * 1e6 # -> uJy
-        i_ujy = wd.imag / wt * 1e6
-        r2_ujy = wd2.real / wt * 1e12
-        i2_ujy = wd2.imag / wt * 1e12
+        r_sc = wd.real / wt * cfg.datascale
+        i_sc = wd.imag / wt * cfg.datascale
+        r2_sc = wd2.real / wt * cfg.datascale**2
+        i2_sc = wd2.imag / wt * cfg.datascale**2
 
         if cfg.believesigmas:
-            ru_ujy = wt**-0.5 * 1e6
-            iu_ujy = wt**-0.5 * 1e6
+            ru_sc = wt**-0.5 * cfg.datascale
+            iu_sc = wt**-0.5 * cfg.datascale
         else:
-            rv_ujy = r2_ujy - r_ujy**2 # variance among real/imag msmts
-            iv_ujy = i2_ujy - i_ujy**2
-            ru_ujy = np.sqrt (rv_ujy * wt2) / wt # uncert in mean real/img values
-            iu_ujy = np.sqrt (iv_ujy * wt2) / wt
+            rv_sc = r2_sc - r_sc**2 # variance among real/imag msmts
+            iv_sc = i2_sc - i_sc**2
+            ru_sc = np.sqrt (rv_sc * wt2) / wt # uncert in mean real/img values
+            iu_sc = np.sqrt (iv_sc * wt2) / wt
 
-        mag = np.sqrt (r_ujy**2 + i_ujy**2)
-        umag = np.sqrt (r_ujy**2 * ru_ujy**2 + i_ujy**2 * iu_ujy**2) / mag
+        mag = np.sqrt (r_sc**2 + i_sc**2)
+        umag = np.sqrt (r_sc**2 * ru_sc**2 + i_sc**2 * iu_sc**2) / mag
 
         print >>cfg.outstream, \
             '%12.5f %6.2f %10.2f %10.2f %10.2f %10.2f %10.2f %10.2f %d' % \
-            (mjd, dtmin, r_ujy, ru_ujy, i_ujy, iu_ujy, mag, umag, n)
+            (mjd, dtmin, r_sc, ru_sc, i_sc, iu_sc, mag, umag, n)
 
 
 def smooth (x, re, reerr, im, imerr, window):
