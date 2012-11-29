@@ -336,7 +336,7 @@ def smooth (x, re, reerr, im, imerr, window):
     """Sample function for reference. Not used in this task."""
     conv = lambda q, r: np.convolve (q, r, mode='valid')
 
-    cx = conv (x, window)
+    cx = conv (x, window) / conv (np.ones_like (x), window) # maintain normalization
 
     rewt = reerr**-2
     cre = conv (rewt * re, window) / conv (rewt, window)
