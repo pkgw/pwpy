@@ -1,5 +1,23 @@
-#! /usr/bin/env casa-script
-# -*- python -*-
+#! /bin/bash
+# -*- shell-script -*-
 
+# This is pretty sad.
+
+if tty >/dev/null ; then
+    pager=${PAGER:-less -S}
+else
+    pager=cat
+fi
+
+casa-python /dev/fd/0 $1 <<'EOF' |sed -e 's/^.*ms::summary+*.//' |$pager
 import sys
-listobs (vis=sys.argv[-1])
+import casac
+
+log = casac.casac.logsink ()
+log.setlogfile ('/dev/fd/1')
+log.setglobal (True)
+ms = casac.casac.ms ()
+ms.open (sys.argv[1])
+ms.summary (verbose=True)
+ms.close ()
+EOF
