@@ -165,8 +165,6 @@ class Config (ParseKeywords):
     time = str
     uvdist = str
 
-RR = 5
-LL = 8
 INVERSE_C_MS = 3.3356409519815204e-09 # inverse (speed of light in m/s)
 
 mssels = frozenset ('array baseline field observation scan '
@@ -202,15 +200,15 @@ def process (cfg):
     ddids = rangeinfo['data_desc_id']
     fields = rangeinfo['field_id']
     colnames = [cfg.datacol] + 'flag weight time axis_info'.split ()
+    rephase = (cfg.rephase is not None)
 
     if fields.size != 1:
         # I feel comfortable making this a fatal error, even if we're
         # not rephasing.
         die ('selected data should contain precisely one field; got %d', fields.size)
-    fieldid = fields[0]
-    rephase = (cfg.rephase is not None)
 
     if rephase:
+        fieldid = fields[0]
         tb.open (os.path.join (cfg.vis, 'FIELD'))
         phdirinfo = tb.getcell ('PHASE_DIR', fieldid)
         tb.close ()
