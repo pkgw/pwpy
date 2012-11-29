@@ -34,18 +34,19 @@ datacol=
   You might want it to be 'corrected_data'.
 
 datascale=
-  Multiply fluxes by this number before reporting them. Defaults
-  to 1e6, so that the output is in terms of microjanskys if the
-  data are correctly flux-scaled. The textual output has two
-  decimal places so adjusting this value can give better results
-  if your characteristic fluxes are significant different than this.
+  Multiply fluxes by this number before reporting them. Defaults to
+  1e6, so that the output is in terms of microjanskys if the data are
+  correctly flux-scaled. The textual output has two decimal places so
+  adjusting this value can give better results if your characteristic
+  fluxes are significantly different than this.
 
-believesigmas=[t|f]
-  Defaults to false, which means that we assume that the 'sigma'
-  column in the dataset isn't scaled correctly. Instead uncertainties
-  are assessed from the scatter of all the visibilities in each
-  timeslot. If true, sigmas are used and propagated in the standard
-  way.
+believeweights=[t|f]
+  Defaults to false, which means that we assume that the 'weight'
+  column in the dataset is NOT scaled such that the variance in the
+  visibility samples is equal to 1/weight. In this case
+  uncertainties are assessed from the scatter of all the visibilities
+  in each timeslot. If true, we trust that variance=1/weight and
+  propagated this in the standard way.
 
 IMPORTANT: the fundamental assumption of this task is that the only
 signal in the visibilities is from a point source at the phasing
@@ -126,7 +127,7 @@ def die (fmt, *args):
 class Config (ParseKeywords):
     vis = Custom (str, required=True)
     datacol = 'data'
-    believesigmas = False
+    believeweights = False
 
     @Custom (str, uiname='out')
     def outstream (val):
@@ -179,7 +180,7 @@ def process (cfg):
         tb = casac.casac.table ()
         ms = casac.casac.ms ()
 
-    # Read stuff in. Even if the sigma values don't have their
+    # Read stuff in. Even if the weight values don't have their
     # absolute scale set correctly, we can still use them to set the
     # relative weighting of the data points.
     #
@@ -325,7 +326,7 @@ def process (cfg):
         r2_sc = wd2.real / wt * cfg.datascale**2
         i2_sc = wd2.imag / wt * cfg.datascale**2
 
-        if cfg.believesigmas:
+        if cfg.believeweights:
             ru_sc = wt**-0.5 * cfg.datascale
             iu_sc = wt**-0.5 * cfg.datascale
         else:
