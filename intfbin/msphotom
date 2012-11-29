@@ -26,7 +26,7 @@ array=, baseline=, field=, observation=, polarization=, scan=,
 scanintent=, spw=, taql=, time=, uvdist=
   MeasurementSet selectors used to filter the input data.
   Default polarization is 'RR,LL'. All polarizations are averaged
-  together, so mixing parallel- and cross-hand pols will is almost
+  together, so mixing parallel- and cross-hand pols is almost
   never what you want to do.
 
 datacol=
@@ -46,7 +46,7 @@ believeweights=[t|f]
   visibility samples is equal to 1/weight. In this case
   uncertainties are assessed from the scatter of all the visibilities
   in each timeslot. If true, we trust that variance=1/weight and
-  propagated this in the standard way.
+  propagate this in the standard way.
 
 IMPORTANT: the fundamental assumption of this task is that the only
 signal in the visibilities is from a point source at the phasing
