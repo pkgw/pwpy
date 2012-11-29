@@ -16,11 +16,12 @@ out=
   Path to which data will be written. If unspecified, data are written
   to standard output.
 
-array=, baseline=, field=, observation=, scan=,
+array=, baseline=, field=, observation=, polarization=, scan=,
 scanintent=, spw=, taql=, time=, uvdist=
-  MeasurementSet selectors used to filter the input data. Note that
-  polarization selection is not supported until I figure out how
-  that should be done.
+  MeasurementSet selectors used to filter the input data.
+  Default polarization is 'RR,LL'. All polarizations are averaged
+  together, so mixing parallel- and cross-hand pols will is almost
+  never what you want to do.
 
 datacol=
   Name of the column to use for visibility data. Defaults to 'data'.
@@ -35,12 +36,6 @@ believesigmas=[t|f]
 
 IMPORTANT: assumes that there's a point source at phase center, and
 that all other emission has been subtracted out.
-
-IMPORTANT: computes fluxes as (RR+LL)/2, and discards data for which
-one or both of these products is missing.
-
-IMPORTANT: doesn't do any filtering of the visbilities (i.e., no field
-selection).
 
 Prints out
 
@@ -129,6 +124,7 @@ class Config (ParseKeywords):
     baseline = str
     field = str
     observation = str
+    polarization = 'RR,LL'
     scan = str
     scanintent = str
     spw = str
@@ -149,82 +145,87 @@ def process (cfg):
         tb = casac.casac.table ()
         ms = casac.casac.ms ()
 
-    # Load info we need to decode polarization stuff
+    # Read stuff in. Even if the sigma values don't have their
+    # absolute scale set correctly, we can still use them to set the
+    # relative weighting of the data points.
+    #
+    # datacol is (ncorr, nchan, nchunk)
+    # flag is (ncorr, nchan, nchunk)
+    # weight is (ncorr, nchunk)
+    # time is (nchunk)
+    # axis_info.corr_axis is (ncorr)
+    # axis_info.freq_axis.chan_freq is (nchan, 1) ?
 
     tb.open (os.path.join (cfg.vis, 'DATA_DESCRIPTION'))
-    ddid_to_pid = tb.getcol ('POLARIZATION_ID')
+    ndd = tb.nrows ()
     tb.close ()
-
-    tb.open (os.path.join (cfg.vis, 'POLARIZATION'))
-    npids = tb.nrows ()
-    numcorrs = tb.getcol ('NUM_CORR')
-    prodinfo = [None] * npids
-
-    for i in xrange (npids):
-        corrtypes = tb.getcell ('CORR_TYPE', i)
-        rridx = llidx = None
-
-        for j in xrange (numcorrs[i]):
-            if corrtypes[j] == RR:
-                rridx = j
-            elif corrtypes[j] == LL:
-                llidx = j
-
-        if rridx is not None and llidx is not None:
-            prodinfo[i] = (rridx, llidx)
-
-    tb.close ()
-
-    ddprods = [prodinfo[p] for p in ddid_to_pid]
-
-    # Now we can read the visibilities. The sigma values don't seem to
-    # have their absolute scale set correctly but we can still use
-    # them to set the relative weighting of the data points.
 
     ms.open (cfg.vis)
     totrows = ms.nrow ()
     sels = dict ((n, cfg.get (n)) for n in mssels
                  if cfg.get (n) is not None)
     ms.msselect (sels)
-    ms.iterinit ()
-    ms.iterorigin ()
-    colnames = [cfg.datacol] + 'flag sigma time data_desc_id'.split ()
+
+    colnames = [cfg.datacol] + 'flag weight time axis_info'.split ()
     tbins = {}
 
-    while True:
-        cols = ms.getdata (items=colnames)
+    for ddid in xrange (ndd):
+        ms.selectinit (ddid)
+        if not ms.nrow (True):
+            # no data for this DDID; a warning will have been printed.
+            # Don't see a way to prevent this short of messing with
+            # casalog.
+            continue
 
-        for i in xrange (cols['time'].size):
-            data = cols[cfg.datacol][:,0,i]
-            flags = cols['flag'][:,0,i]
-            sigma = cols['sigma'][:,i]
-            time = cols['time'][i]
+        if cfg.polarization is not None:
+            ms.selectpolarization (cfg.polarization.split (','))
 
-            prodinfo = ddprods[cols['data_desc_id'][i]]
-            if prodinfo is None:
-                continue # this record doesn't contain both RR and LL
+        ms.iterinit ()
+        ms.iterorigin ()
 
-            rr, ll = prodinfo
-            if flags[rr] or flags[ll]:
-                continue
+        while True:
+            cols = ms.getdata (items=colnames)
 
-            d = 0.5 * (data[rr] + data[ll])
-            wt = 4. / (sigma[rr]**2 + sigma[ll]**2)
-            wd = wt * d
-            wd2 = wt * (d.real**2 + (1j) * d.imag**2)
+            for i in xrange (cols['time'].size): # all records
+                time = cols['time'][i]
+                tdata = tbins.get (time, None)
+                if tdata is None:
+                    tdata = tbins[time] = [0., 0., 0., 0., 0]
 
-            tdata = tbins.get (time, None)
-            if tdata is None:
-                tbins[time] = [wd, wd2, wt, wt**2, 1]
-            else:
-                tdata[0] += wd
-                tdata[1] += wd2
-                tdata[2] += wt
-                tdata[3] += wt**2
-                tdata[4] += 1
+                for j in xrange (cols['flag'].shape[0]): # all polns
+                    # We just average together all polarizations right now!
+                    # (Not actively, but passively by just iterating over them.)
+                    data = cols[cfg.datacol][j,:,i]
+                    flags = cols['flag'][j,:,i]
 
-        if not ms.iternext ():
-            break
+                    # XXXXX casacore is currently broken and returns
+                    # the raw weights from the dataset rather than
+                    # applying the polarization selection. Fortunately
+                    # all of our weights are the same, and you can
+                    # never fetch more pol types than the dataset has,
+                    # so this bit works despite the bug.
+
+                    w = np.where (~flags)[0]
+                    if not w.size:
+                        continue # all flagged
+
+                    d = data[w].mean ()
+                    # account for flagged parts. 90% sure this is the
+                    # right thing to do:
+                    wt = cols['weight'][j,i] * w.size / data.size
+                    wd = wt * d
+                    # note a little bit of a hack here to encode real^2 and
+                    # imag^2 separately:
+                    wd2 = wt * (d.real**2 + (1j) * d.imag**2)
+
+                    tdata[0] += wd
+                    tdata[1] += wd2
+                    tdata[2] += wt
+                    tdata[3] += wt**2
+                    tdata[4] += 1
+
+            if not ms.iternext ():
+                break
 
     ms.close ()
 
