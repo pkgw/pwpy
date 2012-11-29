@@ -192,19 +192,17 @@ def process (cfg):
     # axis_info.corr_axis is (ncorr)
     # axis_info.freq_axis.chan_freq is (nchan, 1) [for now?]
 
-    tb.open (os.path.join (cfg.vis, 'DATA_DESCRIPTION'))
-    ndd = tb.nrows ()
-    tb.close ()
-
     ms.open (cfg.vis)
     totrows = ms.nrow ()
     sels = dict ((n, cfg.get (n)) for n in mssels
                  if cfg.get (n) is not None)
     ms.msselect (sels)
 
+    rangeinfo = ms.range ('data_desc_id field_id'.split ())
+    ddids = rangeinfo['data_desc_id']
+    fields = rangeinfo['field_id']
     colnames = [cfg.datacol] + 'flag weight time axis_info'.split ()
 
-    fields = ms.range ('field_id')['field_id']
     if fields.size != 1:
         # I feel comfortable making this a fatal error, even if we're
         # not rephasing.
@@ -236,17 +234,10 @@ def process (cfg):
 
     tbins = {}
 
-    for ddid in xrange (ndd):
+    for ddid in ddids:
         ms.selectinit (ddid)
-        if not ms.nrow (True):
-            # no data for this DDID; a warning will have been printed.
-            # Don't see a way to prevent this short of messing with
-            # casalog.
-            continue
-
         if cfg.polarization is not None:
             ms.selectpolarization (cfg.polarization.split (','))
-
         ms.iterinit ()
         ms.iterorigin ()
 
