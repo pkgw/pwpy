@@ -136,8 +136,8 @@ def process (cfg):
     tb.close ()
 
     tb.open (os.path.join (cfg.vis, 'POLARIZATION'))
+    npids = tb.nrows ()
     numcorrs = tb.getcol ('NUM_CORR')
-    npids = numcorrs.size
     prodinfo = [None] * npids
 
     for i in xrange (npids):
