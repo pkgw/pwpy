@@ -16,6 +16,12 @@ out=
   Path to which data will be written. If unspecified, data are written
   to standard output.
 
+array=, baseline=, field=, observation=, scan=,
+scanintent=, spw=, taql=, time=, uvdist=
+  MeasurementSet selectors used to filter the input data. Note that
+  polarization selection is not supported until I figure out how
+  that should be done.
+
 datacol=
   Name of the column to use for visibility data. Defaults to 'data'.
   You might want it to be 'corrected_data'.
@@ -118,8 +124,22 @@ class Config (ParseKeywords):
         except Exception as e:
             die ('cannot open path "%s" for writing', val)
 
+    # MeasurementSet filters
+    array = str
+    baseline = str
+    field = str
+    observation = str
+    scan = str
+    scanintent = str
+    spw = str
+    taql = str
+    time = str
+    uvdist = str
+
 RR = 5
 LL = 8
+mssels = frozenset ('array baseline field observation scan '
+                    'scanintent spw taql time uvdist'.split ())
 
 def process (cfg):
     if hasattr (casac, 'homefinder'): # CASA < 4.0.0?
@@ -162,6 +182,10 @@ def process (cfg):
     # them to set the relative weighting of the data points.
 
     ms.open (cfg.vis)
+    totrows = ms.nrow ()
+    sels = dict ((n, cfg.get (n)) for n in mssels
+                 if cfg.get (n) is not None)
+    ms.msselect (sels)
     ms.iterinit ()
     ms.iterorigin ()
     colnames = [cfg.datacol] + 'flag sigma time data_desc_id'.split ()
