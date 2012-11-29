@@ -16,6 +16,12 @@ out=
   Path to which data will be written. If unspecified, data are written
   to standard output.
 
+rephase=RA,DEC
+  Phase the data to extract fluxes in the specified direction. If
+  unspecified, the data are not rephased, i.e. the flux at the
+  phase center is extracted. RA and DEC should be in sexigesimal
+  with fields separated by colons.
+
 array=, baseline=, field=, observation=, polarization=, scan=,
 scanintent=, spw=, taql=, time=, uvdist=
   MeasurementSet selectors used to filter the input data.
@@ -41,8 +47,12 @@ believesigmas=[t|f]
   timeslot. If true, sigmas are used and propagated in the standard
   way.
 
-IMPORTANT: assumes that there's a point source at phase center, and
-that all other emission has been subtracted out.
+IMPORTANT: the fundamental assumption of this task is that the only
+signal in the visibilities is from a point source at the phasing
+center. We also assume that all sampled polarizations get equal
+contributions from the source (though you can resample the Stokes
+parameters on the fly, so this is not quite the same thing as
+requiring the source be unpolarized).
 
 Prints out
 
@@ -60,6 +70,7 @@ data.
 
 import sys, os.path, casac, numpy as np
 from kwargv import ParseKeywords, Custom
+from astutil import *
 
 ## quickutil: usage die
 #- snippet: usage.py (2012 Oct 01)
@@ -128,6 +139,18 @@ class Config (ParseKeywords):
 
     datascale = 1e6
 
+    @Custom ([str, str], default=None)
+    def rephase (val):
+        if val is None:
+            return None
+
+        try:
+            ra = parsehours (val[0])
+            dec = parsedeglat (val[1])
+        except Exception as e:
+            die ('cannot parse "rephase" values as RA/dec: %s', e)
+        return ra, dec
+
     # MeasurementSet filters
     array = str
     baseline = str
@@ -143,6 +166,8 @@ class Config (ParseKeywords):
 
 RR = 5
 LL = 8
+INVERSE_C_MS = 3.3356409519815204e-09 # inverse (speed of light in m/s)
+
 mssels = frozenset ('array baseline field observation scan '
                     'scanintent spw taql time uvdist'.split ())
 
@@ -161,9 +186,10 @@ def process (cfg):
     # datacol is (ncorr, nchan, nchunk)
     # flag is (ncorr, nchan, nchunk)
     # weight is (ncorr, nchunk)
+    # uvw is (3, nchunk)
     # time is (nchunk)
     # axis_info.corr_axis is (ncorr)
-    # axis_info.freq_axis.chan_freq is (nchan, 1) ?
+    # axis_info.freq_axis.chan_freq is (nchan, 1) [for now?]
 
     tb.open (os.path.join (cfg.vis, 'DATA_DESCRIPTION'))
     ndd = tb.nrows ()
@@ -176,6 +202,37 @@ def process (cfg):
     ms.msselect (sels)
 
     colnames = [cfg.datacol] + 'flag weight time axis_info'.split ()
+
+    fields = ms.range ('field_id')['field_id']
+    if fields.size != 1:
+        # I feel comfortable making this a fatal error, even if we're
+        # not rephasing.
+        die ('selected data should contain precisely one field; got %d', fields.size)
+    fieldid = fields[0]
+    rephase = (cfg.rephase is not None)
+
+    if rephase:
+        tb.open (os.path.join (cfg.vis, 'FIELD'))
+        phdirinfo = tb.getcell ('PHASE_DIR', fieldid)
+        tb.close ()
+
+        if phdirinfo.shape[1] != 1:
+            die ('trying to rephase but target field (#%d) has a '
+                 'time-variable phase center, which I can\'t handle', fieldid)
+        ra0, dec0 = phdirinfo[:,0] # in radians.
+
+        # based on intflib/pwflux.py, which was copied from
+        # hex/hex-lib-calcgainerr:
+
+        dra = cfg.rephase[0] - ra0
+        dec = cfg.rephase[1]
+        l = np.sin (dra) * np.cos (dec)
+        m = np.sin (dec) * np.cos (dec0) - np.cos (dra) * np.cos (dec) * np.sin (dec0)
+        n = np.sin (dec) * np.sin (dec0) + np.cos (dra) * np.cos (dec) * np.cos (dec0)
+        n -= 1 # makes the work below easier
+        lmn = np.asarray ([l, m, n])
+        colnames.append ('uvw')
+
     tbins = {}
 
     for ddid in xrange (ndd):
@@ -195,11 +252,25 @@ def process (cfg):
         while True:
             cols = ms.getdata (items=colnames)
 
+            if rephase:
+                freqs = cols['axis_info']['freq_axis']['chan_freq']
+                # In our usage, freqs should be of shape (nchan, 1). If you
+                # don't selectinit() with a specific DD, you seem to get
+                # (nchan, nspw). Neither seems to really agree with the docs.
+                # Trying to be careful in case CASA changes.
+                assert freqs.shape[1] == 1, 'internal inconsistency, chan_freq??'
+                # convert to m^-1 so we can multiply against UVW directly:
+                freqs = freqs[:,0] * INVERSE_C_MS
+
             for i in xrange (cols['time'].size): # all records
                 time = cols['time'][i]
                 tdata = tbins.get (time, None)
                 if tdata is None:
                     tdata = tbins[time] = [0., 0., 0., 0., 0]
+
+                if rephase:
+                    uvw = cols['uvw'][:,i]
+                    ph = np.exp ((0-2j) * np.pi * np.dot (lmn, uvw) * freqs)
 
                 for j in xrange (cols['flag'].shape[0]): # all polns
                     # We just average together all polarizations right now!
@@ -217,6 +288,9 @@ def process (cfg):
                     w = np.where (~flags)[0]
                     if not w.size:
                         continue # all flagged
+
+                    if rephase:
+                        data *= ph
 
                     d = data[w].mean ()
                     # account for flagged parts. 90% sure this is the
