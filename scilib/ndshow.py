@@ -115,9 +115,9 @@ class Clipper (LazyComputer):
         dmin, dmax = data.min (), data.max ()
 
         if not np.isfinite (dmin):
-            dmin = data[np.where (np.isfinite (data))].min ()
+            dmin = data[np.ma.where (np.isfinite (data))].min ()
         if not np.isfinite (dmax):
-            dmax = data[np.where (np.isfinite (data))].max ()
+            dmax = data[np.ma.where (np.isfinite (data))].max ()
 
         self.dmin = dmin
         self.dmax = dmax
@@ -946,9 +946,9 @@ def cycle (arrays, descs=None, cadence=0.6, toworlds=None,
         thismin, thismax = array.min (), array.max ()
 
         if not np.isfinite (thismin):
-            thismin = array[np.where (np.isfinite (array))].min ()
+            thismin = array[np.ma.where (np.isfinite (array))].min ()
         if not np.isfinite (thismax):
-            thismax = array[np.where (np.isfinite (array))].max ()
+            thismax = array[np.ma.where (np.isfinite (array))].max ()
 
         if amin is None:
             w, h, amin, amax = thisw, thish, thismin, thismax
