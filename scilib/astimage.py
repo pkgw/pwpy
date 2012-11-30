@@ -437,6 +437,11 @@ class MIRIADImage (AstroImage):
             os.unlink (self.path) # may be a symlink; rmtree rejects this
 
 
+class _CasaUnsupportedImage (AstroImage):
+    def __init__ (self, path, mode):
+        raise UnsupportedError ('no modules are available for reading CASA images')
+
+
 def _pyrap_convert (d, unitstr):
     from pyrap.quanta import quantity
     return quantity (d['value'], d['unit']).get_value (unitstr)
@@ -642,6 +647,199 @@ class PyrapImage (AstroImage):
             shutil.rmtree (self.path)
         else:
             os.unlink (self.path) # may be a symlink; rmtree rejects this
+
+
+def _casac_convert (d, unitstr):
+    import casac
+    if hasattr (casac, 'casac'):
+        qa = casac.casac.quanta ()
+    else:
+        assert False, 'need to look up quanta in older casac API'
+    x = qa.quantity (d['value'], d['unit'])
+    return qa.convert (x, unitstr)['value']
+
+
+def _casac_imagetool ():
+    import casac
+
+    if hasattr (casac, 'casac'): # CASA >= 3.4?
+        return casac.casac.image ()
+    return casac.homefinder.find_home_by_name ('imageHome').create ()
+
+
+class CasaCImage (AstroImage):
+    # casac uses Fortran-style axis ordering, with innermost first.
+    # casac coordinate systems have two axis orderings, "world" and
+    # "pixel", and generally default to world. We want to keep things
+    # in pixel terms so we have to undo the mapping.
+
+    def __init__ (self, path, mode):
+        try:
+            import casac
+        except ImportError:
+            raise UnsupportedError ('cannot open CASAcore images in casac mode without '
+                                    'the Python module "casac"')
+
+        super (CasaCImage, self).__init__ (path, mode)
+        self._handle = _casac_imagetool ()
+        self._handle.open (path) # no mode specifiable.
+        self.shape = self._handle.shape ()[::-1].copy ()
+
+        cs = self._handle.coordsys ()
+        naxis = self.shape.size
+        # for world-to-pixel, we reverse the values in the array:
+        w2p = self._wax2pax = naxis - 1 - cs.axesmap (toworld=False)
+        # for pixel-to-world, we reverse the array ordering:
+        p2w = self._pax2wax = cs.axesmap (toworld=True)[::-1].copy ()
+        assert p2w.size == self.shape.size
+
+        self._specax = w2p[cs.findcoordinate ('spectral')[2][0]]
+        #self._polax = w2p[cs.findcoordinate ('stokes')[2][0]]
+        self._lonax = w2p[cs.findcoordinate ('direction')[2][0]]
+        self._latax = w2p[cs.findcoordinate ('direction')[2][1]]
+
+        self.axdescs = [None] * naxis
+        names = cs.names ()
+        for i in xrange (naxis):
+            self.axdescs[i] = names[p2w[i]]
+
+        self.charfreq = _casac_convert (cs.referencevalue (format='m', type='spectral')
+                                        ['measure']['spectral']['frequency']['m0'], 'GHz')
+        self.units = maybelower (self._handle.brightnessunit ())
+
+        rb = self._handle.restoringbeam ()
+        if 'major' in rb:
+            self.bmaj = _casac_convert (rb['major'], 'rad')
+            self.bmin = _casac_convert (rb['minor'], 'rad')
+            self.bpa = _casac_convert (rb['positionangle'], 'rad')
+
+        # pclat, pclon?
+        # mjd?
+
+
+    def _closeImpl (self):
+        self._handle.close ()
+
+
+    def read (self, squeeze=False, flip=False):
+        self._checkOpen ()
+
+        blc = np.zeros (self.shape.size)
+        trc = self.shape[::-1].copy () - 1
+        data = self._handle.getchunk (blc, trc, dropdeg=squeeze, getmask=False)
+        data = data.T # does the right thing and gives us C-contiguous data
+        mask = self._handle.getchunk (blc, trc, dropdeg=squeeze, getmask=True)
+        mask = mask.T
+
+        data = np.ma.MaskedArray (data, mask=mask)
+
+        if flip:
+            data = data[...,::-1,:]
+
+        return data
+
+
+    def write (self, data):
+        self._checkOpen ()
+        self._checkWriteable ()
+
+        data = np.ma.asarray (data)
+        if data.shape != tuple (self.shape):
+            raise ValueError ('data is wrong shape: got %s, want %s' \
+                                  % (data.shape, tuple (self.shape)))
+
+        data = data.T # back to CASA convention
+        # putchunk can't do the mask:
+        self._handle.putregion (pixels=data.data, pixelmask=data.mask,
+                                usemask=True)
+        return self
+
+
+    def toworld (self, pixel):
+        # TODO: CASA quantities seem to be spat out in radians and Hz,
+        # which work well enough for us. But this might not be
+        # reliable. And perhaps we'll want to enforce units for
+        # frequency and/or velocity axes.
+
+        self._checkOpen ()
+        pixel = np.asarray (pixel)[::-1] # reverse to CASA's ordering
+        qtys = self._handle.toworld (pixel, format='q')['quantity']
+
+        # Our "world" coordinates are still in what CASA would call
+        # its "pixel" ordering. This will probably all go down in
+        # flames if anyone ever reorders or removes axes.
+
+        naxis = self.shape.size
+        world = np.empty (naxis)
+        for i in xrange (naxis):
+            s = '*%d' % (self._pax2wax[i] + 1)
+            world[i] = qtys[s]['value']
+
+        return world
+
+
+    def topixel (self, world):
+        self._checkOpen ()
+        myworld = np.asarray (world)
+        ncwa = self._wax2pax.size # num of CASA world axes
+        casaworld = np.zeros (ncwa)
+
+        for i in xrange (ncwa):
+            casaworld[self._pax2wax[i]] = myworld[i]
+
+        casapixel = self._handle.topixel (casaworld)['numeric']
+        return casapixel[::-1].copy ()
+
+
+    def saveCopy (self, path, overwrite=False, openmode=None):
+        self._checkOpen ()
+
+        # In theory we could be more efficient and reuse this tool
+        # if openmode is not None. In practice, I'd have to mess
+        # with __init__() and who cares?
+
+        ia = _casac_imagetool ()
+        ia.newimagefromimage (self.path, path, overwrite=overwrite)
+        ia.close ()
+
+        if openmode is None:
+            return None
+        return open (path, openmode)
+
+
+    def saveAsFITS (self, path, overwrite=False, openmode=None):
+        self._checkOpen ()
+
+        self._handle.tofits (path, overwrite=overwrite)
+
+        if openmode is None:
+            return None
+        return FITSImage (path, openmode)
+
+
+    def delete (self):
+        if self._handle is not None:
+            raise UnsupportedError ('cannot delete the image at "%s" without '
+                                    'first closing it', self.path)
+        self._checkWriteable ()
+
+        import shutil, os.path
+
+        if os.path.isdir (self.path):
+            shutil.rmtree (self.path)
+        else:
+            os.unlink (self.path) # may be a symlink; rmtree rejects this
+
+
+try:
+    from pyrap.images import image
+    CASAImage = PyrapImage
+except ImportError:
+    try:
+        import casac
+        CASAImage = CasaCImage
+    except ImportError:
+        CASAImage = _CasaUnsupportedImage
 
 
 class FITSImage (AstroImage):
@@ -939,7 +1137,7 @@ def open (path, mode):
         return MIRIADImage (path, mode)
 
     if exists (join (path, 'table.dat')):
-        return PyrapImage (path, mode)
+        return CASAImage (path, mode)
 
     if isdir (path):
         raise UnsupportedError ('cannot infer format of image "%s"' % path)
