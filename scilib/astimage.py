@@ -729,6 +729,7 @@ class CasaCImage (AstroImage):
         data = self._handle.getchunk (blc, trc, dropdeg=squeeze, getmask=False)
         data = data.T # does the right thing and gives us C-contiguous data
         mask = self._handle.getchunk (blc, trc, dropdeg=squeeze, getmask=True)
+        np.logical_not (mask, mask) # CASA image masking is opposite of CASA UV flagging: T -> OK
         mask = mask.T
 
         data = np.ma.MaskedArray (data, mask=mask)
