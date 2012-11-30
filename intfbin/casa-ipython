@@ -1,0 +1,16 @@
+#! /usr/bin/env casa-python
+# -*- python -*-
+# Copyright 2012 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
+
+import sys
+from os.path import expanduser, join
+
+# CASA will presumably stick with the current IPython version for a
+# while, so for now, don't worry about compat with different IPython
+# APIs.
+import IPython.Shell
+# assume that I'm never going to move my rcdir:
+ipydir = expanduser (join ('~', '.casa', 'ipython'))
+args = ['-ipythondir', ipydir] + sys.argv[1:]
+IPython.Shell.IPShell (argv=args).mainloop ()
