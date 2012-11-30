@@ -654,7 +654,7 @@ def _casac_convert (d, unitstr):
     if hasattr (casac, 'casac'):
         qa = casac.casac.quanta ()
     else:
-        assert False, 'need to look up quanta in older casac API'
+        qa = casac.homefinder.find_home_by_name ('quantaHome').create ()
     x = qa.quantity (d['value'], d['unit'])
     return qa.convert (x, unitstr)['value']
 
@@ -666,6 +666,12 @@ def _casac_imagetool ():
         return casac.casac.image ()
     return casac.homefinder.find_home_by_name ('imageHome').create ()
 
+
+def _casac_findwcoord (cs, kind):
+    v = cs.findcoordinate (kind)
+    if 'world' in v:
+        return np.atleast_1d (v['world'])
+    return v[2]
 
 class CasaCImage (AstroImage):
     # casac uses Fortran-style axis ordering, with innermost first.
@@ -683,20 +689,20 @@ class CasaCImage (AstroImage):
         super (CasaCImage, self).__init__ (path, mode)
         self._handle = _casac_imagetool ()
         self._handle.open (path) # no mode specifiable.
-        self.shape = self._handle.shape ()[::-1].copy ()
+        self.shape = np.asarray (self._handle.shape ())[::-1].copy ()
 
         cs = self._handle.coordsys ()
         naxis = self.shape.size
         # for world-to-pixel, we reverse the values in the array:
-        w2p = self._wax2pax = naxis - 1 - cs.axesmap (toworld=False)
+        w2p = self._wax2pax = naxis - 1 - np.asarray (cs.axesmap (toworld=False))
         # for pixel-to-world, we reverse the array ordering:
-        p2w = self._pax2wax = cs.axesmap (toworld=True)[::-1].copy ()
+        p2w = self._pax2wax = np.asarray (cs.axesmap (toworld=True))[::-1].copy ()
         assert p2w.size == self.shape.size
 
-        self._specax = w2p[cs.findcoordinate ('spectral')[2][0]]
-        #self._polax = w2p[cs.findcoordinate ('stokes')[2][0]]
-        self._lonax = w2p[cs.findcoordinate ('direction')[2][0]]
-        self._latax = w2p[cs.findcoordinate ('direction')[2][1]]
+        self._specax = w2p[_casac_findwcoord (cs, 'spectral')[0]]
+        #self._polax = w2p[_casac_findwcoord (cs, 'stokes')[0]]
+        self._lonax = w2p[_casac_findwcoord (cs, 'direction')[0]]
+        self._latax = w2p[_casac_findwcoord (cs, 'direction')[1]]
 
         self.axdescs = [None] * naxis
         names = cs.names ()
@@ -724,8 +730,11 @@ class CasaCImage (AstroImage):
     def read (self, squeeze=False, flip=False):
         self._checkOpen ()
 
-        blc = np.zeros (self.shape.size)
-        trc = self.shape[::-1].copy () - 1
+        # Older casac doesn't accept ndarrays, and we need to be careful
+        # to change from Numpy types to Python ints.
+        blc = [0] * self.shape.size
+        trc = [int (x) for x in (self.shape[::-1] - 1)]
+
         data = self._handle.getchunk (blc, trc, dropdeg=squeeze, getmask=False)
         data = data.T # does the right thing and gives us C-contiguous data
         mask = self._handle.getchunk (blc, trc, dropdeg=squeeze, getmask=True)
