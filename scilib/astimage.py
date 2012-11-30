@@ -29,7 +29,7 @@ from numpy import pi
 D2R = pi / 180 # if end up needing more of these, start using astutil.py
 R2D = 180 / pi
 
-__all__ = ('UnsupportedError AstroImage MIRIADImage CASAImage '
+__all__ = ('UnsupportedError AstroImage MIRIADImage PyrapImage '
            'FITSImage SimpleImage open').split ()
 
 
@@ -437,20 +437,20 @@ class MIRIADImage (AstroImage):
             os.unlink (self.path) # may be a symlink; rmtree rejects this
 
 
-def _casa_convert (d, unitstr):
+def _pyrap_convert (d, unitstr):
     from pyrap.quanta import quantity
     return quantity (d['value'], d['unit']).get_value (unitstr)
 
 
-class CASAImage (AstroImage):
+class PyrapImage (AstroImage):
     def __init__ (self, path, mode):
         try:
             from pyrap.images import image
         except ImportError:
-            raise UnsupportedError ('cannot open CASAcore images without the '
-                                    'Python module "pyrap.images"')
+            raise UnsupportedError ('cannot open CASAcore images in Pyrap mode without '
+                                    'the Python module "pyrap.images"')
 
-        super (CASAImage, self).__init__ (path, mode)
+        super (PyrapImage, self).__init__ (path, mode)
 
         # no mode specifiable
         self._handle = image (path)
@@ -473,9 +473,9 @@ class CASAImage (AstroImage):
         ii = self._handle.imageinfo ()
 
         if 'restoringbeam' in ii:
-            self.bmaj = _casa_convert (ii['restoringbeam']['major'], 'rad')
-            self.bmin = _casa_convert (ii['restoringbeam']['minor'], 'rad')
-            self.bpa = _casa_convert (ii['restoringbeam']['positionangle'], 'rad')
+            self.bmaj = _pyrap_convert (ii['restoringbeam']['major'], 'rad')
+            self.bmin = _pyrap_convert (ii['restoringbeam']['minor'], 'rad')
+            self.bpa = _pyrap_convert (ii['restoringbeam']['positionangle'], 'rad')
 
         # Make sure that angular units are always measured in radians,
         # because anything else is ridiculous.
@@ -939,7 +939,7 @@ def open (path, mode):
         return MIRIADImage (path, mode)
 
     if exists (join (path, 'table.dat')):
-        return CASAImage (path, mode)
+        return PyrapImage (path, mode)
 
     if isdir (path):
         raise UnsupportedError ('cannot infer format of image "%s"' % path)
