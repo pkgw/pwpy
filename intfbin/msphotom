@@ -60,7 +60,7 @@ Prints out
   MJD dt[min] re reErr im imErr mag magErr npts
 
 with sorted MJDs, one record for each timestamp present in the dataset,
-with all fluxes in ujy. dt is simply (MJD - MJD[0])/86400.
+with all fluxes in ujy. dt is simply (MJD - MJD[0])/1440.
 
 You will probably want to apply a moving smoothing window to the
 output of this program. The function smooth() in the source shows how
