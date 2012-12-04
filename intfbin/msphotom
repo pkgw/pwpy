@@ -363,7 +363,7 @@ def smooth (x, re, reerr, im, imerr, window):
 
 
 def cmdline (argv):
-    checkusage (__doc__, usageifnoargs=True)
+    checkusage (__doc__, argv, usageifnoargs=True)
     cfg = Config ().parse (argv[1:])
     process (cfg)
 
