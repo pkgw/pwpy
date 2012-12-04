@@ -57,10 +57,13 @@ requiring the source be unpolarized).
 
 Prints out
 
-  MJD dt[min] re reErr im imErr mag magErr npts
+  MJD(TT) dt[min] re reErr im imErr mag magErr npts
 
 with sorted MJDs, one record for each timestamp present in the dataset,
-with all fluxes in ujy. dt is simply (MJD - MJD[0])/1440.
+with all fluxes in ujy. dt is simply (MJD - MJD[0]) * 1440. The units
+of re, im, mag, and their uncertainties are microjansky by default,
+but see the datascale keyword, and there's no way to know if the
+data have actually been flux-calibrated or not.
 
 You will probably want to apply a moving smoothing window to the
 output of this program. The function smooth() in the source shows how
@@ -174,9 +177,11 @@ def process (cfg):
     if hasattr (casac, 'homefinder'): # CASA < 4.0.0?
         tb = casac.homefinder.find_home_by_name ('tableHome').create ()
         ms = casac.homefinder.find_home_by_name ('msHome').create ()
+        me = casac.homefinder.find_home_by_name ('measuresHome').create ()
     else:
         tb = casac.casac.table ()
         ms = casac.casac.ms ()
+        me = casac.casac.me ()
 
     # Read stuff in. Even if the weight values don't have their
     # absolute scale set correctly, we can still use them to set the
@@ -254,9 +259,18 @@ def process (cfg):
 
             for i in xrange (cols['time'].size): # all records
                 time = cols['time'][i]
-                tdata = tbins.get (time, None)
+                # get out of UTC as fast as we can! For some reason
+                # giving 'unit=s' below doesn't do what one might hope it would.
+                # CASA can convert to a variety of timescales; TAI is probably
+                # the safest conversion in terms of being helpful while remaining
+                # close to the fundamental data, but TT is possible and should
+                # be perfectly precise for standard applications.
+                mq = me.epoch ('utc', {'value': time / 86400., 'unit': 'd'})
+                mjdtt = me.measure (mq, 'tt')['m0']['value']
+
+                tdata = tbins.get (mjdtt, None)
                 if tdata is None:
-                    tdata = tbins[time] = [0., 0., 0., 0., 0]
+                    tdata = tbins[mjdtt] = [0., 0., 0., 0., 0]
 
                 if rephase:
                     uvw = cols['uvw'][:,i]
@@ -303,13 +317,12 @@ def process (cfg):
     ms.close ()
 
     # Could gain some efficiency by using a better data structure than a dict().
-    st = sorted (tbins.iterkeys ())
+    smjd = sorted (tbins.iterkeys ())
 
-    for t in st:
-        wd, wd2, wt, wt2, n = tbins[t]
+    for mjd in smjd:
+        wd, wd2, wt, wt2, n = tbins[mjd]
 
-        mjd = t / 86400.
-        dtmin = (t - st[0]) / 60.
+        dtmin = 1440 * (mjd - smjd[0])
         r_sc = wd.real / wt * cfg.datascale
         i_sc = wd.imag / wt * cfg.datascale
         r2_sc = wd2.real / wt * cfg.datascale**2
