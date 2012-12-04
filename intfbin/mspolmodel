@@ -1,0 +1,235 @@
+#! /usr/bin/env casa-python
+# -*- python -*-
+
+"""
+mspolmodel vis=<MS> field=<field specification>
+
+Insert polarization information for a model into a Measurement
+Set. Uses a built-in table of polarization properties to generate
+Stokes QUV information from CASA's build in Stokes I models.
+
+The only currently supported source is 3C286 in C band.
+"""
+
+import sys, tempfile, shutil, math
+from os.path import join
+from astutil import *
+from kwargv import ParseKeywords, Custom
+
+
+## quickutil: usage die
+#- snippet: usage.py (2012 Sep 20)
+#- SHA1: ac032a5db2efb5508569c4d5ba6eeb3bba19a7ca
+def showusage (docstring, short, stream, exitcode):
+    if stream is None:
+        from sys import stdout as stream
+    if not short:
+        print >>stream, 'Usage:', docstring.strip ()
+    else:
+        intext = False
+        for l in docstring.splitlines ():
+            if intext:
+                if not len (l):
+                    break
+                print >>stream, l
+            elif len (l):
+                intext = True
+                print >>stream, 'Usage:', l
+        print >>stream, \
+            '\nRun with a sole argument --help for more detailed usage information.'
+    raise SystemExit (exitcode)
+
+def checkusage (docstring, argv=None, usageifnoargs=False):
+    if argv is None:
+        from sys import argv
+    if len (argv) == 1 and usageifnoargs:
+        showusage (docstring, True, None, 0)
+    if len (argv) == 2 and argv[1] in ('-h', '--help'):
+        showusage (docstring, False, None, 0)
+
+def wrongusage (docstring, *rest):
+    import sys
+    intext = False
+
+    if len (rest) == 0:
+        detail = 'invalid command-line arguments'
+    elif len (rest) == 1:
+        detail = rest[0]
+    else:
+        detail = rest[0] % tuple (rest[1:])
+
+    print >>sys.stderr, 'error:', detail, '\n' # extra NL
+    showusage (docstring, True, sys.stderr, 1)
+#- snippet: die.py (2012 Sep 20)
+#- SHA1: 3bdd3282e52403d2dec99d72680cb7bc95c99843
+def die (fmt, *args):
+    if not len (args):
+        raise SystemExit ('error: ' + str (fmt))
+    raise SystemExit ('error: ' + (fmt % args))
+## end
+
+
+class Config (ParseKeywords):
+    vis = Custom (str, required=True)
+    field = Custom (str, required=True)
+
+
+class PolSource (object):
+    name = None # fed to imager.predictcomp(objname)
+    ra = None # rad
+    dec = None # rad
+    models = None
+
+    def __init__ (self, **kwargs):
+        self.__dict__.update (kwargs)
+
+
+class PolModel (object):
+    name = None
+    fmin = None # GHz
+    fmax = None # GHz
+    polfrac = None # [0,1]
+    polpa = None # degr
+
+    def __init__ (self, **kwargs):
+        self.__dict__.update (kwargs)
+
+    def getquv (self, i):
+        # In the future, we might have different models that derive QUV
+        # from I in a different way. Probably won't, though.
+
+        a = self.polpa * D2R
+        p = i * self.polfrac
+        return p * math.cos (a), p * math.sin (a), 0.
+
+
+postol = 1 * A2R
+standard = 'Perley-Butler 2010'
+
+sources = [
+    PolSource (name='3C286', ra=-2.74392753, dec=0.53248521,
+               models=[PolModel (name='C', fmin=4, fmax=8, polfrac=0.112, polpa=66.)])
+    ]
+
+def _rmtree_warn (func, path, excinfo):
+    print >>sys.stderr, 'warning: while cleaning up temporary path %s: %s (%s)' \
+          % (path, excinfo[0], func)
+
+
+def polmodel (cfg):
+    import casac
+
+    if hasattr (casac, 'casac'):
+        ms = casac.casac.ms ()
+        tb = casac.casac.table ()
+        im = casac.casac.imager ()
+        cl = casac.casac.componentlist ()
+    else:
+        ms = casac.homefinder.find_home_by_name ('msHome').create ()
+        tb = casac.homefinder.find_home_by_name ('tableHome').create ()
+        im = casac.homefinder.find_home_by_name ('imagerHome').create ()
+        cl = casac.homefinder.find_home_by_name ('componentlistHome').create ()
+
+    # Set up MS selection so we know what data we actually care about.
+
+    ms.open (cfg.vis)
+    ms.msselect (dict (field=cfg.field))
+    rangeinfo = ms.range ('data_desc_id field_id'.split ())
+    ddids = rangeinfo['data_desc_id']
+    fields = rangeinfo['field_id']
+
+    # Check that we know the field and pull up its model
+
+    if fields.size != 1:
+        die ('selection should pick exactly one field, but got %d', fields.size)
+
+    tb.open (join (cfg.vis, 'FIELD'))
+    refdir = tb.getcell ('REFERENCE_DIR', fields[0])
+    tb.close ()
+
+    if refdir.shape[1] != 1:
+        die ('selected field %s has a time-variable reference direction, which I can\'t handle', cfg.field)
+
+    ra, dec = refdir[:,0]
+
+    for source in sources:
+        if sphdist (dec, ra, source.dec, source.ra) < postol:
+            break
+    else:
+        die ('found no match in my data table for field %s', cfg.field)
+
+    # Now we can get the spws and check that we have a model for them.
+
+    tb.open (join (cfg.vis, 'DATA_DESCRIPTION'))
+    ddspws = tb.getcol ('SPECTRAL_WINDOW_ID')
+    tb.close ()
+
+    spws = list (set (ddspws[ddid] for ddid in ddids))
+
+    freqranges = {}
+    models = {}
+    allfreqs = []
+    tb.open (join (cfg.vis, 'SPECTRAL_WINDOW'))
+    for spw in spws:
+        freqs = tb.getcell ('CHAN_FREQ', spw)
+        freqranges[spw] = (freqs[0], freqs[-1])
+        allfreqs += [freqs[0], freqs[-1]]
+
+        for model in source.models:
+            if freqs[0] >= model.fmin * 1e9 and freqs[-1] <= model.fmax * 1e9:
+                models[spw] = model
+                break
+        else:
+            die ('spw %d is out of frequency bounds for all of my models of '
+                 'field %s (%s)', spw, cfg.field, source.name)
+    tb.close ()
+
+    # Now it's worth using predictcomp() to get the Stokes I fluxes.
+
+    workdir = tempfile.mkdtemp (prefix='mspolmodel')
+    try:
+        cp = im.predictcomp (objname=source.name, standard=standard, freqs=allfreqs,
+                             pfx=workdir + '/')
+        cl.open (cp)
+        if cl.length () != 1:
+            die ('expected one component in predicted list; got %d (%s)',
+                 cl.length (), cp)
+        stokesi = cl.getcomponent (0)['spectrum']['ival']
+        # log=False: we'll have to run the risk that the user won't be aware that
+        # we closed the component list structure. Scary.
+        cl.close (log=False)
+    finally:
+        shutil.rmtree (workdir, onerror=_rmtree_warn)
+
+    # And now we have everything we need. Invoke setjy() a bunch.
+
+    im.open (cfg.vis, usescratch=False)
+
+    for i, spw in enumerate (spws):
+        model = models[spw]
+        f1, f2 = freqranges[spw]
+        i1, i2 = stokesi[i*2:i*2+2]
+
+        spindex = math.log (i2 / i1) / math.log (f2 / f1)
+        q, u, v = model.getquv (i1)
+        reffreq = '%.3fMHz' % (f1 * 1e-6)
+
+        #print '%2d/%d: %d %.3f-%.3f %.3f-%.3f [%.3f %.3f %.3f %3f] %.3f %s' \
+        #      % (i + 1, len (spws), spw, f1*1e-9, f2*1e-9, i1, i2,
+        #         i1, q, u, v, spindex, reffreq)
+        im.setjy (field=cfg.field, spw=str(spw), modimage='',
+                  fluxdensity=[i1, q, u, v], spix=spindex, standard=standard,
+                  scalebychan=True, reffreq=reffreq, usescratch=False)
+
+    im.close ()
+
+
+def cmdline (argv):
+    checkusage (__doc__, argv, usageifnoargs=True)
+    cfg = Config ().parse (argv[1:])
+    polmodel (cfg)
+
+
+if __name__ == '__main__':
+    cmdline (sys.argv)
+
