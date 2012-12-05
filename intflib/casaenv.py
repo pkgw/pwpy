@@ -99,6 +99,18 @@ __all__ += [n for n in dir (math) if n[0] != '_']
 # version of the Python interpreter, and the needed programs will be
 # distributed with it. If we make sure that the directory containing
 # the current Python interpreter is in $PATH, we should be OK.
+#
+# We could avoid some of this rigamarole if we imported tasks as the
+# task_foo modules rather than the foo_cli modules. (To do this,
+# rather than slurping tasks.py, we'd have to get the list of tasks
+# ourselves. We could find tasks.py and parse it ...) This would also
+# avoid the heinous _setup_toplevel_hooks() stuff below. On the other
+# hand, the task_foo functions have the problem of assuming that their
+# keyword parameters are not None even though that's the default for
+# all of them. The defaults are embedded in the foo_cli modules but it
+# seems impractical to extract them in any reasonable way.
+#
+# Or we could parse the task definition XML files in share/xml/...
 
 def _setup_exepath ():
     import sys, os.path
@@ -118,6 +130,23 @@ _tasks_badnames = frozenset ('allcat category deprecated experimental inspect ke
                              'mytasks odict os pdb string sys tget tget_check_params '
                              'tget_defaults tget_description thecats'.split ())
 __all__ += [n for n in dir (tasks) if n[0] != '_' and n not in _tasks_badnames]
+
+
+# When tasks are invoked as Python functions, they reach up into the
+# top stack frame and call functions called update_params and
+# saveinputs. Because you know what would be unreasonable about that?
+
+def _setup_toplevel_hooks ():
+    def dummy_function (*args, **kwargs):
+        pass
+
+    import sys, inspect
+    top = len (inspect.stack ()) - 1
+    topglobals = sys._getframe (top).f_globals
+    topglobals['update_params'] = dummy_function
+    topglobals['saveinputs'] = dummy_function
+
+_setup_toplevel_hooks ()
 
 
 # wrap up. I don't know if this 'startup' flag changes anything we care about.
