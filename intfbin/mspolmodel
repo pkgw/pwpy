@@ -14,6 +14,7 @@ The only currently supported source is 3C286 in C band.
 import sys, tempfile, shutil, math
 from os.path import join
 from astutil import *
+import casautil
 from kwargv import ParseKeywords, Custom
 
 
@@ -117,18 +118,10 @@ def _rmtree_warn (func, path, excinfo):
 
 
 def polmodel (cfg):
-    import casac
-
-    if hasattr (casac, 'casac'):
-        ms = casac.casac.ms ()
-        tb = casac.casac.table ()
-        im = casac.casac.imager ()
-        cl = casac.casac.componentlist ()
-    else:
-        ms = casac.homefinder.find_home_by_name ('msHome').create ()
-        tb = casac.homefinder.find_home_by_name ('tableHome').create ()
-        im = casac.homefinder.find_home_by_name ('imagerHome').create ()
-        cl = casac.homefinder.find_home_by_name ('componentlistHome').create ()
+    ms = casautil.tools.ms ()
+    tb = casautil.tools.table ()
+    im = casautil.tools.imager ()
+    cl = casautil.tools.componentlist ()
 
     # Set up MS selection so we know what data we actually care about.
 
