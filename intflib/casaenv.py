@@ -89,7 +89,28 @@ from math import *
 __all__ += [n for n in dir (math) if n[0] != '_']
 
 
-# tasks module and its names
+# tasks module and its names. The "taskmanager" module, imported by
+# tasks, tries to launch the programs "ipcontroller" and "ipengine",
+# and I see no way to trick it into not doing that. They may not be in
+# $PATH in which case we crash. taskmanager tries to allow
+# customization of the paths to these programs, but it uses gross
+# logic to search the stack for the 'casa' dict, and that won't work
+# for us. So we need to futz with $PATH. We'll be running in the CASA
+# version of the Python interpreter, and the needed programs will be
+# distributed with it. If we make sure that the directory containing
+# the current Python interpreter is in $PATH, we should be OK.
+
+def _setup_exepath ():
+    import sys, os.path
+
+    path = os.environ['PATH'].split (':')
+    pydir = os.path.dirname (sys.executable)
+
+    if pydir not in path:
+        path.append (pydir)
+        os.environ['PATH'] = ':'.join (path)
+
+_setup_exepath ()
 
 import tasks
 from tasks import *
