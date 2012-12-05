@@ -1,7 +1,7 @@
 """casautil - utilities for using the CASA Python libraries
 """
 
-__all__ = ('INVERSE_C_MS INVERSE_C_MNS pol_names pol_to_miriad tools').split ()
+__all__ = ('INVERSE_C_MS INVERSE_C_MNS pol_names pol_to_miriad msselect_keys tools').split ()
 
 
 # Some constants that can be useful
@@ -22,12 +22,19 @@ pol_names = {
 }
 
 pol_to_miriad = {
+    # see mirtask.util for the MIRIAD magic numbers.
     1: 1, 2: 2, 3: 3, 4: 4, # IQUV
     5: -1, 6: -3, 7: -4, 8: -2, # R/L
     9: -5, 10: -7, 11: -8, 12: -6, # X/Y
     # rest are inexpressible
 }
 
+# "polarization" is technically valid, but it pretty much doesn't do
+# what you'd want since records generally contain multiple
+# pols. ms.selectpolarization() should be used instead. Maybe ditto
+# for spw?
+msselect_keys = frozenset ('array baseline field observation '
+                           'scan scaninent spw taql time uvdist'.split ())
 
 # Tool factories.
 
