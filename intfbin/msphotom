@@ -72,7 +72,8 @@ window since im(t) should give a sense of the random variation in the
 data.
 """
 
-import sys, os.path, casac, numpy as np
+import sys, os.path, numpy as np
+import casautil
 from kwargv import ParseKeywords, Custom
 from astutil import *
 
@@ -168,20 +169,11 @@ class Config (ParseKeywords):
     time = str
     uvdist = str
 
-INVERSE_C_MS = 3.3356409519815204e-09 # inverse (speed of light in m/s)
-
-mssels = frozenset ('array baseline field observation scan '
-                    'scanintent spw taql time uvdist'.split ())
 
 def process (cfg):
-    if hasattr (casac, 'homefinder'): # CASA < 4.0.0?
-        tb = casac.homefinder.find_home_by_name ('tableHome').create ()
-        ms = casac.homefinder.find_home_by_name ('msHome').create ()
-        me = casac.homefinder.find_home_by_name ('measuresHome').create ()
-    else:
-        tb = casac.casac.table ()
-        ms = casac.casac.ms ()
-        me = casac.casac.me ()
+    tb = casautil.tools.table ()
+    ms = casautil.tools.ms ()
+    me = casautil.tools.measures ()
 
     # Read stuff in. Even if the weight values don't have their
     # absolute scale set correctly, we can still use them to set the
@@ -197,7 +189,7 @@ def process (cfg):
 
     ms.open (cfg.vis)
     totrows = ms.nrow ()
-    sels = dict ((n, cfg.get (n)) for n in mssels
+    sels = dict ((n, cfg.get (n)) for n in casautil.msselect_keys
                  if cfg.get (n) is not None)
     ms.msselect (sels)
 
@@ -255,7 +247,7 @@ def process (cfg):
                 # Trying to be careful in case CASA changes.
                 assert freqs.shape[1] == 1, 'internal inconsistency, chan_freq??'
                 # convert to m^-1 so we can multiply against UVW directly:
-                freqs = freqs[:,0] * INVERSE_C_MS
+                freqs = freqs[:,0] * casautil.INVERSE_C_MS
 
             for i in xrange (cols['time'].size): # all records
                 time = cols['time'][i]
