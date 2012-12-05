@@ -2,12 +2,12 @@
 # Copyright 2012 Peter Williams
 # Licensed under the GNU General Public License version 3 or higher
 
-CASAPATH=%casa%
-
-if [ -d $CASAPATH/lib64 ] ; then
-    lib=$CASAPATH/lib64
+if [ -d %casa%/lib64 ] ; then
+    lib=%casa%/lib64
+    CASAPATH="%casa% linux_64b whatever"
 else
-    lib=$CASAPATH/lib
+    lib=%casa%/lib
+    CASAPATH="%casa% linux_gnu whatever"
 fi
 
 if [ x"$LD_LIBRARY_PATH" = x ] ; then
