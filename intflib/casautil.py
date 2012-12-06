@@ -74,7 +74,7 @@ def logger (filter='WARN'):
 
     sink.showconsole (True)
     sink.setglobal (True)
-    sink.filter (filter)
+    sink.filter (filter.upper ())
     return sink
 
 
