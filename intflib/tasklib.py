@@ -273,9 +273,9 @@ def flagmanager_cli (argv):
         wrongusage (flagmanager_doc, 'unknown flagmanager mode "%s"' % mode)
 
 
-# "split" functionality
+# split
 #
-# note: spw=999 -> except; scan=999 -> no output (or error) generated
+# note: spw=999 -> exception; scan=999 -> no output, or error, generated
 
 split_doc = \
 """
