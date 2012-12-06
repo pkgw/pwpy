@@ -316,7 +316,7 @@ standard='Perley-Butler 2013'
 Supported selection keywords: field obs scan spw time
 
 And standard logging keyword "loglevel" (default: warn; allowed:
-  severe warn info info1 info2 info3 info5 info5 debug1 debug2 debugging)
+  severe warn info info1 info2 info3 info4 info5 debug1 debug2 debugging)
 """
 
 class SetjyConfig (ParseKeywords):
@@ -405,7 +405,7 @@ Also accepts standard u-v filtering keywords:
   baseline correlation field intent obs spw subarray taql time uvrange
 
 And standard logging keyword "loglevel" (default: warn; allowed:
-  severe warn info info1 info2 info3 info5 info5 debug1 debug2 debugging)
+  severe warn info info1 info2 info3 info4 info5 debug1 debug2 debugging)
 """
 
 class SplitConfig (ParseKeywords):
