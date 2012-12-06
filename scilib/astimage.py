@@ -649,22 +649,14 @@ class PyrapImage (AstroImage):
             os.unlink (self.path) # may be a symlink; rmtree rejects this
 
 
+# 'casac' images. I try to avoid having modules in scilib/ rely on modules
+# in intflib/, but if we're using casac anyway ... whatever
+
 def _casac_convert (d, unitstr):
-    import casac
-    if hasattr (casac, 'casac'):
-        qa = casac.casac.quanta ()
-    else:
-        qa = casac.homefinder.find_home_by_name ('quantaHome').create ()
+    import casautil
+    qa = casautil.tools.quanta ()
     x = qa.quantity (d['value'], d['unit'])
     return qa.convert (x, unitstr)['value']
-
-
-def _casac_imagetool ():
-    import casac
-
-    if hasattr (casac, 'casac'): # CASA >= 3.4?
-        return casac.casac.image ()
-    return casac.homefinder.find_home_by_name ('imageHome').create ()
 
 
 def _casac_findwcoord (cs, kind):
@@ -681,13 +673,13 @@ class CasaCImage (AstroImage):
 
     def __init__ (self, path, mode):
         try:
-            import casac
+            import casautil
         except ImportError:
             raise UnsupportedError ('cannot open CASAcore images in casac mode without '
-                                    'the Python module "casac"')
+                                    'the Python modules "casautil" and "casac"')
 
         super (CasaCImage, self).__init__ (path, mode)
-        self._handle = _casac_imagetool ()
+        self._handle = casautil.tools.image ()
         self._handle.open (path) # no mode specifiable.
         self.shape = np.asarray (self._handle.shape ())[::-1].copy ()
 
@@ -808,7 +800,8 @@ class CasaCImage (AstroImage):
         # if openmode is not None. In practice, I'd have to mess
         # with __init__() and who cares?
 
-        ia = _casac_imagetool ()
+        import casautil
+        ia = casautil.tools.image ()
         ia.newimagefromimage (self.path, path, overwrite=overwrite)
         ia.close ()
 
@@ -846,7 +839,7 @@ try:
     CASAImage = PyrapImage
 except ImportError:
     try:
-        import casac
+        import casac, casautil
         CASAImage = CasaCImage
     except ImportError:
         CASAImage = _CasaUnsupportedImage
