@@ -227,33 +227,36 @@ def flagmanager_cli (argv):
     ms = argv[2]
 
     if mode == 'list':
+        cu.logger ('info')
+    elif mode == 'delete':
+        # it WARNs 'deleting version xxx' ... yargh
+        cu.logger ('severe')
+    else:
+        cu.logger ()
+
+    try:
+        factory = cu.tools.agentflagger
+    except AttributeError:
+        factory = cu.tools.testflagger
+
+    af = factory ()
+    af.open (ms)
+
+    if mode == 'list':
         if len (argv) != 3:
             wrongusage (flagmanager_doc, 'expect exactly one argument in list mode')
-
-        cu.logger ('info')
-        af = cu.tools.agentflagger ()
-        af.open (ms)
         af.getflagversionlist ()
-        af.done ()
     elif mode == 'save':
         if len (argv) != 4:
             wrongusage (flagmanager_doc, 'expect exactly two arguments in save mode')
         name = argv[3]
-        cu.logger ()
-        af = cu.tools.agentflagger ()
-        af.open (ms)
         af.saveflagversion (versionname=name, merge='replace',
                             comment='version "%s" created by casatask flagmanager' % name)
-        af.done ()
     elif mode == 'restore':
         if len (argv) != 4:
             wrongusage (flagmanager_doc, 'expect exactly two arguments in restore mode')
         name = argv[3]
-        cu.logger ()
-        af = cu.tools.agentflagger ()
-        af.open (ms)
         af.restoreflagversion (versionname=name, merge='replace')
-        af.done ()
     elif mode == 'delete':
         if len (argv) != 4:
             wrongusage (flagmanager_doc, 'expect exactly two arguments in delete mode')
@@ -264,13 +267,11 @@ def flagmanager_cli (argv):
             raise RuntimeError ('version "%s" doesn\'t exist in "%s.flagversions"'
                                 % (name, ms))
 
-        cu.logger ('severe') # WARNs that we're deleting the damn version!
-        af = cu.tools.agentflagger ()
-        af.open (ms)
-        print af.deleteflagversion (versionname=name)
-        af.done ()
+        af.deleteflagversion (versionname=name)
     else:
         wrongusage (flagmanager_doc, 'unknown flagmanager mode "%s"' % mode)
+
+    af.done ()
 
 
 # split
