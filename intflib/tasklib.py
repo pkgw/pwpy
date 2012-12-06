@@ -21,6 +21,7 @@ from kwargv import ParseKeywords, Custom
 
 __all__ = ('clearcal clearcal_cli '
            'concat concat_cli '
+           'flagmanager_cli '
            'split split_cli SplitConfig '
            'cmdline_driver').split ()
 
@@ -202,6 +203,74 @@ def concat_cli (argv):
 
     cu.logger ()
     concat (argv[1:-1], argv[-1], timesort)
+
+
+# flagmanager. Not really complicated enough to make it worth making a
+# modular implementation to be driven from the CLI.
+
+flagmanager_doc = \
+"""
+casatask flagmanager list <ms>
+casatask flagmanager save <ms> <name>
+casatask flagmanager restore <ms> <name>
+casatask flagmanager delete <ms> <name>
+"""
+
+def flagmanager_cli (argv):
+    import os.path
+    checkusage (flagmanager_doc, argv, usageifnoargs=True)
+
+    if len (argv) < 3:
+        wrongusage (flagmanager_doc, 'expect at least a mode and an MS name')
+
+    mode = argv[1]
+    ms = argv[2]
+
+    if mode == 'list':
+        if len (argv) != 3:
+            wrongusage (flagmanager_doc, 'expect exactly one argument in list mode')
+
+        cu.logger ('info')
+        af = cu.tools.agentflagger ()
+        af.open (ms)
+        af.getflagversionlist ()
+        af.done ()
+    elif mode == 'save':
+        if len (argv) != 4:
+            wrongusage (flagmanager_doc, 'expect exactly two arguments in save mode')
+        name = argv[3]
+        cu.logger ()
+        af = cu.tools.agentflagger ()
+        af.open (ms)
+        af.saveflagversion (versionname=name, merge='replace',
+                            comment='version "%s" created by casatask flagmanager' % name)
+        af.done ()
+    elif mode == 'restore':
+        if len (argv) != 4:
+            wrongusage (flagmanager_doc, 'expect exactly two arguments in restore mode')
+        name = argv[3]
+        cu.logger ()
+        af = cu.tools.agentflagger ()
+        af.open (ms)
+        af.restoreflagversion (versionname=name, merge='replace')
+        af.done ()
+    elif mode == 'delete':
+        if len (argv) != 4:
+            wrongusage (flagmanager_doc, 'expect exactly two arguments in delete mode')
+        name = argv[3]
+
+        if not os.path.isdir (os.path.join (ms + '.flagversions', 'flags.' + name)):
+            # This condition only results in a WARN from deleteflagversion ()!
+            raise RuntimeError ('version "%s" doesn\'t exist in "%s.flagversions"'
+                                % (name, ms))
+
+        cu.logger ('severe') # WARNs that we're deleting the damn version!
+        af = cu.tools.agentflagger ()
+        af.open (ms)
+        print af.deleteflagversion (versionname=name)
+        af.done ()
+    else:
+        wrongusage (flagmanager_doc, 'unknown flagmanager mode "%s"' % mode)
 
 
 # "split" functionality
