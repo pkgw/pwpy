@@ -274,6 +274,109 @@ def flagmanager_cli (argv):
     af.done ()
 
 
+# setjy
+
+setjy_doc = \
+"""
+casatask setjy vis= [keywords]
+
+Insert model data into a measurement set. We force usescratch=False
+and scalebychan=True. You probably want to specify "field".
+
+fluxdensity=
+  Up to four comma-separated numbers giving Stokes IQUV intensities in
+  Jy. Default values are [-1, 0, 0, 0]. If the Stokes I intensity is
+  negative (i.e., the default), a "sensible default" will be used:
+  detailed spectral models if the source is known (see "standard"), or
+  1 otherwise. If it is zero and "modimage" is used, the flux density
+  of the model image is used. The built-in standards do NOT have
+  polarimetric information, so for pol cal you do need to manually
+  specify the flux density information -- or see the program
+  "mspolmodel".
+
+modimage=
+  An image to use as the basis for the source's spatial structure and,
+  potentialy, flux density (if fluxdensity=0). Only usable for Stokes
+  I.  If the verbatim value of "modimage" can't be opened as a path,
+  it is assumed to be relative to the CASA data directory; a typical
+  value might be "nrao/VLA/CalModels/3C286_C.im".
+
+spindex=
+reffreq=
+  If using fluxdensity, these specify the spectral dependence of the
+  values, such that S = fluxdensity * (freq/reffreq)**spindex. Reffreq
+  is in GHz. Default values are 0 and 1, giving no spectral
+  dependence.
+
+standard='Perley-Butler 2013'
+  Solar-system standards are not supported by this implementation, so
+  acceptable values are: Baars, Perley 90, Perley-Taylor 95,
+  Perley-Taylor 99, Perley-Butler 2010, Perley-Butler 2013.
+
+Supported selection keywords: field obs scan spw time
+
+And standard logging keyword "loglevel" (default: warn; allowed:
+  severe warn info info1 info2 info3 info5 info5 debug1 debug2 debugging)
+"""
+
+class SetjyConfig (ParseKeywords):
+    vis = Custom (str, required=True)
+    modimage = str
+    fluxdensity = [-1., 0., 0., 0.]
+    spindex = 0.
+    reffreq = 1. # GHz
+    standard = 'Perley-Butler 2013'
+
+    # supported selection keywords:
+    field = str
+    obs = str
+    scan = str
+    spw = str
+    time = str
+
+    # teeny hack for CLI
+    loglevel = 'warn'
+
+
+def setjy (cfg):
+    import os.path
+    kws = {}
+
+    for kw in 'field fluxdensity time scan spw standard'.split ():
+        v = getattr (cfg, kw)
+        if v is None:
+            v = ''
+        kws[kw] = v
+
+    kws['reffreq'] = str (cfg.reffreq) + 'GHz'
+    kws['observation'] = cfg.obs or ''
+    kws['spix'] = cfg.spindex
+    kws['scalebychan'] = True # don't think you'd ever want false??
+
+    if cfg.modimage is None:
+        kws['modimage'] = ''
+    else:
+        if os.path.isdir (cfg.modimage):
+            mi = cfg.modimage
+        else:
+            mi = cu.datadir (cfg.modimage)
+            if not os.path.isdir (mi):
+                raise RuntimeError ('no model image "%s" or "%s"' % (cfg.modimage, mi))
+        kws['modimage'] = mi
+
+    im = cu.tools.imager ()
+    im.open (cfg.vis, usescratch=False) # don't think you'll ever want True?
+    im.setjy (**kws)
+    im.close ()
+
+
+def setjy_cli (argv):
+    checkusage (setjy_doc, argv, usageifnoargs=True)
+    cfg = SetjyConfig ().parse (argv[1:])
+    cu.logger (cfg.loglevel)
+    setjy (cfg)
+
+
 # split
 #
 # note: spw=999 -> exception; scan=999 -> no output, or error, generated
