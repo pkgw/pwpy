@@ -12,13 +12,10 @@ else
 fi
 
 casa-python /dev/fd/0 $1 <<'EOF' |sed -e 's/^.*ms::summary+*.//' |$pager
-import sys
-import casac
-
-log = casac.casac.logsink ()
+import sys, casautil
+log = casautil.logger ('info')
 log.setlogfile ('/dev/fd/1')
-log.setglobal (True)
-ms = casac.casac.ms ()
+ms = casautil.tools.ms ()
 ms.open (sys.argv[1])
 ms.summary (verbose=True)
 ms.close ()
