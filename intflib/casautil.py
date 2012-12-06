@@ -5,7 +5,7 @@
 """
 
 __all__ = ('INVERSE_C_MS INVERSE_C_MNS pol_names pol_to_miriad msselect_keys '
-           'logger tools').split ()
+           'datadir logger tools').split ()
 
 
 # Some constants that can be useful
@@ -39,6 +39,31 @@ pol_to_miriad = {
 # for spw?
 msselect_keys = frozenset ('array baseline field observation '
                            'scan scaninent spw taql time uvdist'.split ())
+
+
+# Finding the data directory
+
+def datadir (*subdirs):
+    import os.path
+
+    if 'CASAPATH' in os.environ:
+        data = os.path.join (os.environ['CASAPATH'].split ()[0], 'data')
+    else:
+        import casac
+
+        prevp = None
+        p = os.path.dirname (casac.__file__)
+        while len (p) and p != prevp:
+            data = os.path.join (p, 'data')
+            if os.path.isdir (data):
+                break
+            prevp = p
+            p = os.path.dirname (p)
+
+    if not os.path.isdir (data):
+        raise RuntimeError ('cannot identify CASA data directory')
+
+    return os.path.join (data, *subdirs)
 
 
 # Trying to use the logging facility in a sane way.
