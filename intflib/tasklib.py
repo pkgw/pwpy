@@ -17,7 +17,8 @@ line.
 import casautil as cu
 from kwargv import ParseKeywords, Custom
 
-__all__ = ('SplitConfig split split_cli '
+__all__ = ('split split_cli SplitConfig '
+           'concat concat_cli '
            'cmdline_driver').split ()
 
 
@@ -167,6 +168,67 @@ def split_cli (argv):
     cfg = SplitConfig ().parse (argv[1:])
     cu.logger (cfg.loglevel.upper ()) # log warnings, errors to stderr
     split (cfg)
+
+
+# concat
+
+concat_doc = \
+"""
+casatask concat [-s] <input vises ...> <output vis>
+
+Concatenate the visibility measurement sets.
+
+-s - sort the output in time
+"""
+
+concat_freqtol = 1e-5
+concat_dirtol = 1e-5
+
+def concat (invises, outvis, timesort=False):
+    import os.path
+    tb = cu.tools.table ()
+    ms = cu.tools.ms ()
+
+    if os.path.exists (outvis):
+        raise RuntimeError ('output "%s" already exists' % outvis)
+
+    for invis in invises:
+        if not os.path.isdir (invis):
+            raise RuntimeError ('input "%s" does not exist' % invis)
+
+    tb.open (invises[0])
+    tb.copy (outvis, deep=True, valuecopy=True)
+    tb.close ()
+
+    ms.open (outvis, nomodify=False)
+
+    for invis in invises[1:]:
+        ms.concatenate (msfile=invis, freqtol=concat_freqtol,
+                        dirtol=concat_dirtol)
+
+    ms.writehistory (message='taskname=tasklib.concat', origin='tasklib.concat')
+    ms.writehistory (message='vis = ' + ', '.join (invises), origin='tasklib.concat')
+    ms.writehistory (message='timesort = ' + 'FT'[int (timesort)], origin='tasklib.concat')
+
+    if timesort:
+        ms.timesort ()
+
+    ms.close ()
+
+
+def concat_cli (argv):
+    checkusage (concat_doc, argv, usageifnoargs=True)
+
+    argv = list (argv)
+    timesort = '-s' in argv
+    if timesort:
+        sys.argv.remove ('-s')
+
+    if len (argv) < 3:
+        wrongusage (concat_doc, 'need at least two arguments')
+
+    cu.logger ()
+    concat (argv[1:-1], argv[-1], timesort)
 
 
 # Driver for command-line access
