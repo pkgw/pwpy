@@ -19,7 +19,8 @@ from kwargv import ParseKeywords, Custom
 
 # Keep the tasks alphabetized!
 
-__all__ = ('concat concat_cli '
+__all__ = ('clearcal clearcal_cli '
+           'concat concat_cli '
            'split split_cli SplitConfig '
            'cmdline_driver').split ()
 
@@ -74,6 +75,72 @@ def die (fmt, *args):
         raise SystemExit ('error: ' + str (fmt))
     raise SystemExit ('error: ' + (fmt % args))
 ## end
+
+
+# clearcal
+
+clearcal_doc = \
+"""
+casatask clearcal [-w] <vis1> [more vises...]
+
+Fill the imaging and calibration columns (MODEL_DATA, CORRECTED_DATA,
+IMAGING_WEIGHT) of each measurement set with default values, creating
+the columns if necessary.
+
+-w - only create and fill the IMAGING_WEIGHT column
+"""
+
+clearcal_imaging_col_tmpl = {'_c_order': True,
+                             'comment': '',
+                             'dataManagerGroup': '',
+                             'dataManagerType': '',
+                             'keywords': {},
+                             'maxlen': 0,
+                             'ndim': 1,
+                             'option': 0,
+                             'shape': None,
+                             'valueType': 'float'}
+clearcal_imaging_dminfo_tmpl = {'TYPE': 'TiledShapeStMan',
+                                'SPEC': {'DEFAULTTILESHAPE': [32, 128]},
+                                'NAME': 'imagingweight'}
+
+def clearcal (vis, weightonly=False):
+    tb = cu.tools.table ()
+    cb = cu.tools.calibrater ()
+
+    # cb.open() will create the tables if they're not present, so
+    # if that's the case, we don't actually need to run initcalset()
+
+    tb.open (vis, nomodify=False)
+    colnames = tb.colnames ()
+    needinit = ('MODEL_DATA' in colnames) or ('CORRECTED_DATA' in colnames)
+    if 'IMAGING_WEIGHT' not in colnames:
+        c = dict (clearcal_imaging_col_tmpl)
+        c['shape'] = tb.getcell ('DATA', 0).shape[-1:]
+        tb.addcols ({'IMAGING_WEIGHT': c}, clearcal_imaging_dminfo_tmpl)
+    tb.close ()
+
+    if not weightonly:
+        cb.open (vis)
+        if needinit:
+            cb.initcalset ()
+        cb.close ()
+
+
+def clearcal_cli (argv):
+    checkusage (clearcal_doc, argv, usageifnoargs=True)
+
+    argv = list (argv)
+    weightonly = '-w' in argv
+    if weightonly:
+        sys.argv.remove ('-w')
+
+    if len (argv) < 2:
+        wrongusage (clearcal_doc, 'need at least one argument')
+
+    cu.logger ()
+    for vis in argv[1:]:
+        clearcal (vis, weightonly=weightonly)
 
 
 # concat
