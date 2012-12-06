@@ -1,7 +1,8 @@
 """casautil - utilities for using the CASA Python libraries
 """
 
-__all__ = ('INVERSE_C_MS INVERSE_C_MNS pol_names pol_to_miriad msselect_keys tools').split ()
+__all__ = ('INVERSE_C_MS INVERSE_C_MNS pol_names pol_to_miriad msselect_keys '
+           'logger tools').split ()
 
 
 # Some constants that can be useful
@@ -35,6 +36,44 @@ pol_to_miriad = {
 # for spw?
 msselect_keys = frozenset ('array baseline field observation '
                            'scan scaninent spw taql time uvdist'.split ())
+
+
+# Trying to use the logging facility in a sane way.
+#
+# As soon as you create a logsink, it creates a file called casapy.log.
+# So we do some junk to not leave turds all around the filesystem.
+
+def _rmtree_error (func, path, excinfo):
+    import sys
+    print >>sys.stderr, 'warning: couldn\'t delete temporary file %s: %s (%s)' \
+        % (path, excinfo[0], func)
+
+
+def logger (filter='WARN'):
+    import os, shutil, tempfile
+
+    cwd = os.getcwd ()
+    tempdir = None
+
+    try:
+        tempdir = tempfile.mkdtemp (prefix='casautil')
+
+        try:
+            os.chdir (tempdir)
+            sink = tools.logsink ()
+            sink.setlogfile (os.devnull)
+            os.unlink ('casapy.log')
+        finally:
+            os.chdir (cwd)
+    finally:
+        if tempdir is not None:
+            shutil.rmtree (tempdir, onerror=_rmtree_error)
+
+    sink.showconsole (True)
+    sink.setglobal (True)
+    sink.filter (filter)
+    return sink
+
 
 # Tool factories.
 
