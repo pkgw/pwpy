@@ -26,7 +26,7 @@ output image will always be CASA format.
 Use -f to overwrite the output image if it exists.
 """
 
-import sys, casac, os.path
+import sys, os.path, casautil
 
 ## quickutil: die usage
 #- snippet: die.py (2012 Mar 29)
@@ -81,11 +81,6 @@ def wrongusage (docstring, *rest):
 
 checkusage (__doc__, usageifnoargs=True)
 
-if hasattr (casac, 'homefinder'): # CASA < 4.0.0?
-    ia = casac.homefinder.find_home_by_name ('imageHome').create ()
-else:
-    ia = casac.casac.image ()
-
 overwrite = '-f' in sys.argv
 if overwrite:
     sys.argv.remove ('-f')
@@ -109,6 +104,8 @@ if not os.path.exists (inpath):
 if os.path.exists (outpath) and not overwrite:
     die ('output "%s" already exists', outpath)
 
+casautil.logger ()
+ia = casautil.tools.image ()
 ia.open (inpath)
 shape = ia.shape ()
 nx, ny = shape[:2]
