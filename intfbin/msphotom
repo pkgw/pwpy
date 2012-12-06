@@ -337,7 +337,7 @@ def process (cfg):
             (mjd, dtmin, r_sc, ru_sc, i_sc, iu_sc, mag, umag, n)
 
 
-def smooth (x, re, reerr, im, imerr, window):
+def smooth (x, re, reerr, im, imerr, window, k=1):
     """Sample function for reference. Not used in this task."""
     conv = lambda q, r: np.convolve (q, r, mode='valid')
 
@@ -351,7 +351,7 @@ def smooth (x, re, reerr, im, imerr, window):
     cim = conv (imwt * im, window) / conv (imwt, window)
     cimerr = np.sqrt (conv (imwt, window**2)) / conv (imwt, window)
 
-    return cx, cre, creerr, cim, cimerr
+    return cx[::k], cre[::k], creerr[::k], cim[::k], cimerr[::k]
 
 
 def cmdline (argv):
