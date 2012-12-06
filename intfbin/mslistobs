@@ -11,10 +11,9 @@ else
     pager=cat
 fi
 
-casa-python /dev/fd/0 $1 <<'EOF' |sed -e 's/^.*ms::summary+*.//' |$pager
+casa-python /dev/fd/0 $1 <<'EOF' 2>&1 |sed -e 's/^.*ms::summary+*.//' |$pager
 import sys, casautil
 log = casautil.logger ('info')
-log.setlogfile ('/dev/fd/1')
 ms = casautil.tools.ms ()
 ms.open (sys.argv[1])
 ms.summary (verbose=True)
