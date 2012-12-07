@@ -22,6 +22,7 @@ from kwargv import ParseKeywords, Custom
 __all__ = ('clearcal clearcal_cli '
            'concat concat_cli '
            'flagmanager_cli '
+           'setjy setjy_cli SetjyConfig '
            'split split_cli SplitConfig '
            'cmdline_driver').split ()
 
