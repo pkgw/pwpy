@@ -277,10 +277,19 @@ def flagmanager_cli (argv):
 
 
 # gaincal
+#
+# I've folded in the bandpass functionality since there's
+# so much overlap. Some limitations that this leads to:
+#
+# - bandpass solint has a frequency component that we don't support
+# - bandpass combine defaults to 'scan'
 
 gaincal_doc = \
 """
 casatask gaincal vis=<MS> caltable=<TBL> [keywords]
+
+Compute calibration parameters from data. Encompasses the functionality
+of CASA tasks 'gaincal' *and* 'bandpass'.
 
 vis=
   Input dataset
@@ -293,14 +302,16 @@ gaintype=
     G       - gains per poln and spw (default)
     T       - like G, but one value for all polns
     GSPLINE - like G, with a spline fit. "Experimental"
+    B       - bandpass
+    BPOLY   - bandpass with polynomial fit. "Somewhat experimental"
     K       - antenna-based delays
     KCROSS  - global cross-hand delay ; use parang=True
     XY+QU   - ?
     XYf+QU  - ?
 
 calmode=
-  What parameters to solve for: amp, phase, or both
-  Allowed values: a p ap (default: ap)
+  What parameters to solve for: amplitude ("a"), phase ("p"), or both
+  ("ap"). Default is "ap". Not used in bandpass solutions.
 
 solint=
   Solution interval; this is an upper bound, but solutions
@@ -321,11 +332,14 @@ refant=
 
 solnorm=
   Normalize solution amplitudes to 1 after solving (only applies
-  to gaintypes G and T). Default: false.
+  to gaintypes G, T, B). Also normalizes bandpass phases to zero
+  when solving for bandpasses. Default: false.
 
 append=
   Whether to append solutions to an existing table. If the table
   exists and append=False, the table is overwritten! (Default: false)
+
+*** Pre-applied calibrations:
 
 gaintable=
   Comma-separated list of calibration tables to apply on-the-fly
@@ -363,6 +377,8 @@ parang=
   Whether to apply parallactic angle rotation correction
   (default: false)
 
+*** Low-level parameters:
+
 minblperant=
   Number of baselines for each ant in order to solve (default: 4)
 
@@ -372,6 +388,8 @@ minsnr=
 preavg=
   Interval for pre-averaging data within each solution interval,
   in seconds. Default is -1, meaning not to pre-average.
+
+*** Standard keywords
 
 antenna=
 field=
@@ -415,7 +433,9 @@ class GaincalConfig (ParseKeywords):
     def spwmap (v):
         return [map (int, e.split (',')) for e in v]
 
-    # splinetime, npointaver, phasewrap, smodel
+    # gaincal keywords: splinetime npointaver phasewrap smodel
+    # bandpass keywords: fillgaps degamp degphase visnorm maskcenter
+    #   maskedge
 
     antenna = str
     field = str
@@ -504,6 +524,8 @@ def gaincal (cfg):
 
     if solkws['type'] == 'GSPLINE':
         cb.setsolvegainspline (**solkws)
+    elif solkws['type'] == 'BPOLY':
+        cb.setsolvebandpoly (**solkws)
     else:
         cb.setsolve (**solkws)
 
