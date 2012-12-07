@@ -19,7 +19,8 @@ from kwargv import ParseKeywords, Custom
 
 # Keep the tasks alphabetized!
 
-__all__ = ('clearcal clearcal_cli '
+__all__ = ('applycal applycal_cli ApplycalConfig '
+           'clearcal clearcal_cli '
            'concat concat_cli '
            'flagmanager_cli '
            'gaincal gaincal_cli GaincalConfig '
@@ -78,6 +79,192 @@ def die (fmt, *args):
         raise SystemExit ('error: ' + str (fmt))
     raise SystemExit ('error: ' + (fmt % args))
 ## end
+
+
+# Some utilities
+
+precal_doc = \
+"""
+*** Pre-applied calibrations:
+
+gaintable=
+  Comma-separated list of calibration tables to apply on-the-fly
+  before solving
+
+gainfield=
+  SEMICOLON-separated list of field selections to apply for each gain table.
+  If there are fewer items than there are gaintable items, the list is
+  padded with blank items, implying no selection by field.
+
+interp=
+  COMMA-separated list of interpolation types to use for each gain
+  table. If there are fewer items, the list is padded with 'linear'
+  entries. Allowed values:
+    nearest linear cubic spline
+
+spwmap=
+  SEMICOLON-separated list of spectral window mappings for each
+  existing gain table; each record is a COMMA-separated list of
+  integers. For the i'th spw in the dataset, spwmap[i] specifies
+  the record in the gain table to use. For instance [0, 0, 1, 1]
+  maps four spws in the UV data to just two spectral windows in
+  the preexisting gain table.
+
+opacity=
+  Comma-separated list of opacities in nepers. One for each spw; if
+  there are more spws than entries, the last entry is used for the
+  remaining spws.
+
+gaincurve=
+  Whether to apply VLA-specific built in gain curve correction
+  (default: false)
+
+parang=
+  Whether to apply parallactic angle rotation correction
+  (default: false)
+"""
+
+stdsel_doc = \
+"""
+*** Standard data selection keywords:
+
+antenna=
+field=
+intent=
+observation=
+scan=
+spw=
+taql=
+timerange=
+uvrange=
+"""
+
+loglevel_doc = \
+"""
+loglevel=
+  Level of detail from CASA logging system. Default: warn; allowed:
+    severe warn info info1 info2 info3 info4 info5 debug1 debug2 debugging
+"""
+
+def extractmsselect (cfg):
+    # expects cfg to have:
+    #  antenna field intent observation scan spw taql timerange uvrange
+    # fills a dict with:
+    #  baseline field intent msselect observation scan spw time uvrange
+
+    selkws = {}
+
+    for k in 'field intent observation scan spw uvrange'.split ():
+        selkws[k] = getattr (cfg, k) or ''
+
+    for p in 'antenna:baseline timerange:time taql:msselect'.split ():
+        ck, sk = p.split (':')
+        selkws[sk] = getattr (cfg, ck) or ''
+
+    return selkws
+
+
+def applyonthefly (cb, cfg):
+    # expects cfg to have:
+    #   gaintable gainfield interp spwmap opacity gaincurve parang
+
+    n = len (cfg.gaintable)
+
+    if len (cfg.gainfield) < n:
+        cfg.gainfield += [''] * (n - len (cfg.gainfield))
+    elif len (cfg.gainfield) > n:
+        raise ValueError ('more "gainfield" entries than "gaintable" entries')
+
+    if len (cfg.interp) < n:
+        cfg.interp += ['linear'] * (n - len (cfg.interp))
+    elif len (cfg.interp) > n:
+        raise ValueError ('more "interp" entries than "gaintable" entries')
+
+    if len (cfg.spwmap) < n:
+        cfg.spwmap += [[-1]] * (n - len (cfg.interp))
+    elif len (cfg.spwmap) > n:
+        raise ValueError ('more "spwmap" entries than "gaintable" entries')
+
+    for table, field, interp, spwmap in zip (cfg.gaintable, cfg.gainfield,
+                                             cfg.interp, cfg.spwmap):
+        cb.setapply (table=table, field=field, interp=interp, spwmap=spwmap,
+                     t=0., calwt=True)
+
+    if len (cfg.opacity):
+        cb.setapply (type='TOPAC', opacity=cfg.opacity, t=-1, calwt=True)
+
+    if cfg.gaincurve:
+        cb.setapply (type='GAINCURVE', t=-1, calwt=True)
+
+    if cfg.parang:
+        cb.setapply (type='P')
+
+
+# applycal
+
+applycal_doc = \
+"""
+casatask applycal vis=<MS> [keywords]
+
+Fill in the CORRECTED_DATA column of a visibility dataset using
+the raw data and a set of calibration tables.
+
+vis=
+  The MS to modify
+
+calwt=
+  Write out calibrated weights as well as calibrated visibilities.
+  Default: true
+""" + precal_doc + stdsel_doc + loglevel_doc
+
+
+class ApplycalConfig (ParseKeywords):
+    vis = Custom (str, required=True)
+    calwt = False
+    # skipping: applymode, flagbackup
+
+    gaintable = [str]
+    gainfield = Custom ([str], sep=';')
+    interp = [str]
+    @Custom ([str], sep=';')
+    def spwmap (v):
+        return [map (int, e.split (',')) for e in v]
+    opacity = [float]
+    gaincurve = False
+    parang = False
+
+    antenna = str
+    field = str
+    intent = str
+    observation = str
+    scan = str
+    spw = str
+    taql = str
+    timerange = str
+    uvrange = str
+
+    loglevel = 'warn'
+
+
+def applycal (cfg):
+    cb = cu.tools.calibrater ()
+    cb.open (filename=cfg.vis, compress=False, addcorr=True, addmodel=False)
+
+    selkws = extractmsselect (cfg)
+    selkws['chanmode'] = 'none' # ?
+    cb.selectvis (**selkws)
+
+    applyonthefly (cb, cfg)
+
+    cb.correct ('calflag')
+    cb.close ()
+
+
+def applycal_cli (argv):
+    checkusage (applycal_doc, argv, usageifnoargs=True)
+    cfg = ApplycalConfig ().parse (argv[1:])
+    cu.logger (cfg.loglevel)
+    applycal (cfg)
 
 
 # clearcal
@@ -454,52 +641,11 @@ def gaincal (cfg):
     cb = cu.tools.calibrater ()
     cb.open (filename=cfg.vis, compress=False, addcorr=False, addmodel=False)
 
-    # Selection
-
-    selkws = {}
-
-    for k in 'field intent observation scan spw uvrange'.split ():
-        selkws[k] = getattr (cfg, k) or ''
-
-    for p in 'antenna:baseline timerange:time taql:msselect'.split ():
-        ck, sk = p.split (':')
-        selkws[sk] = getattr (cfg, ck) or ''
-
-    selkws['chanmode'] = 'none'
+    selkws = extractmsselect (cfg)
+    selkws['chanmode'] = 'none' # ?
     cb.selectvis (**selkws)
 
-    # On-the-fly calibrations
-
-    n = len (cfg.gaintable)
-
-    if len (cfg.gainfield) < n:
-        cfg.gainfield += [''] * (n - len (cfg.gainfield))
-    elif len (cfg.gainfield) > n:
-        raise ValueError ('more "gainfield" entries than "gaintable" entries')
-
-    if len (cfg.interp) < n:
-        cfg.interp += ['linear'] * (n - len (cfg.interp))
-    elif len (cfg.interp) > n:
-        raise ValueError ('more "interp" entries than "gaintable" entries')
-
-    if len (cfg.spwmap) < n:
-        cfg.spwmap += [[-1]] * (n - len (cfg.interp))
-    elif len (cfg.spwmap) > n:
-        raise ValueError ('more "spwmap" entries than "gaintable" entries')
-
-    for table, field, interp, spwmap in zip (cfg.gaintable, cfg.gainfield,
-                                             cfg.interp, cfg.spwmap):
-        cb.setapply (table=table, field=field, interp=interp, spwmap=spwmap,
-                     t=0., calwt=True)
-
-    if len (cfg.opacity):
-        cb.setapply (type='TOPAC', opacity=cfg.opacity, t=-1, calwt=True)
-
-    if cfg.gaincurve:
-        cb.setapply (type='GAINCURVE', t=-1, calwt=True)
-
-    if cfg.parang:
-        cb.setapply (type='P')
+    applyonthefly (cb, cfg)
 
     # Solve
 
