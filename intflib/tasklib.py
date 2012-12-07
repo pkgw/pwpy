@@ -129,6 +129,8 @@ stdsel_doc = \
 *** Standard data selection keywords:
 
 antenna=
+array=
+correlation=
 field=
 intent=
 observation=
@@ -146,18 +148,29 @@ loglevel=
     severe warn info info1 info2 info3 info4 info5 debug1 debug2 debugging
 """
 
-def extractmsselect (cfg):
+def extractmsselect (cfg, havearray=False, havecorr=False, taqltomsselect=True):
     # expects cfg to have:
-    #  antenna field intent observation scan spw taql timerange uvrange
+    #  antenna [correlation] field intent observation scan spw taql timerange uvrange
     # fills a dict with:
-    #  baseline field intent msselect observation scan spw time uvrange
+    #  baseline [correlation] field intent (msselect|taql) observation scan spw time uvrange
 
     selkws = {}
 
-    for k in 'field intent observation scan spw uvrange'.split ():
+    direct = 'field intent observation scan spw uvrange'.split ()
+    indirect = 'antenna:baseline array:subarray timerange:time'.split ()
+
+    if havecorr:
+        direct.append ('correlation')
+
+    if taqltomsselect:
+        indirect.append ('taql:msselect')
+    else:
+        direct.append ('taql')
+
+    for k in direct:
         selkws[k] = getattr (cfg, k) or ''
 
-    for p in 'antenna:baseline timerange:time taql:msselect'.split ():
+    for p in indirect:
         ck, sk = p.split (':')
         selkws[sk] = getattr (cfg, ck) or ''
 
@@ -525,45 +538,7 @@ solnorm=
 append=
   Whether to append solutions to an existing table. If the table
   exists and append=False, the table is overwritten! (Default: false)
-
-*** Pre-applied calibrations:
-
-gaintable=
-  Comma-separated list of calibration tables to apply on-the-fly
-  before solving
-
-gainfield=
-  SEMICOLON-separated list of field selections to apply for each gain table.
-  If there are fewer items than there are gaintable items, the list is
-  padded with blank items, implying no selection by field.
-
-interp=
-  COMMA-separated list of interpolation types to use for each gain
-  table. If there are fewer items, the list is padded with 'linear'
-  entries. Allowed values:
-    nearest linear cubic spline
-
-spwmap=
-  SEMICOLON-separated list of spectral window mappings for each
-  existing gain table; each record is a COMMA-separated list of
-  integers. For the i'th spw in the dataset, spwmap[i] specifies
-  the record in the gain table to use. For instance [0, 0, 1, 1]
-  maps four spws in the UV data to just two spectral windows in
-  the preexisting gain table.
-
-opacity=
-  Comma-separated list of opacities in nepers. One for each spw; if
-  there are more spws than entries, the last entry is used for the
-  remaining spws.
-
-gaincurve=
-  Whether to apply VLA-specific built in gain curve correction
-  (default: false)
-
-parang=
-  Whether to apply parallactic angle rotation correction
-  (default: false)
-
+""" + precal_doc + """
 *** Low-level parameters:
 
 minblperant=
@@ -575,24 +550,8 @@ minsnr=
 preavg=
   Interval for pre-averaging data within each solution interval,
   in seconds. Default is -1, meaning not to pre-average.
+""" + stdsel_doc + loglevel_doc
 
-*** Standard keywords
-
-antenna=
-field=
-intent=
-observation=
-scan=
-spw=
-taql=
-timerange=
-uvrange=
-  Standard UV data selection keywords
-
-loglevel=
-  Standard logging keyword "loglevel" (default: warn; allowed:
-  severe warn info info1 info2 info3 info4 info5 debug1 debug2 debugging)
-"""
 
 class GaincalConfig (ParseKeywords):
     vis = Custom (str, required=True)
@@ -725,11 +684,14 @@ standard='Perley-Butler 2013'
   acceptable values are: Baars, Perley 90, Perley-Taylor 95,
   Perley-Taylor 99, Perley-Butler 2010, Perley-Butler 2013.
 
-Supported selection keywords: field obs scan spw time
+*** Supported data selection keywords:
 
-And standard logging keyword "loglevel" (default: warn; allowed:
-  severe warn info info1 info2 info3 info4 info5 debug1 debug2 debugging)
-"""
+field=
+observation=
+scan=
+spw=
+timerange=
+""" + loglevel_doc
 
 class SetjyConfig (ParseKeywords):
     vis = Custom (str, required=True)
@@ -739,14 +701,12 @@ class SetjyConfig (ParseKeywords):
     reffreq = 1. # GHz
     standard = 'Perley-Butler 2013'
 
-    # supported selection keywords:
     field = str
-    obs = str
+    observation = str
     scan = str
     spw = str
-    time = str
+    timerange = str
 
-    # teeny hack for CLI
     loglevel = 'warn'
 
 
@@ -754,14 +714,11 @@ def setjy (cfg):
     import os.path
     kws = {}
 
-    for kw in 'field fluxdensity time scan spw standard'.split ():
-        v = getattr (cfg, kw)
-        if v is None:
-            v = ''
-        kws[kw] = v
+    for kw in 'field fluxdensity observation scan spw standard'.split ():
+        kws[kw] = getattr (cfg, kw) or ''
 
+    kws['time'] = cfg.timerange or ''
     kws['reffreq'] = str (cfg.reffreq) + 'GHz'
-    kws['observation'] = cfg.obs or ''
     kws['spix'] = cfg.spindex
     kws['scalebychan'] = True # don't think you'd ever want false??
 
@@ -806,19 +763,13 @@ step=
 col=all
   Extract the column "col" as the DATA column. If "all", copy all available
   columns without renaming. Possible values:
-  DATA MODEL_DATA CORRECTED_DATA FLOAT_DATA LAG_DATA
+    all DATA MODEL_DATA CORRECTED_DATA FLOAT_DATA LAG_DATA
 
 combine=[col1,col2,...]
   When time-averaging, don't start a new bin when the specified columns change.
   Acceptable column names:
-  scan state
-
-Also accepts standard u-v filtering keywords:
-  baseline correlation field intent obs spw subarray taql time uvrange
-
-And standard logging keyword "loglevel" (default: warn; allowed:
-  severe warn info info1 info2 info3 info4 info5 debug1 debug2 debugging)
-"""
+    scan state
+""" + stdsel_doc + loglevel_doc
 
 class SplitConfig (ParseKeywords):
     vis = Custom (str, required=True)
@@ -829,21 +780,20 @@ class SplitConfig (ParseKeywords):
     col = 'all'
     combine = [str]
 
-    # basic selection keywords:
-    baseline = str
+    antenna = str
+    array = str
     correlation = str
     field = str
     intent = str
     obs = str
     scan = str
     spw = str
-    subarray = str
     taql = str
-    time = str
+    timerange = str
     uvrange = str
 
-    # teeny hack for CLI
     loglevel = 'warn'
+
 
 def split (cfg):
     import os.path
@@ -855,12 +805,8 @@ def split (cfg):
     if os.path.exists (cfg.out):
         raise RuntimeError ('destination "%s" already exists' % cfg.out)
 
-    for k in ('baseline correlation field intent obs scan spw step subarray '
-              'taql time uvrange').split ():
-        v = getattr (cfg, k)
-        if v is None:
-            v = ''
-        kws[k] = v
+    kws = extractmsselect (cfg, havarray=True, havecorr=True,
+                           taqltomsselect=False)
 
     for m in ('out:outputms col:whichcol').split ():
         myk, ck = m.split (':')
