@@ -22,6 +22,7 @@ from kwargv import ParseKeywords, Custom
 __all__ = ('clearcal clearcal_cli '
            'concat concat_cli '
            'flagmanager_cli '
+           'gaincal gaincal_cli GaincalConfig '
            'setjy setjy_cli SetjyConfig '
            'split split_cli SplitConfig '
            'cmdline_driver').split ()
@@ -273,6 +274,248 @@ def flagmanager_cli (argv):
         wrongusage (flagmanager_doc, 'unknown flagmanager mode "%s"' % mode)
 
     af.done ()
+
+
+# gaincal
+
+gaincal_doc = \
+"""
+casatask gaincal vis=<MS> caltable=<TBL> [keywords]
+
+vis=
+  Input dataset
+
+caltable=
+  Output calibration table (can exist if append=True)
+
+gaintype=
+  Kind of gain solution:
+    G       - gains per poln and spw (default)
+    T       - like G, but one value for all polns
+    GSPLINE - like G, with a spline fit. "Experimental"
+    K       - antenna-based delays
+    KCROSS  - global cross-hand delay ; use parang=True
+    XY+QU   - ?
+    XYf+QU  - ?
+
+calmode=
+  What parameters to solve for: amp, phase, or both
+  Allowed values: a p ap (default: ap)
+
+solint=
+  Solution interval; this is an upper bound, but solutions
+  will be broken across certain boundaries according to "combine".
+  'inf'    - solutions as long as possible (the default)
+  'int'    - one solution per integration
+  (str)    - a specific time with units (e.g. '5min')
+  (number) - a specific time in seconds
+
+combine=
+  Comma-separated list of boundary types; solutions will NOT be
+  broken across these boundaries. Types are:
+    field scan spw
+
+refant=
+  Comma-separated list of reference antennas in decreasing
+  priority order.
+
+solnorm=
+  Normalize solution amplitudes to 1 after solving (only applies
+  to gaintypes G and T). Default: false.
+
+append=
+  Whether to append solutions to an existing table. If the table
+  exists and append=False, the table is overwritten! (Default: false)
+
+gaintable=
+  Comma-separated list of calibration tables to apply on-the-fly
+  before solving
+
+gainfield=
+  SEMICOLON-separated list of field selections to apply for each gain table.
+  If there are fewer items than there are gaintable items, the list is
+  padded with blank items, implying no selection by field.
+
+interp=
+  COMMA-separated list of interpolation types to use for each gain
+  table. If there are fewer items, the list is padded with 'linear'
+  entries. Allowed values:
+    nearest linear cubic spline
+
+spwmap=
+  SEMICOLON-separated list of spectral window mappings for each
+  existing gain table; each record is a COMMA-separated list of
+  integers. For the i'th spw in the dataset, spwmap[i] specifies
+  the record in the gain table to use. For instance [0, 0, 1, 1]
+  maps four spws in the UV data to just two spectral windows in
+  the preexisting gain table.
+
+opacity=
+  Comma-separated list of opacities in nepers. One for each spw; if
+  there are more spws than entries, the last entry is used for the
+  remaining spws.
+
+gaincurve=
+  Whether to apply VLA-specific built in gain curve correction
+  (default: false)
+
+parang=
+  Whether to apply parallactic angle rotation correction
+  (default: false)
+
+minblperant=
+  Number of baselines for each ant in order to solve (default: 4)
+
+minsnr=
+  Min. SNR for acceptable solutions (default: 3.0)
+
+preavg=
+  Interval for pre-averaging data within each solution interval,
+  in seconds. Default is -1, meaning not to pre-average.
+
+antenna=
+field=
+intent=
+observation=
+scan=
+spw=
+taql=
+timerange=
+uvrange=
+  Standard UV data selection keywords
+
+loglevel=
+  Standard logging keyword "loglevel" (default: warn; allowed:
+  severe warn info info1 info2 info3 info4 info5 debug1 debug2 debugging)
+"""
+
+class GaincalConfig (ParseKeywords):
+    vis = Custom (str, required=True)
+    caltable = Custom (str, required=True)
+    gaintype = 'G'
+    calmode = 'ap'
+
+    solint = 'inf'
+    combine = [str]
+    refant = [str]
+    solnorm = False
+    append = False
+    minblperant = 4
+    minsnr = 3.0
+    preavg = -1.0
+
+    gaintable = [str]
+    gainfield = Custom ([str], sep=';')
+    interp = [str]
+    opacity = [float]
+    gaincurve = False
+    parang = False
+
+    @Custom ([str], sep=';')
+    def spwmap (v):
+        return [map (int, e.split (',')) for e in v]
+
+    # splinetime, npointaver, phasewrap, smodel
+
+    antenna = str
+    field = str
+    intent = str
+    observation = str
+    scan = str
+    spw = str
+    taql = str # msselect
+    timerange = str
+    uvrange = str
+
+    loglevel = 'warn' # teeny hack for CLI
+
+
+def gaincal (cfg):
+    cb = cu.tools.calibrater ()
+    cb.open (filename=cfg.vis, compress=False, addcorr=False, addmodel=False)
+
+    # Selection
+
+    selkws = {}
+
+    for k in 'field intent observation scan spw uvrange'.split ():
+        selkws[k] = getattr (cfg, k) or ''
+
+    for p in 'antenna:baseline timerange:time taql:msselect'.split ():
+        ck, sk = p.split (':')
+        selkws[sk] = getattr (cfg, ck) or ''
+
+    selkws['chanmode'] = 'none'
+    cb.selectvis (**selkws)
+
+    # On-the-fly calibrations
+
+    n = len (cfg.gaintable)
+
+    if len (cfg.gainfield) < n:
+        cfg.gainfield += [''] * (n - len (cfg.gainfield))
+    elif len (cfg.gainfield) > n:
+        raise ValueError ('more "gainfield" entries than "gaintable" entries')
+
+    if len (cfg.interp) < n:
+        cfg.interp += ['linear'] * (n - len (cfg.interp))
+    elif len (cfg.interp) > n:
+        raise ValueError ('more "interp" entries than "gaintable" entries')
+
+    if len (cfg.spwmap) < n:
+        cfg.spwmap += [[-1]] * (n - len (cfg.interp))
+    elif len (cfg.spwmap) > n:
+        raise ValueError ('more "spwmap" entries than "gaintable" entries')
+
+    for table, field, interp, spwmap in zip (cfg.gaintable, cfg.gainfield,
+                                             cfg.interp, cfg.spwmap):
+        cb.setapply (table=table, field=field, interp=interp, spwmap=spwmap,
+                     t=0., calwt=True)
+
+    if len (cfg.opacity):
+        cb.setapply (type='TOPAC', opacity=cfg.opacity, t=-1, calwt=True)
+
+    if cfg.gaincurve:
+        cb.setapply (type='GAINCURVE', t=-1, calwt=True)
+
+    if cfg.parang:
+        cb.setapply (type='P')
+
+    # Solve
+
+    solkws = {}
+
+    for k in 'append preavg minblperant minsnr solnorm'.split ():
+        solkws[k] = getattr (cfg, k)
+
+    for p in 'caltable:table calmode:apmode'.split ():
+        ck, sk = p.split (':')
+        solkws[sk] = getattr (cfg, ck)
+
+    if isinstance (cfg.solint, (int, float)):
+        solkws['t'] = '%fs' % cfg.solint # sugar
+    else:
+        solkws['t'] = str (cfg.solint)
+
+    solkws['combine'] = ','.join (cfg.combine)
+    solkws['refant'] = ','.join (cfg.refant)
+    solkws['phaseonly'] = False
+    solkws['type'] = cfg.gaintype.upper ()
+
+    if solkws['type'] == 'GSPLINE':
+        cb.setsolvegainspline (**solkws)
+    else:
+        cb.setsolve (**solkws)
+
+    cb.solve ()
+    cb.close ()
+
+
+def gaincal_cli (argv):
+    checkusage (gaincal_doc, argv, usageifnoargs=True)
+    cfg = GaincalConfig ().parse (argv[1:])
+    cu.logger (cfg.loglevel)
+    gaincal (cfg)
 
 
 # setjy
