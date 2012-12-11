@@ -212,7 +212,7 @@ def polmodel (cfg):
         #         i1, q, u, v, spindex, reffreq)
         im.setjy (field=cfg.field, spw=str(spw), modimage='',
                   fluxdensity=[i1, q, u, v], spix=spindex, standard=standard,
-                  scalebychan=True, reffreq=reffreq, usescratch=False)
+                  scalebychan=True, reffreq=reffreq)
 
     im.close ()
 
