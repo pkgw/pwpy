@@ -24,6 +24,7 @@ __all__ = ('applycal applycal_cli ApplycalConfig '
            'concat concat_cli '
            'flagmanager_cli '
            'gaincal gaincal_cli GaincalConfig '
+           'mfsclean mfsclean_cli MfscleanConfig '
            'setjy setjy_cli SetjyConfig '
            'split split_cli SplitConfig '
            'cmdline_driver').split ()
@@ -148,7 +149,7 @@ loglevel=
     severe warn info info1 info2 info3 info4 info5 debug1 debug2 debugging
 """
 
-def extractmsselect (cfg, havearray=False, havecorr=False, taqltomsselect=True):
+def extractmsselect (cfg, havearray=False, havecorr=False, haveintent=True, taqltomsselect=True):
     # expects cfg to have:
     #  antenna [correlation] field intent observation scan spw taql timerange uvrange
     # fills a dict with:
@@ -156,11 +157,17 @@ def extractmsselect (cfg, havearray=False, havecorr=False, taqltomsselect=True):
 
     selkws = {}
 
-    direct = 'field intent observation scan spw uvrange'.split ()
-    indirect = 'antenna:baseline array:subarray timerange:time'.split ()
+    direct = 'field observation scan spw uvrange'.split ()
+    indirect = 'antenna:baseline timerange:time'.split ()
+
+    if havearray:
+        indirect.append ('array:subarray')
 
     if havecorr:
         direct.append ('correlation')
+
+    if haveintent:
+        direct.append ('intent')
 
     if taqltomsselect:
         indirect.append ('taql:msselect')
@@ -643,6 +650,216 @@ def gaincal_cli (argv):
     cfg = GaincalConfig ().parse (argv[1:])
     cu.logger (cfg.loglevel)
     gaincal (cfg)
+
+
+# mfsclean
+#
+# This isn't a CASA task, but we're pulling out a subset of the functionality
+# of clean, which has a bajillion options and has a really gross implementation
+# in the library.
+
+mfsclean_doc = \
+"""
+casatask mfsclean vis=[] [keywords]
+
+Drive the CASA imager with a very restricted set of options
+
+vis=
+  Input visibility MS
+
+imbase=
+  Base name of output files. We create files named "imbaseEXT"
+  where EXT is all of "mask", "TTmodel", "TTrestored", "TTresidual",
+  and "TTpsf", and TT is empty if nterms = 1, and "ttN." otherwise.
+
+nterms=1
+reffreq = 1 [GHz]
+imsize = 256,256
+cell = 1 [arcsec]
+phasecenter = (blank) or 'J2000 12h34m56.7 -12d34m56.7'
+stokes = I
+niter = 500
+gain = 0.1
+threshold = 0 [mJy]
+mask = (blank) or path of CASA-format region text file
+""" + stdsel_doc + loglevel_doc
+
+class MfscleanConfig (ParseKeywords):
+    vis = Custom (str, required=True)
+    imbase = Custom (str, required=True)
+
+    nterms = 1
+    reffreq = 1. # GHz
+    imsize = [256, 256]
+    cell = 1. # arcsec
+    phasecenter = str
+    stokes = 'I'
+    niter = 500
+    gain = 0.1
+    threshold = 0. # mJy
+    mask = str
+
+    # mode = mfs
+    # gridmode = ''
+    # psfmode = clark
+    # nchan = -1
+    # width = 1
+    # imagermode = csclean
+    # cyclefactor = 1.5
+    # cyclespeedup = -1
+    # multiscale = []
+    # interactive = False
+    # uvtaper = False
+    # modelimage = []
+    # weighting = 'briggs'
+    # robust = 0.5
+    # restoringbeam = []
+    # pbcor = False
+    # minpb = 0.2
+    # usescratch = False
+    # allowchunk = False
+    # npixels = 0
+    # veltype = radio
+    # smallscalebias = 0.6
+
+    antenna = str
+    field = str
+    observation = str
+    scan = str
+    spw = str
+    timerange = str
+    uvrange = str
+    taql = str
+
+    loglevel = 'warn'
+
+
+specframenames = 'REST LSRK LSRD BARY GEO TOPO GALACTO LGROUP CMB'.split ()
+
+
+def mfsclean (cfg):
+    import os.path
+
+    ms = cu.tools.ms ()
+    im = cu.tools.imager ()
+    tb = cu.tools.table ()
+    qa = cu.tools.quanta ()
+    ia = cu.tools.image ()
+
+    minpb = 0.2
+
+    # Filenames. TODO: make sure nothing exists
+
+    mask = cfg.imbase + 'mask'
+    pb = cfg.imbase + 'flux'
+
+    if cfg.nterms == 1:
+        models = [cfg.imbase + 'model']
+        restoreds = [cfg.imbase + 'restored']
+        resids = [cfg.imbase + 'residual']
+        psfs = [cfg.imbase + 'psf']
+    else:
+        for i in xrange (cfg.nterms):
+            models = [cfg.imbase + 'tt%d.model' % i]
+            restoreds = [cfg.imbase + 'tt%d.restored' % i]
+            resids = [cfg.imbase + 'tt%d.residual' % i]
+            psfs = [cfg.imbase + 'tt%d.psf' % i]
+
+    # Get info on our selected data for various things we need to figure
+    # out later.
+
+    selkws = extractmsselect (cfg, havearray=False, haveintent=False, taqltomsselect=False)
+    ms.open (cfg.vis)
+    ms.msselect (selkws)
+    rangeinfo = ms.range ('data_desc_id field_id'.split ())
+    ddids = rangeinfo['data_desc_id']
+    fields = rangeinfo['field_id']
+
+    # Get the spectral frame from the first spw of the selected data
+
+    tb.open (os.path.join (cfg.vis, 'DATA_DESCRIPTION'))
+    ddspws = tb.getcol ('SPECTRAL_WINDOW_ID')
+    tb.close ()
+    spw0 = ddspws[ddids[0]]
+
+    tb.open (os.path.join (cfg.vis, 'SPECTRAL_WINDOW'))
+    specframe = specframenames[tb.getcell ('MEAS_FREQ_REF', spw0)]
+    tb.close ()
+
+    # Choose phase center
+
+    if cfg.phasecenter is not None:
+        phasecenter = cfg.phasecenter
+    else:
+        phasecenter = int (fields[0])
+
+    # Set up all of this junk
+
+    im.open (cfg.vis, usescratch=False)
+    im.selectvis (nchan=-1, start=0, step=1, usescratch=False, writeaccess=False, **selkws)
+    im.defineimage (nx=cfg.imsize[0], ny=cfg.imsize[1],
+                    cellx=qa.quantity (cfg.cell, 'arcsec'),
+                    celly=qa.quantity (cfg.cell, 'arcsec'),
+                    outframe=specframe, phasecenter=phasecenter,
+                    stokes=cfg.stokes,
+                    spw=-1, # to verify: selectvis (spw=) good enough?
+                    restfreq='', mode='mfs', veltype='radio',
+                    nchan=-1, start=0, step=1, facets=1)
+    im.weight (type='briggs', rmode='norm', robust=0.5, npixels=0) #noise=, mosaic=
+    # im.filter (...)
+    im.setscales (scalemethod='uservector', uservector=[0])
+    im.setsmallscalebias (0.6)
+    im.setmfcontrol ()
+    im.setvp (dovp=True)
+    im.makeimage (type='pb', image=pb, compleximage='', verbose=False)
+    im.setvp (dovp=False, verbose=False)
+    im.setoptions (ftmachine='ft', wprojplanes=1, freqinterp='linear',
+                   padding=1.2, pastep=360.0, pblimit=minpb,
+                   applypointingoffsets=False, dopbgriddingcorrections=True)
+
+    if cfg.nterms > 1:
+        im.settaylorterms (ntaylorterms=cfg.nterms, reffreq=cfg.reffreq * 1e9)
+
+    im.setmfcontrol (stoplargenegatives=-1, cyclefactor=1.5,
+                     cyclespeedup=-1, minpb=minpb)
+
+    # Create the mask
+
+    im.make (mask)
+    ia.open (mask)
+    maskcs = ia.coordsys ()
+    maskcs.setreferencecode (specframe, 'spectral', True)
+    ia.setcoordsys (maskcs.torecord ())
+
+    if cfg.mask is not None:
+        rg = cu.tools.regionmanager ()
+        regions = rg.fromtextfile (filename=cfg.mask,
+                                   shape=ia.shape (),
+                                   csys=maskcs.torecord ())
+        im.regiontoimagemask (mask=mask, region=regions)
+
+    ia.close ()
+
+    # Create blank model(s). Diverging from task_clean even more
+    # significantly than usual here.
+
+    for model in models:
+        im.make (model)
+
+    # Go!
+
+    im.clean (algorithm='msmfs', niter=cfg.niter, gain=cfg.gain,
+              threshold=qa.quantity (cfg.threshold, 'mJy'),
+              model=models, residual=resids, image=restoreds,
+              psfimage=psfs, mask=mask, interactive=False)
+    im.close ()
+
+
+def mfsclean_cli (argv):
+    checkusage (mfsclean_doc, argv, usageifnoargs=True)
+    cfg = MfscleanConfig ().parse (argv[1:])
+    cu.logger (cfg.loglevel)
+    mfsclean (cfg)
 
 
 # setjy
