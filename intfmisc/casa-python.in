@@ -19,4 +19,4 @@ fi
 # I used to clear PYTHONPATH, but now that's seeming like a bad idea.
 
 export LD_LIBRARY_PATH CASAPATH
-exec $lib/casapy/bin/python "$@"
+exec $CASAPYDEBUGGER $lib/casapy/bin/python "$@"
