@@ -240,7 +240,7 @@ vis=
 
 calwt=
   Write out calibrated weights as well as calibrated visibilities.
-  Default: true
+  Default: false
 """ + precal_doc + stdsel_doc + loglevel_doc
 
 
