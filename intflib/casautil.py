@@ -5,7 +5,7 @@
 """
 
 __all__ = ('INVERSE_C_MS INVERSE_C_MNS pol_names pol_to_miriad msselect_keys '
-           'datadir logger tools').split ()
+           'datadir logger forkandlog tools').split ()
 
 
 # Some constants that can be useful
@@ -101,6 +101,58 @@ def logger (filter='WARN'):
     sink.setglobal (True)
     sink.filter (filter.upper ())
     return sink
+
+
+def forkandlog (function, filter='INFO5'):
+    import sys, os
+
+    readfd, writefd = os.pipe ()
+    pid = os.fork ()
+
+    if pid == 0:
+        # Child process. We never leave this branch.
+        #
+        # Log messages of priority >WARN are sent to stderr regardless
+        # of the status of log.showconsole(). The idea is for this
+        # subprocess to be something super lightweight and
+        # constrained, so it seems best to nullify stderr, and stdout,
+        # to not pollute the output of the calling process.
+        #
+        # I thought of using the default logger() setup and dup2'ing
+        # stderr to the pipe fd, but then if anything else gets
+        # printed to stderr (e.g. Python exception info), it'll get
+        # sent along the pipe too. The caller would have to be much
+        # more complex to be able to detect and handle such output.
+
+        os.close (readfd)
+
+        f = open (os.devnull, 'w')
+        os.dup2 (f.fileno (), 1)
+        os.dup2 (f.fileno (), 2)
+
+        sink = logger (filter=filter)
+        sink.setlogfile ('/dev/fd/%d' % writefd)
+        function (sink)
+        sys.exit (0)
+
+    # Original process.
+
+    os.close (writefd)
+
+    with os.fdopen (readfd) as readhandle:
+        for line in readhandle:
+            yield line
+
+    info = os.waitpid (pid, 0)
+
+    if info[1]:
+        # Because we're a generator, this is the only
+        # way for us to signal if the process died. We
+        # could be rewritten as a context manager.
+        e = RuntimeError ('logging child process PID %d exited '
+                          'with error code %d' % tuple (info))
+        e.pid, e.exitcode = info
+        raise e
 
 
 # Tool factories.
