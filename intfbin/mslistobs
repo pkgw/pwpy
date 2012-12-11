@@ -6,7 +6,7 @@
 # This is pretty sad.
 
 if tty >/dev/null ; then
-    pager=${PAGER:-less -S}
+    pager=${PAGER:-less -SRFX}
 else
     pager=cat
 fi
