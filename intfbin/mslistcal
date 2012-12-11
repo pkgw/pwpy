@@ -1,0 +1,22 @@
+#! /bin/bash
+# -*- shell-script -*-
+# Copyright 2012 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
+
+# This is somewhat sad. We could just be a standalone Python program,
+# but I like the automatic paging on ttys, and based on git:pager.c it
+# looks like that'd be hard to get right in Python.
+
+if tty >/dev/null ; then
+    pager=${PAGER:-less -SRFX}
+else
+    pager=cat
+fi
+
+casa-python /dev/fd/0 $1 $2 <<'EOF' 2>&1 |$pager
+import sys, casautil
+casautil.logger ()
+cb = casautil.tools.calibrater ()
+cb.open (sys.argv[1], compress=False, addcorr=False, addmodel=False)
+cb.listcal (caltable=sys.argv[2], pagerows=-1)
+EOF
