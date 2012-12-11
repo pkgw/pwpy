@@ -103,7 +103,7 @@ def logger (filter='WARN'):
     return sink
 
 
-def forkandlog (function, filter='INFO5'):
+def forkandlog (function, filter='INFO5', debug=False):
     import sys, os
 
     readfd, writefd = os.pipe ()
@@ -126,9 +126,10 @@ def forkandlog (function, filter='INFO5'):
 
         os.close (readfd)
 
-        f = open (os.devnull, 'w')
-        os.dup2 (f.fileno (), 1)
-        os.dup2 (f.fileno (), 2)
+        if not debug:
+            f = open (os.devnull, 'w')
+            os.dup2 (f.fileno (), 1)
+            os.dup2 (f.fileno (), 2)
 
         sink = logger (filter=filter)
         sink.setlogfile ('/dev/fd/%d' % writefd)
