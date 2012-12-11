@@ -190,23 +190,29 @@ def applyonthefly (cb, cfg):
 
     n = len (cfg.gaintable)
 
-    if len (cfg.gainfield) < n:
-        cfg.gainfield += [''] * (n - len (cfg.gainfield))
-    elif len (cfg.gainfield) > n:
+    # fill in missing values, taking care not to mutate cfg.
+
+    gainfields = list (cfg.gainfield)
+    interps = list (cfg.interp)
+    spwmaps = list (cfg.spwmap)
+
+    if len (gainfields) < n:
+        gainfields += [''] * (n - len (gainfields))
+    elif len (gainfields) > n:
         raise ValueError ('more "gainfield" entries than "gaintable" entries')
 
-    if len (cfg.interp) < n:
-        cfg.interp += ['linear'] * (n - len (cfg.interp))
-    elif len (cfg.interp) > n:
+    if len (interps) < n:
+        interps += ['linear'] * (n - len (interps))
+    elif len (interps) > n:
         raise ValueError ('more "interp" entries than "gaintable" entries')
 
-    if len (cfg.spwmap) < n:
-        cfg.spwmap += [[-1]] * (n - len (cfg.interp))
-    elif len (cfg.spwmap) > n:
+    if len (spwmaps) < n:
+        spwmaps += [[-1]] * (n - len (spwmaps))
+    elif len (spwmaps) > n:
         raise ValueError ('more "spwmap" entries than "gaintable" entries')
 
-    for table, field, interp, spwmap in zip (cfg.gaintable, cfg.gainfield,
-                                             cfg.interp, cfg.spwmap):
+    for table, field, interp, spwmap in zip (cfg.gaintable, gainfields,
+                                             interps, spwmaps):
         cb.setapply (table=table, field=field, interp=interp, spwmap=spwmap,
                      t=0., calwt=True)
 
