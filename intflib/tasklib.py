@@ -25,6 +25,7 @@ __all__ = ('applycal applycal_cli ApplycalConfig '
            'flagmanager_cli '
            'gaincal gaincal_cli GaincalConfig '
            'mfsclean mfsclean_cli MfscleanConfig '
+           'plotcal plotcal_cli PlotcalConfig '
            'setjy setjy_cli SetjyConfig '
            'split split_cli SplitConfig '
            'cmdline_driver').split ()
@@ -866,6 +867,96 @@ def mfsclean_cli (argv):
     cfg = MfscleanConfig ().parse (argv[1:])
     cu.logger (cfg.loglevel)
     mfsclean (cfg)
+
+
+# plotcal
+
+plotcal_doc = \
+"""
+casatask plotcal caltable=<MS> [keywords]
+
+Plot values from a calibration dataset in any of a variety of ways.
+
+caltable=
+  The calibration MS to plot
+
+xaxis=
+  amp antenna chan freq imag phase real snr time
+
+yaxis=
+  amp antenna imag phase real snr
+
+iteration=
+  antenna field spw time
+
+*** Data selection
+
+antenna=
+field=
+poln=
+  RL R L XY X Y '/'
+spw=
+timerange=
+
+*** Plot appearance options
+
+plotsymbol=
+plotcolor=
+fontsize=
+
+""" + loglevel_doc
+
+
+class PlotcalConfig (ParseKeywords):
+    caltable = Custom (str, required=True)
+    xaxis = 'time'
+    yaxis = 'amp'
+    iteration = str
+
+    # not implemented: subplot, overplot, clearpanel, plotrange,
+    # showflags, showgui, figfile
+
+    plotsymbol = '.'
+    plotcolor = 'blue'
+    markersize = 5.
+    fontsize = 10.
+
+    antenna = ''
+    field = ''
+    poln = 'RL'
+    spw = ''
+    timerange = ''
+
+    loglevel = 'warn'
+
+
+def plotcal (cfg):
+    cp = cu.tools.calplot ()
+
+    cp.open (cfg.caltable)
+    cp.selectcal (antenna=cfg.antenna, field=cfg.field,
+                  poln=cfg.poln.upper (), spw=cfg.spw, time=cfg.timerange)
+    cp.plotoptions (iteration=cfg.iteration, plotrange=[0.0]*4,
+                    plotsymbol=cfg.plotsymbol,
+                    plotcolor=cfg.plotcolor,
+                    markersize=cfg.markersize,
+                    fontsize=cfg.fontsize)
+    cp.plot (cfg.xaxis.upper (), cfg.yaxis.upper ())
+
+
+def plotcal_cli (argv):
+    import os, pylab as pl
+    checkusage (plotcal_doc, argv, usageifnoargs=True)
+
+    # I can't find where in the source this shows up (maybe removed by 4.0?)
+    # but if I turn off the check, things seem to still work without the
+    # annoying warnings.
+    os.environ['CASA_NOLUSTRE_CHECK'] = '1'
+
+    cfg = PlotcalConfig ().parse (argv[1:])
+    cu.logger (cfg.loglevel)
+    plotcal (cfg)
+    pl.show ()
 
 
 # setjy
