@@ -1216,32 +1216,64 @@ class SplitConfig (ParseKeywords):
 
 
 def split (cfg):
-    import os.path
-    kws = {}
-
-    # ms.split() seems to merrily overwrite existing MSes which
-    # seems pretty questionable. Forbid that for now as best we can.
-    # Race conditions ahoy.
-    if os.path.exists (cfg.out):
-        raise RuntimeError ('destination "%s" already exists' % cfg.out)
+    import os.path, tempfile, shutil
 
     kws = extractmsselect (cfg, havearray=True, havecorr=True,
                            observationtoobs=True, taqltomsselect=False)
-
-    for m in ('out:outputms col:whichcol').split ():
-        myk, ck = m.split (':')
-        kws[ck] = getattr (cfg, myk)
+    kws['whichcol'] = cfg.col
+    kws['combine'] = ','.join (cfg.combine)
 
     if cfg.timebin is None:
         kws['timebin'] = '-1s'
     else:
         kws['timebin'] = str (cfg.timebin) + 's'
 
-    kws['combine'] = ','.join (cfg.combine)
-
     ms = cu.tools.ms ()
     ms.open (cfg.vis)
-    ms.split (**kws)
+
+    # split() will merrily overwrite an existing MS, which I think is
+    # very bad behavior. We try to prevent this in two steps: 1) claim
+    # the desired output name in a way that will error out if it
+    # already exists; 2) tell split() to create its outputs in an
+    # empty temporary directory, to minimize the chances of blowing
+    # away anything preexisting. In the pathological case, there's a
+    # chance for someone with our UID to move something into the
+    # temporary directory with our target name and have us delete
+    # it. There's nothing we can do about that so long as split() is
+    # happy to overwrite existing data.
+    #
+    # It's also possible for someone with our UID to spoil our rename
+    # by changing the permissions on our placeholder output directory
+    # and stuffing something in it, but this failure mode doesn't
+    # involved data loss.
+    #
+    # We put the temporary working directory adjacent to the destination
+    # to make sure it's on the same device.
+
+    didntmakeit = True
+    renamed = False
+    workdir = None
+
+    try:
+        didntmakeit = os.mkdir (cfg.out, 0) # error raised if already exists.
+
+        try:
+            workdir = tempfile.mkdtemp (dir=os.path.dirname (cfg.out),
+                                        prefix=os.path.basename (cfg.out) + '_')
+            kws['outputms'] = os.path.join (workdir, os.path.basename (cfg.out))
+            ms.split (**kws)
+            os.rename (kws['outputms'], cfg.out)
+            renamed = True
+        finally:
+            if workdir is not None:
+                shutil.rmtree (workdir, ignore_errors=True)
+    finally:
+        if not didntmakeit and not renamed:
+            try:
+                os.rmdir (cfg.out)
+            except:
+                pass
+
     ms.close ()
 
 
