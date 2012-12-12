@@ -520,6 +520,14 @@ gaintype=
     BPOLY   - bandpass with polynomial fit. "Somewhat experimental"
     K       - antenna-based delays
     KCROSS  - global cross-hand delay ; use parang=True
+    D       - solve for instrumental leakage
+    Df      - above with per-channel leakage terms
+    D+QU    - solve for leakage and apparent source polarization
+    Df+QU   - above with per-channel leakage terms
+    X       - solve for absolute position angle phase term
+    Xf      - above with per-channel phase terms
+    D+X     - D and X. "Not normally done"
+    Df+X    - Df and X. Presumably also not normally done.
     XY+QU   - ?
     XYf+QU  - ?
 
