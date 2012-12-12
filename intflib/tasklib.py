@@ -151,7 +151,8 @@ loglevel=
     severe warn info info1 info2 info3 info4 info5 debug1 debug2 debugging
 """
 
-def extractmsselect (cfg, havearray=False, havecorr=False, haveintent=True, taqltomsselect=True):
+def extractmsselect (cfg, havearray=False, havecorr=False, haveintent=True, taqltomsselect=True,
+                     observationtoobs=False):
     # expects cfg to have:
     #  antenna [correlation] field intent observation scan spw taql timerange uvrange
     # fills a dict with:
@@ -159,7 +160,7 @@ def extractmsselect (cfg, havearray=False, havecorr=False, haveintent=True, taql
 
     selkws = {}
 
-    direct = 'field observation scan spw uvrange'.split ()
+    direct = 'field scan spw uvrange'.split ()
     indirect = 'antenna:baseline timerange:time'.split ()
 
     if havearray:
@@ -170,6 +171,11 @@ def extractmsselect (cfg, havearray=False, havecorr=False, haveintent=True, taql
 
     if haveintent:
         direct.append ('intent')
+
+    if observationtoobs:
+        indirect.append ('observation:obs')
+    else:
+        direct.append ('observation')
 
     if taqltomsselect:
         indirect.append ('taql:msselect')
@@ -1199,7 +1205,7 @@ class SplitConfig (ParseKeywords):
     correlation = str
     field = str
     intent = str
-    obs = str
+    observation = str # renamed from obs for consistency
     scan = str
     spw = str
     taql = str
@@ -1219,8 +1225,8 @@ def split (cfg):
     if os.path.exists (cfg.out):
         raise RuntimeError ('destination "%s" already exists' % cfg.out)
 
-    kws = extractmsselect (cfg, havarray=True, havecorr=True,
-                           taqltomsselect=False)
+    kws = extractmsselect (cfg, havearray=True, havecorr=True,
+                           observationtoobs=True, taqltomsselect=False)
 
     for m in ('out:outputms col:whichcol').split ():
         myk, ck = m.split (':')
