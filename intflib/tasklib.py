@@ -23,6 +23,7 @@ __all__ = ('applycal applycal_cli ApplycalConfig '
            'clearcal clearcal_cli '
            'concat concat_cli '
            'flagmanager_cli '
+           'fluxscale fluxscale_cli FluxscaleConfig '
            'gaincal gaincal_cli GaincalConfig '
            'mfsclean mfsclean_cli MfscleanConfig '
            'plotcal plotcal_cli PlotcalConfig '
@@ -488,6 +489,97 @@ def flagmanager_cli (argv):
         wrongusage (flagmanager_doc, 'unknown flagmanager mode "%s"' % mode)
 
     af.done ()
+
+
+# fluxscale
+
+fluxscale_doc = \
+"""
+casatask fluxscale vis=<MS> caltable=<MS> fluxtable=<new MS> reference=<fields> transfer=<fields> [keywords]
+
+Write a new calibation table determining the fluxes for intermediate calibrators
+from known reference sources
+
+vis=
+  The visibility dataset. (Shouldn't be needed, but ...)
+
+caltable=
+  The preexisting calibration table with gains associated with more than one source.
+
+fluxtable=
+  The path of a new calibration table to create
+
+reference=
+  Comma-separated names of sources whose model fluxes are assumed to be well-known.
+
+transfer=
+  Comma-separated names of sources whose fluxes should be computed from the gains.
+
+listfile=
+  If specified, write out flux information to this path.
+
+append=
+  Boolean, default false. If true, append to existing cal table rather than
+  overwriting.
+
+refspwmap=
+  Comma-separated list of integers. If gains are only available for some spws,
+  map from the data to the gains. For instance, refspwmap=1,1,3,3 means that spw 0
+  will have its flux calculated using the gains for spw 1.
+""" + loglevel_doc
+
+# Not supported in CASA 3.4:
+#incremental=
+#  Boolean, default false. If true, create an "incremental" table where the amplitudes
+#  are correction factors, not absolute gains. (I.e., for the reference sources,
+#  the amplitudes will be unity.)
+
+
+class FluxscaleConfig (ParseKeywords):
+    vis = Custom (str, required=True)
+    caltable = Custom (str, required=True)
+    fluxtable = Custom (str, required=True)
+    reference = Custom ([str], required=True)
+    transfer = Custom ([str], required=True)
+
+    listfile = str
+    append = False
+    refspwmap = [int]
+    #incremental = False
+
+    loglevel = 'warn'
+
+
+def fluxscale (cfg):
+    cb = cu.tools.calibrater ()
+
+    reference = cfg.reference
+    if isinstance (reference, (list, tuple)):
+        reference = ','.join (reference)
+
+    transfer = cfg.transfer
+    if isinstance (transfer, (list, tuple)):
+        transfer = ','.join (transfer)
+
+    refspwmap = cfg.refspwmap
+    if not len (refspwmap):
+        refspwmap = [-1]
+
+    cb.open (cfg.vis, compress=False, addcorr=False, addmodel=False)
+    result = cb.fluxscale (tablein=cfg.caltable, tableout=cfg.fluxtable,
+                           reference=reference, transfer=transfer,
+                           listfile=cfg.listfile or '',
+                           append=cfg.append, refspwmap=refspwmap)
+                           #incremental=cfg.incremental)
+    cb.close ()
+    return result
+
+
+def fluxscale_cli (argv):
+    checkusage (fluxscale_doc, argv, usageifnoargs=True)
+    cfg = FluxscaleConfig ().parse (argv[1:])
+    cu.logger (cfg.loglevel)
+    fluxscale (cfg)
 
 
 # gaincal
