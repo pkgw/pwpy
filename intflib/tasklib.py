@@ -24,6 +24,7 @@ __all__ = ('applycal applycal_cli ApplycalConfig '
            'concat concat_cli '
            'flagmanager_cli '
            'fluxscale fluxscale_cli FluxscaleConfig '
+           'ft ft_cli FtConfig '
            'gaincal gaincal_cli GaincalConfig '
            'mfsclean mfsclean_cli MfscleanConfig '
            'plotcal plotcal_cli PlotcalConfig '
@@ -586,6 +587,88 @@ def fluxscale_cli (argv):
     cfg = FluxscaleConfig ().parse (argv[1:])
     cu.logger (cfg.loglevel)
     fluxscale (cfg)
+
+
+# ft
+#
+# We derive 'nterms' from len(model), and always derive reffreq
+# from the model images. These seem like safe constraints?
+
+ft_doc = \
+"""
+casatask ft vis=<MS> [keywords]
+
+Fill in (or update) the MODEL_DATA column of a Measurement Set with
+visibilities computed from an image or list of components.
+
+vis=
+  The path to the measurement set
+
+model=
+  Comma-separated list of model images, each giving successive
+  Taylor terms of a spectral model for each source. (It's fine
+  to have just one model, and this will do what you want.) The
+  reference frequency for the Taylor expansion is taken from
+  the first image.
+
+complist=
+  Path to a CASA ComponentList Measurement Set to use in the modeling.
+  I don't know what happens if you specify both this and "model".
+  They might both get applied?
+
+incremental=
+  Bool, default false, meaning that the MODEL_DATA column will be
+  replaced with the new values computed here. If true, the new values
+  are added to whatever's already in MODEL_DATA.
+
+""" + stdsel_doc + loglevel_doc
+
+
+class FtConfig (ParseKeywords):
+    vis = Custom (str, required=True)
+    model = [str]
+    complist = None
+    incremental = False
+
+    antenna = str
+    field = str
+    observation = str
+    scan = str
+    spw = str
+    taql = str
+    timerange = str
+    uvrange = str
+
+    loglevel = 'warn'
+
+
+def ft (cfg):
+    im = cu.tools.imager ()
+
+    im.open (cfg.vis, usescratch=False)
+    im.selectvis (**extractmsselect (cfg, haveintent=False,
+                                     taqltomsselect=False))
+    nmodel = len (cfg.model)
+
+    if nmodel > 1:
+        ia = cu.tools.image ()
+        ia.open (cfg.model[0])
+        # This gives Hz:
+        reffreq = ia.coordsys ().referencevalue (type='spectral')['numeric'][0]
+        ia.close ()
+        im.settaylorterms (ntaylorterms=nmodel, reffreq=reffreq)
+
+    im.ft (model=cfg.model,
+           complist=cfg.complist or '',
+           incremental=cfg.incremental)
+    im.close ()
+
+
+def ft_cli (argv):
+    checkusage (ft_doc, argv, usageifnoargs=True)
+    cfg = FtConfig ().parse (argv[1:])
+    cu.logger (cfg.loglevel)
+    ft (cfg)
 
 
 # gaincal
