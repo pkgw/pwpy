@@ -235,6 +235,15 @@ def applyonthefly (cb, cfg):
         cb.setapply (type='P')
 
 
+def makekwcli (doc, cfgclass, impl):
+    def kwclifunc (argv):
+        checkusage (doc, argv, usageifnoargs=True)
+        cfg = cfgclass ().parse (argv[1:])
+        cu.logger (cfg.loglevel)
+        impl (cfg)
+    return kwclifunc
+
+
 # applycal
 
 applycal_doc = \
@@ -295,11 +304,7 @@ def applycal (cfg):
     cb.close ()
 
 
-def applycal_cli (argv):
-    checkusage (applycal_doc, argv, usageifnoargs=True)
-    cfg = ApplycalConfig ().parse (argv[1:])
-    cu.logger (cfg.loglevel)
-    applycal (cfg)
+applycal_cli = makekwcli (applycal_doc, ApplycalConfig, applycal)
 
 
 # clearcal
@@ -582,11 +587,7 @@ def fluxscale (cfg):
     return result
 
 
-def fluxscale_cli (argv):
-    checkusage (fluxscale_doc, argv, usageifnoargs=True)
-    cfg = FluxscaleConfig ().parse (argv[1:])
-    cu.logger (cfg.loglevel)
-    fluxscale (cfg)
+fluxscale_cli = makekwcli (fluxscale_doc, FluxscaleConfig, fluxscale)
 
 
 # ft
@@ -664,11 +665,7 @@ def ft (cfg):
     im.close ()
 
 
-def ft_cli (argv):
-    checkusage (ft_doc, argv, usageifnoargs=True)
-    cfg = FtConfig ().parse (argv[1:])
-    cu.logger (cfg.loglevel)
-    ft (cfg)
+ft_cli = makekwcli (ft_doc, FtConfig, ft)
 
 
 # gaincal
@@ -841,11 +838,7 @@ def gaincal (cfg):
     cb.close ()
 
 
-def gaincal_cli (argv):
-    checkusage (gaincal_doc, argv, usageifnoargs=True)
-    cfg = GaincalConfig ().parse (argv[1:])
-    cu.logger (cfg.loglevel)
-    gaincal (cfg)
+gaincal_cli = makekwcli (gaincal_doc, GaincalConfig, gaincal)
 
 
 # mfsclean
@@ -1051,11 +1044,7 @@ def mfsclean (cfg):
     im.close ()
 
 
-def mfsclean_cli (argv):
-    checkusage (mfsclean_doc, argv, usageifnoargs=True)
-    cfg = MfscleanConfig ().parse (argv[1:])
-    cu.logger (cfg.loglevel)
-    mfsclean (cfg)
+mfsclean_cli = makekwcli (mfsclean_doc, MfscleanConfig, mfsclean)
 
 
 # plotcal
@@ -1242,11 +1231,7 @@ def setjy (cfg):
     im.close ()
 
 
-def setjy_cli (argv):
-    checkusage (setjy_doc, argv, usageifnoargs=True)
-    cfg = SetjyConfig ().parse (argv[1:])
-    cu.logger (cfg.loglevel)
-    setjy (cfg)
+setjy_cli = makekwcli (setjy_doc, SetjyConfig, setjy)
 
 
 # split
@@ -1360,11 +1345,7 @@ def split (cfg):
     ms.close ()
 
 
-def split_cli (argv):
-    checkusage (split_doc, argv, usageifnoargs=True)
-    cfg = SplitConfig ().parse (argv[1:])
-    cu.logger (cfg.loglevel.upper ()) # log warnings, errors to stderr
-    split (cfg)
+split_cli = makekwcli (split_doc, SplitConfig, split)
 
 
 # Driver for command-line access
