@@ -887,6 +887,7 @@ class MfscleanConfig (ParseKeywords):
     gain = 0.1
     threshold = 0. # mJy
     mask = str
+    minpb = 0.2
 
     # mode = mfs
     # gridmode = ''
@@ -904,7 +905,6 @@ class MfscleanConfig (ParseKeywords):
     # robust = 0.5
     # restoringbeam = []
     # pbcor = False
-    # minpb = 0.2
     # usescratch = False
     # allowchunk = False
     # npixels = 0
@@ -934,8 +934,6 @@ def mfsclean (cfg):
     tb = cu.tools.table ()
     qa = cu.tools.quanta ()
     ia = cu.tools.image ()
-
-    minpb = 0.2
 
     # Filenames. TODO: make sure nothing exists
 
@@ -1005,14 +1003,14 @@ def mfsclean (cfg):
     im.makeimage (type='pb', image=pb, compleximage='', verbose=False)
     im.setvp (dovp=False, verbose=False)
     im.setoptions (ftmachine='ft', wprojplanes=1, freqinterp='linear',
-                   padding=1.2, pastep=360.0, pblimit=minpb,
+                   padding=1.2, pastep=360.0, pblimit=cfg.minpb,
                    applypointingoffsets=False, dopbgriddingcorrections=True)
 
     if cfg.nterms > 1:
         im.settaylorterms (ntaylorterms=cfg.nterms, reffreq=cfg.reffreq * 1e9)
 
     im.setmfcontrol (stoplargenegatives=-1, cyclefactor=1.5,
-                     cyclespeedup=-1, minpb=minpb)
+                     cyclespeedup=-1, minpb=cfg.minpb)
 
     # Create the mask
 
