@@ -862,7 +862,7 @@ imbase=
   and "TTpsf", and TT is empty if nterms = 1, and "ttN." otherwise.
 
 nterms=1
-reffreq = 1 [GHz]
+reffreq = 0 [GHz]
 imsize = 256,256
 cell = 1 [arcsec]
 phasecenter = (blank) or 'J2000 12h34m56.7 -12d34m56.7'
@@ -885,7 +885,7 @@ class MfscleanConfig (ParseKeywords):
     niter = 500
     nterms = 1
     phasecenter = str
-    reffreq = 1. # GHz
+    reffreq = 0. # GHz; 0 -> be sensible
     stokes = 'I'
     threshold = 0. # mJy
 
