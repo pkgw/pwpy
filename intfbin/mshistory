@@ -8,14 +8,28 @@
 # seem to be used in practice (surprise!) although their usage seems
 # to be a bit confused (surprise again!).
 
-import sys, os.path, time, pyrap.tables
+import sys, os.path, time
 
 if len (sys.argv) == 1:
-    print >>sys.stderr, 'Usage: mshistory <mspath>'
+    print >>sys.stderr, 'usage: mshistory <mspath>'
     sys.exit (1)
 
 path = sys.argv[1]
-t = pyrap.tables.table (os.path.join (path, 'HISTORY'), ack=False)
+
+try:
+    import pyrap.tables
+except ImportError:
+    try:
+        import casautil, casac
+    except ImportError:
+        print >>sys.stderr, 'error: neither "pyrap" nor "casautil"/"casac" Python modules available'
+        sys.exit (1)
+    casautil.logger ()
+    t = casautil.tools.table ()
+    t.open (os.path.join (path, 'HISTORY'))
+else:
+    # In this branch we have pyrap.tables.
+    t = pyrap.tables.table (os.path.join (path, 'HISTORY'), ack=False)
 
 for i in xrange (t.nrows ()):
     timeval = t.getcell ('TIME', i)
