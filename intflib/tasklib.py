@@ -948,11 +948,13 @@ def mfsclean (cfg):
         resids = [cfg.imbase + 'residual']
         psfs = [cfg.imbase + 'psf']
     else:
+        models, restoreds, resids, psfs = [], [], [], []
+
         for i in xrange (cfg.nterms):
-            models = [cfg.imbase + 'tt%d.model' % i]
-            restoreds = [cfg.imbase + 'tt%d.restored' % i]
-            resids = [cfg.imbase + 'tt%d.residual' % i]
-            psfs = [cfg.imbase + 'tt%d.psf' % i]
+            models.append (cfg.imbase + 'tt%d.model' % i)
+            restoreds.append (cfg.imbase + 'tt%d.restored' % i)
+            resids.append (cfg.imbase + 'tt%d.residual' % i)
+            psfs.append (cfg.imbase + 'tt%d.psf' % i)
 
     # Get info on our selected data for various things we need to figure
     # out later.
