@@ -877,39 +877,39 @@ class MfscleanConfig (ParseKeywords):
     vis = Custom (str, required=True)
     imbase = Custom (str, required=True)
 
-    nterms = 1
-    reffreq = 1. # GHz
-    imsize = [256, 256]
     cell = 1. # arcsec
-    phasecenter = str
-    stokes = 'I'
-    niter = 500
     gain = 0.1
-    threshold = 0. # mJy
+    imsize = [256, 256]
     mask = str
     minpb = 0.2
+    niter = 500
+    nterms = 1
+    phasecenter = str
+    reffreq = 1. # GHz
+    stokes = 'I'
+    threshold = 0. # mJy
 
-    # mode = mfs
-    # gridmode = ''
-    # psfmode = clark
-    # nchan = -1
-    # width = 1
-    # imagermode = csclean
+    # allowchunk = False
     # cyclefactor = 1.5
     # cyclespeedup = -1
-    # multiscale = []
+    # imagermode = csclean
     # interactive = False
-    # uvtaper = False
+    # gridmode = ''
+    # mode = mfs
     # modelimage = []
-    # weighting = 'briggs'
-    # robust = 0.5
-    # restoringbeam = []
-    # pbcor = False
-    # usescratch = False
-    # allowchunk = False
+    # multiscale = []
+    # nchan = -1
     # npixels = 0
-    # veltype = radio
+    # pbcor = False
+    # psfmode = clark
+    # restoringbeam = []
+    # robust = 0.5
     # smallscalebias = 0.6
+    # usescratch = False
+    # uvtaper = False
+    # veltype = radio
+    # weighting = 'briggs'
+    # width = 1
 
     antenna = str
     field = str
