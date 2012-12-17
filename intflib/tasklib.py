@@ -858,7 +858,7 @@ vis=
 
 imbase=
   Base name of output files. We create files named "imbaseEXT"
-  where EXT is all of "mask", "TTmodel", "TTrestored", "TTresidual",
+  where EXT is all of "mask", "TTmodel", "TTimage", "TTresidual",
   and "TTpsf", and TT is empty if nterms = 1, and "ttN." otherwise.
 
 nterms=1
@@ -942,7 +942,7 @@ def mfsclean (cfg):
 
     if cfg.nterms == 1:
         models = [cfg.imbase + 'model']
-        restoreds = [cfg.imbase + 'restored']
+        restoreds = [cfg.imbase + 'image']
         resids = [cfg.imbase + 'residual']
         psfs = [cfg.imbase + 'psf']
     else:
@@ -950,7 +950,7 @@ def mfsclean (cfg):
 
         for i in xrange (cfg.nterms):
             models.append (cfg.imbase + 'tt%d.model' % i)
-            restoreds.append (cfg.imbase + 'tt%d.restored' % i)
+            restoreds.append (cfg.imbase + 'tt%d.image' % i)
             resids.append (cfg.imbase + 'tt%d.residual' % i)
             psfs.append (cfg.imbase + 'tt%d.psf' % i)
 
