@@ -30,6 +30,7 @@ __all__ = ('applycal applycal_cli ApplycalConfig '
            'plotcal plotcal_cli PlotcalConfig '
            'setjy setjy_cli SetjyConfig '
            'split split_cli SplitConfig '
+           'uvsub uvsub_cli UvsubConfig '
            'cmdline_driver').split ()
 
 
@@ -152,7 +153,8 @@ loglevel=
     severe warn info info1 info2 info3 info4 info5 debug1 debug2 debugging
 """
 
-def extractmsselect (cfg, havearray=False, havecorr=False, haveintent=True, taqltomsselect=True,
+def extractmsselect (cfg, havearray=False, havecorr=False, haveintent=True,
+                     intenttoscanintent=False, taqltomsselect=True,
                      observationtoobs=False):
     # expects cfg to have:
     #  antenna [correlation] field intent observation scan spw taql timerange uvrange
@@ -171,7 +173,10 @@ def extractmsselect (cfg, havearray=False, havecorr=False, haveintent=True, taql
         direct.append ('correlation')
 
     if haveintent:
-        direct.append ('intent')
+        if intenttoscanintent:
+            indirect.append ('intent:scanintent')
+        else:
+            direct.append ('intent')
 
     if observationtoobs:
         indirect.append ('observation:obs')
@@ -1346,6 +1351,55 @@ def split (cfg):
 
 
 split_cli = makekwcli (split_doc, SplitConfig, split)
+
+
+# uvsub
+#
+# We add UV selection keywords not supported by the CASA task.
+# I assume that they're honored ...
+
+uvsub_doc = \
+"""
+casatask uvsub vis= [keywords]
+
+Set the CORRECTED_DATA column to the difference of DATA and MODEL_DATA.
+
+reverse=
+  Boolean, default false, which means to set CORRECTED = DATA - MODEL. If
+  true, CORRECTED = DATA + MODEL.
+""" + stdsel_doc + loglevel_doc
+
+
+class UvsubConfig (ParseKeywords):
+    vis = Custom (str, required=True)
+    reverse = False
+
+    antenna = str
+    array = str
+    field = str
+    intent = str
+    observation = str
+    scan = str
+    spw = str
+    timerange = str
+    uvrange = str
+    taql = str
+
+    loglevel = 'warn'
+
+
+def uvsub (cfg):
+    ms = cu.tools.ms ()
+
+    ms.open (cfg.vis, nomodify=False)
+    ms.msselect (extractmsselect (cfg, havearray=True,
+                                  intenttoscanintent=True,
+                                  taqltomsselect=False))
+    ms.uvsub (reverse=cfg.reverse)
+    ms.close ()
+
+
+uvsub_cli = makekwcli (uvsub_doc, UvsubConfig, uvsub)
 
 
 # Driver for command-line access
