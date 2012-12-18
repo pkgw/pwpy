@@ -454,10 +454,15 @@ Delete the MODEL_DATA and CORRECTED_DATA columns from MSes.
 
 
 def delcal (mspath):
+    wantremove = 'MODEL_DATA CORRECTED_DATA'.split ()
     tb = cu.tools.table ()
     tb.open (mspath, nomodify=False)
-    tb.removecols ('MODEL_DATA CORRECTED_DATA'.split ())
+    cols = frozenset (tb.colnames ())
+    toremove = [c for c in wantremove if c in cols]
+    if len (toremove):
+        tb.removecols (toremove)
     tb.close ()
+    return toremove
 
 
 def delcal_cli (argv):
@@ -465,7 +470,11 @@ def delcal_cli (argv):
     cu.logger ()
 
     for mspath in argv[1:]:
-        delcal (mspath)
+        removed = delcal (mspath)
+        if len (removed):
+            print '%s: removed %s' % (mspath, ', '.join (removed))
+        else:
+            print '%s: nothing to remove' % mspath
 
 
 # flagmanager. Not really complicated enough to make it worth making a
