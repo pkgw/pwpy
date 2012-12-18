@@ -1052,20 +1052,24 @@ def mfsclean (cfg):
 
     # Create the mask
 
-    im.make (mask)
-    ia.open (mask)
-    maskcs = ia.coordsys ()
-    maskcs.setreferencecode (specframe, 'spectral', True)
-    ia.setcoordsys (maskcs.torecord ())
+    if cfg.mask is None:
+        maskstr = ''
+    else:
+        maskstr = mask
+        im.make (mask)
+        ia.open (mask)
+        maskcs = ia.coordsys ()
+        maskcs.setreferencecode (specframe, 'spectral', True)
+        ia.setcoordsys (maskcs.torecord ())
 
-    if cfg.mask is not None:
-        rg = cu.tools.regionmanager ()
-        regions = rg.fromtextfile (filename=cfg.mask,
-                                   shape=ia.shape (),
-                                   csys=maskcs.torecord ())
-        im.regiontoimagemask (mask=mask, region=regions)
+        if cfg.mask is not None:
+            rg = cu.tools.regionmanager ()
+            regions = rg.fromtextfile (filename=cfg.mask,
+                                       shape=ia.shape (),
+                                       csys=maskcs.torecord ())
+            im.regiontoimagemask (mask=mask, region=regions)
 
-    ia.close ()
+        ia.close ()
 
     # Create blank model(s). Diverging from task_clean even more
     # significantly than usual here.
@@ -1078,7 +1082,7 @@ def mfsclean (cfg):
     im.clean (algorithm='msmfs', niter=cfg.niter, gain=cfg.gain,
               threshold=qa.quantity (cfg.threshold, 'mJy'),
               model=models, residual=resids, image=restoreds,
-              psfimage=psfs, mask=mask, interactive=False)
+              psfimage=psfs, mask=maskstr, interactive=False)
     im.close ()
 
 
