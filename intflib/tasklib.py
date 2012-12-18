@@ -1015,10 +1015,32 @@ def mfsclean (cfg):
 
     # Choose phase center
 
-    if cfg.phasecenter is not None:
-        phasecenter = cfg.phasecenter
-    else:
+    if cfg.phasecenter is None:
         phasecenter = int (fields[0])
+    else:
+        phasecenter = cfg.phasecenter
+
+        if ':' in phasecenter:
+            # phasecenter='J2000 19:06:48.568 40:11:06.68'
+            # parses to "07:06:48.57 297.13.19.80"
+            # Using hm/dm instead of ::/:: as separators makes it parse
+            # correctly. No idea how the colons manage to parse both
+            # without warning and totally wrongly.
+            print >>sys.stderr, '\n\nWARNING: you moron, who uses colons in sexagesimal?'
+            tmp1 = phasecenter.split ()
+            twiddled = False
+            if len (tmp1) == 3:
+                tmp2 = tmp1[1].split (':')
+                tmp3 = tmp1[2].split (':')
+                if len (tmp2) == 3 and len (tmp3) == 3:
+                    tmp2 = tmp2[0] + 'h' + tmp2[1] + 'm' + tmp2[2]
+                    tmp3 = tmp3[0] + 'd' + tmp3[1] + 'm' + tmp3[2]
+                    phasecenter = ' '.join ([tmp1[0], tmp2, tmp3])
+                    twiddled = True
+            if twiddled:
+                print >>sys.stderr, 'WARNING: attempted to fix it up: "%s"\n\n' % phasecenter
+            else:
+                print >>sys.stderr, 'WARNING: couldn\'t parse, left as-is; good luck\n\n'
 
     # Set up all of this junk
 
