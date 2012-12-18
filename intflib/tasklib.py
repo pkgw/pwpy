@@ -662,7 +662,7 @@ incremental=
 class FtConfig (ParseKeywords):
     vis = Custom (str, required=True)
     model = [str]
-    complist = None
+    complist = str
     incremental = False
 
     antenna = str
