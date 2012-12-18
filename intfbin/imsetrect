@@ -1,0 +1,101 @@
+#! /usr/bin/env casa-python
+# -*- python -*-
+# Copyright 2012 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
+
+"""
+imsetrect <image> <x> <y> <halfwidth> <value>
+
+Fill a square in the specified image with a constant value.  The square is
+centered on (integer) pixels x and y with a pixel width of
+2*halfwidth+1. So halfwidth = 0 sets only the exact pixel.
+
+This can be useful if you've generated a model of a field and want to isolate
+a discrete source. You can run this on a duplicate of the model to zero out
+the source, and then subtract the model, leaving only the desired source
+un-subtracted.
+"""
+
+import casautil
+
+## quickutil: usage
+#- snippet: usage.py (2012 Sep 20)
+#- SHA1: ac032a5db2efb5508569c4d5ba6eeb3bba19a7ca
+def showusage (docstring, short, stream, exitcode):
+    if stream is None:
+        from sys import stdout as stream
+    if not short:
+        print >>stream, 'Usage:', docstring.strip ()
+    else:
+        intext = False
+        for l in docstring.splitlines ():
+            if intext:
+                if not len (l):
+                    break
+                print >>stream, l
+            elif len (l):
+                intext = True
+                print >>stream, 'Usage:', l
+        print >>stream, \
+            '\nRun with a sole argument --help for more detailed usage information.'
+    raise SystemExit (exitcode)
+
+def checkusage (docstring, argv=None, usageifnoargs=False):
+    if argv is None:
+        from sys import argv
+    if len (argv) == 1 and usageifnoargs:
+        showusage (docstring, True, None, 0)
+    if len (argv) == 2 and argv[1] in ('-h', '--help'):
+        showusage (docstring, False, None, 0)
+
+def wrongusage (docstring, *rest):
+    import sys
+    intext = False
+
+    if len (rest) == 0:
+        detail = 'invalid command-line arguments'
+    elif len (rest) == 1:
+        detail = rest[0]
+    else:
+        detail = rest[0] % tuple (rest[1:])
+
+    print >>sys.stderr, 'error:', detail, '\n' # extra NL
+    showusage (docstring, True, sys.stderr, 1)
+## end
+
+
+def setrect (impath, x, y, halfwidth, value):
+    blc = [x - halfwidth, y - halfwidth]
+    trc = [x + halfwidth, y + halfwidth]
+
+    ia = casautil.tools.image ()
+    ia.open (impath)
+    c = ia.getchunk (blc, trc)
+    c.fill (value)
+    ia.putchunk (c, blc)
+    ia.close ()
+
+
+def commandline (argv):
+    checkusage (__doc__, argv, usageifnoargs=True)
+
+    if len (argv) != 6:
+        wrongusage (__doc__, 'expected exactly 5 arguments')
+
+    impath = argv[1]
+
+    try:
+        x = int (argv[2])
+        y = int (argv[3])
+        halfwidth = int (argv[4])
+        value = float (argv[5])
+    except ValueError:
+        wrongusage (__doc__, 'could not parse one of the numeric arguments')
+
+    casautil.logger ()
+    setrect (impath, x, y, halfwidth, value)
+
+
+if __name__ == '__main__':
+    import sys
+    commandline (sys.argv)
