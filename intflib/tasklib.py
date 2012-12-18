@@ -22,6 +22,7 @@ from kwargv import ParseKeywords, Custom
 __all__ = ('applycal applycal_cli ApplycalConfig '
            'clearcal clearcal_cli '
            'concat concat_cli '
+           'delcal delcal_cli '
            'flagmanager_cli '
            'fluxscale fluxscale_cli FluxscaleConfig '
            'ft ft_cli FtConfig '
@@ -437,6 +438,34 @@ def concat_cli (argv):
 
     cu.logger ()
     concat (argv[1:-1], argv[-1], timesort)
+
+
+# delcal
+#
+# Not a CASA task. Delmod on steroids
+
+
+delcal_doc = \
+"""
+casatask delcal <ms> [mses...]
+
+Delete the MODEL_DATA and CORRECTED_DATA columns from MSes.
+"""
+
+
+def delcal (mspath):
+    tb = cu.tools.table ()
+    tb.open (mspath, nomodify=False)
+    tb.removecols ('MODEL_DATA CORRECTED_DATA'.split ())
+    tb.close ()
+
+
+def delcal_cli (argv):
+    checkusage (delcal_doc, argv, usageifnoargs=True)
+    cu.logger ()
+
+    for mspath in argv[1:]:
+        delcal (mspath)
 
 
 # flagmanager. Not really complicated enough to make it worth making a
