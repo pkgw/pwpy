@@ -892,8 +892,8 @@ vis=
 
 imbase=
   Base name of output files. We create files named "imbaseEXT"
-  where EXT is all of "mask", "TTmodel", "TTimage", "TTresidual",
-  and "TTpsf", and TT is empty if nterms = 1, and "ttN." otherwise.
+  where EXT is all of "mask", "modelTT", "imageTT", "residualTT",
+  and "psfTT", and TT is empty if nterms = 1, and "ttN." otherwise.
 
 nterms=1
 reffreq = 0 [GHz]
@@ -980,13 +980,17 @@ def mfsclean (cfg):
         resids = [cfg.imbase + 'residual']
         psfs = [cfg.imbase + 'psf']
     else:
+        # Note: the names for the 'alpha' and 'alpha.error' images are
+        # generated automatically inside the C++ stuff by looking for image
+        # names ending in 'tt0', so we're limited in our naming flexibility
+        # here.
         models, restoreds, resids, psfs = [], [], [], []
 
         for i in xrange (cfg.nterms):
-            models.append (cfg.imbase + 'tt%d.model' % i)
-            restoreds.append (cfg.imbase + 'tt%d.image' % i)
-            resids.append (cfg.imbase + 'tt%d.residual' % i)
-            psfs.append (cfg.imbase + 'tt%d.psf' % i)
+            models.append (cfg.imbase + 'model.tt%d' % i)
+            restoreds.append (cfg.imbase + 'image.tt%d' % i)
+            resids.append (cfg.imbase + 'residual.tt%d' % i)
+            psfs.append (cfg.imbase + 'psf.tt%d' % i)
 
     # Get info on our selected data for various things we need to figure
     # out later.
