@@ -1401,6 +1401,9 @@ casatask uvsub vis= [keywords]
 
 Set the CORRECTED_DATA column to the difference of DATA and MODEL_DATA.
 
+vis=
+  The input data set.
+
 reverse=
   Boolean, default false, which means to set CORRECTED = DATA - MODEL. If
   true, CORRECTED = DATA + MODEL.
