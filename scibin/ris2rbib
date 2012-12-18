@@ -252,6 +252,9 @@ def ris2bib (ris):
             bib.bibcode = brace (urlunquote (url[30:]))
         elif url.startswith ('http://labs.adsabs.harvard.edu/ui/abs/'):
             bib.bibcode = brace (urlunquote (url[38:]))
+        elif url.startswith ('http://arxiv.org/abs/'):
+            bib.eprint = brace (urlunquote (url[21:]))
+            bib.archivePrefix = '{arxiv}'
 
     if len (ris.UR):
         bib.url = brace (latexescapeurl (ris.UR[0]))
