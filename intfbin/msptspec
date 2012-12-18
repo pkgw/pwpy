@@ -7,7 +7,7 @@
 # to combine them.
 
 """
-msphotom vis=<MS> [keywords...]
+msptspec vis=<MS> [keywords...]
 
 Extract fluxes from the visibilities in a measurement set as a
 function of spectral window (and hence, presumably, frequency). See
