@@ -521,9 +521,11 @@ def flagmanager_cli (argv):
     elif mode == 'save':
         if len (argv) != 4:
             wrongusage (flagmanager_doc, 'expect exactly two arguments in save mode')
+        from time import strftime
         name = argv[3]
         af.saveflagversion (versionname=name, merge='replace',
-                            comment='version "%s" created by casatask flagmanager' % name)
+                            comment='version "%s" created by casatask flagmanager at %s'
+                            % (name, strftime ('%Y-%m-%dT%H:%M:%SZ')))
     elif mode == 'restore':
         if len (argv) != 4:
             wrongusage (flagmanager_doc, 'expect exactly two arguments in restore mode')
