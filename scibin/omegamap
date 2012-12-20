@@ -23,6 +23,12 @@ out=
 fontsize=
  Size of the font to use (default: 10)
 
+subsuperrise=
+ Amount to offset subscripts and superscripts in *builtin* text labels,
+ in ten thousands of an em (default: 5000, as in Pango itself).
+ User-specified labels have to do this manually by using
+ <span rise="RISE" size="smaller"> rather than <sub> or <sup>.
+
 dims=
  Width and height of the output image, in points or pixels; ignored if
  displaying interactively. If only one value is specified, it is used
@@ -142,6 +148,7 @@ class Config (ParseKeywords):
 
     out = str
     fontsize = 10.0
+    subsuperrise = 5000
     coloring = 'white_to_black'
     logfactor = float
     xlabel = 'Right Ascension (J2000)'
@@ -286,6 +293,7 @@ def plot (config):
 
 def doit (config):
     om.pango.setFont (size=config.fontsize)
+    om.pango.setBuiltinSubsuperRise (config.subsuperrise)
     p = plot (config)
 
     if config.out is None:
