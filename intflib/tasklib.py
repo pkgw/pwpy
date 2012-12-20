@@ -916,7 +916,7 @@ niter = 500
 gain = 0.1
 threshold = 0 [mJy]
 mask = (blank) or path of CASA-format region text file
-""" + stdsel_doc + loglevel_doc
+""" + stdsel_doc + loglevel_doc.replace ('warn;', 'info;')
 
 class MfscleanConfig (ParseKeywords):
     vis = Custom (str, required=True)
@@ -965,7 +965,7 @@ class MfscleanConfig (ParseKeywords):
     uvrange = str
     taql = str
 
-    loglevel = 'warn'
+    loglevel = 'info'
 
 
 specframenames = 'REST LSRK LSRD BARY GEO TOPO GALACTO LGROUP CMB'.split ()
