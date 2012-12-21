@@ -4,13 +4,21 @@
 """
 lsqmdl - model data with least-squares fitting
 
-Model(func, x, y, [w]).solve(guess).printsoln()
-  func = lambda x, p1, p2, p3: ...
-PolynomialModel(degree, x, y, [w]).solve().plot()
-ScaleModel(x, y, [w]).solve().showcov()
+Usage:
 
-The w are *weights* and NOT *uncertainties*. If you have zero
-uncertainty on a measurement that's your problem.
+  Model(func, x, y, [invsigma]).solve(guess).printsoln()
+    func = lambda x, p1, p2, p3: ...
+  PolynomialModel(degree, x, y, [invsigma]).solve().plot()
+  ScaleModel(x, y, [invsigma]).solve().showcov()
+
+The invsigma are *inverse sigmas*, NOT inverse *variances* (the usual
+statistical weights). Since most applications deal in sigmas, take
+care to write
+
+  right = Model (func, x, y, 1./u)   not
+  WRONG = Model (func, x, y, u)
+
+If you have zero uncertainty on a measurement, too bad.
 """
 
 import numpy as np
@@ -19,7 +27,7 @@ import numpy as np
 class _ModelBase (object):
     x = None
     y = None
-    w = None
+    invsigma = None
 
     params = None # ndarray of solved model parameters
     perror = None # ndarray of 1-sigma uncerts on pamams
@@ -30,22 +38,22 @@ class _ModelBase (object):
     rchisq = None # reduced chi squared of the fit
     resids = None # resids = y - modely
 
-    def __init__ (self, x, y, w=None):
-        self.setdata (x, y, w)
+    def __init__ (self, x, y, invsigma=None):
+        self.setdata (x, y, invsigma)
 
 
-    def setdata (self, x, y, w=None):
+    def setdata (self, x, y, invsigma=None):
         self.x = np.array (x, dtype=np.float, ndmin=1)
         self.y = np.array (y, dtype=np.float, ndmin=1)
 
-        if w is None:
-            self.w = np.ones (self.y.shape)
+        if invsigma is None:
+            self.insigma = np.ones (self.y.shape)
         else:
-            w = np.array (w, dtype=np.float)
-            self.w = np.broadcast_arrays (self.y, w)[1] # allow scalar w
+            i = np.array (invsigma, dtype=np.float)
+            self.invsigma = np.broadcast_arrays (self.y, i)[1] # allow scalar invsigma
 
-        if self.w.shape != self.y.shape:
-            raise ValueError ('y values and weight values must have same shape')
+        if self.invsigma.shape != self.y.shape:
+            raise ValueError ('y values and inverse-sigma values must have same shape')
 
 
     def printsoln (self):
@@ -78,7 +86,7 @@ class _ModelBase (object):
             modx = np.linspace (mxmin, mxmax, 400)
             mody = self.modelfunc (modx)
 
-        sigmas = self.w**-1 # TODO: zero weights
+        sigmas = self.invsigma**-1 # TODO: handle invsigma = 0
 
         vb = om.layout.VBox (2)
         vb.pData = om.quickXYErr (self.x, self.y, sigmas,
@@ -109,11 +117,11 @@ class _ModelBase (object):
 
 
 class Model (_ModelBase):
-    def __init__ (self, func, x, y, w=None):
+    def __init__ (self, func, x, y, invsigma=None):
         if func is not None:
             self.setfunc (func)
         if x is not None:
-            self.setdata (x, y, w)
+            self.setdata (x, y, invsigma)
 
 
     def setfunc (self, func):
@@ -133,7 +141,7 @@ class Model (_ModelBase):
         def yfunc (params, vec):
             vec[:] = f (x, *params)
 
-        self.lm_prob.setResidualFunc (self.y, self.w, yfunc, None)
+        self.lm_prob.setResidualFunc (self.y, self.invsigma, yfunc, None)
         self.lm_soln = soln = self.lm_prob.solve (guess)
 
         self.paramnames = f.func_code.co_varnames[1:]
@@ -148,16 +156,18 @@ class Model (_ModelBase):
 
 
 class PolynomialModel (_ModelBase):
-    def __init__ (self, degree, x, y, w=None):
+    def __init__ (self, degree, x, y, invsigma=None):
         self.degree = degree
-        self.setdata (x, y, w)
+        self.setdata (x, y, invsigma)
 
 
     def solve (self):
         from numpy.polynomial import polyfit, polyval
 
         self.paramnames = ['a%d' % i for i in xrange (self.degree)]
-        self.params, info = polyfit (self.x, self.y, self.degree, w=self.w, full=True)
+        # Based on my reading of the polyfit() docs, I think w=invsigma**2 is right...
+        self.params, info = polyfit (self.x, self.y, self.degree,
+                                     w=self.invsigma**2, full=True)
         self.perror = None # does anything provide this? could farm out to lmmin ...
         self.covar = None
         self.modelfunc = lambda x: polyval (x, self.params)
@@ -169,7 +179,7 @@ class PolynomialModel (_ModelBase):
 
 class ScaleModel (_ModelBase):
     def solve (self):
-        w2 = self.w**2
+        w2 = self.invsigma**2
         sxx = np.dot (self.x**2, w2)
         sxy = np.dot (self.x * self.y, w2)
         m = sxy / sxx
@@ -182,5 +192,5 @@ class ScaleModel (_ModelBase):
         self.modelfunc = lambda x: m * x
         self.modely = m * self.x
         self.resids = self.y - self.modely
-        self.rchisq = ((self.resids * self.w)**2).sum () / (self.x.size - 1)
+        self.rchisq = ((self.resids * self.invsigma)**2).sum () / (self.x.size - 1)
         return self
