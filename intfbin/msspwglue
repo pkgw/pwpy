@@ -4,8 +4,32 @@
 # Licensed under the GNU General Public License version 3 or higher
 
 """
-msspwglue - copy a measurement set, gluing together adjacent spectral windows
+msspwglue vis=MS out=MS
+
+HARDCODES gluing of inspws 0-7 into outspw 0 and inspws 8-15 into outspw 1!!
+
+vis=
+  The input MS
+
+out=
+  The output MS. Will be created.
+
+field=
+  Optional field ID number. If specified, the new MS will contain data
+  for only this field.
+
+hackfield=
+  Another optional field ID number, used for fixing up MSes where one
+  pointing is accidentally assigned two field IDs. Both "field" and
+  "hackfield" are extracted from the dataset, but the output is changed
+  so that all the records refer to "field" only.
+
+loglevel=
+  Logging detail level. Default is info. Options are
+    severe warn info info1 info2 info3 info4 info5 debug1 debug2 debugging
 """
+
+# Progress() should be split out; it's useful.
 
 import numpy as np
 from kwargv import ParseKeywords, Custom
