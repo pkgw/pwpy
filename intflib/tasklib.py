@@ -1164,7 +1164,7 @@ class PlotcalConfig (ParseKeywords):
     caltable = Custom (str, required=True)
     xaxis = 'time'
     yaxis = 'amp'
-    iteration = str
+    iteration = ''
 
     # not implemented: subplot, overplot, clearpanel, plotrange,
     # showflags, showgui, figfile
