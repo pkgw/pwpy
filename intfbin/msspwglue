@@ -1,0 +1,485 @@
+#! /usr/bin/env casa-python
+# -*- python -*-
+# Copyright 2013 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
+
+"""
+msspwglue - copy a measurement set, gluing together adjacent spectral windows
+"""
+
+import numpy as np
+from kwargv import ParseKeywords, Custom
+import casautil
+
+
+## quickutil: usage die
+#- snippet: usage.py (2012 Sep 29)
+#- SHA1: ac032a5db2efb5508569c4d5ba6eeb3bba19a7ca
+def showusage (docstring, short, stream, exitcode):
+    if stream is None:
+        from sys import stdout as stream
+    if not short:
+        print >>stream, 'Usage:', docstring.strip ()
+    else:
+        intext = False
+        for l in docstring.splitlines ():
+            if intext:
+                if not len (l):
+                    break
+                print >>stream, l
+            elif len (l):
+                intext = True
+                print >>stream, 'Usage:', l
+        print >>stream, \
+            '\nRun with a sole argument --help for more detailed usage information.'
+    raise SystemExit (exitcode)
+
+def checkusage (docstring, argv=None, usageifnoargs=False):
+    if argv is None:
+        from sys import argv
+    if len (argv) == 1 and usageifnoargs:
+        showusage (docstring, True, None, 0)
+    if len (argv) == 2 and argv[1] in ('-h', '--help'):
+        showusage (docstring, False, None, 0)
+
+def wrongusage (docstring, *rest):
+    import sys
+    intext = False
+
+    if len (rest) == 0:
+        detail = 'invalid command-line arguments'
+    elif len (rest) == 1:
+        detail = rest[0]
+    else:
+        detail = rest[0] % tuple (rest[1:])
+
+    print >>sys.stderr, 'error:', detail, '\n' # extra NL
+    showusage (docstring, True, sys.stderr, 1)
+#- snippet: die.py (2012 Sep 29)
+#- SHA1: 3bdd3282e52403d2dec99d72680cb7bc95c99843
+def die (fmt, *args):
+    if not len (args):
+        raise SystemExit ('error: ' + str (fmt))
+    raise SystemExit ('error: ' + (fmt % args))
+## end
+
+
+def _sfmt (t):
+    # Format timespan (t in seconds)
+    if t < 90:
+        return '%.0fs' % t
+    if t < 4000:
+        return '%.1fm' % (t / 60)
+    if t < 90000:
+        return '%.1fh' % (t / 3600)
+    return '%.1fd' % (t / 86400)
+
+
+class Progress (object):
+    elapsed = None
+
+    prefix = None
+    totitems = None
+    tstart = None
+    unbufout = None
+    tlastprint = None
+
+    def __enter__ (self):
+        return self
+
+
+    def __exit__ (self, etype, eval, etb):
+        if self.tstart is not None:
+            self.finish (etype is None)
+        return False
+
+
+    def start (self, totitems, prefix=''):
+        import time, os
+        self.totitems = totitems
+        self.prefix = prefix
+        self.tstart = time.time ()
+        self.tlastprint = 0
+        self.unbufout = os.fdopen (os.dup (1), 'w', 0)
+
+
+    def progress (self, curitems):
+        import time
+        now = time.time ()
+        if now - self.tlastprint < 1:
+            return
+
+        elapsed = now - self.tstart
+        li = len (str (self.totitems))
+
+        if curitems == 0:
+            msg = '%5.1f%% (%*d/%d) elapsed %s ETA %s total %s' % \
+                  (0., li, 0, self.totitems, _sfmt (elapsed), '?', '?')
+        else:
+            pct = 100. * curitems / self.totitems
+            total = 1. * elapsed * self.totitems / curitems
+            eta = total - elapsed
+            msg = '%5.1f%% (%*d/%d) elapsed %s ETA %s total %s' % \
+                  (pct, li, curitems, self.totitems, _sfmt (elapsed),
+                   _sfmt (eta), _sfmt (total))
+
+        print >>self.unbufout, self.prefix, msg.ljust (60) + '\r',
+        self.tlastprint = now
+
+
+    def finish (self, success=True):
+        import time
+        now = time.time ()
+        self.elapsed = now - self.tstart
+
+        if not success:
+            print >>self.unbufout
+        else:
+            msg = '100.0%% (%d/%d) elapsed %s ETA 0s total %s' % \
+                  (self.totitems, self.totitems, _sfmt (self.elapsed),
+                   _sfmt (self.elapsed))
+            print >>self.unbufout, self.prefix, msg.ljust (60)
+
+        self.unbufout.close ()
+        self.tstart = self.unbufout = None
+        self.tlastprint = self.totitems = None
+
+
+class Config (ParseKeywords):
+    vis = Custom (str, required=True)
+    out = Custom (str, required=True)
+
+    field = int
+    hackfield = int
+
+    loglevel = 'info' # XXXXXX
+
+
+# Different things that we do with columns in the SPECTRAL_WINDOW table:
+# match  - scalar values that should all agree
+# first  - scalar values and we'll keep the first
+# scsum  - scalar values and we'll keep the sum
+# concat - vectors that we'll concatenate
+# empty  - column should be empty (ndim = -1)
+_spw_match_cols = frozenset ('MEAS_FREQ_REF FLAG_ROW FREQ_GROUP FREQ_GROUP_NAME '
+                             'IF_CONV_CHAIN NET_SIDEBAND BBC_NO'.split ())
+_spw_first_cols = frozenset ('REF_FREQUENCY NAME'.split ())
+_spw_scsum_cols = frozenset ('NUM_CHAN TOTAL_BANDWIDTH'.split ())
+_spw_concat_cols = frozenset ('CHAN_FREQ CHAN_WIDTH EFFECTIVE_BW RESOLUTION'.split ())
+_spw_empty_cols = frozenset ('ASSOC_SPW_ID ASSOC_NATURE'.split ())
+
+
+def _spwproc_match (spwtb, colname, inspws, outdata):
+    theval = None
+
+    for inspw in inspws:
+        v = spwtb.getcell (colname, inspw)
+        if theval is None:
+            theval = v
+        elif theval != v:
+            die ('glued spws should all have same value of %s column but don\'t', colname)
+
+    outdata[colname] = theval
+
+
+def _spwproc_first (spwtb, colname, inspws, outdata):
+    outdata[colname] = spwtb.getcell (colname, inspws[0])
+
+
+def _spwproc_scsum (spwtb, colname, inspws, outdata):
+    sum = 0
+    for inspw in inspws:
+        sum += spwtb.getcell (colname, inspw)
+    outdata[colname] = sum
+
+
+def _spwproc_concat (spwtb, colname, inspws, outdata):
+    clist = []
+    for inspw in inspws:
+        clist += list (spwtb.getcell (colname, inspw))
+    outdata[colname] = clist
+
+
+# Similar info for the main visibility data
+_vis_ident_cols = 'ARRAY_ID FIELD_ID TIME ANTENNA1 ANTENNA2'.split ()
+_vis_smatch_cols = frozenset ('EXPOSURE FEED1 FEED2 FLAG_ROW INTERVAL '
+                              'OBSERVATION_ID PROCESSOR_ID SCAN_NUMBER '
+                              'STATE_ID TIME_CENTROID'.split ())
+_vis_vmatch_cols = frozenset ('UVW WEIGHT SIGMA'.split ())
+_vis_pconcat_cols = frozenset ('FLAG DATA MODEL_DATA CORRECTED_DATA'.split ())
+_vis_empty_cols = frozenset ('FLAG_CATEGORY WEIGHT_SPECTRUM'.split ())
+_vis_pconcat_dtypes = {'FLAG': np.bool, 'DATA': np.complex128, 'MODEL_DATA': np.complex128,
+                       'CORRECTED_DATA': np.complex128}
+
+_np_converters = {
+    np.bool_: bool,
+    np.int32: int,
+    np.float64: float,
+    np.ndarray: lambda x: x,
+    int: int,
+}
+
+def spwglue (cfg):
+    with Progress () as p:
+        _spwglue (cfg, p)
+
+def _spwglue (cfg, prog):
+    import os.path
+
+    if cfg.hackfield is not None:
+        assert cfg.field is not None
+
+    mapping = [range (8), range (8, 16)]
+    nout = len (mapping)
+
+    # Read in spw and dd info and make sure everything is in order.
+
+    tb = casautil.tools.table ()
+    tb.open (os.path.join (cfg.vis, 'SPECTRAL_WINDOW'))
+    spwcols = tb.colnames ()
+    spwout = [dict () for i in xrange (nout)]
+
+    for col in spwcols:
+        if col in _spw_match_cols:
+            for i in xrange (nout):
+                _spwproc_match (tb, col, mapping[i], spwout[i])
+        elif col in _spw_first_cols:
+            for i in xrange (nout):
+                _spwproc_first (tb, col, mapping[i], spwout[i])
+        elif col in _spw_scsum_cols:
+            for i in xrange (nout):
+                _spwproc_scsum (tb, col, mapping[i], spwout[i])
+        elif col in _spw_concat_cols:
+            for i in xrange (nout):
+                _spwproc_concat (tb, col, mapping[i], spwout[i])
+        elif col in _spw_empty_cols:
+            pass
+        else:
+            die ('don\'t know how to handle SPECTRAL_WINDOW column "%s" in %s"',
+                 col, cfg.vis)
+
+    numchans = tb.getcol ('NUM_CHAN')
+    tb.close ()
+    inspw2outspw = {}
+
+    for i in xrange (nout):
+        ofs = 0
+
+        for inspw in mapping[i]:
+            if inspw in inspw2outspw:
+                die ('spw %d gets duplicated in mapping', inspw)
+            inspw2outspw[inspw] = (i, ofs)
+            ofs += numchans[inspw]
+
+    # We only handle 1:1 mappings between DD and SPW.
+    tb.open (os.path.join (cfg.vis, 'DATA_DESCRIPTION'))
+    ddflagrows = np.asarray (tb.getcol ('FLAG_ROW'))
+    ddpids = np.asarray (tb.getcol ('POLARIZATION_ID'))
+    ddspws = np.asarray (tb.getcol ('SPECTRAL_WINDOW_ID'))
+    tb.close ()
+    indd2outdd = {}
+    ddout = [{'SPECTRAL_WINDOW_ID': i} for i in xrange (nout)]
+
+    for i in xrange (ddspws.size):
+        inspw = ddspws[i]
+
+        if inspw not in inspw2outspw:
+            continue # this dd gets dropped in the processing
+
+        outspw, outofs = inspw2outspw[inspw]
+        indd2outdd[i] = (outspw, outofs)
+
+        fr = ddout[outspw].get ('FLAG_ROW')
+        if fr is None:
+            ddout[outspw]['FLAG_ROW'] = int (ddflagrows[i]) # hack: have to convert bool->int for some reason
+        elif ddflagrows[i] != fr:
+            die ('dd %d glued into output spw %d has different FLAG_ROW ident', i, outspw)
+
+        pid = ddout[outspw].get ('POLARIZATION_ID')
+        if pid is None:
+            ddout[outspw]['POLARIZATION_ID'] = int (ddpids[i]) # np.int32 -> int
+        elif ddpids[i] != pid:
+            die ('dd %d glued into output spw %d has different POLARIZATION ident', i, outspw)
+
+    # Need this for buffer prealloc
+
+    tb.open (os.path.join (cfg.vis, 'POLARIZATION'))
+    numcorrs = tb.getcol ('NUM_CORR')
+    tb.close ()
+
+    # We've done all the up-front sanity-checking we can. Time to start
+    # copying. tb.copy() will clobber existing tables, so do our best to
+    # ensure that there isn't anything preexisting so far. Of course someone
+    # could put a table in the destination between this mkdir and the actual
+    # copy.
+
+    os.mkdir (cfg.out)
+
+    # Copy the overall table structure without contents.
+
+    tb.open (cfg.vis)
+    tb.copy (newtablename=cfg.out, deep=True, valuecopy=True,
+             norows=True).close () # copy() returns the new table.
+    tb.close ()
+
+    for item in os.listdir (cfg.vis):
+        if not os.path.exists (os.path.join (cfg.vis, item, 'table.dat')):
+            continue
+        if item in 'SPECTRAL_WINDOW DATA_DESCRIPTION'.split ():
+            continue # will handle these manually
+        if item == 'SYSPOWER':
+            continue # XXX; large and unused
+        if item == 'SORTED_TABLE':
+            continue # XXX; copies main data rows; not sure what to do about it
+
+        tb.open (os.path.join (cfg.vis, item))
+        tb.copy (os.path.join (cfg.out, item), deep=False, valuecopy=True,
+                 norows=False).close ()
+        tb.close ()
+
+    # The rewritten small tables.
+
+    tb.open (os.path.join (cfg.out, 'SPECTRAL_WINDOW'), nomodify=False)
+    tb.addrows (nout)
+    for i in xrange (nout):
+        for col, val in spwout[i].iteritems ():
+            tb.putcell (col, i, val)
+    tb.close ()
+
+    tb.open (os.path.join (cfg.out, 'DATA_DESCRIPTION'), nomodify=False)
+    tb.addrows (nout)
+    try:
+        for i in xrange (nout):
+            for col, val in ddout[i].iteritems ():
+                tb.putcell (col, i, val)
+    except StandardError as e:
+        raise Exception ('error putting: %d %s %s (%s): %s' % (i, col, val, val.__class__, e))
+    tb.close ()
+
+    # Rewriting the main table.
+
+    tb.open (cfg.vis)
+    colnames = [c for c in tb.colnames ()
+                if c not in _vis_empty_cols]
+    nchunk = 1024
+
+    dt = casautil.tools.table ()
+    dt.open (cfg.out, nomodify=False)
+    outrow = 0
+
+    for outspw in xrange (nout):
+        q = ' or '.join ('DATA_DESC_ID == %d' % t[0] for t in indd2outdd.iteritems ()
+                         if t[1][0] == outspw)
+        if cfg.hackfield is not None:
+            q = '(FIELD_ID == %d or FIELD_ID == %d) and (%s)' % (cfg.field, cfg.hackfield, q)
+        elif cfg.field is not None:
+            q = 'FIELD_ID == %d and (%s)' % (cfg.field, q)
+        if cfg.hackfield is not None:
+            sortlist = 'ARRAY_ID, TIME, ANTENNA1, ANTENNA2, DATA_DESC_ID'
+        else:
+            sortlist = 'ARRAY_ID, FIELD_ID, TIME, ANTENNA1, ANTENNA2, DATA_DESC_ID'
+        st = tb.query (q, sortlist=sortlist)
+        inrow = 0
+        nq = st.nrows ()
+
+        ncorr = numcorrs[ddout[outspw]['POLARIZATION_ID']]
+        nchan = spwout[outspw]['NUM_CHAN']
+        curident = None
+        curout = {}
+
+        for col in colnames:
+            if col in _vis_pconcat_cols:
+                curout[col] = np.zeros ((ncorr, nchan), dtype=_vis_pconcat_dtypes[col])
+            else:
+                curout[col] = None
+
+        def dump ():
+            # increment outrow after calling.
+            dt.addrows (1)
+            for col in colnames:
+                v = curout[col]
+                v = _np_converters[v.__class__] (v)
+                dt.putcell (col, outrow, v)
+
+                if isinstance (v, np.ndarray):
+                    v.fill (0)
+                else:
+                    curout[col] = None
+
+        prog.start (nq, '%d/%d' % (outspw + 1, nout))
+
+        while inrow < nq:
+            prog.progress (inrow)
+
+            vdata = {}
+            for col in colnames:
+                vdata[col] = st.getcol (col, inrow, nchunk)
+
+            nread = vdata['TIME'].size
+
+            if cfg.hackfield is not None:
+                vdata['FIELD_ID'].fill (cfg.field)
+
+            for i in xrange (nread):
+                outspw, outofs = indd2outdd[vdata['DATA_DESC_ID'][i]]
+                newident = tuple (vdata[c][i] for c in _vis_ident_cols)
+
+                if newident != curident:
+                    # Starting a new record
+                    if curident is not None:
+                        dump ()
+                        outrow += 1
+                    curident = newident
+
+                    for col in colnames:
+                        if col in _vis_ident_cols or col in _vis_smatch_cols:
+                            curout[col] = vdata[col][i]
+                        elif col in _vis_vmatch_cols:
+                            curout[col] = vdata[col][...,i]
+                        elif col in _vis_pconcat_cols:
+                            d = vdata[col][...,i]
+                            curout[col][:,outofs:outofs+d.shape[1]] = d
+                        elif col == 'DATA_DESC_ID':
+                            curout['DATA_DESC_ID'] = outspw
+                        else:
+                            die ('unhandled vis column %s', col)
+                else:
+                    # Continuing an existing record
+                    for col in colnames:
+                        if col in _vis_ident_cols or col == 'DATA_DESC_ID':
+                            pass
+                        elif col in _vis_smatch_cols:
+                            if vdata[col][i] != curout[col]:
+                                die ('changing value for column %s within a glued record', col)
+                        elif col in _vis_vmatch_cols:
+                            if not np.all (vdata[col][...,i] == curout[col]):
+                                die ('changing value for column %s within a glued record: %r , %r', col,
+                                     vdata[col][i], curout[col])
+                        elif col in _vis_pconcat_cols:
+                            d = vdata[col][...,i]
+                            curout[col][:,outofs:outofs+d.shape[1]] = d
+                        else:
+                            die ('unhandled vis column %s', col)
+
+            inrow += nread
+
+        if curout['TIME'] is not None:
+            dump () # finish this last record.
+            outrow += 1
+
+        prog.finish ()
+
+    dt.close ()
+    tb.close ()
+
+
+def commandline (argv):
+    checkusage (__doc__, argv, usageifnoargs=True)
+    cfg = Config ().parse (argv[1:])
+    casautil.logger (cfg.loglevel)
+    spwglue (cfg)
+
+
+if __name__ == '__main__':
+    import sys
+    commandline (sys.argv)
