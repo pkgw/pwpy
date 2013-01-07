@@ -272,7 +272,7 @@ calwt=
 class ApplycalConfig (ParseKeywords):
     vis = Custom (str, required=True)
     calwt = False
-    # skipping: applymode, flagbackup
+    # skipping: flagbackup
 
     gaintable = [str]
     gainfield = Custom ([str], sep=';')
@@ -294,6 +294,8 @@ class ApplycalConfig (ParseKeywords):
     timerange = str
     uvrange = str
 
+    applymode = 'calflag' # almost never want to change this
+
     loglevel = 'warn'
 
 
@@ -307,7 +309,7 @@ def applycal (cfg):
 
     applyonthefly (cb, cfg)
 
-    cb.correct ('calflag')
+    cb.correct (cfg.applymode)
     cb.close ()
 
 
