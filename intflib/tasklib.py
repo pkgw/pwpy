@@ -1,4 +1,4 @@
-# Copyright 2012 Peter Williams
+# Copyright 2012-2013 Peter Williams
 # Licensed under the GNU General Public License version 3 or higher
 
 """tasklib - library of clones of CASA tasks
@@ -23,6 +23,7 @@ __all__ = ('applycal applycal_cli ApplycalConfig '
            'clearcal clearcal_cli '
            'concat concat_cli '
            'delcal delcal_cli '
+           'delmod delmod_cli '
            'flagmanager_cli '
            'fluxscale fluxscale_cli FluxscaleConfig '
            'ft ft_cli FtConfig '
@@ -323,6 +324,10 @@ Fill the imaging and calibration columns (MODEL_DATA, CORRECTED_DATA,
 IMAGING_WEIGHT) of each measurement set with default values, creating
 the columns if necessary.
 
+If you want to reset calibration models, these days you probably want
+delmod. If you want to quickly make the columns go away, you probably
+want delcal.
+
 -w - only create and fill the IMAGING_WEIGHT column
 """
 
@@ -442,8 +447,8 @@ def concat_cli (argv):
 
 # delcal
 #
-# Not a CASA task. Delmod on steroids
-
+# Not a CASA task. Delmod on steroids, at least when delmod
+# is operating on scratch columns and not OTF models.
 
 delcal_doc = \
 """
@@ -475,6 +480,33 @@ def delcal_cli (argv):
             print '%s: removed %s' % (mspath, ', '.join (removed))
         else:
             print '%s: nothing to remove' % mspath
+
+
+# delmod
+
+delmod_doc = \
+"""
+casatask delmod <MS...>
+
+Delete the "on-the-fly" model information from the specified
+Measurement Set(s).
+
+If you want to delete the scratch columns, use delcal. If you
+want to clear the scratch columns, use clearcal. I'm torn
+between wanting better terminology and not wanting to be
+gratuitously different from CASA.
+"""
+
+def delmod_cli (argv):
+    checkusage (delmod_doc, argv, usageifnoargs=True)
+    cu.logger ()
+
+    cb = cu.tools.calibrater ()
+
+    for mspath in argv[1:]:
+        cb.open (mspath, addcorr=False, addmodel=False)
+        cb.delmod (otf=True, scr=False)
+        cb.close ()
 
 
 # flagmanager. Not really complicated enough to make it worth making a
