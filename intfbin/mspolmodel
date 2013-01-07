@@ -1,12 +1,14 @@
 #! /usr/bin/env casa-python
 # -*- python -*-
+# Copyright 2013 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
 
 """
 mspolmodel vis=<MS> field=<field specification>
 
 Insert polarization information for a model into a Measurement
 Set. Uses a built-in table of polarization properties to generate
-Stokes QUV information from CASA's build in Stokes I models.
+Stokes QUV information from CASA's built-in Stokes I models.
 
 The only currently supported source is 3C286 in C band.
 """
