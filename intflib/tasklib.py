@@ -25,6 +25,7 @@ __all__ = ('applycal applycal_cli ApplycalConfig '
            'delcal delcal_cli '
            'delmod delmod_cli '
            'flagmanager_cli '
+           'flagzeros flagzeros_cli FlagzerosConfig '
            'fluxscale fluxscale_cli FluxscaleConfig '
            'ft ft_cli FtConfig '
            'gaincal gaincal_cli GaincalConfig '
@@ -580,6 +581,41 @@ def flagmanager_cli (argv):
         wrongusage (flagmanager_doc, 'unknown flagmanager mode "%s"' % mode)
 
     af.done ()
+
+
+# flagzeros. Not quite a CASA task; something like
+# flagdata (vis=, mode='clip', clipzeros=True, flagbackup=False)
+
+flagzeros_doc = \
+"""
+casatask flagzeros vis= [datacol=]
+
+Flag zero data points in the specified data column.
+"""
+
+class FlagzerosConfig (ParseKeywords):
+    vis = Custom (str, required=True)
+    datacol = 'data'
+    loglevel = 'warn'
+
+
+def flagzeros (cfg):
+    af = cu.tools.agentflagger ()
+    af.open (cfg.vis, 0.0)
+    af.selectdata ()
+    pars = dict (datacolumn=cfg.datacol.upper (),
+                 clipzeros=True, name='CLIP', mode='clip',
+                 apply=True)
+    af.parseagentparameters (pars)
+    af.init ()
+    # A summary report would be nice. run() should return
+    # info but I can't get it to do so. (I'm just trying to
+    # copy the task_flagdata.py implementation.)
+    af.run (True, True)
+    af.done ()
+
+
+flagzeros_cli = makekwcli (flagzeros_doc, FlagzerosConfig, flagzeros)
 
 
 # fluxscale
