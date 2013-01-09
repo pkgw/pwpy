@@ -1,0 +1,56 @@
+#! /usr/bin/env casa-python
+# -*- python -*-
+# Copyright 2013 Peter Williams
+# Licensed under the GNU General Public License, version 3 or higher.
+
+"""
+When CASA encounters flagged channels in bandpass calibration tables, it
+interpolates over them as best it can -- even if interp='<any>,nearest'.  This
+means that if certain channels are unflagged in some target data but entirely
+flagged in your BP cal, they'll get multiplied by some hopefully-reasonable
+number, not flagged. This is scary if, for instance, you're using an automated
+system to find RFI, or you flag edge channels in some uneven way.
+
+This script modifies a BP cal table by replacing flagged values with the
+hugest number possible. When applied to data, this zeros out the data in those
+channels. (If your bandpass channelization doesn't match your data, hopefully
+everything works? Ha ha ha.) You can then flag the zeroed data with
+
+flagdata (vis=, mode='clip', clipzeros=True, datacolumn='corrected',
+  flagbackup=False)
+"""
+
+# TODO: add a -f[orce] option to override paranoia
+
+import sys, numpy as np, casautil
+
+if len (sys.argv) < 2:
+    print 'usage: msbphack <BP cal table> [more...]'
+    sys.exit (1)
+
+
+tb = casautil.tools.table ()
+
+for calpath in sys.argv[1:]:
+    tb.open (calpath, nomodify=False)
+
+    try:
+        t = tb.getkeyword ('VisCal')
+    except RuntimeError:
+        print >>sys.stderr, ('error: no "VisCal" keyword in %s; '
+                             'doesn\'t seem to be a BP cal table' % calpath)
+        sys.exit (1)
+    else:
+        if t != 'B Jones':
+            print >>sys.stderr, ('error: table %s doesn\'t seem to be a bandpass '
+                                 'table; type is "%s"' % (calpath, t))
+            sys.exit (1)
+
+    f = tb.getcol ('FLAG')
+    p = tb.getcol ('CPARAM')
+    w = np.where (f)
+    f[w] = False # unflag ...
+    p[w] = np.finfo (p.dtype).max # ... but make exploooode!
+    tb.putcol ('FLAG', f)
+    tb.putcol ('CPARAM', p)
+    tb.close ()
