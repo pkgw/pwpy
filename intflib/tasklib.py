@@ -600,7 +600,12 @@ class FlagzerosConfig (ParseKeywords):
 
 
 def flagzeros (cfg):
-    af = cu.tools.agentflagger ()
+    try:
+        factory = cu.tools.agentflagger
+    except AttributeError:
+        factory = cu.tools.testflagger
+
+    af = factory ()
     af.open (cfg.vis, 0.0)
     af.selectdata ()
     pars = dict (datacolumn=cfg.datacol.upper (),
