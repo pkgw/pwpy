@@ -233,7 +233,7 @@ def process (cfg):
         ms.selectinit (ddid)
         if cfg.polarization is not None:
             ms.selectpolarization (cfg.polarization.split (','))
-        ms.iterinit ()
+        ms.iterinit (maxrows=4096)
         ms.iterorigin ()
 
         while True:
