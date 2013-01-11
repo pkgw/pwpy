@@ -4,15 +4,21 @@
 # Licensed under the GNU General Public License version 3 or higher
 
 """
-msspwglue vis=MS out=MS
-
-HARDCODES gluing of inspws 0-7 into outspw 0 and inspws 8-15 into outspw 1!!
+msspwglue vis=MS out=MS mapping=SPWi-SPWj[,SPWl-SPWm,...]
 
 vis=
   The input MS
 
 out=
   The output MS. Will be created.
+
+mapping=
+  A comma-separated list of spectral window mappings. Each entry takes the
+  form <j>-<k>, where <j> and <k> are integers, k >= j. The input spectral
+  windows in this range (inclusive, unlike Python) are glued into a single
+  output spectral window, with the order matching the order of the keyword.
+  For most wideband VLA datasets you want
+    mapping=0-7,8-15
 
 field=
   Optional field ID number. If specified, the new MS will contain data
@@ -173,6 +179,17 @@ class Config (ParseKeywords):
     vis = Custom (str, required=True)
     out = Custom (str, required=True)
 
+    @Custom ([str], required=True)
+    def mapping (bits):
+        def parse (item):
+            t1, t2 = map (int, item.split ('-'))
+            assert t2 >= t1, 'can\'t do reverse-order mappings'
+            return range (t1, t2 + 1)
+        try:
+            return [parse (b) for b in bits]
+        except Exception as e:
+            die ('unparseable or illegal "mapping" value "%s": %s', ','.join (bits), e)
+
     field = int
     hackfield = int
 
@@ -253,8 +270,7 @@ def _spwglue (cfg, prog):
     if cfg.hackfield is not None:
         assert cfg.field is not None
 
-    mapping = [range (8), range (8, 16)]
-    nout = len (mapping)
+    nout = len (cfg.mapping)
 
     # Read in spw and dd info and make sure everything is in order.
 
@@ -266,16 +282,16 @@ def _spwglue (cfg, prog):
     for col in spwcols:
         if col in _spw_match_cols:
             for i in xrange (nout):
-                _spwproc_match (tb, col, mapping[i], spwout[i])
+                _spwproc_match (tb, col, cfg.mapping[i], spwout[i])
         elif col in _spw_first_cols:
             for i in xrange (nout):
-                _spwproc_first (tb, col, mapping[i], spwout[i])
+                _spwproc_first (tb, col, cfg.mapping[i], spwout[i])
         elif col in _spw_scsum_cols:
             for i in xrange (nout):
-                _spwproc_scsum (tb, col, mapping[i], spwout[i])
+                _spwproc_scsum (tb, col, cfg.mapping[i], spwout[i])
         elif col in _spw_concat_cols:
             for i in xrange (nout):
-                _spwproc_concat (tb, col, mapping[i], spwout[i])
+                _spwproc_concat (tb, col, cfg.mapping[i], spwout[i])
         elif col in _spw_empty_cols:
             pass
         else:
@@ -289,7 +305,7 @@ def _spwglue (cfg, prog):
     for i in xrange (nout):
         ofs = 0
 
-        for inspw in mapping[i]:
+        for inspw in cfg.mapping[i]:
             if inspw in inspw2outspw:
                 die ('spw %d gets duplicated in mapping', inspw)
             inspw2outspw[inspw] = (i, ofs)
