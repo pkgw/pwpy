@@ -264,6 +264,22 @@ def spwglue (cfg):
     with Progress () as p:
         _spwglue (cfg, p)
 
+
+def fillsmall (path, rows):
+    tb = casautil.tools.table ()
+    tb.open (path, nomodify=False)
+    tb.addrows (len (rows))
+
+    try:
+        for i, data in enumerate (rows):
+            for col, val in data.iteritems ():
+                tb.putcell (col, i, val)
+    except StandardError as e:
+        raise Exception ('error putting: %d %s %s (%s): %s' % (i, col, val, val.__class__, e))
+
+    tb.close ()
+
+
 def _spwglue (cfg, prog):
     import os.path
 
@@ -341,17 +357,43 @@ def _spwglue (cfg, prog):
         elif ddpids[i] != pid:
             die ('dd %d glued into output spw %d has different POLARIZATION ident', i, outspw)
 
+    # We don't actually do any sanity checking with the SOURCE table, but we
+    # do need to modify it. Let's just load it up here while we're loading up
+    # all of the other small tables.
+
+    tb = casautil.tools.table ()
+    tb.open (os.path.join (cfg.vis, 'SOURCE'))
+    srccols = [c for c in tb.colnames ()
+               if tb.iscelldefined (c, 0)] # at least POSITION is undefined
+    srckeys = set ()
+    srcout = []
+
+    for i in xrange (tb.nrows ()):
+        data = dict ((c, tb.getcell (c, i)) for c in srccols)
+        m = inspw2outspw.get (data['SPECTRAL_WINDOW_ID'])
+        if m is None:
+            continue # this spw is being dropped
+
+        data['SPECTRAL_WINDOW_ID'] = m[0]
+        key = (data['SOURCE_ID'], data['TIME'], data['INTERVAL'], m[0])
+
+        if key in srckeys:
+            # XXX: should verify that rest of data are identical, but too lazy.
+            continue
+
+        srcout.append (data)
+        srckeys.add (key)
+
     # Need this for buffer prealloc
 
     tb.open (os.path.join (cfg.vis, 'POLARIZATION'))
     numcorrs = tb.getcol ('NUM_CORR')
     tb.close ()
 
-    # We've done all the up-front sanity-checking we can. Time to start
-    # copying. tb.copy() will clobber existing tables, so do our best to
-    # ensure that there isn't anything preexisting so far. Of course someone
-    # could put a table in the destination between this mkdir and the actual
-    # copy.
+    # We've done all the preparation we can. Time to start copying. tb.copy()
+    # will clobber existing tables, so do our best to ensure that there isn't
+    # anything preexisting so far. Of course someone could put a table in the
+    # destination between this mkdir and the actual copy.
 
     os.mkdir (cfg.out)
 
@@ -365,7 +407,7 @@ def _spwglue (cfg, prog):
     for item in os.listdir (cfg.vis):
         if not os.path.exists (os.path.join (cfg.vis, item, 'table.dat')):
             continue
-        if item in 'SPECTRAL_WINDOW DATA_DESCRIPTION'.split ():
+        if item in 'SPECTRAL_WINDOW DATA_DESCRIPTION SOURCE'.split ():
             continue # will handle these manually
         if item == 'SYSPOWER':
             continue # XXX; large and unused
@@ -379,22 +421,9 @@ def _spwglue (cfg, prog):
 
     # The rewritten small tables.
 
-    tb.open (os.path.join (cfg.out, 'SPECTRAL_WINDOW'), nomodify=False)
-    tb.addrows (nout)
-    for i in xrange (nout):
-        for col, val in spwout[i].iteritems ():
-            tb.putcell (col, i, val)
-    tb.close ()
-
-    tb.open (os.path.join (cfg.out, 'DATA_DESCRIPTION'), nomodify=False)
-    tb.addrows (nout)
-    try:
-        for i in xrange (nout):
-            for col, val in ddout[i].iteritems ():
-                tb.putcell (col, i, val)
-    except StandardError as e:
-        raise Exception ('error putting: %d %s %s (%s): %s' % (i, col, val, val.__class__, e))
-    tb.close ()
+    fillsmall (os.path.join (cfg.out, 'SPECTRAL_WINDOW'), spwout)
+    fillsmall (os.path.join (cfg.out, 'DATA_DESCRIPTION'), ddout)
+    fillsmall (os.path.join (cfg.out, 'SOURCE'), srcout)
 
     # Rewriting the main table.
 
