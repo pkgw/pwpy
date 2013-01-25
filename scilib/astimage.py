@@ -865,8 +865,9 @@ class FITSImage (AstroImage):
         # to stdout and a random warning comes up. Hypothetically. At
         # least the original routines are backed up.
         import warnings
-        warnings.showwarning = pyfits.core._showwarning
         warnings.formatwarning = pyfits.core._formatwarning
+        if hasattr (pyfits.core, '_showwarning'): # not overridden in pyfits >=3.1
+            warnings.showwarning = pyfits.core._showwarning
 
         super (FITSImage, self).__init__ (path, mode)
 
