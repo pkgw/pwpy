@@ -324,6 +324,7 @@ aasjournals = [
     (r'.*Astrophysical\sJournal\sLett', u'ApJL'),
     (r'.*Astrophysical\sJournal\sSupp', u'ApJS'),
     (r'.*Astrophysical\sJournal', u'ApJ'),
+    (r'.*Mon.*Not.*Roy.*Ast.*Soc.*Lett', u'MNRAS Lett.'),
     (r'.*Mon.*Not.*Roy.*Ast.*Soc', u'MNRAS'),
     (r'.*Astron.*Astrophys.*Rev', u'A&A Rev.'),
     (r'.*Astron.*Astrophys.*Supp', u'A&AS'),
