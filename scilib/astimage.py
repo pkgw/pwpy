@@ -712,7 +712,11 @@ class CasaCImage (AstroImage):
             self.bpa = _casac_convert (rb['positionangle'], 'rad')
 
         # pclat, pclon?
-        # mjd?
+
+        # this is the *start* of the observation, annoyingly.
+        # The timescale is available but we ignore it. Generally is in
+        # UTC :-(
+        self.mjd = cs.epoch ()['m0']['value']
 
 
     def _closeImpl (self):
