@@ -1,4 +1,4 @@
-# Copyright 2012 Peter Williams
+# Copyright 2012, 2013 Peter Williams
 # Licensed under the GNU General Public License version 3 or higher
 
 """
@@ -47,7 +47,7 @@ class _ModelBase (object):
         self.y = np.array (y, dtype=np.float, ndmin=1)
 
         if invsigma is None:
-            self.insigma = np.ones (self.y.shape)
+            self.invsigma = np.ones (self.y.shape)
         else:
             i = np.array (invsigma, dtype=np.float)
             self.invsigma = np.broadcast_arrays (self.y, i)[1] # allow scalar invsigma
