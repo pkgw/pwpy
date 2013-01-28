@@ -1440,6 +1440,7 @@ def split (cfg):
                            observationtoobs=True, taqltomsselect=False)
     kws['whichcol'] = cfg.col
     kws['combine'] = ','.join (cfg.combine)
+    kws['step'] = [cfg.step] # can be done on per-spw basis; we skip that
 
     if cfg.timebin is None:
         kws['timebin'] = '-1s'
