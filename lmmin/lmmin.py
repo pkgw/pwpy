@@ -665,7 +665,7 @@ P^T (A^T A + D D) P = S^T S. (transpose?)
     for i in xrange (n):
         r[i,i:] = r[i:,i]
 
-    x = r.diagonal ()
+    x = r.diagonal ().copy ()
     zwork = bqt.copy ()
 
     # "Eliminate the diagonal matrix d using a Givens rotation."
