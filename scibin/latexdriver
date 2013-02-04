@@ -11,13 +11,14 @@ while [ $# -gt 0 ] ; do
     case "$1" in
 	-x) engine=xelatex ;;
 	-b) dobibtex=true ;;
+	-l) args="$args -papersize letter" ;;
 	*) break ;;
     esac
     shift
 done
 
 if [ $# -ne 2 ] ; then
-    echo >&2 "usage: latexdriver [-x] [-b] input.tex output.pdf"
+    echo >&2 "usage: latexdriver [-x] [-b] [-l] input.tex output.pdf"
     exit 1
 fi
 
