@@ -152,6 +152,7 @@ tymap = {
 
 
 verbatim = {
+    'AD': 'address',
     'JF': 'journal',
     'VL': 'volume',
     'TI': 'title',
