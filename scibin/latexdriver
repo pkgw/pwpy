@@ -65,6 +65,7 @@ function logrun () {
 logrun $engine "$args -jobname $job" $base $tlog
 if $dobibtex ;then
     logrun bibtex "" $job $blog
+    grep Warning $blog >&2
     # force at least one extra run:
     logrun $engine "$args -jobname $job" $base $tlog
 fi
