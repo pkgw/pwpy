@@ -141,11 +141,11 @@ def parseRIS (stream):
 # Conversion from RIS to bibtex data structures
 
 tymap = {
-    'JOUR': 'article',
     'BOOK': 'book',
     'CHAP': 'incollection',
     'CONF': 'inproceedings',
     'GEN': 'misc',
+    'JOUR': 'article',
     'RPRT': 'techreport',
     'THES': 'phdthesis',
 }
@@ -153,12 +153,11 @@ tymap = {
 
 verbatim = {
     'AD': 'address',
-    'JF': 'journal',
-    'VL': 'volume',
-    'TI': 'title',
-    'T2': 'booktitle',
     'IS': 'number',
+    'JF': 'journal',
     'PB': 'publisher',
+    'TI': 'title',
+    'VL': 'volume',
 }
 
 condverb = {
