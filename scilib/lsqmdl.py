@@ -162,7 +162,11 @@ class PolynomialModel (_ModelBase):
 
 
     def solve (self):
-        from numpy.polynomial import polyfit, polyval
+        try:
+            # numpy 1.7
+            from numpy.polynomial.polynomial import polyfit, polyval
+        except ImportError:
+            from numpy.polynomial import polyfit, polyval
 
         self.paramnames = ['a%d' % i for i in xrange (self.degree)]
         # Based on my reading of the polyfit() docs, I think w=invsigma**2 is right...
