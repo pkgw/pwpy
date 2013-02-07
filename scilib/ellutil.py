@@ -32,7 +32,7 @@ import numpy as np
 
 __all__ = ('F2S S2F sigmascale clscale '
            'bivell bivnorm bivabc bivnf databiv bivplot '
-           'ellnorm ellpoint elld2 ellabc ellplot '
+           'ellnorm ellpoint elld2 ellbiv ellabc ellplot '
            'nfabc nfell nfd2 nfplot '
            'abcell abcd2 abcnf abcplot').split ()
 
@@ -302,6 +302,38 @@ d2 will be an array as well.
     a = c * dx + s * dy
     b = -s * dx + c * dy
     return (a / maj)**2 + (b / min)**2
+
+
+def ellbiv (maj, min, pa):
+    """Given a 2D Gaussian expressed as an ellipse (major, minor, pa),
+compute the equivalent parameters for a Gaussian bivariate distribution.
+We assume that the ellipse is normalized so that the functions evaluate
+identicall for major = minor.
+
+Inputs:
+
+* maj: major axis (sigma not FWHM) of the Gaussian
+* min: minor axis (sigma not FWHM) of the Gaussian
+* pa: position angle (from +x to +y) of the Gaussian, radians
+
+Returns:
+
+* sx: standard deviation (not variance) of x var
+* sy: standard deviation (not variance) of y var
+* cxy: covariance (not correlation coefficient) of x and y
+
+"""
+    _ellcheck (maj, min, pa)
+
+    cpa, spa = np.cos (pa), np.sin (pa)
+    q = np.asarray ([[cpa, -spa],
+                     [spa, cpa]])
+    cov = np.dot (q, np.dot (np.diag ([maj**2, min**2]), q.T))
+    sx = np.sqrt (cov[0,0])
+    sy = np.sqrt (cov[1,1])
+    cxy = cov[0,1]
+
+    return _bivcheck (sx, sy, cxy)
 
 
 def ellabc (maj, min, pa):
