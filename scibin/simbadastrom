@@ -1,0 +1,226 @@
+#! /usr/bin/env python
+# -*- python -*-
+# Copyright 2013 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
+
+"""
+simbadastrom [identifier] [MJD]
+
+Use SIMBAD to predict the position of an object, with uncertainties.
+"""
+
+import sys, precastro, ellutil, numpy.random
+from astutil import *
+from urllib2 import urlopen
+from urllib import quote
+
+sesamebase = 'http://cdsweb.u-strasbg.fr/cgi-bin/nph-sesame?' 
+vizurl = 'http://vizier.u-strasbg.fr/viz-bin/asu-tsv'
+
+## quickutil: usage die
+#- snippet: usage.py (2012 Oct 01)
+#- SHA1: ac032a5db2efb5508569c4d5ba6eeb3bba19a7ca
+def showusage (docstring, short, stream, exitcode):
+    if stream is None:
+        from sys import stdout as stream
+    if not short:
+        print >>stream, 'Usage:', docstring.strip ()
+    else:
+        intext = False
+        for l in docstring.splitlines ():
+            if intext:
+                if not len (l):
+                    break
+                print >>stream, l
+            elif len (l):
+                intext = True
+                print >>stream, 'Usage:', l
+        print >>stream, \
+            '\nRun with a sole argument --help for more detailed usage information.'
+    raise SystemExit (exitcode)
+
+def checkusage (docstring, argv=None, usageifnoargs=False):
+    if argv is None:
+        from sys import argv
+    if len (argv) == 1 and usageifnoargs:
+        showusage (docstring, True, None, 0)
+    if len (argv) == 2 and argv[1] in ('-h', '--help'):
+        showusage (docstring, False, None, 0)
+
+def wrongusage (docstring, *rest):
+    import sys
+    intext = False
+
+    if len (rest) == 0:
+        detail = 'invalid command-line arguments'
+    elif len (rest) == 1:
+        detail = rest[0]
+    else:
+        detail = rest[0] % tuple (rest[1:])
+
+    print >>sys.stderr, 'error:', detail, '\n' # extra NL
+    showusage (docstring, True, sys.stderr, 1)
+#- snippet: die.py (2012 Oct 01)
+#- SHA1: 3bdd3282e52403d2dec99d72680cb7bc95c99843
+def die (fmt, *args):
+    if not len (args):
+        raise SystemExit ('error: ' + str (fmt))
+    raise SystemExit ('error: ' + (fmt % args))
+## end
+
+
+def get_2mass_epoch (tmra, tmdec):
+    postdata = '''-mime=csv
+-source=2MASS
+-out=_q,JD
+-c=%.6f %.6f
+-c.eq=J2000''' % (tmra * R2D, tmdec * R2D)
+
+    jd = None
+
+    for line in urlopen (vizurl, postdata):
+        line = line.strip ()
+        #print '>>', line
+
+        if line.startswith ('1;'):
+            jd = float (line[2:])
+
+    if jd is None:
+        print >>sys.stderr, 'warning: 2MASS epoch lookup failed; astrometry could be very wrong!'
+        return 2451545.0 # J2000.0
+
+    return jd
+
+
+def predict (ident, mjd, n=20000):
+    ra = posumaj = promora = parallax = vradial = None
+    posref = 'unknown'
+
+    for line in urlopen (sesamebase + quote (ident)):
+        if line.startswith ('#!'):
+            die ('Simbad/Sesame lookup failed: %s', line[3:].strip ())
+
+        a = line.strip ().split ()
+        if not len (a):
+            continue
+
+        # The units for our fields are coincidentally the same as
+        # those used by Simbad, for the most part ...
+
+        if a[0] == '%J':
+            ra = float (a[1]) * D2R
+            dec = float (a[2]) * D2R
+        if a[0] == '%J.E':
+            posumaj = float (a[1][1:]) * A2R * 1e-3 # mas -> rad
+            posumin = float (a[2]) * A2R * 1e-3
+            posupa = float (a[3][:-1]) * D2R
+            posref = a[5]
+        elif a[0] == '%P':
+            promora = float (a[1]) # mas/yr
+            promodec = float (a[2])
+            pmumaj = float (a[3][1:]) # mas/yr
+            pmumin = float (a[4])
+            pmupa = float (a[5][:-1]) * D2R # rad!!
+        elif a[0] == '%X':
+            parallax = float (a[1]) # mas
+            parallaxu = float (a[2][1:-1]) # mas
+        elif a[0] == '%V':
+            vradial = float (a[2]) # km/s
+            vradialu = float (a[4][1:-1]) # km/s
+
+    if ra is None:
+        die ('no position returned by Simbad for "%s"', ident)
+
+    # Obtain epoch for 2MASS positions, which are at random times
+
+    o = precastro.Object ()
+
+    if posref == '2003yCat.2246....0C':
+        o.promoepoch = get_2mass_epoch (ra, dec)
+    else:
+        print >>sys.stderr, ('note: assuming catalog position was accurate '
+                             'on J2000.0 (source: %s)' % posref)
+
+    # Get best-estimate position from the reported values.
+
+    o.ra = ra
+    o.dec = dec
+
+    if promora is not None:
+        o.promora = promora
+        o.promodec = promodec
+    if parallax is not None:
+        o.parallax = parallax
+    if vradial is not None:
+        o.vradial = vradial
+
+    bestra, bestdec = o.astropos (mjd + 2400000.5)
+
+    # Figure out uncertainty via Monte Carlo. As always, astronomy position
+    # angle convention requires that we treat declination as X and RA as Y.
+
+    if posumaj is not None:
+        sd, sr, cdr = ellutil.ellbiv (posumaj, posumin, posupa)
+        decs, ras = ellutil.bivrandom (dec, ra, sd, sr, cdr, n).T
+    else:
+        print >>sys.stderr, 'warning: no uncertainties on catalog position'
+        ras = np.zeros (n) + ra
+        decs = np.zeros (n) + dec
+
+    if promora is not None:
+        sd, sr, cdr = ellutil.ellbiv (pmumaj, pmumin, pmupa)
+        pmdecs, pmras = ellutil.bivrandom (promodec, promora, sd, sr, cdr, n).T
+    else:
+        print >>sys.stderr, 'warning: no uncertainties on proper motion'
+        pmras = np.zeros (n) + promora
+        pmdecs = np.zeros (n) + promodec
+
+    if parallax is not None and parallaxu != 0:
+        parallaxes = numpy.random.normal (parallax, parallaxu, n)
+    elif parallax is not None:
+        parallaxes = np.zeros (n) + parallax
+    else:
+        print >>sys.stderr, 'warning: assuming zero parallax'
+        parallaxes = np.zeros (n)
+
+    if vradial is not None:
+        vradials = numpy.random.normal (vradial, vradialu, n)
+    else:
+        # doesn't affect results, don't bother complaining
+        vradials = np.zeros (n)
+
+    # Compute apparent positions
+
+    results = np.empty ((n, 2))
+
+    for i in xrange (n):
+        o.ra = ras[i]
+        o.dec = decs[i]
+        o.promora = pmras[i]
+        o.promodec = pmdecs[i]
+        o.parallax = parallaxes[i]
+        o.vradial = vradials[i]
+
+        ara, adec = o.astropos (mjd + 2400000.5)
+        results[i] = adec, ara
+
+    # Analyze report
+
+    maj, min, pa = ellutil.bivell (*ellutil.databiv (results))
+    f = ellutil.sigmascale (1)
+    maj *= R2A
+    min *= R2A
+    pa *= R2D
+
+    print '%s at %.2f:' % (ident, mjd)
+    print '  ', '   position =', fmtradec (bestra, bestdec)
+    print '  ', 'err(1sigma) = %.2f" x %.2f" @ %.0f deg' % (maj * f, min * f, pa)
+
+
+if __name__ == '__main__':
+    checkusage (__doc__, usageifnoargs=True)
+
+    if len (sys.argv) != 3:
+        wrongusage (__doc__, 'expected exactly two arguments')
+
+    predict (sys.argv[1], float (sys.argv[2]))
