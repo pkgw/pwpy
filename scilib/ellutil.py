@@ -31,7 +31,7 @@ while still providing useful debug output.
 import numpy as np
 
 __all__ = ('F2S S2F sigmascale clscale '
-           'bivell bivnorm bivabc bivnf databiv bivplot '
+           'bivell bivnorm bivabc bivnf databiv bivrandom bivplot '
            'ellnorm ellpoint elld2 ellbiv ellabc ellplot '
            'nfabc nfell nfd2 nfplot '
            'abcell abcd2 abcnf abcplot').split ()
@@ -212,6 +212,32 @@ data (i.e., xy[0] or xy[:,0]) and the second slice gives the Y data
     sx, sy = np.sqrt (np.diag (cov))
     cxy = cov[0,1]
     return _bivcheck (sx, sy, cxy)
+
+
+def bivrandom (x0, y0, sx, sy, cxy, size=None):
+    """Compute random values distributed according to the specified bivariate
+distribution.
+
+Inputs: 
+
+* x0: the center of the x distribution (i.e. its intended mean)
+* y0: the center of the y distribution
+* sx: standard deviation (not variance) of x var
+* sy: standard deviation (not variance) of y var
+* cxy: covariance (not correlation coefficient) of x and y
+* size (optional): the number of values to compute
+
+Returns: array of shape (size, 2); or just (2, ), if size
+  was not specified.
+
+The bivariate parameters of the generated data are approximately recoverable
+by calling 'databiv(retval)'.
+"""
+    from numpy.random import multivariate_normal as mvn
+    p0 = np.asarray ([x0, y0])
+    cov = np.asarray ([[sx**2, cxy],
+                       [cxy, sy**2]])
+    return mvn (p0, cov, size)
 
 
 def bivplot (sx, sy, cxy, **kwargs):
