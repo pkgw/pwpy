@@ -157,6 +157,7 @@ verbatim = {
     'JF': 'journal',
     'PB': 'publisher',
     'TI': 'title',
+    'T2': 'booktitle',
     'VL': 'volume',
 }
 
