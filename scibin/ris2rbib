@@ -245,6 +245,9 @@ def ris2bib (ris):
     # Useful metadata from URLs
 
     for url in ris.UR:
+        if '.ezp-prod1.hul.harvard.edu' in url:
+            url = url.replace ('.ezp-prod1.hul.harvard.edu', '')
+
         if url.startswith ('http://dx.doi.org/') and not bib.has ('doi'):
             bib.doi = brace (urlunquote (url[18:]))
         elif url.startswith ('http://adsabs.harvard.edu/cgi-bin/nph-bib_query?bibcode='):
