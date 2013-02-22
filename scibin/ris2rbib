@@ -138,6 +138,20 @@ def parseRIS (stream):
         yield currecord
 
 
+# Hacks on the RIS data structures
+
+def prefilter (ris):
+    # If a conference proceedings article can be cited more like a journal
+    # article, do that, since it makes life so much easier. Mainly applies to
+    # ASP Conference Series items.
+
+    if (ris.TY == 'CONF' and ris.has ('VL') and ris.has ('SP') and
+        (ris.has ('JF') or ris.has ('SE'))):
+        ris.TY = 'JOUR'
+        if not ris.has ('JF'):
+            ris.JF = ris.SE
+
+
 # Conversion from RIS to bibtex data structures
 
 tymap = {
@@ -386,5 +400,6 @@ else:
     journalmap = None
 
 for ris in parseRIS (sys.stdin):
+    prefilter (ris)
     mapjournalRIS (ris, journalmap)
     bibprint (ris2bib (ris))
