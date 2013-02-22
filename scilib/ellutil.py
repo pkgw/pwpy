@@ -25,7 +25,8 @@ document it.
 
 Possible TODO: make more array-friendly. All of the bounds-checking
 becomes a pain (e.g. need to wrap in np.any()) to make array-friendly
-while still providing useful debug output.
+while still providing useful debug output. np.vectorize() might save
+the day here.
 """
 
 import numpy as np
