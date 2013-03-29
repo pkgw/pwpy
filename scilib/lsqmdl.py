@@ -150,7 +150,8 @@ class Model (_ModelBase):
         self.covar = soln.covar
         self.modelfunc = lambda x: f (x, *soln.params)
         self.modely = self.modelfunc (x)
-        self.rchisq = soln.fnorm / soln.ndof
+        if soln.ndof > 0:
+            self.rchisq = soln.fnorm / soln.ndof
         self.resids = self.y - self.modely
         return self
 
