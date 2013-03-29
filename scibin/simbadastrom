@@ -146,7 +146,7 @@ def predict (ident, mjd, n=20000, verbose=False):
 
     # Obtain epoch for 2MASS positions, which are at random times
 
-    o = precastro.Object ()
+    o = precastro.SiderealObject ()
 
     if posref == '2003yCat.2246....0C':
         o.promoepoch = get_2mass_epoch (ra, dec)
