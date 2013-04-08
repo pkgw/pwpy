@@ -106,7 +106,7 @@ def get_2mass_epoch (tmra, tmdec):
 
 
 def predict (ident, mjd, n=20000, verbose=False):
-    ra = posumaj = promora = parallax = vradial = None
+    ra = posumaj = promora = pmumaj = parallax = vradial = None
     posref = 'unknown'
 
     for line in urlopen (sesamebase + quote (ident)):
@@ -131,9 +131,11 @@ def predict (ident, mjd, n=20000, verbose=False):
         elif a[0] == '%P':
             promora = float (a[1]) # mas/yr
             promodec = float (a[2])
-            pmumaj = float (a[3][1:]) # mas/yr
-            pmumin = float (a[4])
-            pmupa = float (a[5][:-1]) * D2R # rad!!
+
+            if a[3][1] != '~':
+                pmumaj = float (a[3][1:]) # mas/yr
+                pmumin = float (a[4])
+                pmupa = float (a[5][:-1]) * D2R # rad!!
         elif a[0] == '%X':
             parallax = float (a[1]) # mas
             parallaxu = float (a[2][1:-1]) # mas
@@ -193,7 +195,11 @@ def predict (ident, mjd, n=20000, verbose=False):
         ras = np.zeros (n) + ra
         decs = np.zeros (n) + dec
 
-    if promora is not None:
+    if promora is None:
+        print >>sys.stderr, 'warning: assuming zero proper motion'
+        pmras = np.zeros (n)
+        pmdecs = np.zeros (n)
+    elif pmumaj is not None:
         sd, sr, cdr = ellutil.ellbiv (pmumaj, pmumin, pmupa)
         pmdecs, pmras = ellutil.bivrandom (promodec, promora, sd, sr, cdr, n).T
     else:
