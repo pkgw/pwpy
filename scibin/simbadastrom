@@ -113,6 +113,8 @@ def predict (ident, mjd, n=20000, verbose=False):
         if line.startswith ('#!'):
             die ('Simbad/Sesame lookup failed: %s', line[3:].strip ())
 
+        #print >>sys.stderr, '##', line.rstrip ()
+
         a = line.strip ().split ()
         if not len (a):
             continue
@@ -132,7 +134,7 @@ def predict (ident, mjd, n=20000, verbose=False):
             promora = float (a[1]) # mas/yr
             promodec = float (a[2])
 
-            if a[3][1] != '~':
+            if len (a) > 3 and a[3][0] == '[' and a[3][1] != '~':
                 pmumaj = float (a[3][1:]) # mas/yr
                 pmumin = float (a[4])
                 pmupa = float (a[5][:-1]) * D2R # rad!!
