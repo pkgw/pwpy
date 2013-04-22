@@ -37,7 +37,7 @@ fi
 
 # Programs
 
-for bindir in scibin intfbin ; do
+for bindir in scibin intfbin xbin ; do
     install -C$vee -m755 -t $prefix/bin $bindir/*[^~]
 done
 
