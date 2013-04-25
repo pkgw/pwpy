@@ -151,9 +151,10 @@ def process (cfg):
     print >>cfg.out, '# timesys =', timesys
 
     for i in xrange (info.nblocks):
-        s = '%.5f %.5f %d %g %g' % (info.edges[i], info.edges[i+1],
-                                    info.optcounts[i], info.optrates[i],
-                                    info.bsstds[i])
+        s = '%.5f %.5f %d %g %g %g' % (info.edges[i], info.edges[i+1],
+                                       info.optcounts[i],
+                                       info.edges[i+1] - info.edges[i],
+                                       info.optrates[i], info.bsstds[i])
         print >>cfg.out, s
 
 
