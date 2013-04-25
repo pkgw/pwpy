@@ -1,0 +1,37 @@
+#! /bin/bash
+# Copyright 2013 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
+
+events="$1"
+shift
+srcreg="$1"
+shift
+bgreg="$1"
+shift
+
+prevenergy=""
+
+srcarea=$(dmlist "$events[sky=region($srcreg)]" subspace |grep area |tail -n1 |awk '{print $NF}')
+bgarea=$(dmlist "$events[sky=region($bgreg)]" subspace |grep area |tail -n1 |awk '{print $NF}')
+ascale=$(python -c "print 1. * $srcarea / $bgarea")
+
+function doband () {
+    # $1 - energy specification
+
+    bgct=$(dmstat "$events[sky=region($bgreg)][energy=$1][cols energy]" 2>/dev/null \
+	|grep good: |awk '{print $NF}')
+    srcct=$(dmstat "$events[sky=region($srcreg)][energy=$1][cols energy]" 2>/dev/null \
+	|grep good: |awk '{print $NF}')
+    bgsc=$(python -c "print $ascale * $bgct")
+    subbed=$(python -c "print $srcct - $bgsc")
+    printf '%20s\t%.2f\t%d\t%.2f\n' "$1" "$bgsc" "$srcct" "$subbed"
+}
+
+while [ $# -gt 0 ] ; do
+    curenergy="$1"
+    shift
+    doband "$prevenergy:$curenergy"
+    prevenergy="$curenergy"
+done
+
+doband "$prevenergy:"
