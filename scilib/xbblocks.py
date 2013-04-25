@@ -112,6 +112,10 @@ def blockalyze (times, p0=0.05, nbootstrap=512):
             bs_edges = bayesian_blocks (bs_times, fitness='events', p0=p0)
             bs_nblocks = bs_edges.size - 1
 
+            if bs_nblocks < 1:
+                bs_edges = np.asarray ([bs_times.min (), bs_times.max ()])
+                bs_nblocks = 1
+
             bs_ledges = bs_edges[:-1]
             bs_redges = bs_edges[1:]
             bs_widths = bs_redges - bs_ledges
