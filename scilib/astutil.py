@@ -427,3 +427,28 @@ def gaussianDeconvolve (smaj, smin, spa, bmaj, bmin, bpa):
 
 
 __all__ += 'gaussianConvolve gaussianDeconvolve'.split ()
+
+
+# Smooth a timeseries with uncertainties
+
+def smooth (window, x, y, u=None, k=None):
+    if k is None:
+        k = window.size
+
+    conv = lambda q, r: np.convolve (q, r, mode='valid')
+
+    norm = conv (np.ones_like (x), window)
+    cx = conv (x, window) / norm
+
+    if u is None:
+        cy = conv (y, window) / norm
+        return cx[::k], cy[::k]
+
+    w = u**-2
+    cw = conv (w, window)
+    cy = conv (w * y, window) / cw
+    cu = np.sqrt (conv (w, window**2)) / cw
+    return cx[::k], cy[::k], cu[::k]
+
+
+__all__ += ['smooth']
