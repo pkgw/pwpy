@@ -105,8 +105,19 @@ def blockalyze (times, p0=0.05, nbootstrap=512):
         bs_rsumsqs = np.zeros (nblocks)
 
         for _ in xrange (nbootstrap):
-            # Perform the bootstrap sample:
-            bs_times = times[np.random.randint (0, times.size, times.size)]
+            # Perform the bootstrap sample. For very small sample sizes, we
+            # might choose the same event for every slot, which is
+            # nonsensical.
+            for _ in xrange (20):
+                bs_times = times[np.random.randint (0, times.size, times.size)]
+
+                if bs_times.min () == bs_times.max ():
+                    continue
+
+                break
+            else:
+                raise RuntimeError ('couldn\'t generate an acceptable '
+                                    'bootstrap sample')
 
             # Compute rates for this particular instance:
             bs_edges = bayesian_blocks (bs_times, fitness='events', p0=p0)
