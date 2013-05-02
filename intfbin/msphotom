@@ -1,6 +1,6 @@
 #! /usr/bin/env casa-python
 # -*- python -*-
-# Copyright 2012 Peter Williams
+# Copyright 2012-2013 Peter Williams
 # Licensed under the GNU General Public License version 3 or higher
 
 """
@@ -64,12 +64,6 @@ with all fluxes in ujy. dt is simply (MJD - MJD[0]) * 1440. The units
 of re, im, mag, and their uncertainties are microjansky by default,
 but see the datascale keyword, and there's no way to know if the
 data have actually been flux-calibrated or not.
-
-You will probably want to apply a moving smoothing window to the
-output of this program. The function smooth() in the source shows how
-to do this. Recommended to plot re(t) and im(t) in the same plot
-window since im(t) should give a sense of the random variation in the
-data.
 """
 
 import sys, os.path, numpy as np
@@ -337,23 +331,6 @@ def process (cfg):
         print >>cfg.outstream, \
             '%12.5f %6.2f %10.2f %10.2f %10.2f %10.2f %10.2f %10.2f %d' % \
             (mjd, dtmin, r_sc, ru_sc, i_sc, iu_sc, mag, umag, n)
-
-
-def smooth (x, re, reerr, im, imerr, window, k=1):
-    """Sample function for reference. Not used in this task."""
-    conv = lambda q, r: np.convolve (q, r, mode='valid')
-
-    cx = conv (x, window) / conv (np.ones_like (x), window) # maintain normalization
-
-    rewt = reerr**-2
-    cre = conv (rewt * re, window) / conv (rewt, window)
-    creerr = np.sqrt (conv (rewt, window**2)) / conv (rewt, window)
-
-    imwt = imerr**-2
-    cim = conv (imwt * im, window) / conv (imwt, window)
-    cimerr = np.sqrt (conv (imwt, window**2)) / conv (imwt, window)
-
-    return cx[::k], cre[::k], creerr[::k], cim[::k], cimerr[::k]
 
 
 def cmdline (argv):

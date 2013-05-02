@@ -1,5 +1,5 @@
 # -*- mode: python; coding: utf-8 -*-
-# Copyright 2012 Peter Williams
+# Copyright 2012-2013 Peter Williams
 # Licensed under the GNU General Public License version 3 or higher
 
 """
