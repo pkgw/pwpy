@@ -4,18 +4,18 @@
 """
 xbblocks - extended Bayesian Blocks
 
-Builds on the bayesian_blocks implementation by Jake Vanderplas in the AstroML
-package (which has been borrowed into pwpy since it can stand alone).
+Bayesian Blocks analysis for the "time tagged" case described by Scargle+ 2013.
+Inspired by the bayesian_blocks implementation by Jake Vanderplas in the AstroML
+package, but that turned out to have some limitations.
 
-We add iterative determination of the best number of blocks (using an ad-hoc
-routine described in Scargle+ 2012) and bootstrap-based determination of
+We have iterative determination of the best number of blocks (using an ad-hoc
+routine described in Scargle+ 2013) and bootstrap-based determination of
 uncertainties on the block heights (ditto).
 """
 
 import numpy as np
-from bayesian_blocks import bayesian_blocks
 
-__all__ = ['blockalyze']
+__all__ = ['nlogn binbblock ttbblock bsttbblock']
 
 ## quickutil: holder
 #- snippet: holder.py (2012 Sep 29)
@@ -56,120 +56,183 @@ class Holder (object):
 ## end
 
 
-def blockalyze (times, p0=0.05, nbootstrap=512):
+def nlogn (n, dt):
+    # I really feel like there must be a cleverer way to do this
+    # scalar-or-vector possible-bad-value masking.
+
+    if np.isscalar (n):
+        if n == 0:
+            return 0.
+        return n * (np.log (n) - np.log (dt))
+
+    n = np.asarray (n)
+    mask = (n == 0)
+    r = n * (np.log (np.where (mask, 1, n)) - np.log (dt))
+    return np.where (mask, 0, r)
+
+
+def binbblock (widths, counts, p0=0.05):
+    widths = np.asarray (widths)
+    counts = np.asarray (counts)
+    ncells = widths.size
+    origp0 = p0
+
+    if np.any (widths <= 0):
+        raise ValueError ('bin widths must be positive')
+    if widths.size != counts.size:
+        raise ValueError ('widths and counts must have same size')
+    if p0 < 0 or p0 >= 1.:
+        raise ValueError ('p0 must lie within [0, 1)')
+
+    vedges = np.cumsum (np.concatenate (([0], widths))) # size: ncells + 1
+    block_remainders = vedges[-1] - vedges # size: nedges = ncells + 1
+    ccounts = np.cumsum (np.concatenate (([0], counts)))
+    count_remainders = ccounts[-1] - ccounts
+
+    prev_blockstarts = None
+    best = np.zeros (ncells, dtype=np.float)
+    last = np.zeros (ncells, dtype=np.int)
+
+    for _ in xrange (10):
+        # Pluggable num-change-points prior-weight expression:
+        ncp_prior = 4 - np.log (p0 / (0.0136 * ncells**0.478))
+
+        for r in xrange (ncells):
+            tk = block_remainders[:r+1] - block_remainders[r+1]
+            nk = count_remainders[:r+1] - count_remainders[r+1]
+
+            # Pluggable fitness expression:
+            try:
+                fit_vec = nlogn (nk, tk)
+            except:
+                print 'q', nk, tk
+                print 'r', widths, counts
+                raise
+
+            # This incrementally penalizes partitions with more blocks:
+            tmp = fit_vec - ncp_prior
+            tmp[1:] += best[:r]
+
+            imax = np.argmax (tmp)
+            last[r] = imax
+            best[r] = tmp[imax]
+
+        # different semantics than Scargle impl: our blockstarts is similar to
+        # their changepoints, but we always finish with blockstarts[0] = 0.
+
+        work = np.zeros (ncells, dtype=int)
+        workidx = 0
+        ind = last[-1]
+
+        while True:
+            work[workidx] = ind
+            workidx += 1
+            if ind == 0:
+                break
+            ind = last[ind - 1]
+
+        blockstarts = work[:workidx][::-1]
+
+        if prev_blockstarts is not None:
+            if (blockstarts.size == prev_blockstarts.size and
+                (blockstarts == prev_blockstarts).all ()):
+                break # converged
+
+        if blockstarts.size == 1:
+            break # can't shrink any farther
+
+        # Recommended ad-hoc iteration to favor fewer blocks above and beyond
+        # the value of p0:
+        p0 = 1. - (1. - p0)**(1. / (blockstarts.size - 1))
+        prev_blockstarts = blockstarts
+
+    assert blockstarts[0] == 0
+    nblocks = blockstarts.size
+
+    info = Holder ()
+    info.ncells = ncells
+    info.nblocks = nblocks
+    info.origp0 = origp0
+    info.finalp0 = p0
+    info.blockstarts = blockstarts
+    info.counts = np.empty (nblocks, dtype=np.int)
+    info.widths = np.empty (nblocks)
+
+    for iblk in xrange (nblocks):
+        cellstart = blockstarts[iblk]
+        if iblk == nblocks - 1:
+            cellend = ncells - 1
+        else:
+            cellend = blockstarts[iblk+1] - 1
+
+        info.widths[iblk] = widths[cellstart:cellend+1].sum ()
+        info.counts[iblk] = counts[cellstart:cellend+1].sum ()
+
+    info.rates = info.counts / info.widths
+    return info
+
+
+def ttbblock (tstart, tstop, times, p0=0.05):
+    times = np.asarray (times)
+    dt = times[1:] - times[:-1]
+
+    if np.any (dt < 0):
+        raise ValueError ('times must be ordered')
+    if times.min () < tstart:
+        raise ValueError ('no times may be smaller than tstart')
+    if times.max () > tstop:
+        raise ValueError ('no times may be larger than tstop')
+    if p0 < 0 or p0 >= 1.:
+        raise ValueError ('p0 must lie within [0, 1)')
+
+    utimes, uidxs = np.unique (times, return_index=True)
+    nunique = utimes.size
+
+    counts = np.empty (nunique)
+    counts[:-1] = uidxs[1:] - uidxs[:-1]
+    counts[-1] = times.size - uidxs[-1]
+    #assert counts.sum () == times.size
+
+    midpoints = 0.5 * (utimes[1:] + utimes[:-1]) # size: nunique - 1
+    edges = np.concatenate (([tstart], midpoints, [tstop])) # size: nunique + 1
+    widths = edges[1:] - edges[:-1] # size: nunique
+    #assert widths.sum () == tstop - tstart
+
+    info = binbblock (widths, counts, p0=p0)
+    info.ledges = edges[info.blockstarts]
+    info.redges = np.concatenate ((edges[info.blockstarts[1:]], [tstop]))
+    info.midpoints = 0.5 * (info.ledges + info.redges)
+    return info
+
+
+def bsttbblock (times, tstart, tstop, p0=0.05, nbootstrap=512):
+    np.seterr ('raise')
     times = np.asarray (times)
     nevents = times.size
-    if nevents < 2:
-        raise ValueError ('must be given at least 2 events')
+    if nevents < 1:
+        raise ValueError ('must be given at least 1 event')
 
-    # Use the iteration scheme described in Scargle+ 2012, section 2.7, to
-    # adjust the p0 parameter to converge on a believable number of blocks.
+    info = ttbblock (tstart, tstop, times, p0)
 
-    origp0 = p0
-    prevnblocks = -1
+    # Now bootstrap resample to assess uncertainties on the bin heights. This
+    # is the approach recommended by Scargle+.
 
-    for _ in xrange (20):
-        edges = bayesian_blocks (times, fitness='events', p0=p0)
-        nblocks = edges.size - 1
-        assert nblocks > 0
+    bsrsums = np.zeros (info.nblocks)
+    bsrsumsqs = np.zeros (info.nblocks)
 
-        if nblocks == prevnblocks:
-            # Iteration converged. We *could* repeat the bootstrap analysis
-            # below: the different value of p0 will give us different results,
-            # above and beyond the variance associated with the random
-            # bootstrap sampling. My (not-well-informed) intuition is that
-            # it's more proper to use the values derived from the looser p0
-            # value.
-            break
+    for _ in xrange (nbootstrap):
+        bstimes = times[np.random.randint (0, times.size, times.size)]
+        bstimes.sort ()
+        bsinfo = ttbblock (tstart, tstop, bstimes, p0)
+        blocknums = np.minimum (np.searchsorted (bsinfo.redges, info.midpoints),
+                                bsinfo.nblocks - 1)
+        samprates = bsinfo.rates[blocknums]
+        bsrsums += samprates
+        bsrsumsqs += samprates**2
 
-        ledges = edges[:-1]
-        redges = edges[1:]
-        widths = redges - ledges
-
-        # We must be careful about inequality-inclusiveness here to not
-        # lose either the first or last event.
-        counts = np.empty (nblocks)
-        counts[0] = np.count_nonzero (times <= redges[0])
-        for i in xrange (1, counts.size):
-            counts[i] = np.count_nonzero ((times > ledges[i]) & (times <= redges[i]))
-        assert counts.sum () == nevents
-
-        rates = counts / widths
-        midpoints = 0.5 * (ledges + redges)
-
-        # Now bootstrap resample to figure out uncertainties on the bin heights. I
-        # would have thought that the Bayesian analysis would get uncertainties
-        # automagically, but this is the approach recommended by Scargle+.
-
-        bs_rsums = np.zeros (nblocks)
-        bs_rsumsqs = np.zeros (nblocks)
-
-        for _ in xrange (nbootstrap):
-            # Perform the bootstrap sample. For very small sample sizes, we
-            # might choose the same event for every slot, which is
-            # nonsensical.
-            for _ in xrange (20):
-                bs_times = times[np.random.randint (0, times.size, times.size)]
-
-                if bs_times.min () == bs_times.max ():
-                    continue
-
-                break
-            else:
-                raise RuntimeError ('couldn\'t generate an acceptable '
-                                    'bootstrap sample')
-
-            # Compute rates for this particular instance:
-            bs_edges = bayesian_blocks (bs_times, fitness='events', p0=p0)
-            bs_nblocks = bs_edges.size - 1
-
-            if bs_nblocks < 1:
-                bs_edges = np.asarray ([bs_times.min (), bs_times.max ()])
-                bs_nblocks = 1
-
-            bs_ledges = bs_edges[:-1]
-            bs_redges = bs_edges[1:]
-            bs_widths = bs_redges - bs_ledges
-
-            bs_counts = np.empty (bs_nblocks)
-            bs_counts[0] = np.count_nonzero (bs_times <= bs_redges[0])
-            for i in xrange (1, bs_counts.size):
-                bs_counts[i] = np.count_nonzero ((bs_times > bs_ledges[i]) &
-                                                 (bs_times <= bs_redges[i]))
-
-            bs_rates = bs_counts / bs_widths
-
-            # Sample the bootstrap rates at the midpoints of the optimal blocks:
-            bs_blocknums = np.minimum (np.searchsorted (bs_redges, midpoints),
-                                       bs_nblocks - 1)
-            optrates = bs_rates[bs_blocknums]
-            bs_rsums += optrates
-            bs_rsumsqs += optrates**2
-
-        bsmeans = bs_rsums / nbootstrap
-        bsstds = np.sqrt (bs_rsumsqs / nbootstrap - bsmeans**2)
-
-        # Prepare for the next iteration. If only one block, no point in
-        # rerunning.
-
-        if nblocks == 1:
-            break
-
-        prevnblocks = nblocks
-        p0 = 1 - (1 - p0)**(1. / nblocks)
-    else:
-        raise RuntimeError ('iterative nblock-finding algorithm didn\'t converge')
-
-    rv = Holder ()
-    rv.origp0 = origp0
-    rv.finalp0 = p0
-    rv.nevents = nevents
-    rv.nblocks = nblocks
-    rv.edges = edges
-    rv.midpoints = midpoints
-    rv.widths = widths
-    rv.optcounts = counts
-    rv.optrates = rates
-    rv.bsrates = bsmeans
-    rv.bsstds = bsstds
-    return rv
+    bsrmeans = bsrsums / nbootstrap
+    mask = bsrsumsqs / nbootstrap <= bsrmeans**2
+    bsrstds = np.sqrt (np.where (mask, 0, bsrsumsqs / nbootstrap - bsrmeans**2))
+    info.bsrates = bsrmeans
+    info.bsrstds = bsrstds
+    return info

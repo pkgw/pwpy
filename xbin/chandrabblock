@@ -8,7 +8,7 @@ chandrabblock in=[FITS] [keywords...]
 
 Perform a Bayesian Blocks analysis of a Chandra events2 file to determine
 whether the data are consistent with flaring emission. The only data used are
-the event timestamps.
+the event timestamps and the good-time intervals.
 
 ** The input file should be pre-filtered using 'dmcopy' to isolate
 source counts and potentially eliminate background events (e.g., high-energy
@@ -34,8 +34,8 @@ In theory we should be compatible with any file that follows the CIAO Data
 Model, but I suspect that the processing here makes some Chandra-specific
 assumptions. Hence the Chandra-specificity in the name and description.
 
-TODO: I presume that a proper analysis should use spectral and background
-information. For my current purposes, I don't think that's necessary, however.
+TODO: We ignore spectral information as well as any distinction between source
+and background contributions.
 """
 
 try:
@@ -53,6 +53,7 @@ except ImportError:
                        'provide the needed modules')
 
 import sys
+import numpy as np
 from kwargv import ParseKeywords, Custom
 
 ## quickutil: usage die
@@ -126,8 +127,10 @@ def process (cfg):
 
     timesys = f[0].header['timesys']
     mjdref = f[0].header['mjdref']
-    # TODO: handle TIMEZERO, if it's ever used and I can determine the sign convention
     timeunit = f[0].header['timeunit']
+    timezero = f[0].header['timezero']
+    tstart = f[0].header['tstart']
+    tstop = f[0].header['tstop']
 
     if timeunit == 's':
         tscale = 1. / 86400
@@ -144,17 +147,54 @@ def process (cfg):
                 die ('input "%s" has multiple EVENTS sections; don\'t know '
                      'which to use', cfg.inpath)
 
-    mjd = eventhdu.data.time * tscale + mjdref
-    info = xbblocks.blockalyze (mjd, p0=cfg.p0, nbootstrap=cfg.nbootstrap)
+    if eventhdu is None:
+        die ('input "%s" has no EVENTS sections', cfg.inpath)
+
+    ccdid = eventhdu.data.ccd_id.min ()
+    if eventhdu.data.ccd_id.max () != ccdid:
+        die ('can\'t handle data from multiple CCDs in input "%s"', cfg.inpath)
+
+    gtihdu = None
+
+    for hdu in f[1:]:
+        if hdu.name == 'GTI' and hdu.header['ccd_id'] == ccdid:
+            if gtihdu is None:
+                gtihdu = hdu
+            else:
+                die ('input "%s" has multiple matching GTI sections; don\'t know '
+                     'which to use', cfg.inpath)
+
+    if gtihdu is None:
+        print >>sys.stderr, 'warning: no GTI info for active CCD %d; trusting ' \
+            'TSTART and TSTOP instead' % ccdid
+    else:
+        gtistarts = gtihdu.data.START
+        gtistops = gtihdu.data.STOP
+
+        if gtistarts.size != 1:
+            die ('input "%s" has multiple separate GTIs for active CCD %d; I '
+                 'can only handle one', cfg.inpath, ccdid)
+
+        tstart = gtistarts[0]
+        tstop = gtistops[0]
+
+    times = (eventhdu.data.time + timezero) * tscale + mjdref
+    tstart = (tstart + timezero) * tscale + mjdref
+    tstop = (tstop + timezero) * tscale + mjdref
+
+    info = xbblocks.bsttbblock (times, tstart, tstop, p0=cfg.p0,
+                                nbootstrap=cfg.nbootstrap)
 
     print >>cfg.out, '# p0 = %g' % cfg.p0
     print >>cfg.out, '# timesys =', timesys
+    print >>cfg.out, '# tstart = %.5f' % tstart
+    print >>cfg.out, '# tstop = %.5f' % tstop
+    print >>cfg.out, '# n = %d' % times.size
 
     for i in xrange (info.nblocks):
-        s = '%.5f %.5f %d %g %g %g' % (info.edges[i], info.edges[i+1],
-                                       info.optcounts[i],
-                                       info.edges[i+1] - info.edges[i],
-                                       info.optrates[i], info.bsstds[i])
+        s = '%.5f %.5f %d %g %g %g' % (info.ledges[i], info.redges[i],
+                                       info.counts[i], info.widths[i],
+                                       info.rates[i], info.bsrstds[i])
         print >>cfg.out, s
 
 
