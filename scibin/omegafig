@@ -35,7 +35,7 @@ pangosize=[int]
  The size of the font to use for text; passed to Pango
 """
 
-import sys, types, omega as om
+import sys, os, types, omega as om
 from kwargv import ParseKeywords, Custom
 
 
@@ -126,6 +126,8 @@ def doit (driver, args):
     try:
         code = compile (text, driver, 'exec')
     except Exception as e:
+        if 'OMEGAFIG_BACKTRACE' in os.environ:
+            raise
         die ('cannot compile driver file "%s": %s', driver, e)
 
     ns = {'__file__': driver,
@@ -134,6 +136,8 @@ def doit (driver, args):
     try:
         exec code in ns
     except Exception as e:
+        if 'OMEGAFIG_BACKTRACE' in os.environ:
+            raise
         die ('cannot execute driver file "%s": %s', driver, e)
 
     pfunc = ns.get ('plot')
