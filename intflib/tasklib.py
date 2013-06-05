@@ -991,6 +991,7 @@ niter = 500
 gain = 0.1
 threshold = 0 [mJy]
 mask = (blank) or path of CASA-format region text file
+weighting = 'briggs' (robust=0.5) or 'natural'
 """ + stdsel_doc + loglevel_doc.replace ('warn;', 'info;')
 
 class MfscleanConfig (ParseKeywords):
@@ -1008,6 +1009,7 @@ class MfscleanConfig (ParseKeywords):
     reffreq = 0. # GHz; 0 -> be sensible
     stokes = 'I'
     threshold = 0. # mJy
+    weighting = 'briggs'
 
     # allowchunk = False
     # cyclefactor = 1.5
@@ -1028,7 +1030,6 @@ class MfscleanConfig (ParseKeywords):
     # usescratch = False
     # uvtaper = False
     # veltype = radio
-    # weighting = 'briggs'
     # width = 1
 
     antenna = str
@@ -1140,7 +1141,14 @@ def mfsclean (cfg):
                     spw=-1, # to verify: selectvis (spw=) good enough?
                     restfreq='', mode='mfs', veltype='radio',
                     nchan=-1, start=0, step=1, facets=1)
-    im.weight (type='briggs', rmode='norm', robust=0.5, npixels=0) #noise=, mosaic=
+
+    if cfg.weighting == 'briggs':
+        im.weight (type='briggs', rmode='norm', robust=0.5, npixels=0) #noise=, mosaic=
+    elif cfg.weighting == 'natural':
+        im.weight (type='natural', rmode='none')
+    else:
+        raise ValueError ('unknown weighting type "%s"' % cfg.weighting)
+
     # im.filter (...)
     im.setscales (scalemethod='uservector', uservector=[0])
     im.setsmallscalebias (0.6)
