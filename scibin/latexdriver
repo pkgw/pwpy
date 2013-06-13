@@ -2,7 +2,14 @@
 #
 # Drive (xe)latex sensibly
 
+# I stash the annoying LaTeX output files in a hidden directory called
+# .latexwork. However, some LaTeX distributions refuse to write to hidden
+# paths by default. I figured out how to hack the configuration, but that's
+# not a scalable solution. Instead I just create a temporary symlink with an
+# acceptable name -- good jorb security.
+
 workdir=.latexwork
+workalias=_latexwork
 engine=pdflatex
 args="-interaction nonstopmode -halt-on-error -file-line-error"
 dobibtex=false
@@ -37,11 +44,12 @@ if [ -z "$base" ] ; then
     exit 1
 fi
 
-job="$workdir/$base"
-tlog="$workdir/$base.hllog" # "highlevel log"
-blog="$workdir/$base.hlblg" # bibtex version thereof
+job="$workalias/$base"
+tlog="$workalias/$base.hllog" # "highlevel log"
+blog="$workalias/$base.hlblg" # bibtex version thereof
 
 mkdir -p $workdir
+ln -sf $workdir $workalias || exit 1
 
 function logrun () {
     # $1 = command
@@ -58,6 +66,7 @@ function logrun () {
     $1 $2 $3 >&$4
     if [ $? -ne 0 ] ; then
 	cat $4 >&2
+	rm -f $workalias
 	exit 1
     fi
 }
@@ -70,15 +79,20 @@ if $dobibtex ;then
     logrun $engine "$args -jobname $job" $base $tlog
 fi
 
+# deluxetables seem to always tell you to rerun latex. Stripping out
+# lines containing "longtable" makes us ignore them.
+
 n=0
 
-while grep -q Rerun $tlog ; do
+while grep -v longtable $tlog |grep -q Rerun ; do
     logrun $engine "$args -jobname $job" $base $tlog
     if [ $n -gt 10 ] ; then
 	echo >&2 "error: too many iterations; check $tlog"
+	rm -f $workalias
 	exit 1
     fi
     n=$(($n + 1))
 done
 
-exec mv $job.pdf "$output"
+mv $job.pdf "$output"
+exec rm -f $workalias
