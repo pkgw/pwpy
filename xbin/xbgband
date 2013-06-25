@@ -9,6 +9,11 @@ shift
 bgreg="$1"
 shift
 
+if [ -z "$bgreg" ] ; then
+    echo >&2 "usage: xbgband <events.fits> <src.reg> <bg.reg> [energy bin borders (eV)...]"
+    exit 1
+fi
+
 prevenergy=""
 
 srcarea=$(dmlist "$events[sky=region($srcreg)]" subspace |grep area |tail -n1 |awk '{print $NF}')
