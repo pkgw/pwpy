@@ -126,9 +126,10 @@ def predict (ident, mjd, n=20000, verbose=False):
             ra = float (a[1]) * D2R
             dec = float (a[2]) * D2R
         if a[0] == '%J.E':
-            posumaj = float (a[1][1:]) * A2R * 1e-3 # mas -> rad
-            posumin = float (a[2]) * A2R * 1e-3
-            posupa = float (a[3][:-1]) * D2R
+            if a[1] != '[~':
+                posumaj = float (a[1][1:]) * A2R * 1e-3 # mas -> rad
+                posumin = float (a[2]) * A2R * 1e-3
+                posupa = float (a[3][:-1]) * D2R
             posref = a[5]
         elif a[0] == '%P':
             promora = float (a[1]) # mas/yr
