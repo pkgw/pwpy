@@ -45,6 +45,7 @@ lsun = 3.826e33 # erg s^-1
 tsun = 5770 # K
 mearth = 5.974e27 # g
 rearth = 6.378e8 # cm
+mjup = 1.8986e30 # g
 rjup = 7.1492e9 # cm (equatorial)
 
 jypercgs = 1e23 # jy per (erg s^-1 cm^-2 Hz^-1) [dimensionless]
