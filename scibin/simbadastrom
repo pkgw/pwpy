@@ -164,8 +164,10 @@ def predict (ident, mjd, n=20000, verbose=False):
     if verbose:
         print >>sys.stderr, 'D: pos: %s' % fmtradec (ra, dec, precision=3)
         if promora is not None:
-            print >>sys.stderr, ('D: promo: %.2f %.2f (%.3f x %.3f @ %.1f)' %
-                                 (promora, promodec, pmumaj, pmumin, pmupa * R2D))
+            print >>sys.stderr, 'D: promo: %.2f %.2f' % (promora, promodec)
+            if pmumaj is not None:
+                print >>sys.stderr, ('D: pm uncert: %.3f x %.3f @ %.1f' %
+                                     (pmumaj, pmumin, pmupa * R2D))
             print >>sys.stderr, 'D: pm epoch: %.2f' % (o.promoepoch)
         if parallax is not None:
             print >>sys.stderr, 'D: parallax: %.3f (%.3f)' % (parallax, parallaxu)
