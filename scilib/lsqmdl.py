@@ -157,8 +157,8 @@ class Model (_ModelBase):
 
 
 class PolynomialModel (_ModelBase):
-    def __init__ (self, degree, x, y, invsigma=None):
-        self.degree = degree
+    def __init__ (self, nterms, x, y, invsigma=None):
+        self.nterms = nterms
         self.setdata (x, y, invsigma)
 
 
@@ -169,16 +169,16 @@ class PolynomialModel (_ModelBase):
         except ImportError:
             from numpy.polynomial import polyfit, polyval
 
-        self.paramnames = ['a%d' % i for i in xrange (self.degree)]
+        self.paramnames = ['a%d' % i for i in xrange (self.nterms)]
         # Based on my reading of the polyfit() docs, I think w=invsigma**2 is right...
-        self.params, info = polyfit (self.x, self.y, self.degree,
-                                     w=self.invsigma**2, full=True)
+        self.params = polyfit (self.x, self.y, self.nterms - 1,
+                               w=self.invsigma**2)
         self.perror = None # does anything provide this? could farm out to lmmin ...
         self.covar = None
         self.modelfunc = lambda x: polyval (x, self.params)
         self.modely = self.modelfunc (self.x)
-        self.rchisq = info[0] / (self.x.size - self.degree)
         self.resids = self.y - self.modely
+        self.rchisq = ((self.resids * self.invsigma)**2).sum () / (self.x.size - self.nterms)
         return self
 
 
