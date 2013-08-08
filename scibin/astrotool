@@ -132,28 +132,28 @@ def cmd_calc (args):
     print fmt (fparse (' '.join (args)))
 
 
-def cmd_flux (args):
-    """flux <lum[cgs]> <dist[pc]> - luminosity and distance to flux"""
+def cmd_flux2lum (args):
+    """flux2lum <flux[cgs]> <dist[pc]> - flux and distance to luminosity"""
 
     if len (args) != 2:
-        wrongusage (__doc__, 'flux expected exactly 2 arguments')
-
-    lum = fparse (args[0])
-    dist = fparse (args[1])
-    flux = lum / (4 * pi * (dist * cmperpc)**2)
-    print fmt (flux)
-
-
-def cmd_lum (args):
-    """lum <flux[cgs]> <dist[pc]> - flux and distance to luminosity"""
-
-    if len (args) != 2:
-        wrongusage (__doc__, 'lum expected exactly 2 arguments')
+        wrongusage (__doc__, 'flux2lum expected exactly 2 arguments')
 
     flux = fparse (args[0])
     dist = fparse (args[1])
     lum = flux * 4 * pi * (dist * cmperpc)**2
     print fmt (lum)
+
+
+def cmd_lum2flux (args):
+    """lum2flux <lum[cgs]> <dist[pc]> - luminosity and distance to flux"""
+
+    if len (args) != 2:
+        wrongusage (__doc__, 'lum2flux expected exactly 2 arguments')
+
+    lum = fparse (args[0])
+    dist = fparse (args[1])
+    flux = lum / (4 * pi * (dist * cmperpc)**2)
+    print fmt (flux)
 
 
 def _fullusage ():
