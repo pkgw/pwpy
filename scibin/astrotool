@@ -67,6 +67,23 @@ def wrongusage (docstring, *rest):
 ## end:
 
 
+def fparse (text):
+    try:
+        # note: totally reckless about globals/locals passed, etc.
+        # nice to have * from astutil and cgs available.
+        v = eval (text)
+    except Exception as e:
+        die ('cannot evaluate "%s": %s (%s)', text, str (e), e.__class__.__name__)
+
+    try:
+        f = float (v)
+    except Exception as e:
+        die ('evaluted "%s", but could not floatify result %r: %s (%s)', text, v,
+             str (e), e.__class__.__name__)
+
+    return f
+
+
 def fmt (v):
     f1 = '%.4g' % v
     f2 = '%.3e' % v
@@ -88,8 +105,8 @@ def cmd_abs2app (args):
     if len (args) != 2:
         wrongusage (__doc__, 'abs2app expected exactly 2 arguments')
 
-    absmag = float (args[0])
-    dist = float (args[1])
+    absmag = fparse (args[0])
+    dist = fparse (args[1])
     appmag = absmag + 5 * (log10 (dist) - 1)
     print fmt (appmag)
 
@@ -100,8 +117,8 @@ def cmd_app2abs (args):
     if len (args) != 2:
         wrongusage (__doc__, 'app2abs expected exactly 2 arguments')
 
-    appmag = float (args[0])
-    dist = float (args[1])
+    appmag = fparse (args[0])
+    dist = fparse (args[1])
     absmag = appmag - 5 * (log10 (dist) - 1)
     print fmt (absmag)
 
@@ -112,22 +129,7 @@ def cmd_calc (args):
     if not len (args):
         wrongusage (__doc__, 'calc expected arguments')
 
-    text = ' '.join (args)
-
-    try:
-        # note: totally reckless about globals/locals passed, etc.
-        # nice to have * from astutil and cgs available.
-        v = eval (text)
-    except Exception as e:
-        die ('cannot evaluate "%s": %s (%s)', text, str (e), e.__class__.__name__)
-
-    try:
-        f = float (v)
-    except Exception as e:
-        die ('evaluted "%s", but could not floatify result %r: %s (%s)', text, v,
-             str (e), e.__class__.__name__)
-
-    print fmt (f)
+    print fmt (fparse (' '.join (args)))
 
 
 def cmd_flux (args):
@@ -136,8 +138,8 @@ def cmd_flux (args):
     if len (args) != 2:
         wrongusage (__doc__, 'flux expected exactly 2 arguments')
 
-    lum = float (args[0])
-    dist = float (args[1])
+    lum = fparse (args[0])
+    dist = fparse (args[1])
     flux = lum / (4 * pi * (dist * cmperpc)**2)
     print fmt (flux)
 
@@ -148,8 +150,8 @@ def cmd_lum (args):
     if len (args) != 2:
         wrongusage (__doc__, 'lum expected exactly 2 arguments')
 
-    flux = float (args[0])
-    dist = float (args[1])
+    flux = fparse (args[0])
+    dist = fparse (args[1])
     lum = flux * 4 * pi * (dist * cmperpc)**2
     print fmt (lum)
 
