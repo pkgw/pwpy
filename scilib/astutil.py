@@ -337,6 +337,24 @@ def sphofs (lat1, lon1, r, pa, tol=1e-2, rmax=None):
 __all__ += 'sphdist sphbear sphofs'.split ()
 
 
+# Spherical trig tools that are more astronomy-specific. Note that precise
+# positional calculations should generally use precastro and (indirectly)
+# NOVAS.
+
+def parang (hourangle, declination, latitude):
+    """Calculate the parallactic angle of a sky position.
+
+    Inputs and outputs are all in radians. Implementation adapted
+    from GBTIDL parangle.pro."""
+
+    return -np.arctan2 (-np.sin (hourangle),
+                        np.cos (declination) * np.tan (latitude)
+                        - np.sin (declination) * np.cos (hourangle))
+
+
+__all__ += 'parang'.split ()
+
+
 # 2D Gaussian (de)convolution
 
 def gaussianConvolve (maj1, min1, pa1, maj2, min2, pa2):
