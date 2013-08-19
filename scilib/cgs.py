@@ -31,6 +31,7 @@ mue = e * hbar / (2 * me * c) # magnetic moment units, whatever those are
 sigmat = 8 * pi * re**2 / 3 # cm^2
 ergperev = 1.60e-12 # erg / eV [dimensionless]
 evpererg = 1. / ergperev
+conjaaev = 1e8 * c * h / ergperev # eV*Angstrom ; lambda(AA) = conjaaev/E(eV)
 cmperpc = 3.08568025e18 # cm / pc [dimensionless]
 pcpercm = 1. / cmperpc
 cmperau = 1.49598e13 # cm / AU [dimensionless]
