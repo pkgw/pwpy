@@ -30,6 +30,17 @@ nbootstrap=256
   The number of bootstrap samples to extract when determining uncertainties on
   the block rates. The default value is generally fine.
 
+The output consists of header information (lines of the form "# name = value")
+and then one data line for each block:
+
+  tstart[MJD] tstop[MJD] ncounts effbinwidth[day] rate[ct/day] rateerr[ct/day]
+
+Note that the effective bin width may not be equal to tstop-tstart if there
+are gaps in the goodtime coverage within the bin. The count rate error is
+determined with a bootstrapping procedure and unfortunately does not seem to
+be very reliable at the moment. (For instance, it varies substantially as a
+function of the p0 parameter.)
+
 In theory we should be compatible with any file that follows the CIAO Data
 Model, but I suspect that the processing here makes some Chandra-specific
 assumptions. Hence the Chandra-specificity in the name and description.
