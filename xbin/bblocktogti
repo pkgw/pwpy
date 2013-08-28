@@ -1,0 +1,73 @@
+#! /usr/bin/env python
+
+"""
+Given a "chandrabblock" output file, use it to generate a GTI file that can be
+used to filter datasets.
+
+You might want to do this if you used chandrabblock to identify time periods
+of background flaring.
+
+This tool needs to be run in CIAO environment because we invoke the binary
+mtl_build_gti tool.
+"""
+
+import sys, subprocess
+
+MJDREF = 50814 # FIXME: lame conversion to/from MJD in our overall dataflow
+
+def convert (evtpath, bblockstream, ratemax, outpath):
+    stanzas = []
+
+    for line in bblockstream:
+        line = line.strip ()
+        if not len (line):
+            continue
+        if line[0] == '#':
+            continue
+
+        a = line.split ()
+        mjdstart = float (a[0])
+        mjdstop = float (a[1])
+        rate = float (a[4])
+
+        # we want to work in ct/s, not ct/d
+        rate /= 86400
+
+        if rate > ratemax:
+            continue
+
+        tstart = (mjdstart - MJDREF) * 86400
+        tstop = (mjdstop - MJDREF) * 86400
+        stanzas.append ('(time > %.12f && time < %.12f)' % (tstart, tstop))
+
+    args = ['mtl_build_gti',
+            'infile=' + evtpath,
+            'outfile=' + outpath,
+            'mtlfile=none',
+            'lkupfile=none',
+            'userlimit=' + ' || '.join (stanzas),
+            'clobber+']
+    exitcode = subprocess.call (args, shell=False)
+
+    if exitcode:
+        print >>sys.stderr, 'error: command %s failed (exit code %d)' \
+            % (args[0], exitcode)
+        print >>sys.stderr, 'commandline was:', ' '.join (args)
+        sys.exit (1)
+
+
+def cmdline (args):
+    if len (args) != 4:
+        print >>sys.stderr, 'usage: bblocktogti <evtpath> <bblockpath> ' \
+            '<ratemax [ct/s]> <outpath>'
+        sys.exit (1)
+
+    evtpath = args[0]
+    bblockstream = open (args[1])
+    ratemax = float (args[2])
+    outpath = args[3]
+    convert (evtpath, bblockstream, ratemax, outpath)
+
+
+if __name__ == '__main__':
+    cmdline (sys.argv[1:])
