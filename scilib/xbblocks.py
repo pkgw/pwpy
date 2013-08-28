@@ -187,7 +187,7 @@ def ttbblock (tstarts, tstops, times, p0=0.05):
     if np.any ((tstarts[1:] - tstarts[:-1]) <= 0):
         raise ValueError ('tstarts must be ordered and distinct')
     if np.any ((tstops[1:] - tstops[:-1]) <= 0):
-        raise ValueError ('tstarts must be ordered and distinct')
+        raise ValueError ('tstops must be ordered and distinct')
     if np.any (tstarts >= tstops):
         raise ValueError ('tstarts must come before tstops')
     if np.any ((times[1:] - times[:-1]) < 0):
