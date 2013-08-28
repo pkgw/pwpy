@@ -231,8 +231,7 @@ def ttbblock (tstarts, tstops, times, p0=0.05):
                 j = wafter[0]
             else:
                 j = utimes.size
-            # NOTE: this assert breaks if we're here and i == 0
-            assert np.where (utimes < tstart)[0][-1] == j - 1
+            assert i == 0 or np.where (utimes < tstart)[0][-1] == j - 1
 
             counts = np.concatenate ((counts[:j], [0], counts[j:]))
             widths = np.concatenate ((widths, [tstop - tstart]))
