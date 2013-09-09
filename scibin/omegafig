@@ -17,7 +17,7 @@ out=
 dims=
  Width and height of the output image, in points or pixels; ignored if
  displaying interactively. If only one value is specified, it is used for both
- width and height. (default: 256,256)
+ width and height. (default: 256,256; nonintegers not allowed)
 
 margin=
  Margin width, in points or pixels (default: 2)
@@ -101,7 +101,7 @@ class Config (ParseKeywords):
     def margin (v):
         return [v] * 4
 
-    @Custom ([256.0, float])
+    @Custom ([256, int])
     def dims (v):
         if v[1] is None:
             v[1] = v[0]
