@@ -106,14 +106,14 @@ def get_2mass_epoch (tmra, tmdec):
 
 
 def predict (ident, mjd, n=20000, verbose=False):
-    ra = posumaj = promora = pmumaj = parallax = vradial = None
+    ra = posumaj = promora = pmumaj = parallax = parallaxu = vradial = None
     posref = 'unknown'
 
     for line in urlopen (sesamebase + quote (ident)):
         if line.startswith ('#!'):
             die ('Simbad/Sesame lookup failed: %s', line[3:].strip ())
 
-        #print >>sys.stderr, '##', line.rstrip ()
+        print >>sys.stderr, '##', line.rstrip ()
 
         a = line.strip ().split ()
         if not len (a):
@@ -141,7 +141,8 @@ def predict (ident, mjd, n=20000, verbose=False):
                 pmupa = float (a[5][:-1]) * D2R # rad!!
         elif a[0] == '%X':
             parallax = float (a[1]) # mas
-            parallaxu = float (a[2][1:-1]) # mas
+            if len (a) > 2 and a[2][0] == '[' and a[2][1] != '~':
+                parallaxu = float (a[2][1:-1]) # mas
         elif a[0] == '%V':
             vradial = float (a[2]) # km/s
             vradialu = float (a[4][1:-1]) # km/s
@@ -215,6 +216,7 @@ def predict (ident, mjd, n=20000, verbose=False):
     if parallax is not None and parallaxu != 0:
         parallaxes = numpy.random.normal (parallax, parallaxu, n)
     elif parallax is not None:
+        print >>sys.stderr, 'warning: no uncertainty on parallax'
         parallaxes = np.zeros (n) + parallax
     else:
         print >>sys.stderr, 'warning: assuming zero parallax'
