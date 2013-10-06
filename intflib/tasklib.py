@@ -1239,6 +1239,7 @@ timerange=
 plotsymbol=
 plotcolor=
 fontsize=
+figfile=
 
 """ + loglevel_doc
 
@@ -1250,12 +1251,13 @@ class PlotcalConfig (ParseKeywords):
     iteration = ''
 
     # not implemented: subplot, overplot, clearpanel, plotrange,
-    # showflags, showgui, figfile
+    # showflags, showgui
 
     plotsymbol = '.'
     plotcolor = 'blue'
     markersize = 5.
     fontsize = 10.
+    figfile = str
 
     antenna = ''
     field = ''
@@ -1278,6 +1280,9 @@ def plotcal (cfg):
                     markersize=cfg.markersize,
                     fontsize=cfg.fontsize)
     cp.plot (cfg.xaxis.upper (), cfg.yaxis.upper ())
+
+    if cfg.figfile is not None:
+        cp.savefig (cfg.figfile)
 
 
 def plotcal_cli (argv):
