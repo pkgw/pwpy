@@ -29,6 +29,7 @@ __all__ = ('applycal applycal_cli ApplycalConfig '
            'fluxscale fluxscale_cli FluxscaleConfig '
            'ft ft_cli FtConfig '
            'gaincal gaincal_cli GaincalConfig '
+           'gencal gencal_cli GencalConfig '
            'mfsclean mfsclean_cli MfscleanConfig '
            'plotcal plotcal_cli PlotcalConfig '
            'setjy setjy_cli SetjyConfig '
@@ -959,6 +960,96 @@ def gaincal (cfg):
 
 
 gaincal_cli = makekwcli (gaincal_doc, GaincalConfig, gaincal)
+
+
+# gencal
+
+gencal_doc = \
+"""
+casatask gencal vis=<MS> caltable=<TBL> caltype=<TYPE> [keywords...]
+
+Generate certain calibration tables that don't need to be solved for from
+the actual data.
+
+vis=
+  Input dataset
+
+caltable=
+  Output calibration table (appended to if preexisting)
+
+caltype=
+  The kind of table to generate:
+  amp       - generic amplitude correction; needs parameter(s)
+  ph        - generic phase correction; needs parameter(s)
+  sbd       - single-band delay: phase slope for each SPW; needs parameter(s)
+  mbd       - multi-band delay: phase slope for all SPWs; needs parameter(s)
+  antpos    - antenna position corrections in ITRF; what you want; accepts parameter(s)
+  antposvla - antenna position corrections in VLA frame; not what you want; acceps parameter(s)
+  tsys      - tsys from ALMA syscal table
+  swpow     - EVLA switched-power and requantizer gains ("experimental")
+  opac      - tropospheric opacity; needs parameter
+  gc        - (E)VLA elevation-dependent gain curve
+  eff       - (E)VLA antenna efficiency correction
+  gceff     - combination of "gc" and "eff"
+  rq        - EVLA requantizer gains; not what you want
+  swp/rq    - EVLA switched-power gains divided by "rq"; not what you want
+
+parameter=
+  Custom parameters for various caltypes. Dimensionality depends on selections applied.
+  amp       - gain; dimensionless
+  ph        - phase; degrees
+  sbd       - delay; nanosec
+  mbd       - delay; nanosec
+  antpos    - position offsets; ITRF meters (or look up automatically for EVLA if unspecified)
+  antposvla - position offsets; meters in VLA reference frame
+  opac      - opacity; dimensionless
+
+antenna=
+pol=
+spw=
+  Selection keywords governing which solutions to generate and controlling shape
+  of "parameter" keyword.
+""" + loglevel_doc
+
+
+class GencalConfig (ParseKeywords):
+    vis = Custom (str, required=True)
+    caltable = Custom (str, required=True)
+    caltype = Custom (str, required=True)
+    parameter = [float]
+
+    antenna = str
+    pol = str
+    spw = str
+
+    loglevel = 'warn'
+
+
+def gencal (cfg):
+    cb = cu.tools.calibrater ()
+    cb.open (filename=cfg.vis, compress=False, addcorr=False, addmodel=False)
+
+    antenna = cfg.antenna or ''
+    parameter = cfg.parameter
+
+    if cfg.caltype == 'antpos' and cfg.antenna is None:
+        from correct_ant_posns import correct_ant_posns
+        info = correct_ant_posns (cfg.vis, False)
+        if len (info) != 3 or info[0] != 0 or not len (info[1]):
+            import sys
+            print >>sys.stderr, 'correct_ant_posns: got %r' % info
+            raise RuntimeError ('failed to fetch VLA antenna positions')
+
+        antenna = info[1]
+        parameter = info[2]
+
+    cb.specifycal (caltable=cfg.caltable, time='', spw=(cfg.spw or ''),
+                   antenna=antenna, pol=(cfg.pol or ''), caltype=cfg.caltype,
+                   parameter=parameter)
+    cb.close ()
+
+
+gencal_cli = makekwcli (gencal_doc, GencalConfig, gencal)
 
 
 # mfsclean
