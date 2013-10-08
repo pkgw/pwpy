@@ -82,7 +82,7 @@ def popoption (ident, argv=None):
 ## end
 
 
-def get_2mass_epoch (tmra, tmdec):
+def get_2mass_epoch (tmra, tmdec, verbose=False):
     postdata = '''-mime=csv
 -source=2MASS
 -out=_q,JD
@@ -93,7 +93,8 @@ def get_2mass_epoch (tmra, tmdec):
 
     for line in urlopen (vizurl, postdata):
         line = line.strip ()
-        #print '>>', line
+        if verbose:
+            print 'D: 2M >>', line
 
         if line.startswith ('1;'):
             jd = float (line[2:])
@@ -113,7 +114,8 @@ def predict (ident, mjd, n=20000, verbose=False):
         if line.startswith ('#!'):
             die ('Simbad/Sesame lookup failed: %s', line[3:].strip ())
 
-        print >>sys.stderr, '##', line.rstrip ()
+        if verbose:
+            print >>sys.stderr, 'D: S >>', line.rstrip ()
 
         a = line.strip ().split ()
         if not len (a):
@@ -155,7 +157,7 @@ def predict (ident, mjd, n=20000, verbose=False):
     o = precastro.SiderealObject ()
 
     if posref == '2003yCat.2246....0C':
-        o.promoepoch = get_2mass_epoch (ra, dec)
+        o.promoepoch = get_2mass_epoch (ra, dec, verbose)
     else:
         print >>sys.stderr, ('note: assuming catalog position was accurate '
                              'on J2000.0 (source: %s)' % posref)
@@ -171,7 +173,10 @@ def predict (ident, mjd, n=20000, verbose=False):
                                      (pmumaj, pmumin, pmupa * R2D))
             print >>sys.stderr, 'D: pm epoch: %.2f' % (o.promoepoch)
         if parallax is not None:
-            print >>sys.stderr, 'D: parallax: %.3f (%.3f)' % (parallax, parallaxu)
+            if parallaxu is not None:
+                print >>sys.stderr, 'D: parallax: %.3f (%.3f)' % (parallax, parallaxu)
+            else:
+                print >>sys.stderr, 'D: parallax: %.3f (?)' % parallax
         if vradial is not None:
             print >>sys.stderr, 'D: vradial: %.3f (%.3f)' % (vradial, vradialu)
 
