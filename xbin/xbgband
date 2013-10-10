@@ -2,6 +2,13 @@
 # Copyright 2013 Peter Williams
 # Licensed under the GNU General Public License version 3 or higher
 
+# The probability of background is: b^s * exp (-b) / s!
+#
+# We don't want to just go ahead and compute this, though, since s! could be
+# huge. We can use math.lgamma to get a factorial reasonably in natural log
+# space. We want to report the probability in log10 space, yielding the
+# expression used below.
+
 events="$1"
 shift
 srcreg="$1"
@@ -34,10 +41,10 @@ function doband () {
     bgsc=$(python -c "print $ascale * $bgct")
     subbed=$(python -c "print $srcct - $bgsc")
     pbg=$(python -c "
-from math import exp, factorial, log10
+from math import lgamma, log
 b=$bgsc
 s=$srcct
-print log10(b**s*exp(-b)/factorial(s))")
+print (s * log(b) - b - lgamma (s+1)) / log (10)")
 
     printf '%20s\t%.2f\t%d\t%.2f\t%.2f\n' "$1" "$bgsc" "$srcct" "$subbed" "$pbg"
 }
