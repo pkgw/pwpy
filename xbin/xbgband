@@ -10,7 +10,11 @@ bgreg="$1"
 shift
 
 if [ -z "$bgreg" ] ; then
-    echo >&2 "usage: xbgband <events.fits> <src.reg> <bg.reg> [energy bin borders (eV)...]"
+    echo >&2 "usage: xbgband <events.fits> <src.reg> <bg.reg> [energy bin borders (eV)...]
+
+Prints table of: band(eV), expected background counts, total counts, total - background,
+ log10(probability that all counts are from background)
+"
     exit 1
 fi
 
@@ -29,7 +33,13 @@ function doband () {
 	|grep good: |awk '{print $NF}')
     bgsc=$(python -c "print $ascale * $bgct")
     subbed=$(python -c "print $srcct - $bgsc")
-    printf '%20s\t%.2f\t%d\t%.2f\n' "$1" "$bgsc" "$srcct" "$subbed"
+    pbg=$(python -c "
+from math import exp, factorial, log10
+b=$bgsc
+s=$srcct
+print log10(b**s*exp(-b)/factorial(s))")
+
+    printf '%20s\t%.2f\t%d\t%.2f\t%.2f\n' "$1" "$bgsc" "$srcct" "$subbed" "$pbg"
 }
 
 while [ $# -gt 0 ] ; do
