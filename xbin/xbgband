@@ -21,6 +21,10 @@ if [ -z "$bgreg" ] ; then
 
 Prints table of: band(eV), expected background counts, total counts, total - background,
  log10(probability that all counts are from background)
+
+The confidence of source detection in sigma is: sqrt(2) * erfcinv (P_background),
+where erfcinv is the inverse complementary error function. We don't compute this
+here since it would require Scipy.
 "
     exit 1
 fi
