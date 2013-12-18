@@ -287,7 +287,7 @@ def parse_and_print (sfinfo, img, sfstream, resid):
     # Ready to write and possibly make the residual image
 
     cols = [c for c in srctable.sfindcols
-            if c.name not in ('pkflux', 'pkflux_uc')]
+            if c not in ('pkflux', 'pkflux_uc')]
     m = srctable.stmapping ()
     srctable.writetable (sys.stdout, headers, m.cols (cols), func ())
 
