@@ -25,6 +25,7 @@ __all__ = ('applycal applycal_cli ApplycalConfig '
            'delcal delcal_cli '
            'delmod delmod_cli '
            'flagmanager_cli '
+           'flaglist flaglist_cli FlaglistConfig '
            'flagzeros flagzeros_cli FlagzerosConfig '
            'fluxscale fluxscale_cli FluxscaleConfig '
            'ft ft_cli FtConfig '
@@ -582,6 +583,99 @@ def flagmanager_cli (argv):
         wrongusage (flagmanager_doc, 'unknown flagmanager mode "%s"' % mode)
 
     af.done ()
+
+
+# flaglist. Not quite a CASA task; something like
+# flagcmd (vis=, inpmode='list', inpfile=, flagbackup=False)
+#
+# We have to reproduce a lot of the dumb logic from the flaghelper.py module
+# because we can't import it because it drags in the whole casapy pile of
+# stuff.
+
+flaglist_doc = \
+"""
+casatask flaglist vis= inpfile= [datacol=]
+
+Flag data using a list of flagging commands stored in a text file. This
+is approximately equivalent to 'flagcmd(vis=, inpfile=, inpmode='list',
+flagbackup=False)'.
+
+This implementation must emulate the CASA modules that load up the
+flagging commands and may not be precisely compatible with the CASA
+version.
+"""
+
+class FlaglistConfig (ParseKeywords):
+    vis = Custom (str, required=True)
+    inpfile = Custom (str, required=True)
+    datacol = 'data'
+    loglevel = 'warn'
+
+
+def flaglist (cfg):
+    from ast import literal_eval
+
+    try:
+        factory = cu.tools.agentflagger
+    except AttributeError:
+        factory = cu.tools.testflagger
+
+    af = factory ()
+    af.open (cfg.vis, 0.0)
+    af.selectdata ()
+
+    for row, origline in enumerate (open (cfg.inpfile)):
+        origline = origline.rstrip ()
+        if not len (origline):
+            continue
+        if origline[0] == '#':
+            continue
+
+        # emulating flaghelper.py here and elsewhere ...
+        bits = origline.replace ('true', 'True').replace ('false', 'False').split (' ')
+        params = {}
+        lastkey = None
+
+        for bit in bits:
+            subbits = bit.split ('=', 1)
+
+            if len (subbits) == 1:
+                assert lastkey is not None, 'illegal flag list syntax'
+                params[lastkey] += ' ' + bit
+            else:
+                params[subbits[0]] = subbits[1]
+                lastkey = subbits[0]
+
+        assert 'ntime' not in params, 'cannot handle "ntime" flag key'
+
+        for key in params.keys ():
+            val = params[key]
+
+            try:
+                val = literal_eval (val)
+            except ValueError:
+                val = val.strip ('\'"')
+
+            params[key] = val
+
+        params['name'] = 'agent_%d' % row
+        params['datacolumn'] = cfg.datacol.upper ()
+        params['apply'] = True
+
+        params.setdefault ('mode', 'manual')
+
+        if not af.parseagentparameters (params):
+            raise Exception ('cannot parse flag line: %s' % origline)
+
+    af.init ()
+    # A summary report would be nice. run() should return
+    # info but I can't get it to do so. (I'm just trying to
+    # copy the task_flagdata.py implementation.)
+    af.run (True, True)
+    af.done ()
+
+
+flaglist_cli = makekwcli (flaglist_doc, FlaglistConfig, flaglist)
 
 
 # flagzeros. Not quite a CASA task; something like
