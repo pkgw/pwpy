@@ -1156,7 +1156,9 @@ mfsclean_doc = \
 """
 casatask mfsclean vis=[] [keywords]
 
-Drive the CASA imager with a very restricted set of options
+Drive the CASA imager with a very restricted set of options.
+
+For W-projection, set ftmachine='wproject' and wprojplanes=64 (or so).
 
 vis=
   Input visibility MS
@@ -1166,17 +1168,20 @@ imbase=
   where EXT is all of "mask", "modelTT", "imageTT", "residualTT",
   and "psfTT", and TT is empty if nterms = 1, and "ttN." otherwise.
 
-nterms=1
-reffreq = 0 [GHz]
-imsize = 256,256
 cell = 1 [arcsec]
-phasecenter = (blank) or 'J2000 12h34m56.7 -12d34m56.7'
-stokes = I
-niter = 500
+ftmachine = 'ft' or 'wproject'
 gain = 0.1
-threshold = 0 [mJy]
+imsize = 256,256
 mask = (blank) or path of CASA-format region text file
+niter = 500
+nterms = 1
+phasecenter = (blank) or 'J2000 12h34m56.7 -12d34m56.7'
+reffreq = 0 [GHz]
+stokes = I
+threshold = 0 [mJy]
 weighting = 'briggs' (robust=0.5) or 'natural'
+wprojplanes = 1
+
 """ + stdsel_doc + loglevel_doc.replace ('warn;', 'info;')
 
 class MfscleanConfig (ParseKeywords):
@@ -1184,6 +1189,7 @@ class MfscleanConfig (ParseKeywords):
     imbase = Custom (str, required=True)
 
     cell = 1. # arcsec
+    ftmachine = 'ft'
     gain = 0.1
     imsize = [256, 256]
     mask = str
@@ -1195,13 +1201,14 @@ class MfscleanConfig (ParseKeywords):
     stokes = 'I'
     threshold = 0. # mJy
     weighting = 'briggs'
+    wprojplanes = 1
 
     # allowchunk = False
     # cyclefactor = 1.5
     # cyclespeedup = -1
     # imagermode = csclean
     # interactive = False
-    # gridmode = ''
+    # gridmode = '' -- related to ftmachine keyword
     # mode = mfs
     # modelimage = []
     # multiscale = []
@@ -1341,8 +1348,8 @@ def mfsclean (cfg):
     im.setvp (dovp=True)
     im.makeimage (type='pb', image=pb, compleximage='', verbose=False)
     im.setvp (dovp=False, verbose=False)
-    im.setoptions (ftmachine='ft', wprojplanes=1, freqinterp='linear',
-                   padding=1.2, pastep=360.0, pblimit=cfg.minpb,
+    im.setoptions (ftmachine=cfg.ftmachine, wprojplanes=cfg.wprojplanes,
+                   freqinterp='linear', padding=1.2, pastep=360.0, pblimit=cfg.minpb,
                    applypointingoffsets=False, dopbgriddingcorrections=True)
 
     if cfg.nterms > 1:
