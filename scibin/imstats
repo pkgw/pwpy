@@ -1,0 +1,117 @@
+#! /usr/bin/env python
+# -*- mode: python; coding: utf-8 -*-
+# Copyright 2013 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
+
+"""
+imstats <paths...>
+
+Print out various statistics about the central patch of one or more images.
+
+When multiple images are specified, the information for each image will be
+separated by a blank line, and an extra "path" item will be printed out
+indicating which image the information applies to.
+"""
+
+# There are lots of ways this could be made fancier.
+
+import sys, astimage, numpy as np
+
+
+def printstats (path):
+    try:
+        img = astimage.open (path, 'r')
+    except Exception as e:
+        print >>sys.stderr, 'error: can\'t open "%s": %s' % (path, e)
+        return True
+
+    try:
+        img = img.simple ()
+    except Exception, e:
+        print >>sys.stderr, 'imstats: can\'t convert “%s” to simple 2D ' \
+            'sky image; taking first plane' % path
+        data = img.read ()[tuple (np.zeros (img.shape.size - 2))]
+    else:
+        data = img.read ()
+
+    h, w = data.shape
+    patchhalfsize = 32
+
+    p = data[h//2 - patchhalfsize:h//2 + patchhalfsize,
+             w//2 - patchhalfsize:w//2 + patchhalfsize]
+
+    mx = p.max ()
+    mn = p.min ()
+    med = np.median (p)
+    rms = np.sqrt ((p**2).mean ())
+
+    sc = max (abs (mx), abs (mn))
+    expt = 3 * (int (np.floor (np.log10 (sc))) // 3)
+    f = 10**-expt
+
+    print 'min  = %.2f * 10^%d' % (f * mn, expt)
+    print 'max  = %.2f * 10^%d' % (f * mx, expt)
+    print 'med  = %.2f * 10^%d' % (f * med, expt)
+    print 'rms  = %.2f * 10^%d' % (f * rms, expt)
+
+
+def cmdline (argv):
+    checkusage (__doc__, argv, usageifnoargs=True)
+
+    if len (argv) == 2:
+        printstats (argv[1])
+    else:
+        for i, path in enumerate (argv[1:]):
+            if i > 0:
+                print
+            print 'path =', path
+            printstats (path)
+
+
+## quickutil: usage
+#- snippet: usage.py (2012 Mar 29)
+#- SHA1: ac032a5db2efb5508569c4d5ba6eeb3bba19a7ca
+def showusage (docstring, short, stream, exitcode):
+    if stream is None:
+        from sys import stdout as stream
+    if not short:
+        print >>stream, 'Usage:', docstring.strip ()
+    else:
+        intext = False
+        for l in docstring.splitlines ():
+            if intext:
+                if not len (l):
+                    break
+                print >>stream, l
+            elif len (l):
+                intext = True
+                print >>stream, 'Usage:', l
+        print >>stream, \
+            '\nRun with a sole argument --help for more detailed usage information.'
+    raise SystemExit (exitcode)
+
+def checkusage (docstring, argv=None, usageifnoargs=False):
+    if argv is None:
+        from sys import argv
+    if len (argv) == 1 and usageifnoargs:
+        showusage (docstring, True, None, 0)
+    if len (argv) == 2 and argv[1] in ('-h', '--help'):
+        showusage (docstring, False, None, 0)
+
+def wrongusage (docstring, *rest):
+    import sys
+    intext = False
+
+    if len (rest) == 0:
+        detail = 'invalid command-line arguments'
+    elif len (rest) == 1:
+        detail = rest[0]
+    else:
+        detail = rest[0] % tuple (rest[1:])
+
+    print >>sys.stderr, 'error:', detail, '\n' # extra NL
+    showusage (docstring, True, sys.stderr, 1)
+## end
+
+if __name__ == '__main__':
+    cmdline (sys.argv)
