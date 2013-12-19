@@ -30,6 +30,14 @@ hackfield=
   "hackfield" are extracted from the dataset, but the output is changed
   so that all the records refer to "field" only.
 
+meanbp=
+  Path to a pickled numpy array giving the mean amplitude bandpass of the
+  *glued* SPWs. The data are divided by the square of this array, thereby
+  taking out this effect. (Each visibility is affected by the bandpasses of
+  the two antennas contributing to its baseline, which is why we square the
+  bandpass solution.) This makes it easier to run automated RFI flaggers on
+  the data without losing excessive numbers of edge channels.
+
 loglevel=
   Logging detail level. Default is info. Options are
     severe warn info info1 info2 info3 info4 info5 debug1 debug2 debugging
@@ -192,6 +200,7 @@ class Config (ParseKeywords):
 
     field = int
     hackfield = int
+    meanbp = str
 
     loglevel = 'info' # XXXXXX
 
@@ -248,6 +257,7 @@ _vis_smatch_cols = frozenset ('EXPOSURE FEED1 FEED2 FLAG_ROW INTERVAL '
                               'STATE_ID TIME_CENTROID'.split ())
 _vis_vmatch_cols = frozenset ('UVW WEIGHT SIGMA'.split ())
 _vis_pconcat_cols = frozenset ('FLAG DATA MODEL_DATA CORRECTED_DATA'.split ())
+_vis_data_cols = frozenset ('DATA MODEL_DATA CORRECTED_DATA'.split ())
 _vis_empty_cols = frozenset ('FLAG_CATEGORY WEIGHT_SPECTRUM'.split ())
 _vis_pconcat_dtypes = {'FLAG': np.bool, 'DATA': np.complex128, 'MODEL_DATA': np.complex128,
                        'CORRECTED_DATA': np.complex128}
@@ -287,6 +297,17 @@ def _spwglue (cfg, prog):
         assert cfg.field is not None
 
     nout = len (cfg.mapping)
+
+    if cfg.meanbp is None:
+        invsqmeanbp = None
+    else:
+        try:
+            invsqmeanbp = np.load (cfg.meanbp)
+        except Exception as e:
+            die ('couldn\'t open bandpass file "%s": %s (%s)', cfg.meanbp,
+                 e, e.__class__.__name__)
+
+        invsqmeanbp **= -2
 
     # Read in spw and dd info and make sure everything is in order.
 
@@ -456,6 +477,10 @@ def _spwglue (cfg, prog):
         curident = None
         curout = {}
 
+        if invsqmeanbp is not None and nchan != invsqmeanbp.size:
+            die ('need to apply bandpass of %d channels, but output spw %d has '
+                 '%d channels', invsqmeanbp.size, outspw, nchan)
+
         for col in colnames:
             if col in _vis_pconcat_cols:
                 curout[col] = np.zeros ((ncorr, nchan), dtype=_vis_pconcat_dtypes[col])
@@ -468,6 +493,10 @@ def _spwglue (cfg, prog):
             for col in colnames:
                 v = curout[col]
                 v = _np_converters[v.__class__] (v)
+
+                if invsqmeanbp is not None and col in _vis_data_cols:
+                    v *= invsqmeanbp
+
                 dt.putcell (col, outrow, v)
 
                 if isinstance (v, np.ndarray):
