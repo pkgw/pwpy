@@ -7,10 +7,13 @@
 msspwglue vis=MS out=MS mapping=SPWi-SPWj[,SPWl-SPWm,...]
 
 vis=
-  The input MS
+  The input MS.
 
 out=
-  The output MS. Will be created.
+  The output MS. Will be created. If the value contains a comma, it is treated
+  as a list of MSes, and the "field" keyword should be provided and contain
+  an equal number of values. The single input MS will be split into different
+  output MSes for each field.
 
 mapping=
   A comma-separated list of spectral window mappings. Each entry takes the
@@ -22,13 +25,15 @@ mapping=
 
 field=
   Optional field ID number. If specified, the new MS will contain data
-  for only this field.
+  for only this field. If the value contains a comma, it is treated as a list
+  of fields, and the "out" keyword should be a list of MS names.
 
 hackfield=
   Another optional field ID number, used for fixing up MSes where one
   pointing is accidentally assigned two field IDs. Both "field" and
   "hackfield" are extracted from the dataset, but the output is changed
-  so that all the records refer to "field" only.
+  so that all the records refer to "field" only. Disallowed if "field" is
+  a list of fields.
 
 meanbp=
   Path to a pickled numpy array giving the mean amplitude bandpass of the
@@ -185,7 +190,7 @@ class Progress (object):
 
 class Config (ParseKeywords):
     vis = Custom (str, required=True)
-    out = Custom (str, required=True)
+    out = Custom ([str], required=True)
 
     @Custom ([str], required=True)
     def mapping (bits):
@@ -198,7 +203,7 @@ class Config (ParseKeywords):
         except Exception as e:
             die ('unparseable or illegal "mapping" value "%s": %s', ','.join (bits), e)
 
-    field = int
+    field = [int]
     hackfield = int
     meanbp = str
 
@@ -271,8 +276,20 @@ _np_converters = {
 }
 
 def spwglue (cfg):
+    nout = len (cfg.out)
+    nfield = len (cfg.field)
+
+    if (nout != 1 or nfield != 0) and (nout != nfield):
+        die ('%d outputs requested, but only %d fields listed', nout, nfield)
+    if nout != 1 and cfg.hackfield is not None:
+        die ('"hackfield" keyword is not compatible with multiple output sets')
+
+    if nfield == 0:
+        cfg.field = [None]
+
     with Progress () as p:
-        _spwglue (cfg, p)
+        for idx, (out, field) in enumerate (zip (cfg.out, cfg.field)):
+            _spwglue (cfg, p, out, field, nfield, idx)
 
 
 def fillsmall (path, rows):
@@ -290,11 +307,11 @@ def fillsmall (path, rows):
     tb.close ()
 
 
-def _spwglue (cfg, prog):
+def _spwglue (cfg, prog, thisout, thisfield, nfields, fieldidx):
     import os.path
 
     if cfg.hackfield is not None:
-        assert cfg.field is not None
+        assert thisfield is not None
 
     nout = len (cfg.mapping)
 
@@ -416,12 +433,12 @@ def _spwglue (cfg, prog):
     # anything preexisting so far. Of course someone could put a table in the
     # destination between this mkdir and the actual copy.
 
-    os.mkdir (cfg.out)
+    os.mkdir (thisout)
 
     # Copy the overall table structure without contents.
 
     tb.open (cfg.vis)
-    tb.copy (newtablename=cfg.out, deep=True, valuecopy=True,
+    tb.copy (newtablename=thisout, deep=True, valuecopy=True,
              norows=True).close () # copy() returns the new table.
     tb.close ()
 
@@ -436,15 +453,15 @@ def _spwglue (cfg, prog):
             continue # XXX; copies main data rows; not sure what to do about it
 
         tb.open (os.path.join (cfg.vis, item))
-        tb.copy (os.path.join (cfg.out, item), deep=False, valuecopy=True,
+        tb.copy (os.path.join (thisout, item), deep=False, valuecopy=True,
                  norows=False).close ()
         tb.close ()
 
     # The rewritten small tables.
 
-    fillsmall (os.path.join (cfg.out, 'SPECTRAL_WINDOW'), spwout)
-    fillsmall (os.path.join (cfg.out, 'DATA_DESCRIPTION'), ddout)
-    fillsmall (os.path.join (cfg.out, 'SOURCE'), srcout)
+    fillsmall (os.path.join (thisout, 'SPECTRAL_WINDOW'), spwout)
+    fillsmall (os.path.join (thisout, 'DATA_DESCRIPTION'), ddout)
+    fillsmall (os.path.join (thisout, 'SOURCE'), srcout)
 
     # Rewriting the main table.
 
@@ -454,16 +471,16 @@ def _spwglue (cfg, prog):
     nchunk = 1024
 
     dt = casautil.tools.table ()
-    dt.open (cfg.out, nomodify=False)
+    dt.open (thisout, nomodify=False)
     outrow = 0
 
     for outspw in xrange (nout):
         q = ' or '.join ('DATA_DESC_ID == %d' % t[0] for t in indd2outdd.iteritems ()
                          if t[1][0] == outspw)
         if cfg.hackfield is not None:
-            q = '(FIELD_ID == %d or FIELD_ID == %d) and (%s)' % (cfg.field, cfg.hackfield, q)
-        elif cfg.field is not None:
-            q = 'FIELD_ID == %d and (%s)' % (cfg.field, q)
+            q = '(FIELD_ID == %d or FIELD_ID == %d) and (%s)' % (thisfield, cfg.hackfield, q)
+        elif thisfield is not None:
+            q = 'FIELD_ID == %d and (%s)' % (thisfield, q)
         if cfg.hackfield is not None:
             sortlist = 'ARRAY_ID, TIME, ANTENNA1, ANTENNA2, DATA_DESC_ID'
         else:
@@ -504,7 +521,7 @@ def _spwglue (cfg, prog):
                 else:
                     curout[col] = None
 
-        prog.start (nq, '%d/%d' % (outspw + 1, nout))
+        prog.start (nq, '%d/%d' % (nout * fieldidx + outspw + 1, nout * nfields))
 
         while inrow < nq:
             prog.progress (inrow)
@@ -516,7 +533,7 @@ def _spwglue (cfg, prog):
             nread = vdata['TIME'].size
 
             if cfg.hackfield is not None:
-                vdata['FIELD_ID'].fill (cfg.field)
+                vdata['FIELD_ID'].fill (thisfield)
 
             for i in xrange (nread):
                 outspw, outofs = indd2outdd[vdata['DATA_DESC_ID'][i]]
