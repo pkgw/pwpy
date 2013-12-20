@@ -1,0 +1,54 @@
+#! /usr/bin/env casa-script
+# -*- python -*-
+# Copyright 2013 Peter Williams
+# Licensed under the GNU General Public License, version 3 or higher.
+
+# casa-script magic:
+args = open ('args').read ().split ('\0')[3:-1]
+csout, cserr = open ('csout', 'w', 1), open ('cserr', 'w', 1)
+
+if len (args) != 2:
+    print >>cserr, 'usage: casa-importevla <ASDM> <MS>'
+    exit (1)
+
+# FIXME we're gonna break with absolute paths.
+import os.path
+asdm = os.path.join ('data', args[0])
+ms = os.path.join ('data', args[1])
+
+# Here's the best way I can figure to find the recommended value of tbuff (=
+# 1.5 * integration time). Obviously you might have different integration
+# times in the dataset and such, and we're just going to ignore that
+# possibility.
+
+bdfstem = os.listdir (os.path.join (asdm, 'ASDMBinary'))[0]
+bdf = os.path.join (asdm, 'ASDMBinary', bdfstem)
+tbuff = None
+
+with open (bdf) as f:
+    for linenum, line in enumerate (f):
+        if linenum > 60:
+            print >>cserr, 'error: cannot find integration time info in', bdf
+            exit (1)
+
+        if not line.startswith ('<sdmDataSubsetHeader'):
+            continue
+
+        try:
+            i1 = line.index ('<interval>') + len ('<interval>')
+            i2 = line.index ('</interval>')
+            if i2 <= i1:
+                raise ValueError ()
+        except ValueError:
+            print >>cserr, 'error: cannot parse integration time info in', bdf
+
+        tbuff = float (line[i1:i2]) * 1.5e-9 # nanosecs, and want 1.5x
+        break
+
+if tbuff is None:
+    print >>cserr, 'error: found no integration time info'
+
+print >>csout, 'casa-importevla: %s -> %s with tbuff=%.1f' % (args[0], args[1], tbuff)
+importevla (asdm=asdm, vis=ms, ocorr_mode='co', online=True,
+            tbuff=tbuff, flagpol=False, tolerance=1.3, applyflags=True,
+            flagbackup=False)
