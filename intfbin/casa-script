@@ -1,2 +1,68 @@
 #! /bin/sh
-exec casapy --log2term --nogui -c "$@"
+#
+# usage: casa-script <script.py> [script arguments...]
+#
+# This tool makes it possible to run scripts in a full CASA environment from
+# the command line in the sanest way I can muster (for my personal definition
+# of "sane"). Expected usage is in a hashbang line in the script:
+#
+#   #! /usr/bin/env casa-script
+#   # -*- python -*-
+#   ...
+#
+# The elements of sanity are:
+#
+# - casapy is invoked in a temporary directory, so that the logfile turds it
+#   likes to drop everywhere get cleaned up.
+# - command-line arguments are made accessible to the script in a clean-ish
+#   way (last I checked, this didn't work with straight-up casapy)
+# - output is redirected so that casapy's incessant chatter can be silenced
+# - the GUI is disabled
+#
+# Unfortunately I am unable to do anything about casapy's terrible startup
+# time.
+#
+# Inside the temporary directory, the invocation directory of this script is
+# symlinked under the name 'data'. All file paths should begin with 'data/',
+# with special care for command-line arguments, which will need post-processing.
+#
+# The command-line arguments to the invoked script are saved, separated by
+# **NULs**, in a file in the temporary directory called 'args'. These can be
+# retrieved with:
+#
+#   argv = open ('args').read ().split ('\0')[2:-1]
+#   # or
+#   args = open ('args').read ().split ('\0')[3:-1]
+#
+# The output of casapy is redirected to files 'stdout' and 'stderr' in the
+# temporary working directory. The standard output and error of this script
+# are linked to FIFOs in the work directory named 'csout' and 'cserr'.
+# Therefore, to selectively output data to the invoker, do
+#
+#   csout, cserr = open ('csout', 'w', 1), open ('cserr', 'w', 1)
+#   ...
+#   print >>csout, 'info: this script works'
+#   ...
+#   print >>cserr, 'warning: your data are broken'
+#
+# Keep in mind that the script is being executed in CASA's IPython
+# environment, so the environment is highly non-vanilla. To exit, just use
+# "exit (1)".
+
+workdir=`mktemp -d casascript.XXXXXXXXX`
+cd "$workdir"
+ln -s .. data
+cp /proc/$$/cmdline args
+mkfifo csout ; cat csout &
+mkfifo cserr ; cat cserr >&2 &
+casapy --log2term --nogui -c "$1" >stdout 2>stderr
+retval=$?
+
+if [ $retval -ne 0 ] ; then
+    echo >&2 "error: casapy exited with error code $retval; preserving work directory $workdir"
+else
+    cd ..
+    rm -rf "$workdir"
+fi
+
+exit $retval
