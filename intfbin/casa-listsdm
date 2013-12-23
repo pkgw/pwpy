@@ -1,0 +1,30 @@
+#! /usr/bin/env casa-script
+# -*- python -*-
+# Copyright 2013 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher.
+
+# casa-script magic:
+args = open ('args').read ().split ('\0')[3:-1]
+csout, cserr = open ('csout', 'w', 1), open ('cserr', 'w', 1)
+
+if len (args) != 1:
+    print >>cserr, 'usage: casa-listsdm <ASDM>'
+    exit (1)
+
+# FIXME we're gonna break with absolute paths.
+import os.path
+asdm = os.path.join ('data', args[0])
+
+casalog.setlogfile ('listsdm.log')
+listsdm (asdm)
+casalog.setlogfile ('other.log')
+
+s = 'listsdm::::casa'
+n = len (s)
+
+for line in open ('listsdm.log'):
+    i = line.index (s) + n
+    if line[i] == '+':
+        csout.write (line[i + 2:])
+    else:
+        csout.write (line[i + 1:])
