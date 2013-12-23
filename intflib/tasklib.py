@@ -31,6 +31,7 @@ __all__ = ('applycal applycal_cli ApplycalConfig '
            'ft ft_cli FtConfig '
            'gaincal gaincal_cli GaincalConfig '
            'gencal gencal_cli GencalConfig '
+           'image2fits image2fits_cli '
            'mfsclean mfsclean_cli MfscleanConfig '
            'plotcal plotcal_cli PlotcalConfig '
            'setjy setjy_cli SetjyConfig '
@@ -1144,6 +1145,37 @@ def gencal (cfg):
 
 
 gencal_cli = makekwcli (gencal_doc, GencalConfig, gencal)
+
+
+# image2fits
+#
+# This is basically the "exportfits" task with fewer options and a slightly
+# clearer name (which is also consistent with the pwimage2fits script).
+
+image2fits_doc = \
+"""
+casatask image2fits <input MS image> <output FITS image>
+
+Convert an image in MS format to FITS format.
+"""
+
+def image2fits (mspath, fitspath):
+    ia = cu.tools.image ()
+    ia.open (mspath)
+    ia.tofits (outfile=fitspath, velocity=False, optical=False, bitpix=-32,
+               minpix=0, maxpix=-1, overwrite=False, dropstokes=False,
+               stokeslast=True, history=True)
+    ia.close ()
+
+
+def image2fits_cli (argv):
+    checkusage (image2fits_doc, argv, usageifnoargs=True)
+    cu.logger ()
+
+    if len (argv) != 3:
+        wrongusage (image2fits_doc, 'expected exactly 2 arguments')
+
+    image2fits (argv[1], argv[2])
 
 
 # mfsclean

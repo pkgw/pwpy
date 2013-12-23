@@ -1,6 +1,12 @@
 #! /bin/sh
 # Copyright 2012 Peter Williams
 # Licensed under the GNU General Public License version 3 or higher
+
+# This tool converts an MS image to FITS using the 'image2fits' program
+# which is distributed with LOFAR casacore but not NRAO casacore. The
+# tasklib task 'image2fits' does the same functionality using the casac
+# module as provided with NRAO CASA.
+
 in="$1"
 shift
 out="$1"
