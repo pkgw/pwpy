@@ -838,6 +838,9 @@ incremental=
   replaced with the new values computed here. If true, the new values
   are added to whatever's already in MODEL_DATA.
 
+wprojplanes=
+  Optional integer. If provided, W-projection will be used in the computation
+  of the model visibilities, using the specified number of planes.
 """ + stdsel_doc + loglevel_doc
 
 
@@ -846,6 +849,7 @@ class FtConfig (ParseKeywords):
     model = [str]
     complist = str
     incremental = False
+    wprojplanes = int
 
     antenna = str
     field = str
@@ -874,6 +878,10 @@ def ft (cfg):
         reffreq = ia.coordsys ().referencevalue (type='spectral')['numeric'][0]
         ia.close ()
         im.settaylorterms (ntaylorterms=nmodel, reffreq=reffreq)
+
+    if cfg.wprojplanes is not None:
+        im.defineimage ()
+        im.setoptions (ftmachine='wproject', wprojplanes=cfg.wprojplanes)
 
     im.ft (model=cfg.model,
            complist=cfg.complist or '',
