@@ -840,7 +840,9 @@ incremental=
 
 wprojplanes=
   Optional integer. If provided, W-projection will be used in the computation
-  of the model visibilities, using the specified number of planes.
+  of the model visibilities, using the specified number of planes. Note that
+  this *does* make a difference even now that this task only embeds information
+  in a MS to enable later on-the-fly computation of the UV model.
 """ + stdsel_doc + loglevel_doc
 
 
