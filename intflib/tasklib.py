@@ -33,6 +33,7 @@ __all__ = ('applycal applycal_cli ApplycalConfig '
            'gencal gencal_cli GencalConfig '
            'image2fits image2fits_cli '
            'mfsclean mfsclean_cli MfscleanConfig '
+           'plotants plotants_cli '
            'plotcal plotcal_cli PlotcalConfig '
            'setjy setjy_cli SetjyConfig '
            'split split_cli SplitConfig '
@@ -1437,6 +1438,43 @@ def mfsclean (cfg):
 
 
 mfsclean_cli = makekwcli (mfsclean_doc, MfscleanConfig, mfsclean)
+
+
+# plotants
+
+plotants_doc = \
+"""
+casatask plotants <MS>
+
+Plot the physical layout of the antennas described in the MS.
+"""
+
+def plotants (vis):
+    import pylab as pl
+    mp = cu.tools.msplot ()
+
+    mp.open (vis)
+    pl.ion ()
+    pl.clf ()
+    mp.plotoptions (plotsymbol='ro')
+    mp.plot (type='array')
+    mp.reset ()
+    pl.axis ('equal')
+    pl.axis ('scaled')
+    pl.title ('Antenna configuration stored in ' + vis)
+
+
+def plotants_cli (argv):
+    import os, pylab as pl
+
+    checkusage (plotants_doc, argv, usageifnoargs=True)
+
+    if len (argv) != 2:
+        wrongusage (plotants_doc, 'expect exactly one argument, the MS path')
+
+    cu.logger ('warn')
+    plotants (argv[1])
+    pl.show ()
 
 
 # plotcal
