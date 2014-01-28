@@ -46,7 +46,10 @@ def printstats (path):
     rms = np.sqrt ((p**2).mean ())
 
     sc = max (abs (mx), abs (mn))
-    expt = 3 * (int (np.floor (np.log10 (sc))) // 3)
+    if sc <= 0:
+        expt = 0
+    else:
+        expt = 3 * (int (np.floor (np.log10 (sc))) // 3)
     f = 10**-expt
 
     print 'min  = %.2f * 10^%d' % (f * mn, expt)
