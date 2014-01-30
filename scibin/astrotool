@@ -178,6 +178,36 @@ def cmd_sesame (args):
     print obj.describe ()
 
 
+def cmd_sh2d (args):
+    "sh2d <sexagesimal hours> - convert sexagesimal hours to decimal degrees"
+
+    if len (args) != 1:
+        wrongusage (__doc__, 'sh2d expected 1 argument')
+
+    try:
+        rarad = parsehours (args[0])
+    except Exception as e:
+        die ('couldn\'t parse "%s" as sexagesimal hours: %s (%s)',
+             args[0], e, e.__class__.__name__)
+
+    print '%.8f' % (rarad * R2D)
+
+
+def cmd_sl2d (args):
+    "sl2d <sexagesimal latitude in degrees> - convert sexagesimal latitude (ie, declination) to decimal degrees"
+
+    if len (args) != 1:
+        wrongusage (__doc__, 'sl2d expected 1 argument')
+
+    try:
+        decrad = parsedeglat (args[0])
+    except Exception as e:
+        die ('couldn\'t parse "%s" as sexagesimal latitude in degrees: %s (%s)',
+             args[0], e, e.__class__.__name__)
+
+    print '%.8f' % (decrad * R2D)
+
+
 def cmd_ssep (args):
     """ssep <source name> <source name> - print separation between two sources by name"""
 
