@@ -132,6 +132,26 @@ def cmd_calc (args):
     print fmt (fparse (' '.join (args)))
 
 
+def cmd_d2sh (args):
+    "d2sh {expr} - convert decimal degrees to sexagesimal hours (RA)"
+
+    if not len (args):
+        wrongusage (__doc__, 'd2sh expected arguments')
+
+    deglon = fparse (' '.join (args))
+    print fmthours (deglon * D2R)
+
+
+def cmd_d2sl (args):
+    "d2sl {expr} - convert decimal degrees to a sexagesimal latitude (declination)"
+
+    if not len (args):
+        wrongusage (__doc__, 'd2sl expected arguments')
+
+    deglat = fparse (' '.join (args))
+    print fmtdeglat (deglat * D2R)
+
+
 def cmd_flux2lum (args):
     """flux2lum <flux[cgs]> <dist[pc]> - flux and distance to luminosity"""
 
