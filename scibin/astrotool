@@ -132,6 +132,24 @@ def cmd_calc (args):
     print fmt (fparse (' '.join (args)))
 
 
+def cmd_csep (args):
+    """csep <RA1> <dec1> <RA2> <dec2> - print separation between two positions; args in sexagesimal"""
+
+    if len (args) != 4:
+        wrongusage (__doc__, 'csep expected 4 arguments')
+
+    try:
+        lat1 = parsedeglat (args[1])
+        lon1 = parsehours (args[0])
+        lat2 = parsedeglat (args[3])
+        lon2 = parsehours (args[2])
+    except Exception as e:
+        die (e)
+
+    print 'degree:', fmt (sphdist (lat1, lon1, lat2, lon2) * R2D)
+    print 'arcsec:', fmt (sphdist (lat1, lon1, lat2, lon2) * R2A)
+
+
 def cmd_d2sh (args):
     "d2sh {expr} - convert decimal degrees to sexagesimal hours (RA)"
 
