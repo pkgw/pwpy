@@ -47,7 +47,7 @@ def checkusage (docstring, argv=None, usageifnoargs=False):
     if argv is None:
         from sys import argv
     if len (argv) == 1 and usageifnoargs:
-        showusage (docstring, True, None, 0)
+        showusage (docstring, False, None, 0) # XXX customized
     if len (argv) == 2 and argv[1] in ('-h', '--help'):
         showusage (docstring, False, None, 0)
 
