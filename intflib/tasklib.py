@@ -844,6 +844,9 @@ wprojplanes=
   of the model visibilities, using the specified number of planes. Note that
   this *does* make a difference even now that this task only embeds information
   in a MS to enable later on-the-fly computation of the UV model.
+
+usescratch=
+  Foo.
 """ + stdsel_doc + loglevel_doc
 
 
@@ -853,6 +856,7 @@ class FtConfig (ParseKeywords):
     complist = str
     incremental = False
     wprojplanes = int
+    usescratch = False
 
     antenna = str
     field = str
@@ -869,7 +873,7 @@ class FtConfig (ParseKeywords):
 def ft (cfg):
     im = cu.tools.imager ()
 
-    im.open (cfg.vis, usescratch=False)
+    im.open (cfg.vis, usescratch=cfg.usescratch)
     im.selectvis (**extractmsselect (cfg, haveintent=False,
                                      taqltomsselect=False))
     nmodel = len (cfg.model)
@@ -1090,7 +1094,7 @@ caltype=
   sbd       - single-band delay: phase slope for each SPW; needs parameter(s)
   mbd       - multi-band delay: phase slope for all SPWs; needs parameter(s)
   antpos    - antenna position corrections in ITRF; what you want; accepts parameter(s)
-  antposvla - antenna position corrections in VLA frame; not what you want; acceps parameter(s)
+  antposvla - antenna position corrections in VLA frame; not what you want; accepts parameter(s)
   tsys      - tsys from ALMA syscal table
   swpow     - EVLA switched-power and requantizer gains ("experimental")
   opac      - tropospheric opacity; needs parameter
@@ -1108,7 +1112,7 @@ parameter=
   mbd       - delay; nanosec
   antpos    - position offsets; ITRF meters (or look up automatically for EVLA if unspecified)
   antposvla - position offsets; meters in VLA reference frame
-  opac      - opacity; dimensionless
+  opac      - opacity; dimensionless (nepers?)
 
 antenna=
 pol=
