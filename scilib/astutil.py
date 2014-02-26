@@ -469,4 +469,28 @@ def smooth (window, x, y, u=None, k=None):
     return cx[::k], cy[::k], cu[::k]
 
 
-__all__ += ['smooth']
+def dfsmooth (window, df, ucol, k=None):
+    import pandas as pd
+
+    if k is None:
+        k = window.size
+
+    conv = lambda q, r: np.convolve (q, r, mode='valid')
+    w = df[ucol] ** -2
+    invcw = 1. / conv (w, window)
+
+    # XXX: we're not smoothing the index.
+
+    res = {}
+
+    for col in df.columns:
+        if col == ucol:
+            res[col] = np.sqrt (conv (w, window**2)) * invcw
+        else:
+            res[col] = conv (w * df[col], window) * invcw
+
+    res = pd.DataFrame (res)
+    return res[::k]
+
+
+__all__ += ['smooth', 'dfsmooth']
