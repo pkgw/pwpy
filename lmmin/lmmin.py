@@ -1357,11 +1357,15 @@ class Problem (object):
         if np.any (p[PI_F_LLIMIT] > p[PI_F_ULIMIT]):
             raise ValueError ('some param lower limits > upper limits')
 
-        if np.any (p[PI_F_VALUE] < p[PI_F_LLIMIT]):
-            raise ValueError ('some param values < lower limits')
+        for i in xrange (p.shape[1]):
+            v = p[PI_F_VALUE,i]
 
-        if np.any (p[PI_F_VALUE] > p[PI_F_ULIMIT]):
-            raise ValueError ('some param values < lower limits')
+            if np.isnan (v):
+                continue # unspecified param ok; but comparisons will issue warnings
+            if v < p[PI_F_LLIMIT,i]:
+                raise ValueError ('parameter #%d value below its lower limit' % i)
+            if v > p[PI_F_ULIMIT,i]:
+                raise ValueError ('parameter #%d value above its upper limit' % i)
 
         p = self._pinfoo
 
