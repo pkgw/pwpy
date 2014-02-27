@@ -1,4 +1,4 @@
-# Copyright 2012, 2013 Peter Williams
+# Copyright 2012-2014 Peter Williams
 # Licensed under the GNU General Public License version 3 or higher
 
 """
@@ -8,8 +8,8 @@ Usage:
 
   Model(func, x, y, [invsigma]).solve(guess).printsoln()
     func = lambda x, p1, p2, p3: ...
-  PolynomialModel(degree, x, y, [invsigma]).solve().plot()
-  ScaleModel(x, y, [invsigma]).solve().showcov()
+  PolynomialModel(maxexponent, x, y, [invsigma]).solve().plot()
+  ScaleModel(x, y, [invsigma]).solve().showcov() # y = mx
 
 The invsigma are *inverse sigmas*, NOT inverse *variances* (the usual
 statistical weights). Since most applications deal in sigmas, take
@@ -157,8 +157,8 @@ class Model (_ModelBase):
 
 
 class PolynomialModel (_ModelBase):
-    def __init__ (self, nterms, x, y, invsigma=None):
-        self.nterms = nterms
+    def __init__ (self, maxexponent, x, y, invsigma=None):
+        self.maxexponent = maxexponent
         self.setdata (x, y, invsigma)
 
 
@@ -169,16 +169,17 @@ class PolynomialModel (_ModelBase):
         except ImportError:
             from numpy.polynomial import polyfit, polyval
 
-        self.paramnames = ['a%d' % i for i in xrange (self.nterms)]
+        self.paramnames = ['a%d' % i for i in xrange (self.maxexponent + 1)]
         # Based on my reading of the polyfit() docs, I think w=invsigma**2 is right...
-        self.params = polyfit (self.x, self.y, self.nterms - 1,
+        self.params = polyfit (self.x, self.y, self.maxexponent,
                                w=self.invsigma**2)
         self.perror = None # does anything provide this? could farm out to lmmin ...
         self.covar = None
         self.modelfunc = lambda x: polyval (x, self.params)
         self.modely = self.modelfunc (self.x)
         self.resids = self.y - self.modely
-        self.rchisq = ((self.resids * self.invsigma)**2).sum () / (self.x.size - self.nterms)
+        self.rchisq = (((self.resids * self.invsigma)**2).sum ()
+                       / (self.x.size - (self.maxexponent + 1)))
         return self
 
 
