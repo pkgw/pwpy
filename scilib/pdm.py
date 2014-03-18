@@ -81,7 +81,19 @@ def pdm (t, x, u, periods, nbin, nshift=8, nsmc=256, numc=256):
     `numc` - int=256 - number of Monte Carlo added-noise datasets to compute, to evaluate
        the uncertainty in the location of the minimal theta value.
 
-    Returns: 1D array of "theta" values, same size as `periods`.
+    Returns named tuple of:
+
+    `thetas` - 1D array of values of theta statistic, same size as `periods`
+    `imin` - index of smallest (best) value in `thetas`
+    `pmin` - the `period` value with the smallest (best) `theta`
+    `mc_tmins` - 1D array of size `nsmc` with Monte Carlo samplings of minimal
+       theta values for shufflings of the data; assesses significance of the peak
+    `mc_pvalue` - probability (between 0 and 1) of obtaining the best theta value
+       in a randomly-shuffled dataset
+    `mc_pmins` - 1D array of size `numc` with Monte Carlo samplings of best
+       period values for noise-added data; assesses uncertainty of `pmin`
+    `mc_puncert` - standard deviation of `mc_pmins`; approximate uncertainty
+       on `pmin`.
 
     We don't do anything clever, so runtime scales at least as
       t.size * periods.size * nbin * nshift * (nsmc + numc + 1)."""
