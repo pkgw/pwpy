@@ -313,6 +313,8 @@ class ComposedModel (_ModelBase):
         def deriv (pars, jac):
             self.component.deriv (pars, x, jac)
 
+        self.lm_model = model
+        self.lm_deriv = deriv
         self.lm_prob.setResidualFunc (self.y, self.invsigma, model, deriv)
         self.lm_soln = soln = self.lm_prob.solve (guess)
 
@@ -333,6 +335,13 @@ class ComposedModel (_ModelBase):
 
         self.component.extract (soln.params, soln.perror, soln.covar)
         return self
+
+
+    def debug_derivative (self, guess):
+        """returns (explicit, auto)"""
+        import lmmin
+        return lmmin.checkDerivative (self.component.npar, self.x.size,
+                                      self.lm_model, self.lm_deriv, guess)
 
 
 # Now specific components useful in the above framework. The general strategy
