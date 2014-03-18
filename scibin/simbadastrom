@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 # -*- python -*-
-# Copyright 2013 Peter Williams
+# Copyright 2013-2014 Peter Williams
 # Licensed under the GNU General Public License version 3 or higher
 
 """
@@ -199,6 +199,10 @@ def predict (ident, mjd, n=20000, verbose=False):
     # angle convention requires that we treat declination as X and RA as Y.
 
     if posumaj is not None:
+        if posumaj < posumin:
+            # Based on experience with PM, this may be possible
+            posumaj, posumin = posumin, posumaj
+            posupa += 0.5 * np.pi
         sd, sr, cdr = ellutil.ellbiv (posumaj, posumin, posupa)
         decs, ras = ellutil.bivrandom (dec, ra, sd, sr, cdr, n).T
     else:
@@ -211,6 +215,10 @@ def predict (ident, mjd, n=20000, verbose=False):
         pmras = np.zeros (n)
         pmdecs = np.zeros (n)
     elif pmumaj is not None:
+        if pmumaj < pmumin:
+            # I've seen this: V* V374 Peg
+            pmumaj, pmumin = pmumin, pmumaj
+            pmupa += 0.5 * np.pi
         sd, sr, cdr = ellutil.ellbiv (pmumaj, pmumin, pmupa)
         pmdecs, pmras = ellutil.bivrandom (promodec, promora, sd, sr, cdr, n).T
     else:
