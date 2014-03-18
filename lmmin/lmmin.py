@@ -2125,7 +2125,6 @@ class Problem (object):
 def checkDerivative (npar, nout, yfunc, jfunc, guess):
     explicit = np.empty ((npar, nout))
     jfunc (guess, explicit)
-    explicit = explicit.T
 
     p = Problem (npar, nout, yfunc, None)
     auto = p._manual_jacobian (guess)
