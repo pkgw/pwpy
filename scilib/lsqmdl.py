@@ -23,6 +23,12 @@ If you have zero uncertainty on a measurement, too bad.
 
 import numpy as np
 
+try:
+    # numpy 1.7
+    import numpy.polynomial.polynomial as npoly
+except ImportError:
+    import numpy.polynomial as npoly
+
 
 class _ModelBase (object):
     x = None
@@ -163,19 +169,13 @@ class PolynomialModel (_ModelBase):
 
 
     def solve (self):
-        try:
-            # numpy 1.7
-            from numpy.polynomial.polynomial import polyfit, polyval
-        except ImportError:
-            from numpy.polynomial import polyfit, polyval
-
         self.paramnames = ['a%d' % i for i in xrange (self.maxexponent + 1)]
         # Based on my reading of the polyfit() docs, I think w=invsigma**2 is right...
-        self.params = polyfit (self.x, self.y, self.maxexponent,
-                               w=self.invsigma**2)
+        self.params = npoly.polyfit (self.x, self.y, self.maxexponent,
+                                     w=self.invsigma**2)
         self.perror = None # does anything provide this? could farm out to lmmin ...
         self.covar = None
-        self.modelfunc = lambda x: polyval (x, self.params)
+        self.modelfunc = lambda x: npoly.polyval (x, self.params)
         self.modely = self.modelfunc (self.x)
         self.resids = self.y - self.modely
         self.rchisq = (((self.resids * self.invsigma)**2).sum ()
@@ -387,6 +387,30 @@ class AddSinComponent (ModelComponent):
             self.f_phase += np.pi
 
         self.f_phase = (self.f_phase + np.pi) % (2 * np.pi) - np.pi
+
+
+class AddPolynomialComponent (ModelComponent):
+    def __init__ (self, maxexponent, name=None):
+        self.npar = maxexponent + 1
+
+    def _param_names (self):
+        for i in xrange (self.npar):
+            yield 'c%d' % i
+
+    def model (self, pars, x, y):
+        y += npoly.polyval (x, pars)
+
+    def deriv (self, pars, x, jac):
+        w = np.ones_like (x)
+
+        for i in xrange (self.npar):
+            jac[i] = w
+            w *= x
+
+    def extract (self, pars, perr, cov):
+        self.covar = cov
+        self.f_coeffs = pars
+        self.u_coeffs = perr
 
 
 class SeriesComponent (ModelComponent):
