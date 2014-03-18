@@ -1,4 +1,6 @@
 #! /bin/bash
+# Copyright 2014 Peter Williams <peter@newton.cx>
+# Licensed under the GNU General Public License, version 3 or higher.
 #
 # Drive (xe)latex sensibly
 
@@ -13,19 +15,21 @@ workalias=_latexwork
 engine=pdflatex
 args="-interaction nonstopmode -halt-on-error -file-line-error"
 dobibtex=false
+dobibexport=false
 
 while [ $# -gt 0 ] ; do
     case "$1" in
 	-x) engine=xelatex ;;
 	-b) dobibtex=true ;;
 	-l) args="$args -papersize letter" ;;
+	-e*) dobibtex=true ; dobibexport=true ; bestyle="${1#-e}" ;;
 	*) break ;;
     esac
     shift
 done
 
 if [ $# -ne 2 ] ; then
-    echo >&2 "usage: latexdriver [-x] [-b] [-l] input.tex output.pdf"
+    echo >&2 "usage: latexdriver [-x] [-b] [-l] [-eSTYLE] input.tex output.pdf"
     exit 1
 fi
 
@@ -72,7 +76,12 @@ function logrun () {
 }
 
 logrun $engine "$args -jobname $job" $base $tlog
-if $dobibtex ;then
+if $dobibtex ; then
+    if $dobibexport ; then
+	echo + bib btexport $bestyle $job.aux '>'$base.bib
+	bib btexport $bestyle $job.aux >$base.bib || exit 1
+    fi
+
     logrun bibtex "" $job $blog
     grep Warning $blog >&2
     # force at least one extra run:
