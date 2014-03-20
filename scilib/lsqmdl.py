@@ -219,10 +219,12 @@ class ModelComponent (object):
     npar = 0
     name = None
     paramnames = ()
+    nmodelargs = 0
 
     setguess = None
     setvalue = None
     setlimit = None
+    _accum_mfunc = None
 
     def __init__ (self, name=None):
         self.name = name
@@ -256,6 +258,25 @@ class ModelComponent (object):
     def extract (self, pars, perr, cov):
         """Extract fit results into the object for ease of inspection."""
         self.covar = cov
+
+    def _outputshape (self, *args):
+        """This is a helper for evaluating the model function at fixed parameters. To
+        work in the ComposedModel paradigm, we have to allocate an empty array
+        to hold the model output before we can fill it via the _accum_mfunc
+        functions. We can't do that without knowing what size it will be. That
+        size has to be a function of the "free" parameters to the model
+        function that are implicit/fixed during the fitting process. Given these "free"
+        parameters, _outputshape returns the shape that the output will have."""
+        raise NotImplementedError ()
+
+    def mfunc (self, *args):
+        if len (args) != self.nmodelargs:
+            raise TypeError ('model function expected %d arguments, got %d' %
+                             (self.nmodelargs, len (args)))
+
+        result = np.zeros (self._outputshape (*args))
+        self._accum_mfunc (result, *args)
+        return result
 
 
 class ComposedModel (_ModelBase):
@@ -328,12 +349,6 @@ class ComposedModel (_ModelBase):
         self.perror = soln.perror
         self.covar = soln.covar
 
-        def mfunc ():
-            y = np.zeros_like (self.data)
-            self.component.model (self.params, y)
-            return y
-
-        self.mfunc = mfunc
         self.mdata = self.lm_soln.fvec.reshape (self.data.shape)
         if soln.ndof > 0:
             self.rchisq = soln.fnorm / soln.ndof
@@ -341,6 +356,10 @@ class ComposedModel (_ModelBase):
 
         self.component.extract (soln.params, soln.perror, soln.covar)
         return self
+
+
+    def mfunc (self, *args):
+        return self.component.mfunc (*args)
 
 
     def debug_derivative (self, guess):
@@ -357,6 +376,7 @@ class ComposedModel (_ModelBase):
 class AddConstantComponent (ModelComponent):
     npar = 1
     paramnames = ('value', )
+    nmodelargs = 0
 
     def model (self, pars, y):
         y += pars[0]
@@ -364,14 +384,22 @@ class AddConstantComponent (ModelComponent):
     def deriv (self, pars, jac):
         jac[0] = 1.
 
+    def _outputshape (self):
+        return ()
+
     def extract (self, pars, perr, cov):
-        self.mfunc = lambda: pars[0]
+        def _accum_mfunc (res):
+            res += pars[0]
+        self._accum_mfunc = _accum_mfunc
+
         self.covar = cov
         self.f_value = pars[0]
         self.u_value = perr[0]
 
 
 class AddPolynomialComponent (ModelComponent):
+    nmodelargs = 1
+
     def __init__ (self, maxexponent, x, name=None):
         self.npar = maxexponent + 1
         self.x = np.array (x, dtype=np.float, ndmin=1, copy=False, subok=True)
@@ -390,11 +418,49 @@ class AddPolynomialComponent (ModelComponent):
             jac[i] = w
             w *= self.x
 
+    def _outputshape (self, x):
+        return x.shape
+
     def extract (self, pars, perr, cov):
-        self.mfunc = lambda x: npoly.polyval (x, pars)
+        def _accum_mfunc (res, x):
+            res += npoly.polyval (x, pars)
+        self._accum_mfunc = _accum_mfunc
+
         self.covar = cov
         self.f_coeffs = pars
         self.u_coeffs = perr
+
+
+def _broadcast_shapes (s1, s2):
+    """Given array shapes `s1` and `s2`, compute the shape of the array that would
+    result from broadcasting them together."""
+
+    n1 = len (s1)
+    n2 = len (s2)
+    n = max (n1, n2)
+    res = [1] * n
+
+    for i in xrange (n):
+        if i >= n1:
+            c1 = 1
+        else:
+            c1 = s1[n1-1-i]
+
+        if i >= n2:
+            c2 = 1
+        else:
+            c2 = s2[n2-1-i]
+
+        if c1 == 1:
+            rc = c2
+        elif c2 == 1 or c1 == c2:
+            rc = c1
+        else:
+            raise ValueError ('array shapes %r and %r are not compatible' % (s1, s2))
+
+        res[n-1-i] = rc
+
+    return tuple (res)
 
 
 class SeriesComponent (ModelComponent):
@@ -445,6 +511,7 @@ class SeriesComponent (ModelComponent):
         from functools import partial
 
         ofs = 0
+        self.nmodelargs = 0
 
         for i, c in enumerate (self.components):
             if c.name is None:
@@ -454,6 +521,7 @@ class SeriesComponent (ModelComponent):
             c.setvalue = partial (self._offset_setvalue, ofs, c.npar)
             c.setlimit = partial (self._offset_setlimit, ofs, c.npar)
             ofs += c.npar
+            self.nmodelargs += c.nmodelargs
 
         self.npar = ofs
 
@@ -493,6 +561,27 @@ class SeriesComponent (ModelComponent):
             scov = cov[ofs:ofs+n,ofs:ofs+n]
             c.extract (spar, serr, scov)
             ofs += n
+
+
+    def _outputshape (self, *args):
+        s = ()
+        ofs = 0
+
+        for c in self.components:
+            cargs = args[ofs:ofs+c.nmodelargs]
+            s = _broadcast_shapes (s, c._outputshape (*cargs))
+            ofs += c.nmodelargs
+
+        return s
+
+
+    def _accum_mfunc (self, res, *args):
+        ofs = 0
+
+        for c in self.components:
+            cargs = args[ofs:ofs+c.nmodelargs]
+            c._accum_mfunc (res, *cargs)
+            ofs += c.nmodelargs
 
 
 class ScaleComponent (ModelComponent):
@@ -546,6 +635,7 @@ class ScaleComponent (ModelComponent):
         self.subcomp.finalize_setup ()
 
         self.npar = self.subcomp.npar + 1
+        self.nmodelargs = self.subcomp.nmodelargs
 
 
     def prep_params (self):
@@ -569,3 +659,11 @@ class ScaleComponent (ModelComponent):
         self.c_factor = cov[0]
 
         self.subcomp.extract (pars[1:], perr[1:], cov[1:,1:])
+
+
+    def _outputshape (self, *args):
+        return self.subcomp._outputshape (*args)
+
+
+    def _accum_mfunc (self, res, *args):
+        self.subcomp._accum_mfunc (res, *args)
