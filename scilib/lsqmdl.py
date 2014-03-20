@@ -6,17 +6,17 @@ lsqmdl - model data with least-squares fitting
 
 Usage:
 
-  Model(func, x, y, [invsigma]).solve(guess).printsoln()
-    func = lambda x, p1, p2, p3: ...
-  PolynomialModel(maxexponent, x, y, [invsigma]).solve().plot()
-  ScaleModel(x, y, [invsigma]).solve().showcov() # y = mx
+  Model(func, data, [invsigma], [args]).solve(guess).printsoln()
+    func takes (p1, p2, p3[, *args]) and returns model data
+  PolynomialModel(maxexponent, x, data, [invsigma]).solve().plot()
+  ScaleModel(x, data, [invsigma]).solve().showcov() # data = m*x
 
 The invsigma are *inverse sigmas*, NOT inverse *variances* (the usual
 statistical weights). Since most applications deal in sigmas, take
 care to write
 
-  right = Model (func, x, y, 1./u)   not
-  WRONG = Model (func, x, y, u)
+  m = Model (func, data, 1./uncerts) # right!    not
+  m = Model (func, data, uncerts) # WRONG
 
 If you have zero uncertainty on a measurement, too bad.
 """
@@ -31,35 +31,33 @@ except ImportError:
 
 
 class _ModelBase (object):
-    x = None
-    y = None
+    data = None
     invsigma = None
 
     params = None # ndarray of solved model parameters
     perror = None # ndarray of 1-sigma uncerts on pamams
     paramnames = None # iterable of string names for parameters
     covar = None # covariance matrix
-    modelfunc = None # function f(x) -> y evaluating best model at arbitrary x
-    modely = None # modely = modelfunc (x)
+    mfunc = None # function f(...) evaluating model fixed at best params
+    mdata = None # modeled data at best params
     rchisq = None # reduced chi squared of the fit
-    resids = None # resids = y - modely
+    resids = None # resids = data - mdata
 
-    def __init__ (self, x, y, invsigma=None):
-        self.setdata (x, y, invsigma)
+    def __init__ (self, data, invsigma=None):
+        self.setdata (data, invsigma)
 
 
-    def setdata (self, x, y, invsigma=None):
-        self.x = np.array (x, dtype=np.float, ndmin=1)
-        self.y = np.array (y, dtype=np.float, ndmin=1)
+    def setdata (self, data, invsigma=None):
+        self.data = np.array (data, dtype=np.float, ndmin=1)
 
         if invsigma is None:
-            self.invsigma = np.ones (self.y.shape)
+            self.invsigma = np.ones (self.data.shape)
         else:
             i = np.array (invsigma, dtype=np.float)
-            self.invsigma = np.broadcast_arrays (self.y, i)[1] # allow scalar invsigma
+            self.invsigma = np.broadcast_arrays (self.data, i)[1] # allow scalar invsigma
 
-        if self.invsigma.shape != self.y.shape:
-            raise ValueError ('y values and inverse-sigma values must have same shape')
+        if self.invsigma.shape != self.data.shape:
+            raise ValueError ('data values and inverse-sigma values must have same shape')
 
 
     def printsoln (self):
@@ -77,36 +75,33 @@ class _ModelBase (object):
         return self
 
 
-    def plot (self, dlines=False, densemodel=True, xmin=None, xmax=None,
-              ymin=None, ymax=None, mxmin=None, mxmax=None, **kwargs):
+    def plot (self, modelx, dlines=False, xmin=None, xmax=None,
+              ymin=None, ymax=None, **kwargs):
+        """This assumes that `data` is 1D and that `mfunc` takes one argument that
+        should be treated as the X variable."""
+
         import omega as om
 
-        if not densemodel:
-            modx = self.x
-            mody = self.modely
-        else:
-            if mxmin is None:
-                mxmin = self.x.min ()
-            if mxmax is None:
-                mxmax = self.x.max ()
-            modx = np.linspace (mxmin, mxmax, 400)
-            mody = self.modelfunc (modx)
+        modelx = np.asarray (modelx)
+        if modelx.shape != self.data.shape:
+            raise ValueError ('modelx and data arrays must have same shape')
 
+        modely = self.mfunc (modelx)
         sigmas = self.invsigma**-1 # TODO: handle invsigma = 0
 
         vb = om.layout.VBox (2)
-        vb.pData = om.quickXYErr (self.x, self.y, sigmas,
+        vb.pData = om.quickXYErr (modelx, self.data, sigmas,
                                   'Data', lines=dlines, **kwargs)
 
         vb[0] = vb.pData
-        vb[0].addXY (modx, mody, 'Model')
+        vb[0].addXY (modelx, modely, 'Model')
         vb[0].setYLabel ('Y')
         vb[0].rebound (False, True)
         vb[0].setBounds (xmin, xmax, ymin, ymax)
 
         vb[1] = vb.pResid = om.RectPlot ()
         vb[1].defaultField.xaxis = vb[1].defaultField.xaxis
-        vb[1].addXYErr (self.x, self.resids, sigmas, None, lines=False)
+        vb[1].addXYErr (modelx, self.resids, sigmas, None, lines=False)
         vb[1].setLabels ('X', 'Residuals')
         vb[1].rebound (False, True)
         # ignore Y values since residuals are on different scale:
@@ -123,71 +118,86 @@ class _ModelBase (object):
 
 
 class Model (_ModelBase):
-    def __init__ (self, func, x, y, invsigma=None):
+    def __init__ (self, func, data, invsigma=None, args=()):
         if func is not None:
-            self.setfunc (func)
-        if x is not None:
-            self.setdata (x, y, invsigma)
+            self.setfunc (func, args)
+        if data is not None:
+            self.setdata (data, invsigma)
 
 
-    def setfunc (self, func):
+    def setfunc (self, func, args=()):
         self.func = func
+        self._args = args
+
         # Create the Problem here so the caller can futz with it
         # if so desired.
-        npar = func.func_code.co_argcount - 1
+        npar = func.func_code.co_argcount - len (args)
         import lmmin
         self.lm_prob = lmmin.Problem (npar)
+
+        if len (args):
+            self.paramnames = func.func_code.co_varnames[:-len (args)]
+        else:
+            self.paramnames = func.func_code.co_varnames
 
 
     def solve (self, guess):
         guess = np.array (guess, dtype=np.float, ndmin=1)
-        x = self.x
         f = self.func
+        args = self._args
 
-        def yfunc (params, vec):
-            vec[:] = f (x, *params)
+        def lmfunc (params, vec):
+            vec[:] = f (*(tuple (params) + args)).flatten ()
 
-        self.lm_prob.setResidualFunc (self.y, self.invsigma, yfunc, None)
+        self.lm_prob.setResidualFunc (self.data.flatten (),
+                                      self.invsigma.flatten (),
+                                      lmfunc, None)
         self.lm_soln = soln = self.lm_prob.solve (guess)
 
-        self.paramnames = f.func_code.co_varnames[1:]
         self.params = soln.params
         self.perror = soln.perror
         self.covar = soln.covar
-        self.modelfunc = lambda x: f (x, *soln.params)
-        self.modely = self.modelfunc (x)
+
+        from functools import partial
+        self.mfunc = partial (f, *soln.params)
+        self.mdata = soln.fvec.reshape (self.data.shape)
+
         if soln.ndof > 0:
             self.rchisq = soln.fnorm / soln.ndof
-        self.resids = self.y - self.modely
+        self.resids = self.data - self.mdata
         return self
 
 
 class PolynomialModel (_ModelBase):
-    def __init__ (self, maxexponent, x, y, invsigma=None):
+    def __init__ (self, maxexponent, x, data, invsigma=None):
         self.maxexponent = maxexponent
-        self.setdata (x, y, invsigma)
-
+        self.x = np.array (x, dtype=np.float, ndmin=1, copy=False, subok=True)
+        self.setdata (data, invsigma)
 
     def solve (self):
         self.paramnames = ['a%d' % i for i in xrange (self.maxexponent + 1)]
         # Based on my reading of the polyfit() docs, I think w=invsigma**2 is right...
-        self.params = npoly.polyfit (self.x, self.y, self.maxexponent,
+        self.params = npoly.polyfit (self.x, self.data, self.maxexponent,
                                      w=self.invsigma**2)
         self.perror = None # does anything provide this? could farm out to lmmin ...
         self.covar = None
-        self.modelfunc = lambda x: npoly.polyval (x, self.params)
-        self.modely = self.modelfunc (self.x)
-        self.resids = self.y - self.modely
+        self.mfunc = lambda x: npoly.polyval (x, self.params)
+        self.mdata = self.mfunc (self.x)
+        self.resids = self.data - self.mdata
         self.rchisq = (((self.resids * self.invsigma)**2).sum ()
                        / (self.x.size - (self.maxexponent + 1)))
         return self
 
 
 class ScaleModel (_ModelBase):
+    def __init__ (self, x, data, invsigma=None):
+        self.x = np.array (x, dtype=np.float, ndmin=1, copy=False, subok=True)
+        self.setdata (data, invsigma)
+
     def solve (self):
         w2 = self.invsigma**2
         sxx = np.dot (self.x**2, w2)
-        sxy = np.dot (self.x * self.y, w2)
+        sxy = np.dot (self.x * self.data, w2)
         m = sxy / sxx
         uc_m = 1. / np.sqrt (sxx)
 
@@ -195,9 +205,9 @@ class ScaleModel (_ModelBase):
         self.params = np.asarray ([m])
         self.perror = np.asarray ([uc_m])
         self.covar = self.perror.reshape ((1, 1))
-        self.modelfunc = lambda x: m * x
-        self.modely = m * self.x
-        self.resids = self.y - self.modely
+        self.mfunc = lambda x: m * x
+        self.mdata = m * self.x
+        self.resids = self.data - self.mdata
         self.rchisq = ((self.resids * self.invsigma)**2).sum () / (self.x.size - 1)
         return self
 
@@ -235,11 +245,11 @@ class ModelComponent (object):
         functions should be called."""
         pass
 
-    def model (self, pars, x, y):
-        """Modify `y` based on `x` and `pars`."""
+    def model (self, pars, y):
+        """Modify `y` based on `pars`."""
         pass
 
-    def deriv (self, pars, x, jac):
+    def deriv (self, pars, jac):
         """Compute the Jacobian. `jac[i]` is d`y`/d`pars[i]`."""
         pass
 
@@ -249,11 +259,11 @@ class ModelComponent (object):
 
 
 class ComposedModel (_ModelBase):
-    def __init__ (self, component, x, y, invsigma=None):
+    def __init__ (self, component, data, invsigma=None):
         if component is not None:
             self.setcomponent (component)
-        if x is not None:
-            self.setdata (x, y, invsigma)
+        if data is not None:
+            self.setdata (data, invsigma)
 
 
     def _component_setguess (self, vals, ofs=0):
@@ -304,34 +314,30 @@ class ComposedModel (_ModelBase):
                 if np.isfinite (self.force_guess[i]):
                     guess[i] = self.force_guess[i]
 
-        x = self.x
-
         def model (pars, outputs):
             outputs.fill (0)
-            self.component.model (pars, x, outputs)
-
-        def deriv (pars, jac):
-            self.component.deriv (pars, x, jac)
+            self.component.model (pars, outputs)
 
         self.lm_model = model
         self.lm_deriv = deriv
-        self.lm_prob.setResidualFunc (self.y, self.invsigma, model, deriv)
+        self.lm_prob.setResidualFunc (self.data, self.invsigma, model,
+                                      self.component.deriv)
         self.lm_soln = soln = self.lm_prob.solve (guess)
 
         self.params = soln.params
         self.perror = soln.perror
         self.covar = soln.covar
 
-        def modelfunc (x):
-            y = np.zeros_like (x)
-            self.component.model (self.params, x, y)
+        def mfunc ():
+            y = np.zeros_like (self.data)
+            self.component.model (self.params, y)
             return y
 
-        self.modelfunc = modelfunc
-        self.modely = modelfunc (x)
+        self.mfunc = mfunc
+        self.mdata = self.lm_soln.fvec.reshape (self.data.shape)
         if soln.ndof > 0:
             self.rchisq = soln.fnorm / soln.ndof
-        self.resids = self.y - self.modely
+        self.resids = self.data - self.mdata
 
         self.component.extract (soln.params, soln.perror, soln.covar)
         return self
@@ -340,7 +346,7 @@ class ComposedModel (_ModelBase):
     def debug_derivative (self, guess):
         """returns (explicit, auto)"""
         import lmmin
-        return lmmin.checkDerivative (self.component.npar, self.x.size,
+        return lmmin.checkDerivative (self.component.npar, self.data.size,
                                       self.lm_model, self.lm_deriv, guess)
 
 
@@ -352,62 +358,40 @@ class AddConstantComponent (ModelComponent):
     npar = 1
     paramnames = ('value', )
 
-    def model (self, pars, x, y):
+    def model (self, pars, y):
         y += pars[0]
 
-    def deriv (self, pars, x, jac):
+    def deriv (self, pars, jac):
         jac[0] = 1.
 
     def extract (self, pars, perr, cov):
+        self.mfunc = lambda: pars[0]
         self.covar = cov
         self.f_value = pars[0]
         self.u_value = perr[0]
 
 
-class AddSinComponent (ModelComponent):
-    npar = 3
-    paramnames = ('amp', 'angfreq', 'phase')
-
-    def model (self, pars, x, y):
-        y += pars[0] * np.sin (pars[1] * x + pars[2])
-
-    def deriv (self, pars, x, jac):
-        th = pars[1] * x + pars[2]
-        jac[0] = np.sin (th)
-        jac[2] = pars[0] * np.cos (th)
-        jac[1] = jac[1] * x
-
-    def extract (self, pars, perr, cov):
-        self.covar = cov
-        self.f_amp, self.f_angfreq, self.f_phase = pars
-        self.u_amp, self.u_angfreq, self.u_phase = perr
-
-        if self.f_amp < 0:
-            self.f_amp *= -1
-            self.f_phase += np.pi
-
-        self.f_phase = (self.f_phase + np.pi) % (2 * np.pi) - np.pi
-
-
 class AddPolynomialComponent (ModelComponent):
-    def __init__ (self, maxexponent, name=None):
+    def __init__ (self, maxexponent, x, name=None):
         self.npar = maxexponent + 1
+        self.x = np.array (x, dtype=np.float, ndmin=1, copy=False, subok=True)
 
     def _param_names (self):
         for i in xrange (self.npar):
             yield 'c%d' % i
 
-    def model (self, pars, x, y):
-        y += npoly.polyval (x, pars)
+    def model (self, pars, y):
+        y += npoly.polyval (self.x, pars)
 
-    def deriv (self, pars, x, jac):
-        w = np.ones_like (x)
+    def deriv (self, pars, jac):
+        w = np.ones_like (self.x)
 
         for i in xrange (self.npar):
             jac[i] = w
-            w *= x
+            w *= self.x
 
     def extract (self, pars, perr, cov):
+        self.mfunc = lambda x: npoly.polyval (x, pars)
         self.covar = cov
         self.f_coeffs = pars
         self.u_coeffs = perr
@@ -479,22 +463,22 @@ class SeriesComponent (ModelComponent):
             c.prep_params ()
 
 
-    def model (self, pars, x, y):
+    def model (self, pars, y):
         ofs = 0
 
         for c in self.components:
             p = pars[ofs:ofs+c.npar]
-            c.model (p, x, y)
+            c.model (p, y)
             ofs += c.npar
 
 
-    def deriv (self, pars, x, jac):
+    def deriv (self, pars, jac):
         ofs = 0
 
         for c in self.components:
             p = pars[ofs:ofs+c.npar]
             j = jac[ofs:ofs+c.npar]
-            c.deriv (p, x, j)
+            c.deriv (p, j)
             ofs += c.npar
 
 
@@ -568,15 +552,14 @@ class ScaleComponent (ModelComponent):
         self.subcomp.prep_params ()
 
 
-    def model (self, pars, x, y):
-        self.subcomp.model (pars[1:], x, y)
+    def model (self, pars, y):
+        self.subcomp.model (pars[1:], y)
         y *= pars[0]
 
 
-    def deriv (self, pars, x, jac):
-        self.subcomp.model (pars[1:], x, jac[0])
-
-        self.subcomp.deriv (pars[1:], x, jac[1:])
+    def deriv (self, pars, jac):
+        self.subcomp.model (pars[1:], jac[0])
+        self.subcomp.deriv (pars[1:], jac[1:])
         jac[1:] *= pars[0]
 
 
