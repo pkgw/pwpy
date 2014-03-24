@@ -1,3 +1,4 @@
+# -*- mode: python; coding: utf-8 -*-
 # Copyright 2012-2014 Peter Williams
 # Licensed under the GNU General Public License version 3 or higher
 
@@ -612,6 +613,180 @@ class SeriesComponent (ModelComponent):
             cargs = args[ofs:ofs+c.nmodelargs]
             c._accum_mfunc (res, *cargs)
             ofs += c.nmodelargs
+
+
+class MatMultComponent (ModelComponent):
+    """Given a component yielding k**2 data points and k additional components,
+    each yielding n data points. The result is [A]×[B], where A is the square
+    matrix formed from the first component's output, and B is the (k, n)
+    matrix of stacked output from the final k components.
+
+    Parameters are ordered in same way as the components named above.
+    """
+
+    def __init__ (self, k, name=None):
+        super (MatMultComponent, self).__init__ (name)
+        self.k = k
+        self.acomponent = None
+        self.bcomponents = [None] * k
+
+
+    def _param_names (self):
+        pfx = self.acomponent.name + '.' if self.acomponent.name is not None else ''
+        for p in self.acomponent._param_names ():
+            yield pfx + p
+
+        for c in self.bcomponents:
+            pfx = c.name + '.' if c.name is not None else ''
+            for p in c._param_names ():
+                yield pfx + p
+
+
+    def _offset_setguess (self, ofs, npar, vals, subofs=0):
+        vals = np.asarray (vals)
+        if subofs < 0 or subofs + vals.size > npar:
+            raise ValueError ('subofs %d, vals.size %d, npar %d' %
+                              (subofs, vals.size, npar))
+        return self.setguess (vals, ofs + subofs)
+
+
+    def _offset_setvalue (self, ofs, npar, cidx, value, fixed=False):
+        if cidx < 0 or cidx >= npar:
+            raise ValueError ('cidx %d, npar %d' % (cidx, npar))
+        return self.setvalue (ofs + cidx, value, fixed)
+
+
+    def _offset_setlimit (self, ofs, npar, cidx, lower=-np.inf, upper=np.inf):
+        if cidx < 0 or cidx >= npar:
+            raise ValueError ('cidx %d, npar %d' % (cidx, npar))
+        return self.setlimit (ofs + cidx, lower, upper)
+
+
+    def finalize_setup (self):
+        from functools import partial
+
+        c = self.acomponent
+
+        if c.name is None:
+            c.name = 'a'
+
+        c.setguess = partial (self._offset_setguess, 0, c.npar)
+        c.setvalue = partial (self._offset_setvalue, 0, c.npar)
+        c.setlimit = partial (self._offset_setlimit, 0, c.npar)
+        ofs = c.npar
+        self.nmodelargs = c.nmodelargs
+
+        for i, c in enumerate (self.bcomponents):
+            if c.name is None:
+                c.name = 'b%d' % i
+
+            c.setguess = partial (self._offset_setguess, ofs, c.npar)
+            c.setvalue = partial (self._offset_setvalue, ofs, c.npar)
+            c.setlimit = partial (self._offset_setlimit, ofs, c.npar)
+            ofs += c.npar
+            self.nmodelargs += c.nmodelargs
+
+        self.npar = ofs
+
+
+    def prep_params (self):
+        self.acomponent.prep_params ()
+
+        for c in self.bcomponents:
+            c.prep_params ()
+
+
+    def _sep_model (self, pars, nd):
+        k = self.k
+        ma = np.zeros ((k, k))
+        mb = np.zeros ((k, nd))
+
+        c = self.acomponent
+        c.model (pars[:c.npar], ma.reshape (k**2))
+
+        pofs = c.npar
+
+        for i, c in enumerate (self.bcomponents):
+            p = pars[pofs:pofs+c.npar]
+            c.model (p, mb[i])
+            pofs += c.npar
+
+        return ma, mb
+
+
+    def model (self, pars, y):
+        k = self.k
+        nd = y.size // k
+        ma, mb = self._sep_model (pars, nd)
+        np.dot (ma, mb, y.reshape ((k, nd)))
+
+
+    def deriv (self, pars, jac):
+        k = self.k
+        nd = jac.shape[1] // k
+        npar = self.npar
+
+        ma, mb = self._sep_model (pars, nd)
+        ja = np.zeros ((npar, k, k))
+        jb = np.zeros ((npar, k, nd))
+
+        c = self.acomponent
+        c.deriv (pars[:c.npar], ja[:c.npar].reshape ((c.npar, k**2)))
+        pofs = c.npar
+
+        for i, c in enumerate (self.bcomponents):
+            p = pars[pofs:pofs+c.npar]
+            c.deriv (p, jb[pofs:pofs+c.npar,i,:])
+            pofs += c.npar
+
+        for i in xrange (self.npar):
+            jac[i] = (np.dot (ja[i], mb) + np.dot (ma, jb[i])).reshape (k * nd)
+
+
+    def extract (self, pars, perr, cov):
+        c = self.acomponent
+        c.extract (pars[:c.npar], perr[:c.npar], cov[:c.npar,:c.npar])
+        ofs = c.npar
+
+        for c in self.bcomponents:
+            n = c.npar
+
+            spar = pars[ofs:ofs+n]
+            serr = perr[ofs:ofs+n]
+            scov = cov[ofs:ofs+n,ofs:ofs+n]
+            c.extract (spar, serr, scov)
+            ofs += n
+
+
+    def _outputshape (self, *args):
+        aofs = self.acomponent.nmodelargs
+        sb = ()
+
+        for c in self.bcomponents:
+            a = args[aofs:aofs+c.nmodelargs]
+            sb = _broadcast_shapes (sb, c._outputshape (*a))
+            aofs += c.nmodelargs
+
+        return (self.k,) + sb
+
+
+    def _accum_mfunc (self, res, *args):
+        k = self.k
+        nd = res.shape[1]
+
+        ma = np.zeros ((k, k))
+        mb = np.zeros ((k, nd))
+
+        c = self.acomponent
+        c._accum_mfunc (ma.reshape (k**2), *(args[:c.nmodelargs]))
+        aofs = c.nmodelargs
+
+        for i, c in enumerate (self.bcomponents):
+            a = args[aofs:aofs+c.nmodelargs]
+            c._accum_mfunc (mb[i], *a)
+            aofs += c.nmodelargs
+
+        np.dot (ma, mb, res)
 
 
 class ScaleComponent (ModelComponent):
