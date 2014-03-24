@@ -164,11 +164,13 @@ class Model (_ModelBase):
 
         from functools import partial
         self.mfunc = partial (f, *soln.params)
-        self.mdata = soln.fvec.reshape (self.data.shape)
+
+        # fvec = resids * invsigma = (data - mdata) * invsigma
+        self.resids = soln.fvec.reshape (self.data.shape) / self.invsigma
+        self.mdata = self.data - self.resids
 
         if soln.ndof > 0:
             self.rchisq = soln.fnorm / soln.ndof
-        self.resids = self.data - self.mdata
         return self
 
 
@@ -353,10 +355,12 @@ class ComposedModel (_ModelBase):
         self.perror = soln.perror
         self.covar = soln.covar
 
-        self.mdata = self.lm_soln.fvec.reshape (self.data.shape)
+        # fvec = resids * invsigma = (data - mdata) * invsigma
+        self.resids = self.lm_soln.fvec.reshape (self.data.shape) / self.invsigma
+        self.mdata = self.data - self.resids
+
         if soln.ndof > 0:
             self.rchisq = soln.fnorm / soln.ndof
-        self.resids = self.data - self.mdata
 
         self.component.extract (soln.params, soln.perror, soln.covar)
         return self
