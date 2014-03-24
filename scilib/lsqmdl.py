@@ -340,7 +340,7 @@ class ComposedModel (_ModelBase):
             self.component.model (pars, outputs)
 
         self.lm_model = model
-        self.lm_deriv = deriv
+        self.lm_deriv = self.component.deriv
         self.lm_prob.setResidualFunc (self.data, self.invsigma, model,
                                       self.component.deriv)
         self.lm_soln = soln = self.lm_prob.solve (guess)
