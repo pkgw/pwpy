@@ -251,12 +251,12 @@ class ModelComponent (object):
         functions should be called."""
         pass
 
-    def model (self, pars, y):
-        """Modify `y` based on `pars`."""
+    def model (self, pars, mdata):
+        """Modify `mdata` based on `pars`."""
         pass
 
     def deriv (self, pars, jac):
-        """Compute the Jacobian. `jac[i]` is d`y`/d`pars[i]`."""
+        """Compute the Jacobian. `jac[i]` is d`mdata`/d`pars[i]`."""
         pass
 
     def extract (self, pars, perr, cov):
@@ -382,8 +382,8 @@ class AddConstantComponent (ModelComponent):
     paramnames = ('value', )
     nmodelargs = 0
 
-    def model (self, pars, y):
-        y += pars[0]
+    def model (self, pars, mdata):
+        mdata += pars[0]
 
     def deriv (self, pars, jac):
         jac[0] = 1.
@@ -412,8 +412,8 @@ class AddValuesComponent (ModelComponent):
         for i in xrange (self.npar):
             yield 'v%d' % i
 
-    def model (self, pars, y):
-        y += pars
+    def model (self, pars, mdata):
+        mdata += pars
 
     def deriv (self, pars, jac):
         jac[:,:] = np.eye (self.npar)
@@ -442,8 +442,8 @@ class AddPolynomialComponent (ModelComponent):
         for i in xrange (self.npar):
             yield 'c%d' % i
 
-    def model (self, pars, y):
-        y += npoly.polyval (self.x, pars)
+    def model (self, pars, mdata):
+        mdata += npoly.polyval (self.x, pars)
 
     def deriv (self, pars, jac):
         w = np.ones_like (self.x)
@@ -565,12 +565,12 @@ class SeriesComponent (ModelComponent):
             c.prep_params ()
 
 
-    def model (self, pars, y):
+    def model (self, pars, mdata):
         ofs = 0
 
         for c in self.components:
             p = pars[ofs:ofs+c.npar]
-            c.model (p, y)
+            c.model (p, mdata)
             ofs += c.npar
 
 
@@ -717,11 +717,11 @@ class MatMultComponent (ModelComponent):
         return ma, mb
 
 
-    def model (self, pars, y):
+    def model (self, pars, mdata):
         k = self.k
-        nd = y.size // k
+        nd = mdata.size // k
         ma, mb = self._sep_model (pars, nd)
-        np.dot (ma, mb, y.reshape ((k, nd)))
+        np.dot (ma, mb, mdata.reshape ((k, nd)))
 
 
     def deriv (self, pars, jac):
@@ -850,9 +850,9 @@ class ScaleComponent (ModelComponent):
         self.subcomp.prep_params ()
 
 
-    def model (self, pars, y):
-        self.subcomp.model (pars[1:], y)
-        y *= pars[0]
+    def model (self, pars, mdata):
+        self.subcomp.model (pars[1:], mdata)
+        mdata *= pars[0]
 
 
     def deriv (self, pars, jac):
