@@ -72,7 +72,10 @@ class _ModelBase (object):
                 frac = abs (100. * err / val)
                 print '%s: %14g +/- %14g (%.2f%%)' % (pn.rjust (lmax), val, err, frac)
 
-        print '%s: %14g' % ('r chi sq'.rjust (lmax), self.rchisq)
+        if self.rchisq is None:
+            print '%s: unknown/undefined' % ('r chi sq'.rjust (lmax))
+        else:
+            print '%s: %14g' % ('r chi sq'.rjust (lmax), self.rchisq)
         return self
 
 
