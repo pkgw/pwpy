@@ -558,6 +558,7 @@ class SeriesComponent (ModelComponent):
             c.setguess = partial (self._offset_setguess, ofs, c.npar)
             c.setvalue = partial (self._offset_setvalue, ofs, c.npar)
             c.setlimit = partial (self._offset_setlimit, ofs, c.npar)
+            c.finalize_setup ()
             ofs += c.npar
             self.nmodelargs += c.nmodelargs
 
@@ -680,6 +681,7 @@ class MatMultComponent (ModelComponent):
         c.setguess = partial (self._offset_setguess, 0, c.npar)
         c.setvalue = partial (self._offset_setvalue, 0, c.npar)
         c.setlimit = partial (self._offset_setlimit, 0, c.npar)
+        c.finalize_setup ()
         ofs = c.npar
         self.nmodelargs = c.nmodelargs
 
@@ -690,6 +692,7 @@ class MatMultComponent (ModelComponent):
             c.setguess = partial (self._offset_setguess, ofs, c.npar)
             c.setvalue = partial (self._offset_setvalue, ofs, c.npar)
             c.setlimit = partial (self._offset_setlimit, ofs, c.npar)
+            c.finalize_setup ()
             ofs += c.npar
             self.nmodelargs += c.nmodelargs
 
