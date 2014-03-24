@@ -170,7 +170,8 @@ class Model (_ModelBase):
         self.mdata = self.data - self.resids
 
         if soln.ndof > 0:
-            self.rchisq = soln.fnorm / soln.ndof
+            # lm_soln.fnorm can be unreliable ("max (fnorm, fnorm1)" branch)
+            self.rchisq = (self.lm_soln.fvec**2).sum () / soln.ndof
         return self
 
 
@@ -360,7 +361,8 @@ class ComposedModel (_ModelBase):
         self.mdata = self.data - self.resids
 
         if soln.ndof > 0:
-            self.rchisq = soln.fnorm / soln.ndof
+            # lm_soln.fnorm can be unreliable ("max (fnorm, fnorm1)" branch)
+            self.rchisq = (self.lm_soln.fvec**2).sum () / soln.ndof
 
         self.component.extract (soln.params, soln.perror, soln.covar)
         return self
