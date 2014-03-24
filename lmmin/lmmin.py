@@ -1655,19 +1655,19 @@ class Problem (object):
 
             if anylimits:
                 # Check for parameters pegged at limits
-                whlpeg = where (hasllim & (x == llim))
-                nlpeg = len (whlpeg[0])
-                whupeg = where (hasulim & (x == ulim))
-                nupeg = len (whupeg[0])
+                whlpeg = where (hasllim & (x == llim))[0]
+                nlpeg = len (whlpeg)
+                whupeg = where (hasulim & (x == ulim))[0]
+                nupeg = len (whupeg)
 
                 if nlpeg:
                     # Check total derivative of sum wrt lower-pegged params
                     for i in xrange (nlpeg):
-                        if dot (fjac[whlpeg[0][i]], fvec) > 0:
+                        if dot (fjac[whlpeg[i]], fvec) > 0:
                             fjac[whlpeg[i]] = 0
                 if nupeg:
                     for i in xrange (nupeg):
-                        if dot (fjac[whupeg[0][i]], fvec) < 0:
+                        if dot (fjac[whupeg[i]], fvec) < 0:
                             fjac[whupeg[i]] = 0
 
             # Compute QR factorization of the Jacobian
@@ -2763,7 +2763,8 @@ def _lmder1_watson ():
                     [-0.6637102230174097e-08, 0.1000001644117873e+01, -0.5639322083473270e-03,
                      0.3478205404869979e+00, -0.1567315039556524e+00, 0.1052815176545732e+01,
                      -0.3247271151521395e+01, 0.7288434894306651e+01, -0.1027184823696385e+02,
-                      0.9074113643837332e+01, -0.4541375465336661e+01, 0.1012011888308566e+01])
+                      0.9074113643837332e+01, -0.4541375465336661e+01, 0.1012011888308566e+01],
+                    decimal=7)
     _lmder1_driver (31, func, jac, np.zeros (12) + 100,
                     0.2018918044623666e+07, 0.2173104025398453e-04,
                     [-0.6638060464852487e-08, 0.1000001644117862e+01, -0.5639322103249589e-03,
