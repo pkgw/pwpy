@@ -397,6 +397,36 @@ class AddConstantComponent (ModelComponent):
         self.u_value = perr[0]
 
 
+class AddValuesComponent (ModelComponent):
+    """XXX terminology between this and AddConstant is mushy."""
+    nmodelargs = 0
+
+    def __init__ (self, nvals, name=None):
+        self.npar = nvals
+
+    def _param_names (self):
+        for i in xrange (self.npar):
+            yield 'v%d' % i
+
+    def model (self, pars, y):
+        y += pars
+
+    def deriv (self, pars, jac):
+        jac[:,:] = np.eye (self.npar)
+
+    def _outputshape (self):
+        return (self.npar,)
+
+    def extract (self, pars, perr, cov):
+        def _accum_mfunc (res):
+            res += pars
+        self._accum_mfunc = _accum_mfunc
+
+        self.covar = cov
+        self.f_vals = pars
+        self.u_vals = perr
+
+
 class AddPolynomialComponent (ModelComponent):
     nmodelargs = 1
 
