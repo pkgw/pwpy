@@ -117,8 +117,18 @@ class _ModelBase (object):
 
     def showcov (self):
         import ndshow
-        # would be nice: labels with parameter names
+        # would be nice: labels with parameter names (hard because this is ndshow,
+        # not omegaplot)
         ndshow.view (self.covar, title='Covariance Matrix')
+
+
+    def showcorr (self):
+        import ndshow
+        # would be nice: labels with parameter names (hard because this is ndshow,
+        # not omegaplot)
+        d = np.diag (self.covar) ** -0.5
+        corr = self.covar * d[np.newaxis,:] * d[:,np.newaxis]
+        ndshow.view (corr, title='Correlation Matrix')
 
 
 class Model (_ModelBase):
