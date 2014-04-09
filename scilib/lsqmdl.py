@@ -155,6 +155,16 @@ class Model (_ModelBase):
             self.paramnames = func.func_code.co_varnames
 
 
+    def setfunc_hack (self, func, npar, paramnames, args=()):
+        """This is a hack to make it not-impossible to have variable numbers of
+        parameters in the lsqmodel framework."""
+        self.func = func
+        self._args = args
+        import lmmin
+        self.lm_prob = lmmin.Problem (npar)
+        self.paramnames = list (paramnames)
+
+
     def solve (self, guess):
         guess = np.array (guess, dtype=np.float, ndmin=1)
         f = self.func
