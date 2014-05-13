@@ -8,11 +8,15 @@ in a background using the approach described in Kraft, Burrows, & Nousek (1991).
 That paper provides tables of values; this module can calculate intervals for
 arbitrary inputs.
 
+This implementation almost directly transcribes the equations. We do, however,
+work in log-gamma space to try to avoid overflows with large values of N or B.
+
 TODO: tests!
+
 """
 
-from numpy import exp, vectorize
-from scipy.special import gamma
+from numpy import exp, log, vectorize
+from scipy.special import gammaln
 from scipy.integrate import quad
 from scipy.optimize import newton
 
@@ -20,16 +24,17 @@ __all__ = ['kbn_conf', 'vec_kbn_conf']
 
 
 def _cconst (N, B):
-    s = 0
+    s = 0.
+    lnb = log (B)
 
     for n in xrange (N + 1):
-        s += exp (-B) * B**n / gamma (n + 1)
+        s += exp (-B + n * lnb - gammaln (n + 1))
 
     return 1. / s
 
 
 def _fcnb (C, N, B, S):
-    return C * exp (-(S + B)) * (S + B)**N / gamma (N + 1)
+    return C * exp (-(S + B) + N * log (S + B) - gammaln (N + 1))
 
 
 def _fnb (N, B, S):
