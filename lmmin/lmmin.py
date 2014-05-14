@@ -108,7 +108,7 @@
 #
 # Moré, J. 1978, "The Levenberg-Marquardt Algorithm: Implementation
 #  and Theory," in Numerical Analysis, vol. 630, ed. G. A. Watson
-#  (Springer-Verlag: Berlin), p. 105 (DOI: 10.1007/BFb0067690 )
+#  (Springer-Verlag: Berlin), p. 105 (DOI: 10.1007/BFb0067700 )
 #
 # Moré, J and Wright, S. 1987, "Optimization Software Guide," SIAM,
 #  Frontiers in Applied Mathematics, no. 14. (ISBN:
