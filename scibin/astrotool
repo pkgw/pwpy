@@ -283,6 +283,19 @@ def cmd_sesame (args):
     print obj.describe ()
 
 
+def cmd_senscale (args):
+    "senscale <sens1> <time1> <time2> - scale a sensitivity for a different integration time"
+
+    if len (args) != 3:
+        wrongusage (__doc__, 'senscale expected 3 arguments')
+
+    s1 = fparse (args[0])
+    t1 = fparse (args[1])
+    t2 = fparse (args[2])
+    s2 = s1 * np.sqrt (t1 / t2)
+    print fmt (s2)
+
+
 def cmd_sh2d (args):
     "sh2d <sexagesimal hours> - convert sexagesimal hours to decimal degrees"
 
