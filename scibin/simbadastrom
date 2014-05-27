@@ -9,13 +9,8 @@ simbadastrom [identifier] [MJD]
 Use SIMBAD to predict the position of an object, with uncertainties.
 """
 
-import sys, precastro, ellutil, numpy.random
+import sys
 from astutil import *
-from urllib2 import urlopen
-from urllib import quote
-
-sesamebase = 'http://cdsweb.u-strasbg.fr/cgi-bin/nph-sesame?' 
-vizurl = 'http://vizier.u-strasbg.fr/viz-bin/asu-tsv'
 
 ## quickutil: usage die popoption
 #- snippet: usage.py (2012 Oct 01)
@@ -82,193 +77,6 @@ def popoption (ident, argv=None):
 ## end
 
 
-def get_2mass_epoch (tmra, tmdec, verbose=False):
-    postdata = '''-mime=csv
--source=2MASS
--out=_q,JD
--c=%.6f %.6f
--c.eq=J2000''' % (tmra * R2D, tmdec * R2D)
-
-    jd = None
-
-    for line in urlopen (vizurl, postdata):
-        line = line.strip ()
-        if verbose:
-            print 'D: 2M >>', line
-
-        if line.startswith ('1;'):
-            jd = float (line[2:])
-
-    if jd is None:
-        print >>sys.stderr, 'warning: 2MASS epoch lookup failed; astrometry could be very wrong!'
-        return 2451545.0 # J2000.0
-
-    return jd
-
-
-def predict (ident, mjd, n=20000, verbose=False):
-    ra = posumaj = promora = pmumaj = parallax = parallaxu = vradial = None
-    posref = 'unknown'
-
-    for line in urlopen (sesamebase + quote (ident)):
-        if line.startswith ('#!'):
-            die ('Simbad/Sesame lookup failed: %s', line[3:].strip ())
-
-        if verbose:
-            print >>sys.stderr, 'D: S >>', line.rstrip ()
-
-        a = line.strip ().split ()
-        if not len (a):
-            continue
-
-        # The units for our fields are coincidentally the same as
-        # those used by Simbad, for the most part ...
-
-        if a[0] == '%J':
-            ra = float (a[1]) * D2R
-            dec = float (a[2]) * D2R
-        if a[0] == '%J.E':
-            if a[1] != '[~':
-                posumaj = float (a[1][1:]) * A2R * 1e-3 # mas -> rad
-                posumin = float (a[2]) * A2R * 1e-3
-                posupa = float (a[3][:-1]) * D2R
-            posref = a[5]
-        elif a[0] == '%P':
-            promora = float (a[1]) # mas/yr
-            promodec = float (a[2])
-
-            if len (a) > 3 and a[3][0] == '[' and a[3][1] != '~':
-                pmumaj = float (a[3][1:]) # mas/yr
-                pmumin = float (a[4])
-                pmupa = float (a[5][:-1]) * D2R # rad!!
-        elif a[0] == '%X':
-            parallax = float (a[1]) # mas
-            if len (a) > 2 and a[2][0] == '[' and a[2][1] != '~':
-                parallaxu = float (a[2][1:-1]) # mas
-        elif a[0] == '%V':
-            vradial = float (a[2]) # km/s
-            vradialu = float (a[4][1:-1]) # km/s
-
-    if ra is None:
-        die ('no position returned by Simbad for "%s"', ident)
-
-    # Obtain epoch for 2MASS positions, which are at random times
-
-    o = precastro.SiderealObject ()
-
-    if posref == '2003yCat.2246....0C':
-        o.promoepoch = get_2mass_epoch (ra, dec, verbose)
-    else:
-        print >>sys.stderr, ('note: assuming catalog position was accurate '
-                             'on J2000.0 (source: %s)' % posref)
-
-    # Maybe debug
-
-    if verbose:
-        print >>sys.stderr, 'D: pos: %s' % fmtradec (ra, dec, precision=3)
-        if promora is not None:
-            print >>sys.stderr, 'D: promo: %.2f %.2f' % (promora, promodec)
-            if pmumaj is not None:
-                print >>sys.stderr, ('D: pm uncert: %.3f x %.3f @ %.1f' %
-                                     (pmumaj, pmumin, pmupa * R2D))
-            print >>sys.stderr, 'D: pm epoch: %.2f' % (o.promoepoch)
-        if parallax is not None:
-            if parallaxu is not None:
-                print >>sys.stderr, 'D: parallax: %.3f (%.3f)' % (parallax, parallaxu)
-            else:
-                print >>sys.stderr, 'D: parallax: %.3f (?)' % parallax
-        if vradial is not None:
-            print >>sys.stderr, 'D: vradial: %.3f (%.3f)' % (vradial, vradialu)
-
-    # Get best-estimate position from the reported values.
-
-    o.ra = ra
-    o.dec = dec
-
-    if promora is not None:
-        o.promora = promora
-        o.promodec = promodec
-    if parallax is not None:
-        o.parallax = parallax
-    if vradial is not None:
-        o.vradial = vradial
-
-    bestra, bestdec = o.astropos (mjd + 2400000.5)
-
-    # Figure out uncertainty via Monte Carlo. As always, astronomy position
-    # angle convention requires that we treat declination as X and RA as Y.
-
-    if posumaj is not None:
-        if posumaj < posumin:
-            # Based on experience with PM, this may be possible
-            posumaj, posumin = posumin, posumaj
-            posupa += 0.5 * np.pi
-        sd, sr, cdr = ellutil.ellbiv (posumaj, posumin, posupa)
-        decs, ras = ellutil.bivrandom (dec, ra, sd, sr, cdr, n).T
-    else:
-        print >>sys.stderr, 'warning: no uncertainties on catalog position'
-        ras = np.zeros (n) + ra
-        decs = np.zeros (n) + dec
-
-    if promora is None:
-        print >>sys.stderr, 'warning: assuming zero proper motion'
-        pmras = np.zeros (n)
-        pmdecs = np.zeros (n)
-    elif pmumaj is not None:
-        if pmumaj < pmumin:
-            # I've seen this: V* V374 Peg
-            pmumaj, pmumin = pmumin, pmumaj
-            pmupa += 0.5 * np.pi
-        sd, sr, cdr = ellutil.ellbiv (pmumaj, pmumin, pmupa)
-        pmdecs, pmras = ellutil.bivrandom (promodec, promora, sd, sr, cdr, n).T
-    else:
-        print >>sys.stderr, 'warning: no uncertainties on proper motion'
-        pmras = np.zeros (n) + promora
-        pmdecs = np.zeros (n) + promodec
-
-    if parallax is not None and parallaxu != 0:
-        parallaxes = numpy.random.normal (parallax, parallaxu, n)
-    elif parallax is not None:
-        print >>sys.stderr, 'warning: no uncertainty on parallax'
-        parallaxes = np.zeros (n) + parallax
-    else:
-        print >>sys.stderr, 'warning: assuming zero parallax'
-        parallaxes = np.zeros (n)
-
-    if vradial is not None:
-        vradials = numpy.random.normal (vradial, vradialu, n)
-    else:
-        # doesn't affect results, don't bother complaining
-        vradials = np.zeros (n)
-
-    # Compute apparent positions
-
-    results = np.empty ((n, 2))
-
-    for i in xrange (n):
-        o.ra = ras[i]
-        o.dec = decs[i]
-        o.promora = pmras[i]
-        o.promodec = pmdecs[i]
-        o.parallax = parallaxes[i]
-        o.vradial = vradials[i]
-
-        ara, adec = o.astropos (mjd + 2400000.5)
-        results[i] = adec, ara
-
-    # Analyze report
-
-    maj, min, pa = ellutil.bivell (*ellutil.databiv (results))
-    f = ellutil.sigmascale (1)
-    maj *= R2A
-    min *= R2A
-    pa *= R2D
-
-    print '%s at %.2f:' % (ident, mjd)
-    print '  ', '   position =', fmtradec (bestra, bestdec)
-    print '  ', 'err(1sigma) = %.2f" x %.2f" @ %.0f deg' % (maj * f, min * f, pa)
-
-
 def commandline (argv):
     checkusage (__doc__, argv, usageifnoargs=True)
     verbose = popoption ('v', argv)
@@ -276,7 +84,15 @@ def commandline (argv):
     if len (argv) != 3:
         wrongusage (__doc__, 'expected exactly two arguments')
 
-    predict (argv[1], float (argv[2]), verbose=verbose)
+    ident = argv[1]
+    mjd = float (argv[2])
+
+    info = AstrometryInfo ()
+    info.fill_from_simbad (ident, debug=verbose)
+    p = info.predict (mjd)
+    print '%s at %.3f:' % (ident, mjd)
+    print
+    info.print_prediction (p)
 
 
 if __name__ == '__main__':

@@ -1,5 +1,5 @@
 # -*- mode: python; coding: utf-8 -*-
-# Copyright 2012-2013 Peter Williams
+# Copyright 2012-2014 Peter Williams
 # Licensed under the GNU General Public License version 3 or higher
 
 """
@@ -494,3 +494,416 @@ def dfsmooth (window, df, ucol, k=None):
 
 
 __all__ += ['smooth', 'dfsmooth']
+
+
+# Given astrometric properties of a source, predict its position *with
+# uncertainties* at a given date through Monte Carlo simulations involving
+# precastro.
+
+_vizurl = 'http://vizier.u-strasbg.fr/viz-bin/asu-tsv'
+
+def get_2mass_epoch (tmra, tmdec, debug=False):
+    """Given a 2MASS ra/dec in radians, fetch the epoch when it was observed
+    as an MJD."""
+    from urllib2 import urlopen
+    postdata = '''-mime=csv
+-source=2MASS
+-out=_q,JD
+-c=%.6f %.6f
+-c.eq=J2000''' % (tmra * R2D, tmdec * R2D)
+
+    jd = None
+
+    for line in urlopen (_vizurl, postdata):
+        line = line.strip ()
+        if debug:
+            print 'D: 2M >>', line
+
+        if line.startswith ('1;'):
+            jd = float (line[2:])
+
+    if jd is None:
+        import sys
+        print >>sys.stderr, 'warning: 2MASS epoch lookup failed; astrometry could be very wrong!'
+        return 51544.5 # J2000.0
+
+    return jd - 2400000.5
+
+
+_simbadbase = 'http://simbad.u-strasbg.fr/simbad/sim-script?script='
+_simbaditems = ('COO(d;A) COO(d;D) COO(E) COO(B) PM(A) PM(D) PM(E) PLX(V) PLX(E) '
+                'RV(V) RV(E)').split ()
+
+def get_simbad_astrometry_info (ident, items=_simbaditems, debug=False):
+    from urllib import quote
+    from urllib2 import urlopen
+
+    s = '\\n'.join ('%s %%%s' % (i, i) for i in items)
+    s = '''output console=off script=off
+format object "%s"
+query id %s''' % (s, ident)
+    url = _simbadbase + quote (s)
+    results = {}
+    errtext = None
+
+    for line in urlopen (url):
+        line = line.strip ()
+        if debug:
+            print 'D: SA >>', line
+
+        if errtext is not None:
+            errtext += line
+        elif line.startswith ('::error'):
+            errtext = ''
+        elif len (line):
+            k, v = line.split (' ', 1)
+            results[k] = v
+
+    if errtext is not None:
+        raise Exception ('SIMBAD query error: ' + errtext)
+    return results
+
+
+class AstrometryInfo (object):
+    """Holds astrometric data and their uncertainties, and can compute
+    predicted positions with uncertainties.
+
+    Fields:
+
+    ra          - J2000 right ascension of the object, in radians
+    dec         - J2000 declination of the object, in radians
+    pos_u_maj   - Major axis of positional error ellipse, in radians
+    pos_u_min   - Minor axis of positional error ellipse, in radians
+    pos_u_pa    - Position angle of positional error ellipse, East from
+                  North, in radians
+    pos_epoch   - Epoch of position; that is, date when the position was
+                  measured, as an MJD[TT].
+    promo_ra    - Proper motion in right ascension, in mas/yr.
+                  XXX: terminology for cos(delta) factor
+    promo_dec   - Proper motion in declination, in mas/yr.
+    promo_u_maj - Major axis of proper motion error ellipse, in mas/yr
+    promo_u_min - Minor axis of proper motion error ellipse, in mas/yr
+    promo_u_pa  - Position angle of proper motion error ellipse, East from
+                  North, in radians
+    parallax    - Parallax of the target, in mas.
+    u_parallax  - Uncertainty in the parallax, in mas.
+    vradial     - Radial velocity of the object, in km/s.
+                  XXX: totally pointless?
+    u_vradial   - Uncertainty in the radial velocity, in km/s.
+                  XXX: totally pointless?
+
+    Methods:
+
+    fill_from_simbad (ident, debug=False) - does what it says
+    verify(complain=True) - make sure fields are consistent and valid
+    predict(mjd, complain=True) - predict position with uncertainty at given MJD
+        returns (ra, dec, maj, min, pa), all in radians
+    print_prediction(ptup) - prints prediction to stdout prettily
+    """
+
+    ra = None
+    dec = None
+    pos_u_maj = None
+    pos_u_min = None
+    pos_u_pa = None
+    pos_epoch = None
+    promo_ra = None
+    promo_dec = None
+    promo_u_maj = None
+    promo_u_min = None
+    promo_u_pa = None
+    parallax = None
+    u_parallax = None
+    vradial = None
+    u_vradial = None
+
+
+    def __init__ (self, simbadident=None, **kwargs):
+        if simbadident is not None:
+            self.fill_from_simbad (simbadident)
+
+        for k, v in kwargs.iteritems ():
+            setattr (self, k, v)
+
+
+    def _partial_info (self, val0, *rest):
+        if not len (rest):
+            return False
+
+        first = val0 is None
+        for v in rest:
+            if (v is None) != first:
+                return True
+        return False
+
+
+    def verify (self, complain=True):
+        import sys
+
+        if self.ra is None:
+            raise ValueError ('AstrometryInfo missing "ra"')
+        if self.dec is None:
+            raise ValueError ('AstrometryInfo missing "dec"')
+
+        if self._partial_info (self.promo_ra, self.promo_dec):
+            raise ValueError ('partial proper-motion info in AstrometryInfo')
+
+        if self._partial_info (self.pos_u_maj, self.pos_u_min, self.pos_u_pa):
+            raise ValueError ('partial positional uncertainty info in AstrometryInfo')
+
+        if self._partial_info (self.promo_u_maj, self.promo_u_min, self.promo_u_pa):
+            raise ValueError ('partial proper-motion uncertainty info in AstrometryInfo')
+
+        if self.pos_u_maj is None:
+            if complain:
+                print >>sys.stderr, 'AstrometryInfo: no positional uncertainty info'
+        elif self.pos_u_maj < self.pos_u_min:
+            # Based on experience with PM, this may be possible
+            if complain:
+                print >>sys.stderr, ('AstrometryInfo: swapped positional '
+                                     'uncertainty major/minor axes')
+            self.pos_u_maj, self.pos_u_min = self.pos_u_min, self.pos_u_maj
+            self.pos_u_pa += 0.5 * np.pi
+
+        if self.promo_ra is None:
+            if complain:
+                print >>sys.stderr, 'AstrometryInfo: assuming zero proper motion'
+        elif self.promo_u_maj is None:
+            if complain:
+                print >>sys.stderr, 'AstrometryInfo: no uncertainty on proper motion'
+        elif self.promo_u_maj < self.promo_u_min:
+            # I've seen this: V* V374 Peg
+            if complain:
+                print >>sys.stderr, ('AstrometryInfo: swapped proper motion '
+                                     'uncertainty major/minor axes')
+            self.promo_u_maj, self.promo_u_min = self.promo_u_min, self.promo_u_maj
+            self.promo_u_pa += 0.5 * np.pi
+
+        if self.parallax is None:
+            if complain:
+                print >>sys.stderr, 'AstrometryInfo: assuming zero parallax'
+        else:
+            if self.parallax < 0.:
+                raise ValueError ('negative parallax in AstrometryInfo')
+            if self.u_parallax is None:
+                if complain:
+                    print >>sys.stderr, 'AstrometryInfo: no uncertainty on parallax'
+
+        if self.vradial is None:
+            pass # not worth complaining
+        elif self.u_vradial is None:
+            if complain:
+                print >>sys.stderr, 'AstrometryInfo: no uncertainty on v_radial'
+
+        return self # chain-friendly
+
+
+    def predict (self, mjd, complain=True, n=20000):
+        """Returns (ra, dec, major, minor, pa), all in radians. These are the
+        predicted position of the object and its uncertainty at `mjd`. If
+        `complain` is True, print out warnings for incomplete information. `n`
+        is the number of Monte Carlo samples to draw for computing the
+        positional uncertainty.
+
+        """
+        import ellutil, precastro, sys
+        o = precastro.SiderealObject ()
+        self.verify (complain=complain)
+
+        # "Best" position.
+
+        o.ra = self.ra
+        o.dec = self.dec
+
+        if self.pos_epoch is not None:
+            o.promoepoch = self.pos_epoch + 2400000.5
+        else:
+            if complain:
+                print >>sys.stderr, ('AstrometryInfo.predict(): assuming epoch of '
+                                     'position is J2000.0')
+            o.promoepoch = 2451545.0 # J2000.0
+
+        if self.promo_ra is not None:
+            o.promora = self.promo_ra
+            o.promodec = self.promo_dec
+        if self.parallax is not None:
+            o.parallax = self.parallax
+        if self.vradial is not None:
+            o.vradial = self.vradial
+
+        bestra, bestdec = o.astropos (mjd + 2400000.5)
+
+        # Monte Carlo to get an uncertainty. As always, astronomy position
+        # angle convention requires that we treat declination as X and RA as
+        # Y. First, we check sanity and generate randomized parameters:
+
+        if self.pos_u_maj is None and self.promo_u_maj is None and self.u_parallax is None:
+            if complain:
+                print >>sys.stderr, ('AstrometryInfo.predict(): no uncertainties '
+                                     'available; cannot Monte Carlo!')
+            return (bestra, bestdec, 0., 0., 0.)
+
+        if self.pos_u_maj is not None:
+            sd, sr, cdr = ellutil.ellbiv (self.pos_u_maj, self.pos_u_min, self.pos_u_pa)
+            decs, ras = ellutil.bivrandom (self.dec, self.ra, sd, sr, cdr, n).T
+        else:
+            ras = np.zeros (n) + self.ra
+            decs = np.zeros (n) + self.dec
+
+        if self.promo_ra is None:
+            pmras = np.zeros (n)
+            pmdecs = np.zeros (n)
+        elif self.promo_u_maj is not None:
+            sd, sr, cdr = ellutil.ellbiv (self.promo_u_maj, self.promo_u_min, self.promo_u_pa)
+            pmdecs, pmras = ellutil.bivrandom (self.promo_dec, self.promo_ra, sd, sr, cdr, n).T
+        else:
+            pmras = np.zeros (n) + self.promo_ra
+            pmdecs = np.zeros (n) + self.promo_dec
+
+        if self.parallax is None:
+            parallaxes = np.zeros (n)
+        elif self.u_parallax is not None:
+            parallaxes = np.random.normal (self.parallax, self.u_parallax, n)
+        else:
+            parallaxes = np.zeros (n) + self.parallax
+
+        if self.vradial is not None:
+            vradials = np.random.normal (self.vradial, self.u_vradial, n)
+        else:
+            vradials = np.zeros (n)
+
+        # Now we compute the positions and summarize as an ellipse:
+
+        results = np.empty ((n, 2))
+
+        for i in xrange (n):
+            o.ra = ras[i]
+            o.dec = decs[i]
+            o.promora = pmras[i]
+            o.promodec = pmdecs[i]
+            o.parallax = parallaxes[i]
+            o.vradial = vradials[i]
+
+            ara, adec = o.astropos (mjd + 2400000.5)
+            results[i] = adec, ara
+
+        maj, min, pa = ellutil.bivell (*ellutil.databiv (results))
+
+        # All done.
+
+        return bestra, bestdec, maj, min, pa
+
+
+    def print_prediction (self, ptup):
+        """The argument is the tuple returned by predict(). Prints it to stdout."""
+        import ellutil
+        bestra, bestdec, maj, min, pa = ptup
+
+        f = ellutil.sigmascale (1)
+        maj *= R2A
+        min *= R2A
+        pa *= R2D
+
+        print u'position =', fmtradec (bestra, bestdec)
+        print u'err(1σ)  = %.2f" × %.2f" @ %.0f°' % (maj * f, min * f, pa)
+
+
+    def fill_from_simbad (self, ident, debug=False):
+        """Fills in astrometric information based on Simbad/Sesame. Returns `self`.
+
+        """
+        import sys
+        info = get_simbad_astrometry_info (ident, debug=debug)
+        posref = 'unknown'
+
+        for k, v in info.iteritems ():
+            if '~' in v:
+                continue # no info
+
+            if k == 'COO(d;A)':
+                self.ra = float (v) * D2R
+            elif k == 'COO(d;D)':
+                self.dec = float (v) * D2R
+            elif k == 'COO(E)':
+                a = v.split ()
+                self.pos_u_maj = float (a[0]) * A2R * 1e-3 # mas -> rad
+                self.pos_u_min = float (a[1]) * A2R * 1e-3
+                self.pos_u_pa = float (a[2]) * D2R
+            elif k == 'COO(B)':
+                posref = v
+            elif k == 'PM(A)':
+                self.promo_ra = float (v) # mas/yr
+            elif k == 'PM(D)':
+                self.promo_dec = float (v) # mas/yr
+            elif k == 'PM(E)':
+                a = v.split ()
+                self.promo_u_maj = float (a[0]) # mas/yr
+                self.promo_u_min = float (a[1])
+                self.promo_u_pa = float (a[2]) * D2R # rad!
+            elif k == 'PLX(V)':
+                self.parallax = float (v) # mas
+            elif k == 'PLX(E)':
+                self.u_parallax = float (v) # mas
+            elif k == 'RV(V)':
+                self.vradial = float (v) # km/s
+            elif k == 'RV(E)':
+                self.u_vradial = float (v) #km/s
+
+        if self.ra is None:
+            raise Exception ('no position returned by Simbad for "%s"' % ident)
+        if self.u_parallax == 0:
+            self.u_parallax = None
+        if self.u_vradial == 0:
+            self.u_vradial = None
+
+        # Get the right epoch of position for 2MASS positions
+
+        if posref == '2003yCat.2246....0C':
+            self.pos_epoch = get_2mass_epoch (self.ra, self.dec, debug)
+
+        return self # eases chaining
+
+
+    def __unicode__ (self):
+        self.verify (complain=False)
+        a = []
+        a.append (u'Position: ' + fmtradec (self.ra, self.dec))
+        if self.pos_u_maj is None:
+            a.append (u'No uncertainty info for position.')
+        else:
+            a.append (u'Pos. uncert: %.3f" × %.3f" @ %.0f°' %
+                      (self.pos_u_maj * R2A, self.pos_u_min * R2A,
+                       self.pos_u_pa * R2D))
+        if self.pos_epoch is None:
+            a.append (u'No epoch of position.')
+        else:
+            a.append (u'Epoch of position: MJD %.3f' % self.pos_epoch)
+        if self.promo_ra is None:
+            a.append (u'No proper motion.')
+        else:
+            a.append (u'Proper motion: %.3f, %.3f mas/yr' % (self.promo_ra, self.promo_dec))
+        if self.promo_u_maj is None:
+            a.append (u'No uncertainty info for proper motion.')
+        else:
+            a.append (u'Promo. uncert: %.1f × %.1f mas/yr @ %.0f°' %
+                      (self.promo_u_maj, self.promo_u_min,
+                       self.promo_u_pa * R2D))
+        if self.parallax is None:
+            a.append (u'No parallax information.')
+        elif self.u_parallax is not None:
+            a.append (u'Parallax: %.1f ± %.1f mas' % (self.parallax, self.u_parallax))
+        else:
+            a.append (u'Parallax: %.1f mas, unknown uncert.' % self.parallax)
+        if self.vradial is None:
+            a.append (u'No radial velocity information.')
+        elif self.u_vradial is not None:
+            a.append (u'Radial velocity: %.2f ± %.2f km/s' % (self.vradial, self.u_vradial))
+        else:
+            a.append (u'Radial velocity: %.1f km/s, unknown uncert.' % self.vradial)
+        return u'\n'.join (a)
+
+
+    def __str__ (self):
+        return unicode (self).encode ('utf-8')
+
+__all__ += ['AstrometryInfo']
