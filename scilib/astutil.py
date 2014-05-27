@@ -21,7 +21,9 @@ H2R = pi / 12
 F2S = 1 / np.sqrt (8 * np.log (2)) # FWHM to sigma
 S2F = np.sqrt (8 * np.log (2))
 
-__all__ = 'np pi twopi halfpi R2A A2R R2D D2R R2H H2R F2S S2F'.split ()
+J2000 = 51544.5
+
+__all__ = 'np pi twopi halfpi R2A A2R R2D D2R R2H H2R F2S S2F J2000'.split ()
 
 
 # Angle and orientation (PA) normalization
@@ -525,7 +527,7 @@ def get_2mass_epoch (tmra, tmdec, debug=False):
     if jd is None:
         import sys
         print >>sys.stderr, 'warning: 2MASS epoch lookup failed; astrometry could be very wrong!'
-        return 51544.5 # J2000.0
+        return J2000
 
     return jd - 2400000.5
 
