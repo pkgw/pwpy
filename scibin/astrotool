@@ -113,7 +113,7 @@ def cmd_abs2app (args):
     dist = fparse (args[1])
     appmag = absmag + 5 * (log10 (dist) - 1)
     print fmt (appmag)
-cmd_abs2app.argspec = '<absmag[mag]> <dist[pc]>'
+cmd_abs2app.argspec = '<absmag [mag]> <dist [pc]>'
 cmd_abs2app.summary = 'Convert absolute to apparent magnitude.'
 
 def cmd_app2abs (args):
@@ -124,7 +124,7 @@ def cmd_app2abs (args):
     dist = fparse (args[1])
     absmag = appmag - 5 * (log10 (dist) - 1)
     print fmt (absmag)
-cmd_app2abs.argspec = '<appmag[mag]> <dist[pc]>'
+cmd_app2abs.argspec = '<appmag [mag]> <dist [pc]>'
 cmd_app2abs.summary = 'Convert apparent to absolute magnitude.'
 
 
@@ -156,7 +156,7 @@ def cmd_c2m (args):
     t = precastro.Time ().fromfdcal (year, month, iday, fday, 'TAI')
     print '%.4f' % t.asMJD ()
 cmd_c2m.argspec = '<year> <month> <frac.day> [hour] [min] [sec]'
-cmd_c2m.summary = 'Convert calendar date to MJD[TAI].'
+cmd_c2m.summary = 'Convert a calendar date to MJD[TAI].'
 
 
 def cmd_calc (args):
@@ -182,7 +182,7 @@ def cmd_csep (args):
 
     print 'degree:', fmt (sphdist (lat1, lon1, lat2, lon2) * R2D)
     print 'arcsec:', fmt (sphdist (lat1, lon1, lat2, lon2) * R2A)
-cmd_csep.argspec = '<RA1> <dec1> <RA2> <dec2>'
+cmd_csep.argspec = '<RA 1> <dec 1> <RA 2> <dec 2>'
 cmd_csep.summary = 'Print separation between two positions; args in sexagesimal.'
 
 
@@ -236,7 +236,7 @@ def cmd_flux2lum (args):
     dist = fparse (args[1])
     lum = flux * 4 * pi * (dist * cmperpc)**2
     print fmt (lum)
-cmd_flux2lum.argspec = '<flux[cgs]> <dist[pc]>'
+cmd_flux2lum.argspec = '<flux [cgs]> <dist [pc]>'
 cmd_flux2lum.summary = 'Compute luminosity from flux and distance.'
 
 
@@ -248,7 +248,7 @@ def cmd_lum2flux (args):
     dist = fparse (args[1])
     flux = lum / (4 * pi * (dist * cmperpc)**2)
     print fmt (flux)
-cmd_lum2flux.argspec = '<lum[cgs]> <dist[pc]>'
+cmd_lum2flux.argspec = '<lum [cgs]> <dist [pc]>'
 cmd_lum2flux.summary = 'Compute flux from luminosity and distance.'
 
 
@@ -299,7 +299,7 @@ def cmd_senscale (args):
     t2 = fparse (args[2])
     s2 = s1 * np.sqrt (t1 / t2)
     print fmt (s2)
-cmd_senscale.argspec = '<sens1> <time1> <time2>'
+cmd_senscale.argspec = '<sens 1> <time 1> <time 2>'
 cmd_senscale.summary = 'Scale a sensitivity to a different integration time.'
 
 
@@ -316,7 +316,7 @@ def cmd_sh2d (args):
     print '%.8f' % (rarad * R2D)
 cmd_sh2d.argspec = '<sexagesimal hours>'
 cmd_sh2d.summary = 'Convert sexagesimal hours to decimal degrees.'
-
+cmd_sh2d.moredocs = """The argument should look like "12:20:14.6"."""
 
 def cmd_sl2d (args):
     if len (args) != 1:
@@ -331,6 +331,7 @@ def cmd_sl2d (args):
     print '%.8f' % (decrad * R2D)
 cmd_sl2d.argspec = '<sexagesimal latitude in degrees>'
 cmd_sl2d.summary = 'Convert sexagesimal latitude (ie, declination) to decimal degrees.'
+cmd_sl2d.moredocs = """The argument should look like "47:20:14.6". The leading sign is optional."""
 
 
 def cmd_ssep (args):
@@ -403,7 +404,7 @@ def driver (argv):
         func (args)
     except UsageError as e:
         print >>sys.stderr, 'error:', e, '\n\nusage: astrotool', cmdname, \
-            func.argspec, '\n\n', func.summary
+            func.argspec
 
 
 if __name__ == '__main__':
