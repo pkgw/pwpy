@@ -149,10 +149,8 @@ class Model (_ModelBase):
         import lmmin
         self.lm_prob = lmmin.Problem (npar)
 
-        if len (args):
-            self.paramnames = func.func_code.co_varnames[:-len (args)]
-        else:
-            self.paramnames = func.func_code.co_varnames
+        narg = func.func_code.co_argcount - len (args)
+        self.paramnames = func.func_code.co_varnames[:narg]
 
 
     def setfunc_hack (self, func, npar, paramnames, args=()):
