@@ -1,0 +1,94 @@
+#! /usr/bin/env casa-python
+# -*- python -*-
+# Copyright 2014 Peter Williams
+# Licensed under the GNU General Public License version 3 or higher
+
+"""casa-imgetpix <image> <x> <y>
+
+Print out the pixel value at the specified location in a CASA image.
+
+Used in my VLA pipeline for mechanically extracting spectral index info.
+
+"""
+
+import casautil
+
+## quickutil: usage
+#- snippet: usage.py (2012 Sep 20)
+#- SHA1: ac032a5db2efb5508569c4d5ba6eeb3bba19a7ca
+def showusage (docstring, short, stream, exitcode):
+    if stream is None:
+        from sys import stdout as stream
+    if not short:
+        print >>stream, 'Usage:', docstring.strip ()
+    else:
+        intext = False
+        for l in docstring.splitlines ():
+            if intext:
+                if not len (l):
+                    break
+                print >>stream, l
+            elif len (l):
+                intext = True
+                print >>stream, 'Usage:', l
+        print >>stream, \
+            '\nRun with a sole argument --help for more detailed usage information.'
+    raise SystemExit (exitcode)
+
+def checkusage (docstring, argv=None, usageifnoargs=False):
+    if argv is None:
+        from sys import argv
+    if len (argv) == 1 and usageifnoargs:
+        showusage (docstring, True, None, 0)
+    if len (argv) == 2 and argv[1] in ('-h', '--help'):
+        showusage (docstring, False, None, 0)
+
+def wrongusage (docstring, *rest):
+    import sys
+    intext = False
+
+    if len (rest) == 0:
+        detail = 'invalid command-line arguments'
+    elif len (rest) == 1:
+        detail = rest[0]
+    else:
+        detail = rest[0] % tuple (rest[1:])
+
+    print >>sys.stderr, 'error:', detail, '\n' # extra NL
+    showusage (docstring, True, sys.stderr, 1)
+## end
+
+
+def getpix (impath, x, y):
+    blc = [x, y]
+    trc = [x, y]
+
+    ia = casautil.tools.image ()
+    ia.open (impath)
+    c = ia.getchunk (blc, trc)
+    ia.close ()
+
+    print c[0,0,0,0]
+
+
+def commandline (argv):
+    checkusage (__doc__, argv, usageifnoargs=True)
+
+    if len (argv) != 4:
+        wrongusage (__doc__, 'expected exactly 3 arguments')
+
+    impath = argv[1]
+
+    try:
+        x = int (argv[2])
+        y = int (argv[3])
+    except ValueError:
+        wrongusage (__doc__, 'could not parse one of the numeric arguments')
+
+    casautil.logger ()
+    getpix (impath, x, y)
+
+
+if __name__ == '__main__':
+    import sys
+    commandline (sys.argv)
