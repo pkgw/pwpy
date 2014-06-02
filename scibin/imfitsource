@@ -539,6 +539,8 @@ def fit_one_source (im, xmid, ymid, forcepoint=False,
     c = f.components[-1]
     c.postproc_total_flux (im)
     fy, fx = im.topixel ([c.f_dec, c.f_ra])
+    if im.pclat is not None:
+        d = sphdist (c.f_dec, c.f_ra, im.pclat, im.pclon)
 
     def report (key, fmt, value):
         print (key, '=', fmt % value, sep='')
@@ -555,6 +557,10 @@ def fit_one_source (im, xmid, ymid, forcepoint=False,
     report ('dec_sexg', '%s', fmtdeglat (c.f_dec))
     report ('x_pix', '%.1f', fx)
     report ('y_pix', '%.1f', fy)
+
+    if im.pclat is not None:
+        report ('pnt_ctr_distance', '%.3f', d * R2A)
+
     report ('pos_err_major_arcsec', '%.3f', s * c.eell_pos[0] * R2A)
     report ('pos_err_minor_arcsec', '%.3f', s * c.eell_pos[1] * R2A)
     report ('pos_err_pa_deg', '%.1f', c.eell_pos[2] * R2D)
