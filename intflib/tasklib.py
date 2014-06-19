@@ -1053,8 +1053,12 @@ def gaincal (cfg):
     else:
         solkws['t'] = str (cfg.solint)
 
+    if isinstance (cfg.refant, basestring):
+        solkws['refant'] = cfg.refant
+    else:
+        solkws['refant'] = ','.join (cfg.refant)
+
     solkws['combine'] = ','.join (cfg.combine)
-    solkws['refant'] = ','.join (cfg.refant)
     solkws['phaseonly'] = False
     solkws['type'] = cfg.gaintype.upper ()
 
