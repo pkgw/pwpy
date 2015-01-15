@@ -564,7 +564,8 @@ def _spwglue (cfg, prog, thisout, thisfield, nfields, fieldidx):
                 else:
                     # Continuing an existing record
                     for col in colnames:
-                        if col in _vis_ident_cols or col == 'DATA_DESC_ID':
+                        if col in _vis_ident_cols or col == 'DATA_DESC_ID' or col == 'WEIGHT' \
+                               or col == 'SIGMA':
                             pass
                         elif col in _vis_smatch_cols:
                             if vdata[col][i] != curout[col]:
@@ -572,7 +573,7 @@ def _spwglue (cfg, prog, thisout, thisfield, nfields, fieldidx):
                         elif col in _vis_vmatch_cols:
                             if not np.all (vdata[col][...,i] == curout[col]):
                                 die ('changing value for column %s within a glued record: %r , %r', col,
-                                     vdata[col][i], curout[col])
+                                     vdata[col][...,i], curout[col])
                         elif col in _vis_or_cols:
                             curout[col] |= vdata[col][i]
                         elif col in _vis_pconcat_cols:
