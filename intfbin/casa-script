@@ -49,20 +49,46 @@
 # environment, so the environment is highly non-vanilla. To exit, just use
 # "exit (1)".
 
+# Set up a fully-qualified path name to the input script so that CASA can
+# always find it, even when we hop around in subdirectories. Otherwise it
+# tries to evaluate the filename as a line of Python.
+
+script=$(cd $(dirname $1) && pwd)/$(basename $1)
+if [ ! -e "$script" ] ; then
+    echo >&2 "error: cannot find input script \"$1\"; should be at \"$script\""
+    exit 1
+fi
+
 workdir=`mktemp -d casascript.XXXXXXXXX`
 cd "$workdir"
 ln -s .. data
 cp /proc/$$/cmdline args
-mkfifo csout ; cat csout &
-mkfifo cserr ; cat cserr >&2 &
-casapy --log2term --nogui -c "$1" >stdout 2>stderr
+mkfifo csout cserr || exit 1
+
+# Process group management insanity:
+# http://stackoverflow.com/a/1645157/3760486 I'm sure I could do a
+# better/cleaner job of this, but I'm pretty sure this code errs on the side
+# of safety, and that's my priority.
+
+trap : SIGTERM SIGINT
+cat csout &
+killpids="-$!"
+cat cserr >&2 &
+killpids="$killpids -$!"
+casapy --log2term --nogui -c "$script" </dev/null >stdout 2>stderr &
+killpids="$killpids -$!"
+wait $!
 retval=$?
+
+if [ $retval -gt 128 ] ; then
+    kill -- $killpids
+fi
 
 if [ $retval -ne 0 ] ; then
     echo >&2 "error: casapy exited with error code $retval; preserving work directory $workdir"
 else
     cd ..
-    rm -rf "$workdir"
+    [ x"$CASASCRIPT_DEBUG_WORK" != x ] || rm -rf "$workdir"
 fi
 
 exit $retval
