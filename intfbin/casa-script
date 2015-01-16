@@ -46,8 +46,22 @@
 #   print >>cserr, 'warning: your data are broken'
 #
 # Keep in mind that the script is being executed in CASA's IPython
-# environment, so the environment is highly non-vanilla. To exit, just use
-# "exit (1)".
+# environment, so the environment is highly non-vanilla. Because IPython
+# just prints exceptions to the screen, you need to wrap the entire program
+# in a try/except block and handle them manually:
+#
+#  # after setting up cserr
+#  try:
+#    ... entire program ...
+#  except SystemExit:
+#    pass
+#  except:
+#    import os, sys, traceback
+#    traceback.print_exception (*sys.exc_info (), file=cserr)
+#    os._exit (1)
+#
+# Note that we need to use os._exit() to be able to actually exit with an
+# error return code. Do not use sys.exit() or (CASA's) exit().
 
 # Set up a fully-qualified path name to the input script so that CASA can
 # always find it, even when we hop around in subdirectories. Otherwise it
