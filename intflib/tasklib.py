@@ -504,9 +504,10 @@ between wanting better terminology and not wanting to be
 gratuitously different from CASA.
 """
 
-def delmod_cli (argv):
+def delmod_cli (argv, alter_logger=True):
     checkusage (delmod_doc, argv, usageifnoargs=True)
-    cu.logger ()
+    if alter_logger:
+        cu.logger ()
 
     cb = cu.tools.calibrater ()
 
@@ -527,7 +528,7 @@ casatask flagmanager restore <ms> <name>
 casatask flagmanager delete <ms> <name>
 """
 
-def flagmanager_cli (argv):
+def flagmanager_cli (argv, alter_logger=True):
     import os.path
     checkusage (flagmanager_doc, argv, usageifnoargs=True)
 
@@ -537,13 +538,14 @@ def flagmanager_cli (argv):
     mode = argv[1]
     ms = argv[2]
 
-    if mode == 'list':
-        cu.logger ('info')
-    elif mode == 'delete':
-        # it WARNs 'deleting version xxx' ... yargh
-        cu.logger ('severe')
-    else:
-        cu.logger ()
+    if alter_logger:
+        if mode == 'list':
+            cu.logger ('info')
+        elif mode == 'delete':
+            # it WARNs 'deleting version xxx' ... yargh
+            cu.logger ('severe')
+        else:
+            cu.logger ()
 
     try:
         factory = cu.tools.agentflagger
