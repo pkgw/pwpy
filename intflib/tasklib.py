@@ -34,7 +34,7 @@ __all__ = ('applycal applycal_cli ApplycalConfig '
            'image2fits image2fits_cli '
            'mfsclean mfsclean_cli MfscleanConfig '
            'plotants plotants_cli '
-           'plotcal plotcal_cli PlotcalConfig '
+           'plotcal plotcal_cli plotcal_multipage_page PlotcalConfig '
            'setjy setjy_cli SetjyConfig '
            'split split_cli SplitConfig '
            'uvsub uvsub_cli UvsubConfig '
@@ -1565,6 +1565,33 @@ def plotcal (cfg):
 
     if cfg.figfile is not None:
         cp.savefig (cfg.figfile)
+
+
+def plotcal_multipage_pdf (cfg, pdfpath, **kwargs):
+    import matplotlib.pyplot as plt
+    from matplotlib.backends.backend_pdf import PdfPages
+
+    cp = cu.tools.calplot ()
+    cp.open (cfg.caltable)
+    cp.selectcal (antenna=cfg.antenna, field=cfg.field,
+                  poln=cfg.poln.upper (), spw=cfg.spw, time=cfg.timerange)
+    cp.plotoptions (iteration=cfg.iteration, plotrange=[0.0]*4,
+                    plotsymbol=cfg.plotsymbol,
+                    plotcolor=cfg.plotcolor,
+                    markersize=cfg.markersize,
+                    fontsize=cfg.fontsize)
+
+    pdf = PdfPages (pdfpath)
+    try:
+        cp.plot (cfg.xaxis.upper (), cfg.yaxis.upper ())
+        pdf.savefig (**kwargs)
+
+        while cp.next ():
+            pdf.savefig (**kwargs)
+
+        plt.close ()
+    finally:
+        pdf.close ()
 
 
 def plotcal_cli (argv):
