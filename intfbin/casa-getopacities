@@ -14,7 +14,7 @@ try:
 
     if len (args) != 3:
         print >>cserr, 'usage: casa-getopacities <MS> <spwwidths> <plotdest>'
-        exit ()
+        os._exit (1)
 
     # FIXME we're gonna break with absolute paths.
     import os.path
