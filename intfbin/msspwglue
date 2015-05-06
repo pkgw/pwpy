@@ -325,6 +325,10 @@ def _spwglue (cfg, prog, thisout, thisfield, nfields, fieldidx):
             die ('couldn\'t open bandpass file "%s": %s (%s)', cfg.meanbp,
                  e, e.__class__.__name__)
 
+        if np.any (invsqmeanbp <= 0):
+            die ('illegal bandpass file "%s": some values are nonpositive',
+                 cfg.meanbp)
+
         invsqmeanbp **= -2
 
     # Read in spw and dd info and make sure everything is in order.
