@@ -48,6 +48,11 @@ believeweights=[t|f]
   in each timeslot. If true, we trust that variance=1/weight and
   propagate this in the standard way.
 
+format=[humane(default)|pandas]
+  The format of the output. The default is "humane" which is described
+  below. The "pandas" format is slightly less human-friendly but can
+  be read directly into a Pandas DataFrame with pandas.read_table ().
+
 IMPORTANT: the fundamental assumption of this task is that the only
 signal in the visibilities is from a point source at the phasing
 center. We also assume that all sampled polarizations get equal
@@ -122,6 +127,25 @@ def die (fmt, *args):
     raise SystemExit ('error: ' + (fmt % args))
 ## end
 
+
+class HumaneOutputFormat (object):
+    def header (self, cfg):
+        pass
+
+    def row (self, cfg, mjd, dtmin, r_sc, ru_sc, i_sc, iu_sc, mag, umag, n):
+        print >>cfg.outstream, \
+            '%12.5f %6.2f %10.2f %10.2f %10.2f %10.2f %10.2f %10.2f %d' % \
+            (mjd, dtmin, r_sc, ru_sc, i_sc, iu_sc, mag, umag, n)
+
+
+class PandasOutputFormat (object):
+    def header (self, cfg):
+        print >>cfg.outstream, 'mjd dtmin re ure im uim abs uabs nsamp'.replace (' ', '\t')
+
+    def row (self, cfg, *args):
+        print >>cfg.outstream, '\t'.join (str (x) for x in args)
+
+
 class Config (ParseKeywords):
     vis = Custom (str, required=True)
     datacol = 'data'
@@ -137,6 +161,16 @@ class Config (ParseKeywords):
             die ('cannot open path "%s" for writing', val)
 
     datascale = 1e6
+
+    @Custom (str, default='humane')
+    def format (val):
+        if val is None or val == 'humane':
+            return HumaneOutputFormat ()
+
+        if val == 'pandas':
+            return PandasOutputFormat ()
+
+        die ('unrecognized output format %r', val)
 
     @Custom ([str, str], default=None)
     def rephase (val):
@@ -304,6 +338,7 @@ def process (cfg):
 
     # Could gain some efficiency by using a better data structure than a dict().
     smjd = sorted (tbins.iterkeys ())
+    cfg.format.header (cfg)
 
     for mjd in smjd:
         wd, wd2, wt, wt2, n = tbins[mjd]
@@ -327,10 +362,7 @@ def process (cfg):
 
         mag = np.sqrt (r_sc**2 + i_sc**2)
         umag = np.sqrt (r_sc**2 * ru_sc**2 + i_sc**2 * iu_sc**2) / mag
-
-        print >>cfg.outstream, \
-            '%12.5f %6.2f %10.2f %10.2f %10.2f %10.2f %10.2f %10.2f %d' % \
-            (mjd, dtmin, r_sc, ru_sc, i_sc, iu_sc, mag, umag, n)
+        cfg.format.row (cfg, mjd, dtmin, r_sc, ru_sc, i_sc, iu_sc, mag, umag, n)
 
 
 def cmdline (argv):
